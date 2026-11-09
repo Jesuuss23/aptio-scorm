@@ -1,27 +1,37 @@
 {
   "name": "api",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
+  "scripts": {
+    "dev": "node --watch --enable-source-maps --import @swc-node/register/esm-register src/main.ts",
+    "start": "node --enable-source-maps --import @swc-node/register/esm-register src/main.ts",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
   "dependencies": {
     "@aptio/db": "workspace:*",
-    "cors": "^2.8.6",
+    "@nestjs/common": "^12.4.2",
+    "@nestjs/config": "^12.1.1",
+    "@nestjs/core": "^12.4.2",
+    "@nestjs/platform-express": "^12.4.2",
+    "@nestjs/swagger": "^12.1.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "dotenv": "^18.0.9",
-    "express": "^5.3.0"
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
+    "@nestjs/testing": "^12.4.2",
+    "@swc-node/register": "^1.12.1",
+    "@swc/core": "^1.16.22",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
-    "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "@types/supertest": "^7.2.1",
+    "supertest": "^7.3.2",
+    "typescript": "^5.9.3",
+    "unplugin-swc": "^2.0.0",
+    "vitest": "^3.2.7"
   }
 }
