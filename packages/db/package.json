@@ -1,0 +1,30 @@
+{
+  "name": "@aptio/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "validate": "prisma validate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "seed": "prisma db seed",
+    "test": "vitest run"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
+    "@prisma/client": "^6.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "prisma": "^6.19.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.4"
+  }
+}
