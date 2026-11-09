@@ -11,7 +11,8 @@
     "schema:test": "pnpm --filter @aptio/schema test",
     "ia:casos": "node packages/ai/scripts/validar-casos.mjs && pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.json",
     "openapi:lint": "npx @redocly/cli lint docs/api/openapi.yaml",
-    "db:test": "pnpm --filter @aptio/db test"
+    "db:test": "pnpm --filter @aptio/db test",
+    "web:e2e": "pnpm --filter web e2e"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

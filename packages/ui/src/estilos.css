@@ -1,0 +1,487 @@
+/* Estilos base y componentes de la interfaz. Todos los tamaños de letra salen de tokens.css. */
+@import './tokens.css';
+@import '@fontsource/plus-jakarta-sans/400.css';
+@import '@fontsource/plus-jakarta-sans/500.css';
+@import '@fontsource/plus-jakarta-sans/600.css';
+@import '@fontsource/plus-jakarta-sans/700.css';
+@import '@fontsource/plus-jakarta-sans/800.css';
+@import '@fontsource/jetbrains-mono/600.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+}
+body {
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--fuente-ui);
+  font-size: var(--texto-base);
+  line-height: 1.45;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+:focus-visible {
+  outline: 3px solid var(--color-cobalto);
+  outline-offset: 2px;
+}
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+h1 {
+  font-size: var(--titulo-pagina);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+h2,
+h3 {
+  font-size: var(--titulo-panel);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+a {
+  color: var(--color-cobalto);
+}
+.num {
+  font-family: var(--fuente-num);
+  font-variant-numeric: tabular-nums;
+}
+.sec {
+  color: var(--color-texto-sec);
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---- Estructura: barra lateral, barra superior y contenido ---- */
+.ap-app {
+  display: flex;
+  min-height: 100vh;
+}
+.ap-lateral {
+  width: var(--ancho-barra);
+  flex: 0 0 var(--ancho-barra);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
+  background: var(--color-cobalto);
+  color: #dbeafe;
+  padding: 16px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  z-index: 9;
+}
+.ap-marca {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 6px 18px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  text-decoration: none;
+}
+.ap-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--color-naranja);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+.ap-logo svg {
+  width: 22px;
+  height: 22px;
+}
+.ap-nombre {
+  font-size: var(--titulo-panel);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.ap-nombre span {
+  color: #ffb08f;
+}
+.ap-sub {
+  display: block;
+  font-size: var(--texto-xs);
+  color: #bfdbfe;
+}
+.ap-grupo {
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: rgba(219, 234, 254, 0.62);
+  padding: 14px 10px 6px;
+}
+.ap-lateral a.ap-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: #e0ecff;
+  text-decoration: none;
+  font-weight: 500;
+  position: relative;
+}
+.ap-lateral a.ap-item:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.ap-lateral a.ap-item[aria-current='page'] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-weight: 700;
+}
+.ap-lateral a.ap-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--color-naranja);
+}
+.ap-paso {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  font-family: var(--fuente-num);
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.ap-paso:empty {
+  background: transparent;
+}
+a.ap-item[aria-current='page'] .ap-paso:not(:empty) {
+  background: var(--color-naranja);
+}
+.ap-pie {
+  margin-top: auto;
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ap-usuario {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 2px 4px;
+  color: #fff;
+  font-size: var(--texto-sm);
+  min-width: 0;
+}
+.ap-usuario > div {
+  min-width: 0;
+  flex: 1;
+}
+.ap-usuario b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-usuario small {
+  display: block;
+  color: #bfdbfe;
+  font-size: var(--texto-xs);
+}
+.ap-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--color-cobalto);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: var(--texto-sm);
+  flex: 0 0 auto;
+}
+.ap-salir {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: transparent;
+  color: #fff;
+  border-radius: var(--radio-control);
+  padding: 4px 8px;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+.ap-salir:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.ap-principal {
+  flex: 1;
+  min-width: 0;
+}
+.ap-superior {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: saturate(1.4) blur(8px);
+  border-bottom: 1px solid var(--color-borde);
+}
+.ap-superior-in {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  min-height: 60px;
+  padding: 8px var(--margen);
+}
+.ap-ruta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-texto-sec);
+}
+.ap-ruta b {
+  color: var(--color-texto);
+  font-weight: 700;
+}
+.ap-ruta .ap-sep {
+  color: #cbd5e1;
+}
+.ap-acciones {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ap-contenido {
+  max-width: var(--ancho-max);
+  margin: 0;
+  padding: 24px var(--margen) 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ap-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.ap-cabecera p {
+  margin-top: 4px;
+  color: var(--color-texto-sec);
+  max-width: 760px;
+}
+
+@media (min-width: 901px) {
+  /* El cobalto llega hasta el pie aunque el contenido sea más alto que la pantalla. */
+  .ap-app {
+    background: linear-gradient(90deg, var(--color-cobalto) var(--ancho-barra), transparent var(--ancho-barra));
+  }
+}
+@media (max-width: 900px) {
+  .ap-app {
+    flex-direction: column;
+  }
+  .ap-lateral {
+    width: auto;
+    height: auto;
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    padding: 8px var(--margen);
+  }
+  .ap-marca {
+    border-bottom: 0;
+    margin: 0;
+    padding: 0 8px 0 0;
+  }
+  .ap-sub,
+  .ap-grupo,
+  .ap-usuario > div {
+    display: none;
+  }
+  .ap-pie {
+    margin: 0 0 0 auto;
+    padding: 0;
+    flex-direction: row;
+    align-items: center;
+  }
+  .ap-lateral a.ap-item {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  .ap-paso:empty {
+    display: none;
+  }
+  .ap-lateral a.ap-item[aria-current='page']::before {
+    display: none;
+  }
+  .ap-superior {
+    position: static;
+  }
+}
+
+/* ---- Componentes ---- */
+.tarjeta {
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-tarjeta);
+  padding: 18px 20px;
+  box-shadow: var(--sombra);
+  min-width: 0;
+}
+.boton {
+  border: 1px solid var(--color-borde);
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  border-radius: var(--radio-control);
+  padding: 8px 14px;
+  font-size: var(--texto-base);
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.boton:hover {
+  border-color: #9db8ea;
+}
+.boton.primario {
+  background: var(--color-cobalto);
+  border-color: var(--color-cobalto);
+  color: #fff;
+}
+.boton.primario:hover {
+  background: var(--color-cobalto-activo);
+  border-color: var(--color-cobalto-activo);
+}
+.boton.ia {
+  background: var(--color-naranja-suave);
+  border-color: var(--color-naranja-borde);
+  color: var(--color-naranja-texto);
+}
+.boton.ia:hover {
+  border-color: var(--color-naranja);
+}
+.boton.grande {
+  font-size: var(--titulo-panel);
+  padding: 12px 20px;
+  border-radius: 10px;
+}
+.boton[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--texto-sm);
+  color: var(--color-texto-sec);
+  font-weight: 600;
+  min-width: 0;
+}
+.campo input,
+.campo select,
+.campo textarea {
+  font-size: var(--texto-base);
+  font-weight: 400;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  padding: 9px 11px;
+  width: 100%;
+}
+.campo input:focus {
+  border-color: var(--color-cobalto);
+}
+.etiqueta {
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-texto-sec);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--texto-sm);
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--color-suave);
+  white-space: nowrap;
+}
+.chip.validado {
+  background: var(--color-validado-suave);
+  color: var(--color-validado);
+}
+.chip.aviso {
+  background: var(--color-aviso-suave);
+  color: var(--color-aviso);
+}
+.chip.ia {
+  background: var(--color-naranja-suave);
+  color: var(--color-naranja-texto);
+}
+.nota {
+  border-radius: 9px;
+  padding: 9px 12px;
+  font-size: var(--texto-sm);
+}
+.nota.validado {
+  background: var(--color-validado-suave);
+  color: var(--color-validado);
+}
+.nota.aviso {
+  background: var(--color-aviso-suave);
+  color: var(--color-aviso);
+}
+.nota.error {
+  background: var(--color-error-suave);
+  color: var(--color-error);
+}
+.dato {
+  font-family: var(--fuente-num);
+  font-size: var(--dato);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

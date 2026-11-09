@@ -37,3 +37,7 @@ apps/*/.cursor/
 apps/*/.devin/
 apps/*/.claude/
 dump.rdb
+
+# Resultados de Playwright
+test-results/
+playwright-report/
