@@ -36,3 +36,4 @@ apps/*/.agents/
 apps/*/.cursor/
 apps/*/.devin/
 apps/*/.claude/
+dump.rdb
