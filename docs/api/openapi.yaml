@@ -1,0 +1,4353 @@
+openapi: 3.0.3
+info:
+  title: Aptio SCORM · API
+  version: 0.2.0
+  license:
+    name: Propietario · Grupo de Soluciones Creativas SAC
+  description: 'API REST del generador de SCORM con IA. Prefijo /api/v1. Las tareas largas (generación, IA, voz, exportación) responden 202 con
+    un trabajo y avisan por eventos (SSE). La IA nunca cambia el curso sin una acción del usuario: crea propuestas.'
+servers:
+- url: http://localhost:3000/api/v1
+  description: Local
+- url: https://{entorno}.ejemplo.local/api/v1
+  description: Pruebas
+  variables:
+    entorno:
+      default: pruebas
+security:
+- cookieSesion: []
+tags:
+- name: Acceso
+  description: Sesión con correo y clave o con Google, recuperación de clave, usuarios y roles
+- name: Clientes y kits
+  description: Clientes, kit de marca, pantallas modelo, glosario, pronunciación y fichas LMS (M02)
+- name: Proyectos
+  description: Proyectos y material del cliente (M03)
+- name: Recursos
+  description: 'Archivos en S3: subida, biblioteca e imágenes generadas'
+- name: Generación
+  description: Generador del SCORM y sus 11 etapas (M04)
+- name: Curso
+  description: Documento del curso, versiones y cambios del editor (M05, M06)
+- name: Asistente IA
+  description: Propuestas de la IA que el usuario aplica o descarta
+- name: Revisión
+  description: Control de calidad, observaciones y comentarios (M05)
+- name: Personaje y voz
+  description: Narración, boca sincronizada y audio del cliente (M07)
+- name: Idiomas
+  description: Traducción y revisión ES/EN (M08)
+- name: Alineación y navegación
+  description: Alineación pedagógica, patrones de navegación y vista previa (M10, M11)
+- name: Entrega
+  description: Validación y exportación SCORM, HTML y kit de gamificación (M12)
+- name: Costos y rentabilidad
+  description: Costos de IA, parámetros y mediciones (M13)
+- name: Conexiones IA
+  description: Proveedor y modelo por tarea (M13)
+paths:
+  /auth/ingresar:
+    post:
+      tags:
+      - Acceso
+      summary: Iniciar sesión
+      operationId: post_auth_ingresar
+      description: Cookie httpOnly; 5 intentos fallidos bloquean 15 min
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ingreso'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sesion'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '401':
+          description: Credenciales incorrectas o correo no invitado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+  /auth/salir:
+    post:
+      tags:
+      - Acceso
+      summary: Cerrar sesión
+      operationId: post_auth_salir
+      responses:
+        '204':
+          description: Sin contenido
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /auth/google:
+    get:
+      tags:
+      - Acceso
+      summary: Ingresar con Google
+      operationId: get_auth_google
+      description: Redirige a Google (OpenID Connect con PKCE). Solo ingresan correos ya invitados por un administrador; no crea cuentas nuevas.
+      responses:
+        '302':
+          description: Redirección
+      security: []
+  /auth/google/callback:
+    get:
+      tags:
+      - Acceso
+      summary: Retorno de Google
+      operationId: get_auth_google_callback
+      description: Valida state y nonce, exige email_verified y vincula la cuenta por correo; crea la cookie de sesión y redirige a la web.
+      parameters:
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '302':
+          description: Redirección
+        '401':
+          description: Credenciales incorrectas o correo no invitado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+  /auth/clave/olvido:
+    post:
+      tags:
+      - Acceso
+      summary: Pedir cambio de clave
+      operationId: post_auth_clave_olvido
+      description: 'Envía un enlace de un solo uso por correo (vence en 60 min). Límite: 3 pedidos por hora.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SolicitudClave'
+      responses:
+        '202':
+          description: Sin contenido
+        '422':
+          $ref: '#/components/responses/NoValido'
+      security: []
+  /auth/clave/restablecer:
+    post:
+      tags:
+      - Acceso
+      summary: Restablecer clave
+      operationId: post_auth_clave_restablecer
+      description: Invalida el token y cierra las otras sesiones del usuario.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NuevaClave'
+      responses:
+        '204':
+          description: Sin contenido
+        '422':
+          $ref: '#/components/responses/NoValido'
+      security: []
+  /yo:
+    get:
+      tags:
+      - Acceso
+      summary: Usuario actual
+      operationId: get_yo
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /usuarios:
+    get:
+      tags:
+      - Acceso
+      summary: Listar usuarios
+      operationId: get_usuarios
+      description: Solo ADMINISTRADOR
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Acceso
+      summary: Crear usuario
+      operationId: post_usuarios
+      description: Solo ADMINISTRADOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioEntrada'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /usuarios/{usuarioId}:
+    patch:
+      tags:
+      - Acceso
+      summary: Cambiar rol o desactivar
+      operationId: patch_usuarios_usuarioId
+      description: Solo ADMINISTRADOR
+      parameters:
+      - name: usuarioId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Listar clientes
+      operationId: get_clientes
+      parameters:
+      - name: buscar
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Clientes y kits
+      summary: Crear cliente
+      operationId: post_clientes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteEntrada'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Ver cliente
+      operationId: get_clientes_clienteId
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    patch:
+      tags:
+      - Clientes y kits
+      summary: Editar cliente
+      operationId: patch_clientes_clienteId
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}/kit:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Ver kit de marca
+      operationId: get_clientes_clienteId_kit
+      description: Incluye contraste calculado
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KitMarca'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    put:
+      tags:
+      - Clientes y kits
+      summary: Guardar kit de marca
+      operationId: put_clientes_clienteId_kit
+      description: 409 si la versión cambió; las miniaturas se regeneran en segundo plano
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KitMarcaEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KitMarca'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+  /clientes/{clienteId}/kit/extraer:
+    post:
+      tags:
+      - Clientes y kits
+      summary: Extraer kit de un curso o logo (IA)
+      operationId: post_clientes_clienteId_kit_extraer
+      description: Devuelve una propuesta de kit para revisar
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropuestaSolicitud'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}/kit/pantallas-modelo:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Listar pantallas modelo
+      operationId: get_clientes_clienteId_kit_pantallas_modelo
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PantallaModelo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    post:
+      tags:
+      - Clientes y kits
+      summary: Agregar pantalla modelo
+      operationId: post_clientes_clienteId_kit_pantallas_modelo
+      description: Rol DISENADOR_GRAFICO o ADMINISTRADOR
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PantallaModeloEntrada'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PantallaModelo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}/kit/pantallas-modelo/{modeloId}:
+    put:
+      tags:
+      - Clientes y kits
+      summary: Editar pantalla modelo
+      operationId: put_clientes_clienteId_kit_pantallas_modelo_modeloId
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: modeloId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PantallaModeloEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PantallaModelo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Clientes y kits
+      summary: Desactivar pantalla modelo
+      operationId: delete_clientes_clienteId_kit_pantallas_modelo_modeloId
+      description: Borrado lógico (activa = false)
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: modeloId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Sin contenido
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /clientes/{clienteId}/glosario:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Ver glosario
+      operationId: get_clientes_clienteId_glosario
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GlosarioTermino'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    put:
+      tags:
+      - Clientes y kits
+      summary: Reemplazar glosario
+      operationId: put_clientes_clienteId_glosario
+      description: Marca traducciones afectadas como PENDIENTE
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/GlosarioTermino'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GlosarioTermino'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}/pronunciacion:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Ver diccionario de pronunciación
+      operationId: get_clientes_clienteId_pronunciacion
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PronunciacionTermino'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    put:
+      tags:
+      - Clientes y kits
+      summary: Reemplazar diccionario de pronunciación
+      operationId: put_clientes_clienteId_pronunciacion
+      description: Marca narraciones afectadas como DESACTUALIZADA
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/PronunciacionTermino'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PronunciacionTermino'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}/fichas-lms:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Ver fichas de compatibilidad LMS
+      operationId: get_clientes_clienteId_fichas_lms
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FichaCompatibilidad'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    post:
+      tags:
+      - Clientes y kits
+      summary: Registrar ficha de compatibilidad
+      operationId: post_clientes_clienteId_fichas_lms
+      description: Puede incluir el JSON del modo diagnóstico
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FichaCompatibilidad'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FichaCompatibilidad'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /proyectos:
+    get:
+      tags:
+      - Proyectos
+      summary: Listar proyectos
+      operationId: get_proyectos
+      description: El revisor del cliente solo ve los de su cliente
+      parameters:
+      - name: clienteId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: buscar
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Proyecto'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Proyectos
+      summary: Crear proyecto (Nuevo SCORM)
+      operationId: post_proyectos
+      description: Datos técnicos opcionales
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProyectoEntrada'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proyecto'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /proyectos/{proyectoId}:
+    get:
+      tags:
+      - Proyectos
+      summary: Ver proyecto
+      operationId: get_proyectos_proyectoId
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proyecto'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    patch:
+      tags:
+      - Proyectos
+      summary: Editar proyecto o datos técnicos
+      operationId: patch_proyectos_proyectoId
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProyectoEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Proyecto'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Proyectos
+      summary: Archivar proyecto
+      operationId: delete_proyectos_proyectoId
+      description: Pasa a ARCHIVADO; no borra
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Sin contenido
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /recursos/subidas:
+    post:
+      tags:
+      - Recursos
+      summary: Pedir URL de subida firmada
+      operationId: post_recursos_subidas
+      description: Tipos permitidos por lista; tamaño máximo por tipo configurable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubidaSolicitud'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubidaUrl'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /recursos/subidas/{subidaId}/confirmar:
+    post:
+      tags:
+      - Recursos
+      summary: Confirmar subida y crear recurso
+      operationId: post_recursos_subidas_subidaId_confirmar
+      description: Verifica tipo real y hash; sanitiza SVG
+      parameters:
+      - name: subidaId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recurso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /recursos:
+    get:
+      tags:
+      - Recursos
+      summary: Buscar recursos
+      operationId: get_recursos
+      parameters:
+      - name: clienteId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: proyectoId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: tipo
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: origen
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Recurso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /recursos/{recursoId}:
+    get:
+      tags:
+      - Recursos
+      summary: Ver recurso con URL firmada
+      operationId: get_recursos_recursoId
+      parameters:
+      - name: recursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Recurso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /recursos/imagenes-ia:
+    post:
+      tags:
+      - Recursos
+      summary: Generar imágenes con el estilo del kit
+      operationId: post_recursos_imagenes_ia
+      description: Las variantes quedan en la biblioteca del cliente con origen GENERADO
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImagenIaEntrada'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /proyectos/{proyectoId}/materiales:
+    post:
+      tags:
+      - Proyectos
+      summary: Agregar material o tema
+      operationId: post_proyectos_proyectoId_materiales
+      description: Inicia extracción de texto o transcripción
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialEntrada'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialFuente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    get:
+      tags:
+      - Proyectos
+      summary: Listar material
+      operationId: get_proyectos_proyectoId_materiales
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MaterialFuente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /materiales/{materialId}:
+    patch:
+      tags:
+      - Proyectos
+      summary: Cambiar decisión del mapa de temas
+      operationId: patch_materiales_materialId
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaterialFuente'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialFuente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /proyectos/{proyectoId}/generaciones:
+    post:
+      tags:
+      - Generación
+      summary: Generar el SCORM
+      operationId: post_proyectos_proyectoId_generaciones
+      description: Una generación activa por proyecto (409 si ya hay una)
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneracionEntrada'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+  /generaciones/{generacionId}:
+    get:
+      tags:
+      - Generación
+      summary: Ver avance de la generación
+      operationId: get_generaciones_generacionId
+      parameters:
+      - name: generacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Generacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /generaciones/{generacionId}/cancelar:
+    post:
+      tags:
+      - Generación
+      summary: Cancelar generación
+      operationId: post_generaciones_generacionId_cancelar
+      description: Conserva lo ya generado
+      parameters:
+      - name: generacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Generacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /generaciones/{generacionId}/eventos:
+    get:
+      tags:
+      - Generación
+      summary: Eventos de avance (SSE)
+      operationId: get_generaciones_generacionId_eventos
+      description: 'text/event-stream: etapa, pantalla-lista, costo, fin, error'
+      parameters:
+      - name: generacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Flujo de eventos
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /proyectos/{proyectoId}/curso:
+    get:
+      tags:
+      - Curso
+      summary: Ver documento del curso
+      operationId: get_proyectos_proyectoId_curso
+      description: ETag = versión
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    put:
+      tags:
+      - Curso
+      summary: Reemplazar documento del curso
+      operationId: put_proyectos_proyectoId_curso
+      description: Valida contra el esquema; 422 con la lista de errores; 409 si cambió la versión
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Versión del curso leída (bloqueo optimista)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CursoEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+    patch:
+      tags:
+      - Curso
+      summary: Aplicar JSON Patch al curso
+      operationId: patch_proyectos_proyectoId_curso
+      description: Content-Type application/json-patch+json
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: If-Match
+        in: header
+        required: true
+        schema:
+          type: string
+        description: Versión del curso leída (bloqueo optimista)
+      requestBody:
+        required: true
+        content:
+          application/json-patch+json:
+            schema:
+              $ref: '#/components/schemas/JsonPatch'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+  /cursos/{cursoId}/versiones:
+    get:
+      tags:
+      - Curso
+      summary: Historial de versiones
+      operationId: get_cursos_cursoId_versiones
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CursoVersion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/versiones/{version}/restaurar:
+    post:
+      tags:
+      - Curso
+      summary: Restaurar una versión
+      operationId: post_cursos_cursoId_versiones_version_restaurar
+      description: Crea una versión nueva con motivo «restauración»
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Curso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/pantallas/{pantallaId}:
+    patch:
+      tags:
+      - Curso
+      summary: Guardar cambios del editor en una pantalla
+      operationId: patch_cursos_cursoId_pantallas_pantallaId
+      description: Dispara regeneración en cascada solo de lo afectado
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pantallaId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PantallaCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/pantallas/{pantallaId}/aprobar:
+    post:
+      tags:
+      - Curso
+      summary: Aprobar una pantalla
+      operationId: post_cursos_cursoId_pantallas_pantallaId_aprobar
+      description: Una pantalla aprobada no cambia por IA sin nueva aprobación
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pantallaId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/pantallas/aprobar:
+    post:
+      tags:
+      - Curso
+      summary: Aprobar varias pantallas
+      operationId: post_cursos_cursoId_pantallas_aprobar
+      description: soloSinObservaciones = aprobar las que no tienen observaciones abiertas
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Aprobacion'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/propuestas:
+    post:
+      tags:
+      - Asistente IA
+      summary: Pedir una propuesta a la IA
+      operationId: post_cursos_cursoId_propuestas
+      description: Más visual, menos texto, actividad, variantes, ilustración, pedido libre, alineación, patrón, pausas de video
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PropuestaSolicitud'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    get:
+      tags:
+      - Asistente IA
+      summary: Listar propuestas
+      operationId: get_cursos_cursoId_propuestas
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: pantallaId
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Propuesta'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /propuestas/{propuestaId}/aplicar:
+    post:
+      tags:
+      - Asistente IA
+      summary: Aplicar propuesta
+      operationId: post_propuestas_propuestaId_aplicar
+      description: 409 si quedó VENCIDA; se puede deshacer restaurando la versión anterior
+      parameters:
+      - name: propuestaId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AplicarPropuesta'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+  /propuestas/{propuestaId}/descartar:
+    post:
+      tags:
+      - Asistente IA
+      summary: Descartar propuesta
+      operationId: post_propuestas_propuestaId_descartar
+      parameters:
+      - name: propuestaId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Sin contenido
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/observaciones:
+    get:
+      tags:
+      - Revisión
+      summary: Listar observaciones
+      operationId: get_cursos_cursoId_observaciones
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pantallaId
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: resuelta
+        in: query
+        required: false
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Observacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/control-calidad:
+    post:
+      tags:
+      - Revisión
+      summary: Ejecutar control de calidad
+      operationId: post_cursos_cursoId_control_calidad
+      description: 'Reglas + IA: alineación, accesibilidad, ortografía, longitud por idioma, faltantes'
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /observaciones/{observacionId}:
+    patch:
+      tags:
+      - Revisión
+      summary: Marcar observación como resuelta
+      operationId: patch_observaciones_observacionId
+      parameters:
+      - name: observacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Observacion'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Observacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/comentarios:
+    get:
+      tags:
+      - Revisión
+      summary: Listar comentarios
+      operationId: get_cursos_cursoId_comentarios
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comentario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    post:
+      tags:
+      - Revisión
+      summary: Comentar una pantalla
+      operationId: post_cursos_cursoId_comentarios
+      description: REVISOR_CLIENTE puede comentar, no editar
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComentarioEntrada'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comentario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /comentarios/{comentarioId}:
+    patch:
+      tags:
+      - Revisión
+      summary: Resolver comentario
+      operationId: patch_comentarios_comentarioId
+      parameters:
+      - name: comentarioId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Comentario'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comentario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/narraciones:
+    get:
+      tags:
+      - Personaje y voz
+      summary: Listar narraciones
+      operationId: get_cursos_cursoId_narraciones
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: idioma
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Narracion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/narraciones/regenerar:
+    post:
+      tags:
+      - Personaje y voz
+      summary: Regenerar narraciones
+      operationId: post_cursos_cursoId_narraciones_regenerar
+      description: Por defecto solo las DESACTUALIZADA
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NarracionSolicitud'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/narraciones/{pantallaId}/{idioma}/audio-cliente:
+    post:
+      tags:
+      - Personaje y voz
+      summary: Usar audio del cliente
+      operationId: post_cursos_cursoId_narraciones_pantallaId_idioma_audio_cliente
+      description: Limpia ruido, re-locuta o calcula la boca desde la grabación
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pantallaId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: idioma
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - es
+          - en
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AudioClienteEntrada'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /voz/muestra:
+    post:
+      tags:
+      - Personaje y voz
+      summary: Escuchar una muestra con boca
+      operationId: post_voz_muestra
+      description: Para probar voz y pronunciación; no se guarda en el curso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MuestraVoz'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MuestraVozResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/traducciones:
+    get:
+      tags:
+      - Idiomas
+      summary: Listar textos y su traducción
+      operationId: get_cursos_cursoId_traducciones
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Traduccion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/traducciones/traducir:
+    post:
+      tags:
+      - Idiomas
+      summary: Traducir pendientes con el glosario
+      operationId: post_cursos_cursoId_traducciones_traducir
+      description: No toca lo REVISADA
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /traducciones/{traduccionId}:
+    patch:
+      tags:
+      - Idiomas
+      summary: Editar o marcar como revisada
+      operationId: patch_traducciones_traduccionId
+      parameters:
+      - name: traduccionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TraduccionCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Traduccion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/alineacion:
+    get:
+      tags:
+      - Alineación y navegación
+      summary: Informe de alineación pedagógica
+      operationId: get_cursos_cursoId_alineacion
+      description: Calculado desde el documento; sin costo de IA
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlineacionInforme'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/navegacion:
+    get:
+      tags:
+      - Alineación y navegación
+      summary: Ver patrón y reglas
+      operationId: get_cursos_cursoId_navegacion
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Navegacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    put:
+      tags:
+      - Alineación y navegación
+      summary: Guardar patrón y reglas
+      operationId: put_cursos_cursoId_navegacion
+      description: patronPreferidoDelCliente = true lo guarda en el kit
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Navegacion'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Navegacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/vista-previa:
+    post:
+      tags:
+      - Alineación y navegación
+      summary: Crear enlace de vista previa
+      operationId: post_cursos_cursoId_vista_previa
+      description: Enlace temporal para el participante o el revisor
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VistaPrevia'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /cursos/{cursoId}/validar:
+    post:
+      tags:
+      - Entrega
+      summary: Validar antes de exportar
+      operationId: post_cursos_cursoId_validar
+      description: Nunca bloquea por tamaño
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportacionEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Validacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/exportaciones:
+    post:
+      tags:
+      - Entrega
+      summary: Exportar
+      operationId: post_cursos_cursoId_exportaciones
+      description: SCORM 1.2 por defecto, perfil Genérico
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportacionEntrada'
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo202'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    get:
+      tags:
+      - Entrega
+      summary: Listar exportaciones
+      operationId: get_cursos_cursoId_exportaciones
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Exportacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /exportaciones/{exportacionId}:
+    get:
+      tags:
+      - Entrega
+      summary: Ver exportación y descargar
+      operationId: get_exportaciones_exportacionId
+      description: descargaUrl firmada por 15 min
+      parameters:
+      - name: exportacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exportacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /costos:
+    get:
+      tags:
+      - Costos y rentabilidad
+      summary: Resumen de costos de IA
+      operationId: get_costos
+      parameters:
+      - name: desde
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: hasta
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+      - name: clienteId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: proyectoId
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenCostos'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /negocio/parametros:
+    get:
+      tags:
+      - Costos y rentabilidad
+      summary: Ver parámetros de rentabilidad
+      operationId: get_negocio_parametros
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParametrosNegocio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    put:
+      tags:
+      - Costos y rentabilidad
+      summary: Guardar parámetros de rentabilidad
+      operationId: put_negocio_parametros
+      description: Solo ADMINISTRADOR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParametrosNegocio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParametrosNegocio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /negocio/rentabilidad:
+    get:
+      tags:
+      - Costos y rentabilidad
+      summary: Calcular rentabilidad
+      operationId: get_negocio_rentabilidad
+      description: Con «mediciones» usa los promedios de MedicionProceso
+      parameters:
+      - name: fuente
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - supuestos
+          - mediciones
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rentabilidad'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /negocio/mediciones:
+    get:
+      tags:
+      - Costos y rentabilidad
+      summary: Listar mediciones de horas
+      operationId: get_negocio_mediciones
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MedicionProceso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Costos y rentabilidad
+      summary: Registrar horas medidas
+      operationId: post_negocio_mediciones
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicionProceso'
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicionProceso'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /conexiones-ia:
+    get:
+      tags:
+      - Conexiones IA
+      summary: Ver proveedor por tarea
+      operationId: get_conexiones_ia
+      description: Nunca devuelve claves
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigProveedor'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /conexiones-ia/{tarea}:
+    put:
+      tags:
+      - Conexiones IA
+      summary: Cambiar proveedor o modelo de una tarea
+      operationId: put_conexiones_ia_tarea
+      description: Solo ADMINISTRADOR
+      parameters:
+      - name: tarea
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - TEXTO
+          - PANTALLAS
+          - IMAGEN
+          - VOZ
+          - BOCA
+          - TRADUCCION
+          - TRANSCRIPCION
+          - CALIDAD
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigProveedor'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigProveedor'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /conexiones-ia/{tarea}/probar:
+    post:
+      tags:
+      - Conexiones IA
+      summary: Probar conexión
+      operationId: post_conexiones_ia_tarea_probar
+      parameters:
+      - name: tarea
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PruebaProveedor'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+components:
+  securitySchemes:
+    cookieSesion:
+      type: apiKey
+      in: cookie
+      name: sesion
+  responses:
+    NoAutenticado:
+      description: Sin sesión
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    SinPermiso:
+      description: El rol no permite la acción
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NoEncontrado:
+      description: No existe
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NoValido:
+      description: Datos no válidos (incluye errores del esquema del curso)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Conflicto:
+      description: Versión desactualizada o trabajo en curso
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required:
+      - codigo
+      - mensaje
+      properties:
+        codigo:
+          type: string
+          example: CONFLICTO_VERSION
+        mensaje:
+          type: string
+        detalles:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    TextoI18n:
+      type: object
+      properties:
+        es:
+          type: string
+        en:
+          type: string
+      description: Texto por idioma
+    Rol:
+      type: string
+      enum:
+      - ADMINISTRADOR
+      - DISENADOR_INSTRUCCIONAL
+      - DISENADOR_GRAFICO
+      - PRODUCTOR
+      - REVISOR_CLIENTE
+    Usuario:
+      type: object
+      required:
+      - id
+      - email
+      - nombre
+      - rol
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        nombre:
+          type: string
+        rol:
+          $ref: '#/components/schemas/Rol'
+        clienteId:
+          type: string
+          format: uuid
+          nullable: true
+        activo:
+          type: boolean
+        metodos:
+          type: array
+          items:
+            type: string
+            enum:
+            - clave
+            - google
+    UsuarioEntrada:
+      type: object
+      required:
+      - email
+      - nombre
+      - rol
+      properties:
+        email:
+          type: string
+          format: email
+        nombre:
+          type: string
+        rol:
+          $ref: '#/components/schemas/Rol'
+        clienteId:
+          type: string
+          format: uuid
+        claveTemporal:
+          type: string
+          minLength: 10
+    Ingreso:
+      type: object
+      required:
+      - email
+      - clave
+      properties:
+        email:
+          type: string
+          format: email
+        clave:
+          type: string
+    SolicitudClave:
+      type: object
+      required:
+      - email
+      properties:
+        email:
+          type: string
+          format: email
+      description: Siempre responde 202, exista o no el correo (no revela cuentas).
+    NuevaClave:
+      type: object
+      required:
+      - token
+      - clave
+      properties:
+        token:
+          type: string
+        clave:
+          type: string
+          minLength: 10
+      description: Token de un solo uso, vence en 60 minutos. Clave de al menos 10 caracteres.
+    Sesion:
+      type: object
+      required:
+      - usuario
+      - expira
+      properties:
+        usuario:
+          $ref: '#/components/schemas/Usuario'
+        expira:
+          type: string
+          format: date-time
+      description: La sesión viaja en una cookie httpOnly; esta respuesta solo informa.
+    Cliente:
+      type: object
+      required:
+      - id
+      - nombre
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        lmsHabitual:
+          type: string
+          nullable: true
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        notas:
+          type: string
+          nullable: true
+        tieneKit:
+          type: boolean
+    ClienteEntrada:
+      type: object
+      required:
+      - nombre
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+        lmsHabitual:
+          type: string
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        notas:
+          type: string
+    Paleta:
+      type: object
+      required:
+      - primario
+      - secundario
+      - acento
+      - fondo
+      - texto
+      properties:
+        primario:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        secundario:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        acento:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        fondo:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+        texto:
+          type: string
+          pattern: ^#[0-9A-Fa-f]{6}$
+    Voz:
+      type: object
+      required:
+      - proveedor
+      - voz
+      properties:
+        proveedor:
+          type: string
+          example: google
+        voz:
+          type: string
+          example: es-US-Neural2-A
+        velocidad:
+          type: number
+          minimum: 0.5
+          maximum: 2
+    KitMarca:
+      type: object
+      required:
+      - id
+      - clienteId
+      - estilo
+      - paleta
+      - voces
+      - version
+      properties:
+        id:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        estilo:
+          type: string
+        paleta:
+          $ref: '#/components/schemas/Paleta'
+        tipografias:
+          type: object
+          properties:
+            titulos:
+              type: string
+            textos:
+              type: string
+        logoRecursoId:
+          type: string
+          format: uuid
+          nullable: true
+        personaje:
+          type: object
+          properties:
+            recursoId:
+              type: string
+              format: uuid
+            nombre:
+              type: string
+            bocasDisponibles:
+              type: array
+              items:
+                type: string
+                enum:
+                - A
+                - B
+                - C
+                - D
+                - E
+                - F
+                - G
+                - H
+                - X
+        voces:
+          type: object
+          properties:
+            es:
+              $ref: '#/components/schemas/Voz'
+            en:
+              $ref: '#/components/schemas/Voz'
+        version:
+          type: integer
+        contraste:
+          type: object
+          properties:
+            textoFondo:
+              type: number
+            cumpleAA:
+              type: boolean
+          description: Calculado
+    KitMarcaEntrada:
+      type: object
+      required:
+      - estilo
+      - paleta
+      - voces
+      - version
+      properties:
+        estilo:
+          type: string
+        paleta:
+          $ref: '#/components/schemas/Paleta'
+        tipografias:
+          type: object
+          properties:
+            titulos:
+              type: string
+            textos:
+              type: string
+        logoRecursoId:
+          type: string
+          format: uuid
+        personaje:
+          type: object
+          additionalProperties: true
+        voces:
+          type: object
+          properties:
+            es:
+              $ref: '#/components/schemas/Voz'
+            en:
+              $ref: '#/components/schemas/Voz'
+        version:
+          type: integer
+          description: Versión leída (bloqueo optimista)
+    Disposicion:
+      type: string
+      enum:
+      - portada
+      - objetivos
+      - personaje
+      - dato
+      - idea
+      - lista
+      - memoria
+      - clasificar
+      - ordenar
+      - decision
+      - video
+      - hotspot
+      - quiz
+      - vf
+      - resumen
+      - seccion
+      - resultados
+      - cierre
+    PantallaModelo:
+      type: object
+      required:
+      - id
+      - disposicion
+      - nombre
+      - definicion
+      properties:
+        id:
+          type: string
+          format: uuid
+        disposicion:
+          $ref: '#/components/schemas/Disposicion'
+        nombre:
+          type: string
+        definicion:
+          type: object
+          additionalProperties: true
+        miniaturaRecursoId:
+          type: string
+          format: uuid
+          nullable: true
+        orden:
+          type: integer
+        activa:
+          type: boolean
+    PantallaModeloEntrada:
+      type: object
+      required:
+      - disposicion
+      - nombre
+      - definicion
+      properties:
+        disposicion:
+          $ref: '#/components/schemas/Disposicion'
+        nombre:
+          type: string
+        definicion:
+          type: object
+          additionalProperties: true
+        orden:
+          type: integer
+        activa:
+          type: boolean
+    GlosarioTermino:
+      type: object
+      required:
+      - termino
+      properties:
+        termino:
+          type: string
+        traduccion:
+          type: string
+          nullable: true
+        noTraducir:
+          type: boolean
+    PronunciacionTermino:
+      type: object
+      required:
+      - idioma
+      - escrito
+      - pronunciado
+      properties:
+        idioma:
+          type: string
+          enum:
+          - es
+          - en
+        escrito:
+          type: string
+        pronunciado:
+          type: string
+    FichaCompatibilidad:
+      type: object
+      required:
+      - lmsNombre
+      properties:
+        id:
+          type: string
+          format: uuid
+        lmsNombre:
+          type: string
+        lmsVersion:
+          type: string
+        limiteSubidaMb:
+          type: integer
+          nullable: true
+        notas:
+          type: string
+        resultadoDiagnostico:
+          type: object
+          additionalProperties: true
+    DatosTecnicos:
+      type: object
+      properties:
+        lms:
+          type: string
+          example: Aún no se sabe
+        formato:
+          type: string
+          enum:
+          - SCORM12
+          - SCORM2004
+          - HTML
+          - NO_DEFINIDO
+        horasCapacitacion:
+          type: number
+          minimum: 0
+        porcentajeScorm:
+          type: number
+          minimum: 0
+          maximum: 100
+        fechaEntrega:
+          type: string
+          format: date
+      description: 'Todo opcional: muchos clientes no lo definen.'
+    EstadoProyecto:
+      type: string
+      enum:
+      - BORRADOR
+      - GENERANDO
+      - REVISION
+      - ENTREGADO
+      - ARCHIVADO
+    Proyecto:
+      type: object
+      required:
+      - id
+      - clienteId
+      - nombre
+      - estado
+      - idiomas
+      properties:
+        id:
+          type: string
+          format: uuid
+        clienteId:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoProyecto'
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        modoIdioma:
+          type: string
+          enum:
+          - unico
+          - separados
+          - mismo-paquete
+        publico:
+          type: string
+        tono:
+          type: string
+        pantallasObjetivo:
+          type: integer
+        porcentajeActividades:
+          type: integer
+        datosTecnicos:
+          $ref: '#/components/schemas/DatosTecnicos'
+        avance:
+          type: object
+          properties:
+            aprobadas:
+              type: integer
+            total:
+              type: integer
+        costoIaUsd:
+          type: number
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    ProyectoEntrada:
+      type: object
+      required:
+      - clienteId
+      - nombre
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          minLength: 2
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        modoIdioma:
+          type: string
+          enum:
+          - unico
+          - separados
+          - mismo-paquete
+        publico:
+          type: string
+        tono:
+          type: string
+          enum:
+          - Cercano
+          - Formal
+          - Motivador
+        pantallasObjetivo:
+          type: integer
+          minimum: 5
+          maximum: 120
+        porcentajeActividades:
+          type: integer
+          minimum: 0
+          maximum: 100
+        datosTecnicos:
+          $ref: '#/components/schemas/DatosTecnicos'
+      description: Solo cliente y nombre son obligatorios.
+    MaterialFuente:
+      type: object
+      required:
+      - id
+      - tipo
+      - estado
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum:
+          - PDF
+          - WORD
+          - POWERPOINT
+          - VIDEO
+          - AUDIO
+          - IMAGEN
+          - TEMA
+        recursoId:
+          type: string
+          format: uuid
+          nullable: true
+        tema:
+          type: string
+          nullable: true
+        estado:
+          type: string
+          enum:
+          - pendiente
+          - procesando
+          - listo
+          - error
+        paginas:
+          type: array
+          items:
+            type: object
+            properties:
+              n:
+                type: integer
+              texto:
+                type: string
+              escaneada:
+                type: boolean
+        mapaTemas:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              tema:
+                type: string
+              paginas:
+                type: string
+              decision:
+                type: string
+                enum:
+                - conservar
+                - complementario
+                - omitir
+              motivo:
+                type: string
+    MaterialEntrada:
+      type: object
+      required:
+      - tipo
+      properties:
+        tipo:
+          type: string
+          enum:
+          - PDF
+          - WORD
+          - POWERPOINT
+          - VIDEO
+          - AUDIO
+          - IMAGEN
+          - TEMA
+        recursoId:
+          type: string
+          format: uuid
+        tema:
+          type: string
+      description: recursoId para archivos; tema cuando el cliente solo da el tema.
+    SubidaSolicitud:
+      type: object
+      required:
+      - nombre
+      - mime
+      - bytes
+      properties:
+        nombre:
+          type: string
+        mime:
+          type: string
+        bytes:
+          type: integer
+          minimum: 1
+        clienteId:
+          type: string
+          format: uuid
+        proyectoId:
+          type: string
+          format: uuid
+    SubidaUrl:
+      type: object
+      required:
+      - subidaId
+      - url
+      - expira
+      properties:
+        subidaId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+        campos:
+          type: object
+          additionalProperties: true
+        expira:
+          type: string
+          format: date-time
+    Recurso:
+      type: object
+      required:
+      - id
+      - tipo
+      - origen
+      - nombre
+      - mime
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum:
+          - IMAGEN
+          - SVG
+          - AUDIO
+          - VIDEO
+          - DOCUMENTO
+          - FUENTE
+          - SUBTITULO
+          - PAQUETE
+        origen:
+          type: string
+          enum:
+          - BIBLIOTECA
+          - GENERADO
+          - SUBIDO
+          - CLIENTE
+        nombre:
+          type: string
+        mime:
+          type: string
+        bytes:
+          type: integer
+        ancho:
+          type: integer
+        alto:
+          type: integer
+        duracionMs:
+          type: integer
+        alt:
+          $ref: '#/components/schemas/TextoI18n'
+        url:
+          type: string
+          format: uri
+          description: URL firmada temporal
+    ImagenIaEntrada:
+      type: object
+      required:
+      - clienteId
+      - descripcion
+      properties:
+        clienteId:
+          type: string
+          format: uuid
+        proyectoId:
+          type: string
+          format: uuid
+        descripcion:
+          type: string
+          minLength: 5
+        variantes:
+          type: integer
+          minimum: 1
+          maximum: 4
+          default: 4
+        relacion:
+          type: string
+          enum:
+          - '1:1'
+          - '16:9'
+          - '4:3'
+    GeneracionEntrada:
+      type: object
+      required:
+      - pantallas
+      - idiomas
+      properties:
+        pantallas:
+          type: integer
+          minimum: 5
+          maximum: 120
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        publico:
+          type: string
+        tono:
+          type: string
+        porcentajeActividades:
+          type: integer
+          minimum: 0
+          maximum: 100
+        etapas:
+          type: array
+          items:
+            type: string
+          description: Para regenerar solo algunas etapas; vacío = todas
+    EstadoTrabajo:
+      type: string
+      enum:
+      - EN_COLA
+      - EN_CURSO
+      - COMPLETADO
+      - ERROR
+      - CANCELADO
+    Etapa:
+      type: object
+      required:
+      - etapa
+      - orden
+      - estado
+      properties:
+        etapa:
+          type: string
+          enum:
+          - RESUMEN_MATERIAL
+          - OBJETIVOS_ESTRUCTURA
+          - STORYBOARD_GUION
+          - PANTALLAS
+          - ILUSTRACIONES
+          - VOZ_ES
+          - BOCA
+          - SUBTITULOS
+          - VERSION_EN
+          - CONTROL_CALIDAD
+          - PAQUETE
+        orden:
+          type: integer
+        estado:
+          $ref: '#/components/schemas/EstadoTrabajo'
+        detalle:
+          type: string
+        proveedor:
+          type: string
+        inicio:
+          type: string
+          format: date-time
+        fin:
+          type: string
+          format: date-time
+        costoUsd:
+          type: number
+    Generacion:
+      type: object
+      required:
+      - id
+      - proyectoId
+      - estado
+      - etapas
+      properties:
+        id:
+          type: string
+          format: uuid
+        proyectoId:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoTrabajo'
+        avance:
+          type: number
+          minimum: 0
+          maximum: 100
+        pantallasListas:
+          type: integer
+        costoUsd:
+          type: number
+        etapas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Etapa'
+        creadoEn:
+          type: string
+          format: date-time
+        terminadoEn:
+          type: string
+          format: date-time
+    Trabajo202:
+      type: object
+      required:
+      - id
+      - estado
+      properties:
+        id:
+          type: string
+          format: uuid
+        estado:
+          $ref: '#/components/schemas/EstadoTrabajo'
+        eventos:
+          type: string
+          format: uri
+          description: URL de eventos (SSE)
+    Curso:
+      type: object
+      required:
+      - id
+      - versionEsquema
+      - version
+      - documento
+      properties:
+        id:
+          type: string
+          format: uuid
+        proyectoId:
+          type: string
+          format: uuid
+        versionEsquema:
+          type: string
+          example: 0.2.0
+        version:
+          type: integer
+        documento:
+          type: object
+          description: Valida contra docs/04-modelo-contenido/esquema-curso-v0.schema.json
+        actualizadoEn:
+          type: string
+          format: date-time
+    CursoEntrada:
+      type: object
+      required:
+      - documento
+      properties:
+        documento:
+          type: object
+        motivo:
+          type: string
+    JsonPatch:
+      type: array
+      items:
+        type: object
+        required:
+        - op
+        - path
+        properties:
+          op:
+            type: string
+            enum:
+            - add
+            - remove
+            - replace
+            - move
+            - copy
+            - test
+          path:
+            type: string
+          from:
+            type: string
+          value: {}
+    CursoVersion:
+      type: object
+      required:
+      - version
+      - motivo
+      - creadoEn
+      properties:
+        version:
+          type: integer
+        motivo:
+          type: string
+        creadoPor:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+    AjusteElemento:
+      type: object
+      properties:
+        tamanoCqw:
+          type: number
+        escala:
+          type: number
+        color:
+          type: string
+        relleno:
+          type: string
+        alineacion:
+          type: string
+          enum:
+          - izquierda
+          - centro
+          - derecha
+        desplazamiento:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+            dispositivo:
+              type: string
+              enum:
+              - todos
+              - escritorio
+              - celular
+        animacion:
+          type: string
+          enum:
+          - auto
+          - ninguna
+          - aparecer
+          - deslizar
+          - zoom
+          - rebotar
+        retardoS:
+          type: number
+        finS:
+          type: number
+        anclaPalabra:
+          type: integer
+          minimum: 0
+        oculto:
+          type: boolean
+    PantallaCambio:
+      type: object
+      required:
+      - version
+      properties:
+        titulo:
+          $ref: '#/components/schemas/TextoI18n'
+        narracion:
+          $ref: '#/components/schemas/TextoI18n'
+        textos:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/TextoI18n'
+          description: Clave = ruta del texto en la pantalla
+        disposicion:
+          $ref: '#/components/schemas/Disposicion'
+        fondo:
+          type: string
+        ajustes:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AjusteElemento'
+        extras:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        version:
+          type: integer
+      description: Cambios del editor sobre una pantalla. Dispara la regeneración en cascada de lo afectado.
+    CambioResultado:
+      type: object
+      required:
+      - version
+      - regenerando
+      properties:
+        version:
+          type: integer
+        regenerando:
+          type: array
+          items:
+            type: string
+            enum:
+            - voz-es
+            - boca
+            - subtitulos-es
+            - traduccion-en
+            - voz-en
+            - subtitulos-en
+    Aprobacion:
+      type: object
+      properties:
+        pantallaIds:
+          type: array
+          items:
+            type: string
+        soloSinObservaciones:
+          type: boolean
+    PropuestaSolicitud:
+      type: object
+      required:
+      - tipo
+      properties:
+        tipo:
+          type: string
+          enum:
+          - mas-visual
+          - menos-texto
+          - actividad
+          - variantes
+          - otra-ilustracion
+          - libre
+          - alineacion
+          - patron-recomendar
+          - patron-crear
+          - pausas-video
+          - kit-extraer
+        pantallaId:
+          type: string
+        pedido:
+          type: string
+          maxLength: 500
+    Propuesta:
+      type: object
+      required:
+      - id
+      - tipo
+      - titulo
+      - cambios
+      - versionBase
+      - estado
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+        pantallaId:
+          type: string
+          nullable: true
+        titulo:
+          type: string
+        descripcion:
+          type: string
+        cambios:
+          $ref: '#/components/schemas/JsonPatch'
+        vistaPrevia:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Variantes renderizables (para «ver 3 variantes»)
+        versionBase:
+          type: integer
+        estado:
+          type: string
+          enum:
+          - PENDIENTE
+          - APLICADA
+          - DESCARTADA
+          - VENCIDA
+        costoUsd:
+          type: number
+        creadoEn:
+          type: string
+          format: date-time
+    AplicarPropuesta:
+      type: object
+      properties:
+        varianteIndice:
+          type: integer
+          minimum: 0
+          description: Si la propuesta trae variantes
+    Observacion:
+      type: object
+      required:
+      - id
+      - tipo
+      - severidad
+      - mensaje
+      - resuelta
+      properties:
+        id:
+          type: string
+          format: uuid
+        pantallaId:
+          type: string
+          nullable: true
+        tipo:
+          type: string
+          enum:
+          - CALIDAD
+          - ALINEACION
+          - IDIOMA
+          - ACCESIBILIDAD
+          - MATERIAL_FALTANTE
+        severidad:
+          type: string
+          enum:
+          - info
+          - aviso
+          - bloquea-entrega
+        mensaje:
+          type: string
+        origen:
+          type: string
+          enum:
+          - regla
+          - ia
+          - usuario
+        resuelta:
+          type: boolean
+    Comentario:
+      type: object
+      required:
+      - id
+      - pantallaId
+      - texto
+      properties:
+        id:
+          type: string
+          format: uuid
+        pantallaId:
+          type: string
+        autor:
+          type: string
+        texto:
+          type: string
+        resuelto:
+          type: boolean
+        creadoEn:
+          type: string
+          format: date-time
+    ComentarioEntrada:
+      type: object
+      required:
+      - pantallaId
+      - texto
+      properties:
+        pantallaId:
+          type: string
+        texto:
+          type: string
+          minLength: 1
+    Narracion:
+      type: object
+      required:
+      - pantallaId
+      - idioma
+      - estado
+      properties:
+        pantallaId:
+          type: string
+        idioma:
+          type: string
+          enum:
+          - es
+          - en
+        texto:
+          type: string
+        duracionS:
+          type: number
+        origen:
+          type: string
+          enum:
+          - tts
+          - grabacion
+        voz:
+          type: string
+        estado:
+          type: string
+          enum:
+          - ACTUALIZADA
+          - DESACTUALIZADA
+          - GENERANDO
+          - ERROR
+        audioUrl:
+          type: string
+          format: uri
+        bocas:
+          type: array
+          items:
+            type: array
+            items: {}
+          description: '[[ms, ''A''..''X''], …]'
+        subtitulosUrl:
+          type: string
+          format: uri
+    NarracionSolicitud:
+      type: object
+      properties:
+        pantallaIds:
+          type: array
+          items:
+            type: string
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        soloDesactualizadas:
+          type: boolean
+          default: true
+    AudioClienteEntrada:
+      type: object
+      required:
+      - recursoId
+      - accion
+      properties:
+        recursoId:
+          type: string
+          format: uuid
+        accion:
+          type: string
+          enum:
+          - usar-con-boca
+          - limpiar
+          - relocutar-ia
+    MuestraVoz:
+      type: object
+      required:
+      - texto
+      - idioma
+      properties:
+        texto:
+          type: string
+          maxLength: 600
+        idioma:
+          type: string
+          enum:
+          - es
+          - en
+        clienteId:
+          type: string
+          format: uuid
+        voz:
+          type: string
+        velocidad:
+          type: number
+    MuestraVozResultado:
+      type: object
+      required:
+      - audioUrl
+      - bocas
+      properties:
+        audioUrl:
+          type: string
+          format: uri
+        bocas:
+          type: array
+          items: {}
+    Traduccion:
+      type: object
+      required:
+      - id
+      - ruta
+      - estado
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruta:
+          type: string
+          description: JSON Pointer
+        pantallaId:
+          type: string
+        es:
+          type: string
+        en:
+          type: string
+        estado:
+          type: string
+          enum:
+          - PENDIENTE
+          - TRADUCIDA_IA
+          - REVISADA
+          - DESBORDE
+        detalle:
+          type: string
+    TraduccionCambio:
+      type: object
+      properties:
+        en:
+          type: string
+        estado:
+          type: string
+          enum:
+          - REVISADA
+    AlineacionInforme:
+      type: object
+      required:
+      - objetivos
+      - totalAlertas
+      properties:
+        objetivos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              texto:
+                type: string
+              nivelBloom:
+                type: string
+              presenta:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              practica:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              evalua:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+              alertas:
+                type: array
+                items:
+                  type: string
+        totalAlertas:
+          type: integer
+    Navegacion:
+      type: object
+      properties:
+        patron:
+          type: string
+          enum:
+          - clasico
+          - historias
+          - vertical
+          - mapa
+          - hub
+          - ramificado
+          - inmersivo
+          - personalizado
+        patronPersonalizado:
+          type: object
+          additionalProperties: true
+        modo:
+          type: string
+          enum:
+          - libre
+          - condiciones
+          - secuencial
+        siguienteSeHabilita:
+          type: string
+          enum:
+          - siempre
+          - narracion
+          - actividad
+        reanudar:
+          type: string
+          enum:
+          - preguntar
+          - automatica
+          - 'no'
+        mostrar:
+          type: array
+          items:
+            type: string
+        patronPreferidoDelCliente:
+          type: boolean
+      description: Igual a `navegacion` del documento del curso.
+    VistaPrevia:
+      type: object
+      required:
+      - url
+      - expira
+      properties:
+        url:
+          type: string
+          format: uri
+        expira:
+          type: string
+          format: date-time
+    ExportacionEntrada:
+      type: object
+      required:
+      - formato
+      properties:
+        formato:
+          type: string
+          enum:
+          - SCORM12
+          - SCORM2004
+          - HTML
+          - JSON
+          - KIT_GAMIFICACION
+        perfilLms:
+          type: string
+          enum:
+          - generico
+          - moodle
+          - blackboard
+          - chamilo
+          - canvas
+          default: generico
+        modoIdioma:
+          type: string
+          enum:
+          - unico
+          - separados
+          - mismo-paquete
+        incluirDiagnostico:
+          type: boolean
+          default: true
+        incluirInforme:
+          type: boolean
+          default: true
+    Validacion:
+      type: object
+      required:
+      - errores
+      - advertencias
+      properties:
+        errores:
+          type: array
+          items:
+            type: string
+        advertencias:
+          type: array
+          items:
+            type: string
+        pesoEstimadoMb:
+          type: number
+        suspendDataCaracteres:
+          type: integer
+        pantallasSinAprobar:
+          type: integer
+      description: Nunca bloquea por tamaño; solo advierte.
+    Exportacion:
+      type: object
+      required:
+      - id
+      - formato
+      - estado
+      properties:
+        id:
+          type: string
+          format: uuid
+        formato:
+          type: string
+        perfilLms:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoTrabajo'
+        bytes:
+          type: integer
+        informe:
+          $ref: '#/components/schemas/Validacion'
+        descargaUrl:
+          type: string
+          format: uri
+          nullable: true
+        creadoEn:
+          type: string
+          format: date-time
+    ConfigProveedor:
+      type: object
+      required:
+      - tarea
+      - proveedor
+      - modelo
+      properties:
+        tarea:
+          type: string
+          enum:
+          - TEXTO
+          - PANTALLAS
+          - IMAGEN
+          - VOZ
+          - BOCA
+          - TRADUCCION
+          - TRANSCRIPCION
+          - CALIDAD
+        proveedor:
+          type: string
+        modelo:
+          type: string
+        parametros:
+          type: object
+          additionalProperties: true
+        limiteGastoMensualUsd:
+          type: number
+          nullable: true
+        activo:
+          type: boolean
+        claveConfigurada:
+          type: boolean
+          description: Solo informa si existe la variable de entorno; nunca devuelve la clave
+    PruebaProveedor:
+      type: object
+      required:
+      - ok
+      properties:
+        ok:
+          type: boolean
+        latenciaMs:
+          type: integer
+        mensaje:
+          type: string
+    ResumenCostos:
+      type: object
+      required:
+      - totalUsd
+      properties:
+        totalUsd:
+          type: number
+        porProveedor:
+          type: array
+          items:
+            type: object
+            properties:
+              proveedor:
+                type: string
+              tarea:
+                type: string
+              usd:
+                type: number
+        porProyecto:
+          type: array
+          items:
+            type: object
+            properties:
+              proyectoId:
+                type: string
+                format: uuid
+              nombre:
+                type: string
+              usd:
+                type: number
+        promedioPorScormUsd:
+          type: number
+    ParametrosNegocio:
+      type: object
+      properties:
+        precioHoy:
+          type: number
+        precioCompetencia:
+          type: number
+        precioNuevo:
+          type: number
+        personas:
+          type: integer
+        horasProductivasDia:
+          type: number
+        tarifaHora:
+          type: number
+        tipoCambio:
+          type: number
+        diasEsperaHoy:
+          type: number
+        diasEsperaGenerador:
+          type: number
+        licenciasMesHoy:
+          type: number
+        licenciasMesGenerador:
+          type: number
+        iaPorScormUsd:
+          type: number
+        etapas:
+          type: array
+          items:
+            type: object
+            properties:
+              etapa:
+                type: string
+              horasHoy:
+                type: number
+              horasGenerador:
+                type: number
+    Rentabilidad:
+      type: object
+      properties:
+        horasHoy:
+          type: number
+        horasGenerador:
+          type: number
+        diasHoy:
+          type: number
+        diasGenerador:
+          type: number
+        scormMesHoy:
+          type: number
+        scormMesGenerador:
+          type: number
+        costoHoy:
+          type: number
+        costoGenerador:
+          type: number
+        margenCompetenciaHoy:
+          type: number
+        margenCompetenciaGenerador:
+          type: number
+        margenPrecioNuevo:
+          type: number
+        fuente:
+          type: string
+          enum:
+          - supuestos
+          - mediciones
+    MedicionProceso:
+      type: object
+      required:
+      - proyectoRef
+      - escenario
+      - etapa
+      - horas
+      properties:
+        id:
+          type: string
+          format: uuid
+        proyectoRef:
+          type: string
+        escenario:
+          type: string
+          enum:
+          - hoy
+          - generador
+        etapa:
+          type: string
+        horas:
+          type: number
+          minimum: 0
+        notas:
+          type: string

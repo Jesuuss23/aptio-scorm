@@ -1,0 +1,1976 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/curso/v0.json",
+  "title": "Curso de cápsulas (esquema v0)",
+  "description": "Fuente de verdad del curso: contenido por idioma, pantallas, interacciones, narración, recursos y seguimiento. Referencia recursos por id, nunca por ruta.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "versionEsquema",
+    "id",
+    "metadatos",
+    "idiomas",
+    "modoIdioma",
+    "kitMarcaId",
+    "objetivos",
+    "modulos",
+    "seguimiento",
+    "recursos"
+  ],
+  "properties": {
+    "versionEsquema": {
+      "enum": [
+        "0.1.0",
+        "0.2.0"
+      ]
+    },
+    "id": {
+      "$ref": "#/$defs/id"
+    },
+    "metadatos": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "titulo",
+        "cliente",
+        "publico",
+        "duracionEstimadaMin",
+        "creado",
+        "actualizado"
+      ],
+      "properties": {
+        "titulo": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "descripcion": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "cliente": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "nombre"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/id"
+            },
+            "nombre": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "publico": {
+          "type": "string"
+        },
+        "nivel": {
+          "enum": [
+            "basico",
+            "intermedio",
+            "avanzado"
+          ]
+        },
+        "duracionEstimadaMin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "autor": {
+          "type": "string"
+        },
+        "creado": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actualizado": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "idiomas": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/idioma"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "modoIdioma": {
+      "description": "unico: un idioma; separados: un paquete por idioma; mismo-paquete: todos los idiomas en un paquete con selector.",
+      "enum": [
+        "unico",
+        "separados",
+        "mismo-paquete"
+      ]
+    },
+    "kitMarcaId": {
+      "$ref": "#/$defs/id"
+    },
+    "objetivos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "texto",
+          "nivelBloom"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "texto": {
+            "$ref": "#/$defs/textoI18n"
+          },
+          "nivelBloom": {
+            "enum": [
+              "recordar",
+              "comprender",
+              "aplicar",
+              "analizar",
+              "evaluar",
+              "crear"
+            ]
+          }
+        }
+      }
+    },
+    "modulos": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/modulo"
+      }
+    },
+    "seguimiento": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterioCompletado",
+        "notaMinima",
+        "notaReportada"
+      ],
+      "properties": {
+        "criterioCompletado": {
+          "enum": [
+            "pantallas-obligatorias",
+            "sumativa"
+          ]
+        },
+        "notaMinima": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "intentosMaximos": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "notaReportada": {
+          "enum": [
+            "mejor",
+            "ultima"
+          ]
+        }
+      }
+    },
+    "recursos": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recurso"
+      }
+    },
+    "navegacion": {
+      "description": "Forma de recorrer la cápsula (patrón) y reglas de avance. Opcional: si falta, se usa patrón clásico con actividades obligatorias.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "patron": {
+          "enum": [
+            "clasico",
+            "historias",
+            "vertical",
+            "mapa",
+            "hub",
+            "ramificado",
+            "inmersivo",
+            "personalizado"
+          ]
+        },
+        "patronPersonalizado": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "nombre",
+            "base",
+            "progreso",
+            "avance",
+            "menu"
+          ],
+          "properties": {
+            "nombre": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "base": {
+              "enum": [
+                "clasico",
+                "historias",
+                "vertical",
+                "mapa",
+                "hub",
+                "ramificado",
+                "inmersivo"
+              ]
+            },
+            "progreso": {
+              "enum": [
+                "barra",
+                "segmentos",
+                "puntos",
+                "porcentaje",
+                "ninguno"
+              ]
+            },
+            "avance": {
+              "enum": [
+                "botones",
+                "deslizar-y-botones",
+                "desplazar"
+              ]
+            },
+            "menu": {
+              "enum": [
+                "temario",
+                "mapa",
+                "temas",
+                "ninguno"
+              ]
+            },
+            "marcador": {
+              "type": "boolean"
+            },
+            "barra": {
+              "enum": [
+                "arriba",
+                "abajo",
+                "flotante",
+                "ninguna"
+              ]
+            },
+            "origen": {
+              "enum": [
+                "usuario",
+                "ia"
+              ]
+            }
+          }
+        },
+        "modo": {
+          "enum": [
+            "libre",
+            "condiciones",
+            "secuencial"
+          ]
+        },
+        "siguienteSeHabilita": {
+          "enum": [
+            "siempre",
+            "narracion",
+            "actividad"
+          ]
+        },
+        "reanudar": {
+          "enum": [
+            "preguntar",
+            "automatica",
+            "no"
+          ]
+        },
+        "mostrar": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "temario",
+              "progreso",
+              "contador",
+              "botones",
+              "glosario",
+              "recursos",
+              "ayuda",
+              "accesibilidad",
+              "puntos",
+              "idioma"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "objetivosAlInicio": {
+          "type": "boolean"
+        },
+        "atajosTeclado": {
+          "type": "boolean"
+        }
+      }
+    },
+    "gamificacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "nivel": {
+          "enum": [
+            "ninguna",
+            "ligera",
+            "completa"
+          ]
+        },
+        "puntosPorAcierto": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "insignias": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "nombre",
+              "condicion"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "nombre": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "recursoId": {
+                "$ref": "#/$defs/id"
+              },
+              "condicion": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "tipo",
+                  "refId"
+                ],
+                "properties": {
+                  "tipo": {
+                    "enum": [
+                      "completar-capsula",
+                      "completar-modulo",
+                      "nota-minima-interaccion"
+                    ]
+                  },
+                  "refId": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "valor": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,63}$"
+    },
+    "idioma": {
+      "enum": [
+        "es",
+        "en"
+      ]
+    },
+    "textoI18n": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "es": {
+          "type": "string",
+          "minLength": 1
+        },
+        "en": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "origen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tipo",
+        "revisado"
+      ],
+      "properties": {
+        "tipo": {
+          "enum": [
+            "documento",
+            "ia",
+            "manual"
+          ]
+        },
+        "documentoId": {
+          "$ref": "#/$defs/id"
+        },
+        "paginas": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "revisado": {
+          "type": "boolean"
+        }
+      },
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "documento"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "documentoId",
+          "paginas"
+        ]
+      }
+    },
+    "estadoContenido": {
+      "enum": [
+        "borrador",
+        "propuesta-ia",
+        "aprobado"
+      ]
+    },
+    "animacion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "movimiento"
+      ],
+      "properties": {
+        "movimiento": {
+          "enum": [
+            "aparecer",
+            "deslizar",
+            "rebotar",
+            "flotar",
+            "latir",
+            "senalar",
+            "parpadear"
+          ]
+        },
+        "capa": {
+          "type": "string",
+          "description": "id de la capa SVG a animar; si falta, se anima la pieza completa"
+        },
+        "retardoMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duracionMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "repetir": {
+          "type": "boolean"
+        }
+      }
+    },
+    "visual": {
+      "description": "Texto o imagen para opciones, cartas y elementos de interacción.",
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "texto": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "recursoId": {
+          "$ref": "#/$defs/id"
+        },
+        "alt": {
+          "$ref": "#/$defs/textoI18n"
+        }
+      },
+      "dependentRequired": {
+        "recursoId": [
+          "alt"
+        ]
+      }
+    },
+    "boca": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "X"
+      ]
+    },
+    "audioNarracion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estado",
+        "voz",
+        "hashTexto"
+      ],
+      "properties": {
+        "estado": {
+          "enum": [
+            "pendiente",
+            "generado",
+            "desactualizado"
+          ]
+        },
+        "recursoAudioId": {
+          "$ref": "#/$defs/id"
+        },
+        "voz": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "proveedor",
+            "voz"
+          ],
+          "properties": {
+            "proveedor": {
+              "enum": [
+                "google",
+                "azure",
+                "elevenlabs",
+                "cliente"
+              ]
+            },
+            "voz": {
+              "type": "string"
+            },
+            "velocidad": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 2
+            }
+          }
+        },
+        "hashTexto": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8,64}$"
+        },
+        "duracionMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bocas": {
+          "description": "Marcas [tiempoMs, boca] ordenadas por tiempo.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "prefixItems": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "$ref": "#/$defs/boca"
+              }
+            ],
+            "items": false,
+            "minItems": 2
+          }
+        },
+        "subtitulosId": {
+          "$ref": "#/$defs/id"
+        }
+      },
+      "if": {
+        "properties": {
+          "estado": {
+            "const": "generado"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "recursoAudioId",
+          "duracionMs",
+          "bocas",
+          "subtitulosId"
+        ]
+      }
+    },
+    "narracion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "texto",
+        "porIdioma"
+      ],
+      "properties": {
+        "texto": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "personajeBloqueId": {
+          "$ref": "#/$defs/id"
+        },
+        "porIdioma": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "es": {
+              "$ref": "#/$defs/audioNarracion"
+            },
+            "en": {
+              "$ref": "#/$defs/audioNarracion"
+            }
+          }
+        }
+      }
+    },
+    "preguntaQuiz": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "enunciado",
+        "opciones",
+        "retroalimentacion"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "objetivoId": {
+          "$ref": "#/$defs/id"
+        },
+        "enunciado": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "seleccionMultiple": {
+          "type": "boolean"
+        },
+        "opciones": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "contenido",
+              "correcta"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "contenido": {
+                "$ref": "#/$defs/visual"
+              },
+              "correcta": {
+                "type": "boolean"
+              }
+            }
+          },
+          "contains": {
+            "properties": {
+              "correcta": {
+                "const": true
+              }
+            }
+          }
+        },
+        "retroalimentacion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "correcta",
+            "incorrecta"
+          ],
+          "properties": {
+            "correcta": {
+              "$ref": "#/$defs/textoI18n"
+            },
+            "incorrecta": {
+              "$ref": "#/$defs/textoI18n"
+            }
+          }
+        }
+      }
+    },
+    "interaccion": {
+      "type": "object",
+      "required": [
+        "tipo",
+        "modo",
+        "datos"
+      ],
+      "properties": {
+        "tipo": {
+          "enum": [
+            "INT-01",
+            "INT-02",
+            "INT-03",
+            "INT-04",
+            "INT-05",
+            "INT-06",
+            "INT-07",
+            "INT-08"
+          ]
+        },
+        "modo": {
+          "enum": [
+            "formativa",
+            "sumativa"
+          ]
+        },
+        "peso": {
+          "type": "number",
+          "minimum": 0
+        },
+        "instruccion": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "datos": {
+          "type": "object"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-01"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosMemoria"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-02"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosClasificar"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-03"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosOrdenar"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-04"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosTarjetas"
+              },
+              "modo": {
+                "const": "formativa"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-05"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosQuiz"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-06"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosExploracion"
+              },
+              "modo": {
+                "const": "formativa"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-07"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosDeslizar"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "INT-08"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "datos": {
+                "$ref": "#/$defs/datosDecision"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "datosMemoria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pares"
+      ],
+      "properties": {
+        "pares": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "a",
+              "b"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "a": {
+                "$ref": "#/$defs/visual"
+              },
+              "b": {
+                "$ref": "#/$defs/visual"
+              }
+            }
+          }
+        },
+        "intentosMaximos": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "datosClasificar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grupos",
+        "elementos"
+      ],
+      "properties": {
+        "grupos": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "etiqueta"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "etiqueta": {
+                "$ref": "#/$defs/textoI18n"
+              }
+            }
+          }
+        },
+        "elementos": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "contenido",
+              "grupoCorrecto"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "contenido": {
+                "$ref": "#/$defs/visual"
+              },
+              "grupoCorrecto": {
+                "$ref": "#/$defs/id"
+              },
+              "retroalimentacion": {
+                "$ref": "#/$defs/textoI18n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "datosOrdenar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pasos"
+      ],
+      "properties": {
+        "pasos": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "contenido"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "contenido": {
+                "$ref": "#/$defs/visual"
+              }
+            }
+          }
+        }
+      }
+    },
+    "datosTarjetas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tarjetas"
+      ],
+      "properties": {
+        "tarjetas": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "frente",
+              "reverso"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "frente": {
+                "$ref": "#/$defs/visual"
+              },
+              "reverso": {
+                "$ref": "#/$defs/visual"
+              }
+            }
+          }
+        }
+      }
+    },
+    "datosQuiz": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "preguntas"
+      ],
+      "properties": {
+        "preguntas": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 15,
+          "items": {
+            "$ref": "#/$defs/preguntaQuiz"
+          }
+        },
+        "segundosPorPregunta": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "vidas": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "preguntasPorIntento": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "barajarOpciones": {
+          "type": "boolean"
+        }
+      }
+    },
+    "datosExploracion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "imagenId",
+        "alt",
+        "puntos"
+      ],
+      "properties": {
+        "imagenId": {
+          "$ref": "#/$defs/id"
+        },
+        "alt": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "puntos": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "x",
+              "y",
+              "titulo",
+              "contenido",
+              "obligatorio"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "x": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "y": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "titulo": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "contenido": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "obligatorio": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "datosDeslizar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "afirmaciones"
+      ],
+      "properties": {
+        "afirmaciones": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "texto",
+              "verdadera",
+              "retroalimentacion"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "texto": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "verdadera": {
+                "type": "boolean"
+              },
+              "retroalimentacion": {
+                "$ref": "#/$defs/textoI18n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "datosDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inicioId",
+        "nodos"
+      ],
+      "properties": {
+        "inicioId": {
+          "$ref": "#/$defs/id"
+        },
+        "nodos": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "situacion",
+              "opciones"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "situacion": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "opciones": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 3,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "id",
+                    "texto",
+                    "consecuencia",
+                    "puntaje"
+                  ],
+                  "properties": {
+                    "id": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "texto": {
+                      "$ref": "#/$defs/textoI18n"
+                    },
+                    "consecuencia": {
+                      "$ref": "#/$defs/textoI18n"
+                    },
+                    "recursoId": {
+                      "$ref": "#/$defs/id"
+                    },
+                    "puntaje": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "siguienteId": {
+                      "$ref": "#/$defs/id"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "marcadorVideo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "tiempoMs",
+        "tipo",
+        "obligatorio"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tiempoMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tipo": {
+          "enum": [
+            "pregunta",
+            "punto",
+            "capitulo"
+          ]
+        },
+        "obligatorio": {
+          "type": "boolean"
+        },
+        "pregunta": {
+          "$ref": "#/$defs/preguntaQuiz"
+        },
+        "titulo": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "contenido": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "posicion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y"
+          ],
+          "properties": {
+            "x": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "y": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "origen": {
+          "$ref": "#/$defs/origen"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "pregunta"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "pregunta"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "punto"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "titulo",
+              "contenido",
+              "posicion"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "capitulo"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "titulo"
+            ]
+          }
+        }
+      ]
+    },
+    "bloque": {
+      "type": "object",
+      "required": [
+        "id",
+        "tipo"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tipo": {
+          "enum": [
+            "texto",
+            "imagen",
+            "personaje",
+            "interaccion",
+            "video"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "texto"
+              }
+            }
+          },
+          "then": {
+            "additionalProperties": false,
+            "required": [
+              "rol",
+              "contenido",
+              "origen"
+            ],
+            "properties": {
+              "id": true,
+              "tipo": true,
+              "rol": {
+                "enum": [
+                  "titulo",
+                  "subtitulo",
+                  "cuerpo",
+                  "destacado"
+                ]
+              },
+              "contenido": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "origen": {
+                "$ref": "#/$defs/origen"
+              },
+              "animacion": {
+                "$ref": "#/$defs/animacion"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "imagen"
+              }
+            }
+          },
+          "then": {
+            "additionalProperties": false,
+            "required": [
+              "recursoId",
+              "decorativa"
+            ],
+            "properties": {
+              "id": true,
+              "tipo": true,
+              "recursoId": {
+                "$ref": "#/$defs/id"
+              },
+              "decorativa": {
+                "type": "boolean"
+              },
+              "alt": {
+                "$ref": "#/$defs/textoI18n"
+              },
+              "animacion": {
+                "$ref": "#/$defs/animacion"
+              },
+              "origen": {
+                "$ref": "#/$defs/origen"
+              }
+            },
+            "if": {
+              "properties": {
+                "decorativa": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "alt"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "personaje"
+              }
+            }
+          },
+          "then": {
+            "additionalProperties": false,
+            "required": [
+              "recursoId"
+            ],
+            "properties": {
+              "id": true,
+              "tipo": true,
+              "recursoId": {
+                "$ref": "#/$defs/id",
+                "description": "SVG del personaje con capas boca_A..boca_X"
+              },
+              "pose": {
+                "enum": [
+                  "explicando",
+                  "celebrando",
+                  "pensando",
+                  "advirtiendo",
+                  "neutral"
+                ]
+              },
+              "lado": {
+                "enum": [
+                  "izquierda",
+                  "derecha"
+                ]
+              },
+              "animacion": {
+                "$ref": "#/$defs/animacion"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "interaccion"
+              }
+            }
+          },
+          "then": {
+            "additionalProperties": false,
+            "required": [
+              "interaccion"
+            ],
+            "properties": {
+              "id": true,
+              "tipo": true,
+              "interaccion": {
+                "$ref": "#/$defs/interaccion"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tipo": {
+                "const": "video"
+              }
+            }
+          },
+          "then": {
+            "additionalProperties": false,
+            "required": [
+              "recursoId",
+              "marcadores",
+              "reglas"
+            ],
+            "properties": {
+              "id": true,
+              "tipo": true,
+              "recursoId": {
+                "$ref": "#/$defs/id"
+              },
+              "subtitulos": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "es": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "en": {
+                    "$ref": "#/$defs/id"
+                  }
+                }
+              },
+              "marcadores": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/marcadorVideo"
+                }
+              },
+              "reglas": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "impedirAdelantar",
+                  "porcentajeMinimo"
+                ],
+                "properties": {
+                  "impedirAdelantar": {
+                    "type": "boolean"
+                  },
+                  "porcentajeMinimo": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "pantalla": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "titulo",
+        "tipo",
+        "plantilla",
+        "estado",
+        "obligatoria",
+        "bloques"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "titulo": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "tipo": {
+          "enum": [
+            "portada",
+            "contenido",
+            "interactiva",
+            "evaluacion",
+            "video",
+            "cierre"
+          ]
+        },
+        "objetivoIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "plantilla": {
+          "type": "string",
+          "description": "id de plantilla de pantalla del estilo del kit"
+        },
+        "estado": {
+          "$ref": "#/$defs/estadoContenido"
+        },
+        "obligatoria": {
+          "type": "boolean"
+        },
+        "bloques": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/bloque"
+          }
+        },
+        "narracion": {
+          "$ref": "#/$defs/narracion"
+        },
+        "fondoRecursoId": {
+          "$ref": "#/$defs/id"
+        },
+        "disposicion": {
+          "description": "Composición de la pantalla generada (v0.2). La define el generador a partir de las pantallas modelo del kit; el editor puede cambiarla.",
+          "enum": [
+            "portada",
+            "objetivos",
+            "personaje",
+            "dato",
+            "idea",
+            "lista",
+            "memoria",
+            "clasificar",
+            "ordenar",
+            "decision",
+            "video",
+            "hotspot",
+            "quiz",
+            "vf",
+            "resumen",
+            "seccion",
+            "resultados",
+            "cierre"
+          ]
+        },
+        "fondo": {
+          "description": "Color de fondo de la pantalla como rol del kit (v0.2).",
+          "$ref": "#/$defs/rolColor"
+        },
+        "ajustes": {
+          "description": "Retoques del editor por elemento (clave = id del bloque o del elemento de la disposición). Se guardan aparte del contenido para que la IA pueda regenerar textos sin perderlos (v0.2).",
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/ajusteElemento"
+          }
+        },
+        "extras": {
+          "description": "Elementos agregados a mano en el editor sobre la pantalla generada (v0.2).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/elementoExtra"
+          }
+        }
+      }
+    },
+    "rolColor": {
+      "enum": [
+        "primario",
+        "secundario",
+        "acento",
+        "texto",
+        "blanco",
+        "alerta",
+        "fondo"
+      ]
+    },
+    "ajusteElemento": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tamanoCqw": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 20,
+          "description": "Tamaño de texto en % del ancho de la pantalla"
+        },
+        "escala": {
+          "type": "number",
+          "minimum": 0.3,
+          "maximum": 3
+        },
+        "color": {
+          "$ref": "#/$defs/rolColor"
+        },
+        "relleno": {
+          "$ref": "#/$defs/rolColor"
+        },
+        "alineacion": {
+          "enum": [
+            "izquierda",
+            "centro",
+            "derecha"
+          ]
+        },
+        "desplazamiento": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x",
+            "y"
+          ],
+          "description": "Desplazamiento en % del ancho de la pantalla (modo libre). Por dispositivo cuando aplica.",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "dispositivo": {
+              "enum": [
+                "todos",
+                "escritorio",
+                "celular"
+              ]
+            }
+          }
+        },
+        "animacion": {
+          "enum": [
+            "auto",
+            "ninguna",
+            "aparecer",
+            "deslizar",
+            "zoom",
+            "rebotar"
+          ]
+        },
+        "retardoS": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600,
+          "description": "Línea de tiempo: segundo en que aparece el elemento, desde el inicio de la pantalla"
+        },
+        "finS": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 600,
+          "description": "Línea de tiempo: segundo en que sale. Sin valor, queda hasta el final de la pantalla"
+        },
+        "anclaPalabra": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Índice de la palabra de la narración con la que aparece. Si la narración cambia, el tiempo se recalcula con las marcas de la nueva voz"
+        },
+        "oculto": {
+          "type": "boolean"
+        }
+      }
+    },
+    "elementoExtra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "tipo",
+        "x",
+        "y",
+        "ancho"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tipo": {
+          "enum": [
+            "titulo",
+            "texto",
+            "dato",
+            "boton",
+            "imagen",
+            "insignia",
+            "forma",
+            "personaje"
+          ]
+        },
+        "texto": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "recursoId": {
+          "$ref": "#/$defs/id"
+        },
+        "x": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "y": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ancho": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "alClic": {
+          "enum": [
+            "nada",
+            "siguiente",
+            "retroalimentacion",
+            "ventana",
+            "audio",
+            "puntos"
+          ]
+        }
+      }
+    },
+    "capsula": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "titulo",
+        "objetivoIds",
+        "duracionEstimadaMin",
+        "pantallas"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "titulo": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "objetivoIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        },
+        "duracionEstimadaMin": {
+          "type": "number",
+          "minimum": 0
+        },
+        "pantallas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/pantalla"
+          }
+        }
+      }
+    },
+    "modulo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "titulo",
+        "capsulas"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "titulo": {
+          "$ref": "#/$defs/textoI18n"
+        },
+        "capsulas": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capsula"
+          }
+        }
+      }
+    },
+    "recurso": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "tipo",
+        "origen",
+        "nombre",
+        "mime"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "tipo": {
+          "enum": [
+            "imagen",
+            "svg",
+            "audio",
+            "video",
+            "subtitulos",
+            "lottie",
+            "documento"
+          ]
+        },
+        "origen": {
+          "enum": [
+            "biblioteca",
+            "generado",
+            "subido",
+            "cliente"
+          ]
+        },
+        "nombre": {
+          "type": "string"
+        },
+        "mime": {
+          "type": "string"
+        },
+        "idioma": {
+          "$ref": "#/$defs/idioma"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "licencia": {
+          "type": "string"
+        },
+        "capas": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "ids de capas detectadas en un SVG"
+        }
+      }
+    }
+  }
+}

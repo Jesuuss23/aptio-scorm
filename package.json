@@ -7,14 +7,22 @@
     "stop:infra": "docker compose down",
     "dev": "pnpm --filter \"./apps/*\" --parallel dev",
     "db:migrate": "pnpm --filter api exec prisma migrate dev",
-    "db:seed": "pnpm --filter api exec prisma db seed"
+    "db:seed": "pnpm --filter api exec prisma db seed",
+    "schema:test": "node docs/04-modelo-contenido/pruebas.mjs",
+    "ia:casos": "node packages/ai/scripts/validar-casos.mjs && node docs/04-modelo-contenido/validar.mjs packages/ai/casos/loto/curso-esperado-es.json",
+    "openapi:lint": "npx @redocly/cli lint docs/api/openapi.yaml"
   },
   "devDependencies": {
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
     ]
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

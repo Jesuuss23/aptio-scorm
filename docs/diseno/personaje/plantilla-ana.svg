@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="ana" viewBox="0 0 300 400" width="300" height="400">
+  <title>Ana · plantilla técnica de capas (no es el arte final)</title>
+  <!-- Colores del kit: #0000FE = primario, #00FE00 = secundario, #FE0000 = acento. El sistema los reemplaza por los del cliente. -->
+  <g id="personaje" transform="scale(4.1667)">
+    <g id="pose_neutral">
+      <g id="cuerpo_neutral"><rect x="16" y="52" width="40" height="44" rx="12" fill="#0000FE"/><rect x="31" y="52" width="10" height="16" fill="#FE0000"/><rect x="16" y="78" width="40" height="3" fill="#00FE00"/></g>
+      <g id="brazos_neutral"><path d="M18 58L12 82" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="12" cy="82" r="3.6" fill="#C68B62"/><path d="M54 58L60 82" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="60" cy="82" r="3.6" fill="#C68B62"/></g>
+    </g>
+    <g id="pose_explicando" display="none">
+      <g id="cuerpo_explicando"><rect x="16" y="52" width="40" height="44" rx="12" fill="#0000FE"/><rect x="31" y="52" width="10" height="16" fill="#FE0000"/><rect x="16" y="78" width="40" height="3" fill="#00FE00"/></g>
+      <g id="brazos_explicando"><path d="M18 58L12 82" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="12" cy="82" r="3.6" fill="#C68B62"/><path d="M54 58L66 46" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="66" cy="46" r="3.6" fill="#C68B62"/></g>
+    </g>
+    <g id="pose_celebrando" display="none">
+      <g id="cuerpo_celebrando"><rect x="16" y="52" width="40" height="44" rx="12" fill="#0000FE"/><rect x="31" y="52" width="10" height="16" fill="#FE0000"/><rect x="16" y="78" width="40" height="3" fill="#00FE00"/></g>
+      <g id="brazos_celebrando"><path d="M18 58L8 36" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="8" cy="36" r="3.6" fill="#C68B62"/><path d="M54 58L64 36" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="64" cy="36" r="3.6" fill="#C68B62"/></g>
+    </g>
+    <g id="pose_advirtiendo" display="none">
+      <g id="cuerpo_advirtiendo"><rect x="16" y="52" width="40" height="44" rx="12" fill="#0000FE"/><rect x="31" y="52" width="10" height="16" fill="#FE0000"/><rect x="16" y="78" width="40" height="3" fill="#00FE00"/></g>
+      <g id="brazos_advirtiendo"><path d="M18 58L12 82" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="12" cy="82" r="3.6" fill="#C68B62"/><path d="M54 58L62 40" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="62" cy="40" r="3.6" fill="#C68B62"/><rect x="58" y="31" width="8" height="8" rx="2" fill="#C68B62"/></g>
+    </g>
+    <g id="pose_pensando" display="none">
+      <g id="cuerpo_pensando"><rect x="16" y="52" width="40" height="44" rx="12" fill="#0000FE"/><rect x="31" y="52" width="10" height="16" fill="#FE0000"/><rect x="16" y="78" width="40" height="3" fill="#00FE00"/></g>
+      <g id="brazos_pensando"><path d="M18 58L12 82" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="12" cy="82" r="3.6" fill="#C68B62"/><path d="M54 58L44 52" stroke="#0000FE" stroke-width="7" stroke-linecap="round"/><circle cx="44" cy="52" r="3.6" fill="#C68B62"/></g>
+    </g>
+    <g id="cabeza">
+      <circle id="cara" cx="36" cy="38" r="17" fill="#C68B62"/>
+      <g id="casco"><path d="M18 30a18 16 0 0 1 36 0z" fill="#FE0000"/><rect x="15" y="28" width="42" height="5" rx="2.5" fill="#FE0000"/></g>
+      <g id="cejas"><path d="M26 33.5q3-2 6 0M40 33.5q3-2 6 0" stroke="#4A2A1A" stroke-width="1.4" fill="none" stroke-linecap="round"/></g>
+      <g id="ojos_abiertos"><circle cx="29" cy="37" r="2" fill="#102033"/><circle cx="43" cy="37" r="2" fill="#102033"/></g>
+      <g id="ojos_cerrados" display="none"><path d="M27 37.5h4M41 37.5h4" stroke="#102033" stroke-width="1.6" stroke-linecap="round"/></g>
+      <g id="bocas">
+        <g id="boca_A" display="none"><path d="M30 46h12" stroke="#7A2E1F" stroke-width="2.5" stroke-linecap="round"/></g>
+        <g id="boca_B" display="none"><rect x="31" y="44" width="10" height="4" rx="2" fill="#7A2E1F"/><rect x="32" y="44" width="8" height="1.6" fill="#FFFFFF"/></g>
+        <g id="boca_C" display="none"><ellipse cx="36" cy="46" rx="5" ry="3.2" fill="#7A2E1F"/></g>
+        <g id="boca_D" display="none"><ellipse cx="36" cy="46.5" rx="6" ry="4.8" fill="#7A2E1F"/><ellipse cx="36" cy="49" rx="3.4" ry="1.6" fill="#D9776A"/></g>
+        <g id="boca_E" display="none"><ellipse cx="36" cy="46" rx="3.6" ry="4" fill="#7A2E1F"/></g>
+        <g id="boca_F" display="none"><ellipse cx="36" cy="46" rx="2.4" ry="2.6" fill="#7A2E1F"/></g>
+        <g id="boca_G" display="none"><rect x="31" y="44.5" width="10" height="3" rx="1.5" fill="#7A2E1F"/><rect x="32" y="44" width="8" height="1.8" fill="#FFFFFF"/></g>
+        <g id="boca_H" display="none"><ellipse cx="36" cy="46" rx="5" ry="3.5" fill="#7A2E1F"/><ellipse cx="36" cy="44.8" rx="2.4" ry="1.2" fill="#D9776A"/></g>
+        <g id="boca_X"><path d="M31 45q5 3 10 0" stroke="#7A2E1F" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>
+      </g>
+    </g>
+  </g>
+</svg>
