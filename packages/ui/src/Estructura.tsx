@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { Marca } from './Logo.js';
+import { iniciales } from './iniciales.js';
 
 export interface ItemMenu {
   ruta: string;
@@ -29,14 +30,6 @@ export interface EstructuraProps {
   acciones?: ReactNode;
   children: ReactNode;
 }
-
-export const iniciales = (nombre: string) =>
-  nombre
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]!.toUpperCase())
-    .join('');
 
 /** Barra lateral cobalto de 240 px, barra superior con ruta y contenido a 32 px (HU-0110). */
 export function Estructura({ menu, rutaActual, ruta, usuario, alNavegar, alSalir, estado, acciones, children }: EstructuraProps) {

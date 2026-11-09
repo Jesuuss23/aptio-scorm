@@ -60,7 +60,8 @@ function escuchar(base: string, cookie: string) {
   return { recibidos, abierto, cerrar: () => respuesta?.destroy() };
 }
 
-describe.skipIf(!redisListo || !baseLista)('CP-016 · eventos en vivo (HU-0105)', () => {
+// En CI los servicios son obligatorios: si faltan, la prueba falla en vez de saltarse.
+describe.skipIf((!redisListo || !baseLista) && !process.env.CI)('CP-016 · eventos en vivo (HU-0105)', () => {
   let app: INestApplication;
   let base: string;
   let worker: { close(): Promise<void> };

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { hashearClave, verificarClave, type Prisma } from '@aptio/db';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { CorreoService } from '../correo/correo.service.js';

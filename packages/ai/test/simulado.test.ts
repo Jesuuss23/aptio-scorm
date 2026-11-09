@@ -9,7 +9,15 @@ describe('modo simulado con el caso LOTO', () => {
   });
 
   it('cada salida grabada valida contra su esquema', () => {
-    for (const tarea of tareasSimuladas()) expect(() => leerSalidaSimulada(tarea), tarea).not.toThrow();
+    const fallidas = tareasSimuladas().filter((tarea) => {
+      try {
+        leerSalidaSimulada(tarea);
+        return false;
+      } catch {
+        return true;
+      }
+    });
+    expect(fallidas).toEqual([]);
   });
 
   it('devuelve la estructura de IA-04', () => {
