@@ -66,6 +66,7 @@ model Usuario {
   emailVerificado  Boolean   @default(false)
   intentosFallidos Int       @default(0)
   bloqueadoHasta   DateTime? // 5 intentos fallidos = 15 minutos
+  versionSesion    Int       @default(0) // sube al cambiar la clave o desactivar: invalida las sesiones abiertas
   rol              Rol
   clienteId        String?   @db.Uuid // solo para REVISOR_CLIENTE
   // organizacionId es null solo para SUPERADMIN

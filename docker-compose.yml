@@ -33,6 +33,15 @@ services:
     volumes:
       - s3_data:/var/lib/localstack
 
+  # Correo de desarrollo: recibe las invitaciones y los enlaces de clave (HU-0109).
+  mailpit:
+    image: axllent/mailpit:v1.33
+    container_name: aptio-mailpit
+    restart: always
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+
 volumes:
   postgres_data:
   redis_data:
