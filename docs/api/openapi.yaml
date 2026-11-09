@@ -45,7 +45,29 @@ tags:
   description: Costos de IA, parámetros y mediciones (M13)
 - name: Conexiones IA
   description: Proveedor y modelo por tarea (M13)
+- name: Plataforma
+  description: Salud del servicio y operación (M15)
 paths:
+  /salud:
+    get:
+      tags:
+      - Plataforma
+      summary: Salud de la API y de la base de datos (CP-001)
+      operationId: salud
+      security: []
+      responses:
+        '200':
+          description: API y base de datos disponibles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Salud'
+        '503':
+          description: La base de datos no responde
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Salud'
   /auth/ingresar:
     post:
       tags:
@@ -2653,6 +2675,30 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    Salud:
+      type: object
+      required:
+      - estado
+      - servicio
+      - baseDatos
+      - fecha
+      properties:
+        estado:
+          type: string
+          enum:
+          - ok
+          - degradado
+        servicio:
+          type: string
+          example: Aptio SCORM API
+        baseDatos:
+          type: string
+          enum:
+          - ok
+          - error
+        fecha:
+          type: string
+          format: date-time
     Error:
       type: object
       required:
