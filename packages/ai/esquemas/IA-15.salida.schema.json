@@ -1,0 +1,480 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-15.json",
+  "title": "IA-15 · Componer pantalla con componentes del kit (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pantallaId": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+    },
+    "disposicion": {
+      "enum": [
+        "portada",
+        "objetivos",
+        "personaje",
+        "dato",
+        "idea",
+        "lista",
+        "memoria",
+        "clasificar",
+        "ordenar",
+        "decision",
+        "video",
+        "hotspot",
+        "quiz",
+        "vf",
+        "resumen",
+        "seccion",
+        "resultados",
+        "cierre"
+      ]
+    },
+    "fondo": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/rolColor"
+    },
+    "campos": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "titulo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 70
+        },
+        "subtitulo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "texto": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 220
+        },
+        "dato": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140,
+          "description": "Idea clave destacada"
+        },
+        "datoGrande": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "numero": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "icono": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 30
+              },
+              "titulo": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "texto": {
+                "type": "string",
+                "minLength": 0,
+                "maxLength": 120
+              }
+            },
+            "required": [
+              "titulo"
+            ]
+          },
+          "minItems": 2,
+          "maxItems": 6
+        },
+        "burbuja": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 220,
+          "description": "Lo que dice el personaje en globo"
+        },
+        "situacion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "pregunta": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "afirmacion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "opciones": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 90
+          },
+          "minItems": 2,
+          "maxItems": 4
+        },
+        "correcta": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retroOk": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "retroNo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "required": [
+        "titulo"
+      ]
+    },
+    "personaje": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pose": {
+          "enum": [
+            "explicando",
+            "celebrando",
+            "pensando",
+            "advirtiendo",
+            "neutral"
+          ]
+        },
+        "lado": {
+          "enum": [
+            "izquierda",
+            "derecha"
+          ]
+        }
+      },
+      "required": [
+        "pose",
+        "lado"
+      ]
+    },
+    "pedidosImagen": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "uso": {
+            "enum": [
+              "principal",
+              "icono",
+              "fondo",
+              "escena"
+            ]
+          },
+          "descripcion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          }
+        },
+        "required": [
+          "id",
+          "uso",
+          "descripcion"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 4
+    },
+    "actividad": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "enum": [
+            "INT-01",
+            "INT-02",
+            "INT-03",
+            "INT-04",
+            "INT-05",
+            "INT-06",
+            "INT-07",
+            "INT-08"
+          ]
+        }
+      },
+      "required": [
+        "tipo"
+      ]
+    },
+    "motivo": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    }
+  },
+  "required": [
+    "pantallaId",
+    "disposicion",
+    "campos",
+    "pedidosImagen"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "portada"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "subtitulo"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "objetivos"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "items"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "personaje"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "burbuja"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "dato"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "datoGrande",
+              "texto"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "idea"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "texto",
+              "dato"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "lista"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "items"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "decision"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "situacion",
+              "opciones",
+              "correcta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "quiz"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "pregunta",
+              "opciones",
+              "correcta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "vf"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "afirmacion",
+              "correcta"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "resumen"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "items"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "const": "seccion"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "campos": {
+            "required": [
+              "titulo",
+              "numero"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disposicion": {
+            "enum": [
+              "memoria",
+              "clasificar",
+              "ordenar",
+              "hotspot",
+              "decision",
+              "quiz",
+              "vf"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "actividad"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-04.json",
+  "title": "IA-04 · Estructura del curso (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "objetivos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "texto": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/textoI18n"
+          },
+          "nivelBloom": {
+            "enum": [
+              "recordar",
+              "comprender",
+              "aplicar",
+              "analizar",
+              "evaluar",
+              "crear"
+            ]
+          },
+          "verbo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          }
+        },
+        "required": [
+          "id",
+          "texto",
+          "nivelBloom",
+          "verbo"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 6
+    },
+    "modulos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "titulo": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/textoI18n"
+          },
+          "capsulas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+                },
+                "titulo": {
+                  "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/textoI18n"
+                },
+                "objetivoIds": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+                  },
+                  "minItems": 1
+                },
+                "duracionEstimadaMin": {
+                  "type": "number",
+                  "minimum": 1,
+                  "maximum": 30
+                },
+                "pantallas": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+                      },
+                      "tipo": {
+                        "enum": [
+                          "portada",
+                          "objetivos",
+                          "contenido",
+                          "actividad",
+                          "evaluacion",
+                          "seccion",
+                          "resumen",
+                          "resultados",
+                          "cierre"
+                        ]
+                      },
+                      "proposito": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "objetivoIds": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+                        },
+                        "minItems": 0
+                      },
+                      "fragmentoIds": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+                        },
+                        "minItems": 0
+                      },
+                      "actividadSugerida": {
+                        "enum": [
+                          "INT-01",
+                          "INT-02",
+                          "INT-03",
+                          "INT-04",
+                          "INT-05",
+                          "INT-06",
+                          "INT-07",
+                          "INT-08"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "tipo",
+                      "proposito",
+                      "objetivoIds",
+                      "fragmentoIds"
+                    ]
+                  },
+                  "minItems": 3,
+                  "maxItems": 45
+                }
+              },
+              "required": [
+                "id",
+                "titulo",
+                "objetivoIds",
+                "duracionEstimadaMin",
+                "pantallas"
+              ]
+            },
+            "minItems": 1
+          }
+        },
+        "required": [
+          "id",
+          "titulo",
+          "capsulas"
+        ]
+      },
+      "minItems": 1
+    },
+    "supuestos": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "minItems": 0,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "objetivos",
+    "modulos"
+  ]
+}

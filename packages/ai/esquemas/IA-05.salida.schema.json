@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-05.json",
+  "title": "IA-05 · Storyboard de una cápsula (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "capsulaId": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+    },
+    "pantallas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "textoPantalla": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 220,
+            "description": "Texto visible; máximo 30 palabras (lo verifica la regla de longitud)"
+          },
+          "narracion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "description": "Lo que dice el personaje; máximo 45 palabras, frases cortas"
+          },
+          "visual": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Qué se ve: idea de la ilustración, ícono o escena"
+          },
+          "actividad": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "tipo": {
+                "enum": [
+                  "INT-01",
+                  "INT-02",
+                  "INT-03",
+                  "INT-04",
+                  "INT-05",
+                  "INT-06",
+                  "INT-07",
+                  "INT-08"
+                ]
+              },
+              "consigna": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "tipo",
+              "consigna"
+            ]
+          },
+          "objetivoIds": {
+            "type": "array",
+            "items": {
+              "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+            },
+            "minItems": 0
+          },
+          "origen": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/origen"
+          },
+          "notas": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "titulo",
+          "textoPantalla",
+          "narracion",
+          "visual",
+          "objetivoIds",
+          "origen"
+        ]
+      },
+      "minItems": 3,
+      "maxItems": 45
+    }
+  },
+  "required": [
+    "capsulaId",
+    "pantallas"
+  ]
+}

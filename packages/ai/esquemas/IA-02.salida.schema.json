@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-02.json",
+  "title": "IA-02 · Propuesta conservar/complementario/omitir (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "metaMinutos": {
+      "type": "number",
+      "minimum": 1
+    },
+    "minutosEstimados": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Duración estimada solo con los temas conservados"
+    },
+    "clasificacion": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "temaId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "decision": {
+            "enum": [
+              "conservar",
+              "complementario",
+              "omitir"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "temaId",
+          "decision",
+          "motivo"
+        ]
+      },
+      "minItems": 1
+    },
+    "observaciones": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "minItems": 0,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "metaMinutos",
+    "minutosEstimados",
+    "clasificacion"
+  ]
+}

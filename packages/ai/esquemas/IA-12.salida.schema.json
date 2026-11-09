@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-12.json",
+  "title": "IA-12 · Revisión de calidad (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "observaciones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "pantallaId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "tipo": {
+            "enum": [
+              "ortografia",
+              "coherencia",
+              "alineacion",
+              "longitud",
+              "accesibilidad",
+              "faltante",
+              "tono",
+              "exactitud"
+            ]
+          },
+          "gravedad": {
+            "enum": [
+              "alta",
+              "media",
+              "baja"
+            ]
+          },
+          "mensaje": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "sugerencia": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "ruta": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "id",
+          "pantallaId",
+          "tipo",
+          "gravedad",
+          "mensaje"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 120
+    },
+    "resumen": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400
+    }
+  },
+  "required": [
+    "observaciones",
+    "resumen"
+  ]
+}

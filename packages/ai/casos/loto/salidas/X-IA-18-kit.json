@@ -1,0 +1,29 @@
+{
+  "paleta": {
+    "primario": "#0F2A44",
+    "secundario": "#1F7A5C",
+    "acento": "#F2A900",
+    "texto": "#102033",
+    "fondo": "#F5F7FA"
+  },
+  "tipografias": {
+    "titulos": "Archivo",
+    "texto": "Source Sans 3",
+    "alternativasLibres": [
+      "Inter",
+      "IBM Plex Sans"
+    ]
+  },
+  "estilo": {
+    "ilustracion": "plana",
+    "esquinas": "suaves",
+    "tono": "Industrial, claro, con amarillo de seguridad como acento"
+  },
+  "contrasteOk": true,
+  "evidencias": [
+    "Azul marino dominante en portada y encabezados",
+    "Amarillo de seguridad en señalética",
+    "Fuente sin serifa geométrica en títulos"
+  ],
+  "confianza": 0.8
+}

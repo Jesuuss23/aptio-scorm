@@ -1,0 +1,46 @@
+{
+  "observaciones": [
+    {
+      "id": "obs-1",
+      "pantallaId": "p18",
+      "tipo": "faltante",
+      "gravedad": "alta",
+      "mensaje": "Falta el video del cliente; la pantalla usa un marcador de lugar.",
+      "sugerencia": "Pedir el video al cliente o cambiar la pantalla por «Ordenar pasos» con ilustraciones."
+    },
+    {
+      "id": "obs-2",
+      "pantallaId": "p07",
+      "tipo": "longitud",
+      "gravedad": "media",
+      "mensaje": "En inglés, la tarjeta «Cylinders and hoses» desborda el espacio.",
+      "sugerencia": "Usar «Cylinders, hoses».",
+      "ruta": "/modulos/0/capsulas/0/pantallas/6/bloques/1/interaccion/datos/pares/2/b"
+    },
+    {
+      "id": "obs-3",
+      "pantallaId": "p20",
+      "tipo": "exactitud",
+      "gravedad": "media",
+      "mensaje": "La ilustración es genérica; los puntos de aislamiento reales de la faja 3 están en el Anexo B (p. 30).",
+      "sugerencia": "Pedir al cliente una foto o el diagrama del Anexo B."
+    },
+    {
+      "id": "obs-4",
+      "pantallaId": "p09",
+      "tipo": "exactitud",
+      "gravedad": "baja",
+      "mensaje": "El ejemplo de la faja es contenido creado por la IA, no está en el manual.",
+      "sugerencia": "Confirmar con el cliente o marcarlo como caso ilustrativo."
+    },
+    {
+      "id": "obs-5",
+      "pantallaId": "p04",
+      "tipo": "accesibilidad",
+      "gravedad": "baja",
+      "mensaje": "El símbolo «≠» puede leerse mal con lector de pantalla.",
+      "sugerencia": "Texto alternativo: «Apagado no es igual a energía cero»."
+    }
+  ],
+  "resumen": "Cápsula coherente con el manual; 1 observación alta (video faltante) y 4 menores. Los tres objetivos tienen actividad y preguntas en el reto final."
+}

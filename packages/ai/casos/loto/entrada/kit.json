@@ -1,0 +1,68 @@
+{
+  "id": "kit-minera-andina",
+  "nombre": "Minera Andina",
+  "paleta": {
+    "primario": "#0F2A44",
+    "secundario": "#1F7A5C",
+    "acento": "#F2A900",
+    "texto": "#102033",
+    "fondo": "#F5F7FA"
+  },
+  "tipografias": {
+    "titulos": "Archivo",
+    "texto": "Source Sans 3"
+  },
+  "estilo": {
+    "ilustracion": "plana",
+    "esquinas": "suaves",
+    "tono": "industrial, claro y cercano"
+  },
+  "disposiciones": [
+    "portada",
+    "objetivos",
+    "personaje",
+    "dato",
+    "idea",
+    "lista",
+    "memoria",
+    "clasificar",
+    "ordenar",
+    "decision",
+    "video",
+    "hotspot",
+    "quiz",
+    "vf",
+    "resumen",
+    "seccion",
+    "resultados",
+    "cierre"
+  ],
+  "personaje": {
+    "recursoId": "svg-ana",
+    "nombre": "Ana",
+    "poses": [
+      "explicando",
+      "advirtiendo",
+      "celebrando",
+      "pensando",
+      "neutral"
+    ]
+  },
+  "biblioteca": [
+    {
+      "id": "ico-candado",
+      "descripcion": "Candado personal rojo con tarjeta, estilo plano",
+      "formato": "svg"
+    },
+    {
+      "id": "img-alerta-energia",
+      "descripcion": "Señal de advertencia con rayo y manómetro, estilo plano",
+      "formato": "svg"
+    },
+    {
+      "id": "img-trofeo",
+      "descripcion": "Trofeo con estrella, estilo plano",
+      "formato": "svg"
+    }
+  ]
+}

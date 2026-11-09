@@ -1,0 +1,395 @@
+{
+  "nota": "Sin IA de texto. Duraciones simuladas (65 ms por carácter); con la voz real las da el audio.",
+  "narraciones": [
+    {
+      "pantallaId": "p01",
+      "texto": "Hola, te doy la bienvenida a esta cápsula sobre bloqueo y etiquetado.",
+      "hashTexto": "e973259adc8c51317c5260dfeb2278b9d4c3cf265b8f0d4135c25b14931195b8",
+      "duracionMs": 4485,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p01-es",
+      "subtitulosId": "vtt-p01-es"
+    },
+    {
+      "pantallaId": "p02",
+      "texto": "Al terminar podrás identificar, distinguir y aplicar los pasos del bloqueo.",
+      "hashTexto": "957aa4cbe8c3a5478c7345a49e0973bd600fb8a725156d7b4137c49b65ea0170",
+      "duracionMs": 4875,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p02-es",
+      "subtitulosId": "vtt-p02-es"
+    },
+    {
+      "pantallaId": "p03",
+      "texto": "Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo.",
+      "hashTexto": "dfacb5b012bce3dd52c2d5e088ef6867ed80bdc3bdabd5ad435d6c779eae3b7d",
+      "duracionMs": 6305,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p03-es",
+      "subtitulosId": "vtt-p03-es"
+    },
+    {
+      "pantallaId": "p04",
+      "texto": "Ojo: apagado no significa energía cero. Un equipo puede guardar energía aunque esté apagado.",
+      "hashTexto": "a6a67b6c89f24b9b5dff73fe2fe441281fa174ecbee8c0c785cba88e6f9e2919",
+      "duracionMs": 5980,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p04-es",
+      "subtitulosId": "vtt-p04-es"
+    },
+    {
+      "pantallaId": "p05",
+      "texto": "Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada.",
+      "hashTexto": "d88fa810be6894c3a13b167759ec8722100598b2bb07ba929f5f7307721ffc7a",
+      "duracionMs": 5330,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p05-es",
+      "subtitulosId": "vtt-p05-es"
+    },
+    {
+      "pantallaId": "p06",
+      "texto": "Hay seis tipos: eléctrica, mecánica, hidráulica, neumática, térmica y química.",
+      "hashTexto": "8019e39c51466356bc7297223fdb1e1d283442e1ddeadbc88acef35a9e016f6f",
+      "duracionMs": 5070,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p06-es",
+      "subtitulosId": "vtt-p06-es"
+    },
+    {
+      "pantallaId": "p07",
+      "texto": "Encuentra las parejas: cada energía con su ejemplo.",
+      "hashTexto": "82c055f6992c45fd682511d4141e31de303392edee6d34f2b85a75d36965050f",
+      "duracionMs": 3315,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p07-es",
+      "subtitulosId": "vtt-p07-es"
+    },
+    {
+      "pantallaId": "p08",
+      "texto": "Después de apagar puede quedar energía residual: presión, carga o un resorte tenso.",
+      "hashTexto": "bfcc1e18c3878637d6c6e1b340eae0b27d079aa37488954d90e7d1e6d834021e",
+      "duracionMs": 5395,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p08-es",
+      "subtitulosId": "vtt-p08-es"
+    },
+    {
+      "pantallaId": "p09",
+      "texto": "La semana pasada una faja se movió sola al liberar la presión del cilindro. Nadie la había bloqueado.",
+      "hashTexto": "482e59714cb8a1d6e29196705a4edb99120f310780d93d39781af43dd35c7c4d",
+      "duracionMs": 6565,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p09-es",
+      "subtitulosId": "vtt-p09-es"
+    },
+    {
+      "pantallaId": "p10",
+      "texto": "Clasifica cada práctica en segura o riesgosa.",
+      "hashTexto": "f8e64ece09e9e5fc10046675e53d3bfe1ebe9da20b6d26b5769e5723b069cfc8",
+      "duracionMs": 2925,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p10-es",
+      "subtitulosId": "vtt-p10-es"
+    },
+    {
+      "pantallaId": "p11",
+      "texto": "Repasemos: apagado no es energía cero, hay seis tipos de energía y la residual también se bloquea.",
+      "hashTexto": "d5ebfb3a16585aa56f46e558686bc6d6e89b1b3f3351ff38c1511eef3ad94e6c",
+      "duracionMs": 6370,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p11-es",
+      "subtitulosId": "vtt-p11-es"
+    },
+    {
+      "pantallaId": "p12",
+      "texto": "Ahora veamos los seis pasos del bloqueo.",
+      "hashTexto": "27ec0933147969fc09e46e731b6e46c1ddce249158c423bc1bf8d61f7d9ae94e",
+      "duracionMs": 2600,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p12-es",
+      "subtitulosId": "vtt-p12-es"
+    },
+    {
+      "pantallaId": "p13",
+      "texto": "Primero preparas, luego avisas y después apagas el equipo.",
+      "hashTexto": "1c799219a3314a39e3c069159d1f98cf399f2cecdbfe50f417bc4814045cb211",
+      "duracionMs": 3770,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p13-es",
+      "subtitulosId": "vtt-p13-es"
+    },
+    {
+      "pantallaId": "p14",
+      "texto": "Luego aíslas, bloqueas y etiquetas, y verificas la energía cero.",
+      "hashTexto": "24c995965b1b50227f8d144d80dfac9cdf68803062d9307dc728e3623b16cf1f",
+      "duracionMs": 4160,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p14-es",
+      "subtitulosId": "vtt-p14-es"
+    },
+    {
+      "pantallaId": "p15",
+      "texto": "Ordena los seis pasos del bloqueo.",
+      "hashTexto": "88d6b54d3f4b1b81dcd80c5190a2951766616eaef7f97ea3aad0fdabbd370cc0",
+      "duracionMs": 2210,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p15-es",
+      "subtitulosId": "vtt-p15-es"
+    },
+    {
+      "pantallaId": "p16",
+      "texto": "Cada trabajador coloca su propio candado y guarda su única llave.",
+      "hashTexto": "c51485820d10550627887243c5752b56c69e5a48cb728b9984dfcfb5581f07b6",
+      "duracionMs": 4225,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p16-es",
+      "subtitulosId": "vtt-p16-es"
+    },
+    {
+      "pantallaId": "p17",
+      "texto": "Tu compañero olvidó su candado y te pide el tuyo. ¿Qué harías?",
+      "hashTexto": "0d39d4c0eab7b69685d829da4b75ec0d0fa534ac53af74d7c05fe64d49291968",
+      "duracionMs": 4030,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p17-es",
+      "subtitulosId": "vtt-p17-es"
+    },
+    {
+      "pantallaId": "p18",
+      "texto": "Mira el procedimiento completo. El video se detendrá para hacerte preguntas.",
+      "hashTexto": "96d5eaf2499006087b659c9ba3d26c7dc7b2572a8fae6019a9a1b40a1d56dac0",
+      "duracionMs": 4940,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p18-es",
+      "subtitulosId": "vtt-p18-es"
+    },
+    {
+      "pantallaId": "p19",
+      "texto": "El paso que más se omite es verificar la energía cero. Intenta arrancar el equipo después de bloquearlo.",
+      "hashTexto": "e6e0d2364cc07a06d69a6f67696cacb76ab0d7a8b9dc20fab5c6290911b077ae",
+      "duracionMs": 6760,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p19-es",
+      "subtitulosId": "vtt-p19-es"
+    },
+    {
+      "pantallaId": "p20",
+      "texto": "Explora la escena y encuentra los tres puntos de aislamiento.",
+      "hashTexto": "39fdabd85551d6a92599f02fb2cf56dac918a2120d32659cedfcc0945fa36336",
+      "duracionMs": 3965,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p20-es",
+      "subtitulosId": "vtt-p20-es"
+    },
+    {
+      "pantallaId": "p21",
+      "texto": "Si trabajan varios, cada uno pone su candado en una pinza grupal.",
+      "hashTexto": "158441905d662ea9da0a8a1f9d51c105bda8e2010b4b7dec290703cacdc60679",
+      "duracionMs": 4225,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p21-es",
+      "subtitulosId": "vtt-p21-es"
+    },
+    {
+      "pantallaId": "p22",
+      "texto": "¿Cuándo empiezas a trabajar en el equipo?",
+      "hashTexto": "444eea400d536b44296463d060d22697f1d2dda5daa0336ee19dfa599d5f9d5d",
+      "duracionMs": 2665,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p22-es",
+      "subtitulosId": "vtt-p22-es"
+    },
+    {
+      "pantallaId": "p23",
+      "texto": "Por último, cómo retirar el bloqueo de forma segura.",
+      "hashTexto": "4eb0ac60e0944e2a6ac6ed199ed266a35d2392f31528cdcdb89cbc11b22d599b",
+      "duracionMs": 3380,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p23-es",
+      "subtitulosId": "vtt-p23-es"
+    },
+    {
+      "pantallaId": "p24",
+      "texto": "Revisa el área, avisa y retira solo tu candado con tu llave.",
+      "hashTexto": "4f00528eaf053f4803e6737ef4a8615af613df4bc0be1c5beaf8682b09f7539b",
+      "duracionMs": 3900,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p24-es",
+      "subtitulosId": "vtt-p24-es"
+    },
+    {
+      "pantallaId": "p25",
+      "texto": "Encuentras el candado de un compañero que ya se fue. ¿Qué haces?",
+      "hashTexto": "25de7dd123216dbf0a4447947ae0adc1ce1cdd0399e3fc17a0e53f4e617cc90a",
+      "duracionMs": 4160,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p25-es",
+      "subtitulosId": "vtt-p25-es"
+    },
+    {
+      "pantallaId": "p26",
+      "texto": "¿Mito o realidad? Si el equipo está apagado, no hace falta bloquearlo.",
+      "hashTexto": "ed2c82de8169960c72417a72f5c7d9fc212fb31c88600e6ccfd6ceb8727e27a6",
+      "duracionMs": 4550,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p26-es",
+      "subtitulosId": "vtt-p26-es"
+    },
+    {
+      "pantallaId": "p27",
+      "texto": "En resumen: seis pasos, tu candado y tu llave, y siempre verifica la energía cero.",
+      "hashTexto": "c40eb1cc1c1ea2c200a23c4143f78a25c4a09b0c40b8d792f381580f565e7848",
+      "duracionMs": 5330,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p27-es",
+      "subtitulosId": "vtt-p27-es"
+    },
+    {
+      "pantallaId": "p28",
+      "texto": "Reto final. ¿Quién puede retirar tu candado?",
+      "hashTexto": "b868cf942f867b11138e7c8978c9954b11105f6e095033c5ac4a4a7ff7280613",
+      "duracionMs": 2860,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p28-es",
+      "subtitulosId": "vtt-p28-es"
+    },
+    {
+      "pantallaId": "p29",
+      "texto": "Estos son tus resultados.",
+      "hashTexto": "da8d08fe8445594b14c034f0ff9fc26fc944972491d1892490719aca6a9be511",
+      "duracionMs": 1625,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p29-es",
+      "subtitulosId": "vtt-p29-es"
+    },
+    {
+      "pantallaId": "p30",
+      "texto": "¡Lo lograste! Ya sabes bloquear y etiquetar de forma segura.",
+      "hashTexto": "d8c7ab860f3680172c34ee19cedc27b5989b2bc7ca92888ac162120129254ba6",
+      "duracionMs": 3900,
+      "voz": {
+        "proveedor": "google",
+        "voz": "es-US-Neural2-A",
+        "velocidad": 1.0
+      },
+      "recursoAudioId": "aud-p30-es",
+      "subtitulosId": "vtt-p30-es"
+    }
+  ]
+}

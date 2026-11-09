@@ -1,0 +1,13 @@
+{
+  "recomendada": {
+    "tipo": "INT-02",
+    "motivo": "El objetivo 2 pide distinguir prácticas: clasificar en dos grupos hace visible la diferencia.",
+    "nivelBloom": "comprender"
+  },
+  "alternativas": [
+    {
+      "tipo": "INT-07",
+      "motivo": "Deslizar mito o realidad sirve como repaso rápido, pero con menos contraste entre grupos."
+    }
+  ]
+}

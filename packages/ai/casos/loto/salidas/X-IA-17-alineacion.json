@@ -1,0 +1,21 @@
+{
+  "resumen": "El objetivo 3 (aplicar) solo tiene preguntas de recordar en el quiz formativo p22; se propone una situación.",
+  "cambios": [
+    {
+      "tipo": "ajustar-pregunta",
+      "objetivoId": "obj-3",
+      "nivelBloom": "aplicar",
+      "motivo": "Convertir p22-q3 en una situación de trabajo.",
+      "pantallaId": "p22"
+    }
+  ],
+  "patch": [
+    {
+      "op": "replace",
+      "path": "/modulos/0/capsulas/0/pantallas/21/bloques/1/interaccion/datos/preguntas/2/enunciado",
+      "value": {
+        "es": "Cortaste la energía del motor con el interruptor. ¿Qué haces ahora?"
+      }
+    }
+  ]
+}

@@ -1,0 +1,186 @@
+{
+  "documentoId": "doc-pets-seg-014",
+  "totalPaginas": 30,
+  "temas": [
+    {
+      "id": "t01",
+      "titulo": "Datos del documento y control de cambios",
+      "resumen": "Portada, control de versiones e índice del procedimiento.",
+      "paginas": [
+        1,
+        2,
+        3
+      ],
+      "peso": 1,
+      "tipoContenido": "otro"
+    },
+    {
+      "id": "t02",
+      "titulo": "Objetivo y alcance",
+      "resumen": "Para qué sirve el procedimiento y a quién aplica; excluye alta tensión.",
+      "paginas": [
+        4,
+        5
+      ],
+      "peso": 2,
+      "tipoContenido": "norma"
+    },
+    {
+      "id": "t03",
+      "titulo": "Referencias",
+      "resumen": "Normas y manuales de referencia.",
+      "paginas": [
+        6
+      ],
+      "peso": 1,
+      "tipoContenido": "otro"
+    },
+    {
+      "id": "t04",
+      "titulo": "Definiciones clave",
+      "resumen": "Bloqueo, etiquetado, energía cero, dispositivo de aislamiento y energía residual.",
+      "paginas": [
+        7,
+        8
+      ],
+      "peso": 4,
+      "tipoContenido": "concepto"
+    },
+    {
+      "id": "t05",
+      "titulo": "Responsabilidades y capacitación",
+      "resumen": "Qué hace cada rol; capacitación obligatoria; el incumplimiento es falta grave.",
+      "paginas": [
+        9,
+        10,
+        11
+      ],
+      "peso": 2,
+      "tipoContenido": "norma"
+    },
+    {
+      "id": "t06",
+      "titulo": "Qué es la energía peligrosa",
+      "resumen": "Energía que puede mover, calentar o liberar algo de forma inesperada; apagado no es energía cero.",
+      "paginas": [
+        12
+      ],
+      "peso": 5,
+      "tipoContenido": "concepto"
+    },
+    {
+      "id": "t07",
+      "titulo": "Seis tipos de energía",
+      "resumen": "Eléctrica, mecánica, hidráulica, neumática, térmica y química, con ejemplos.",
+      "paginas": [
+        13
+      ],
+      "peso": 5,
+      "tipoContenido": "concepto"
+    },
+    {
+      "id": "t08",
+      "titulo": "Energía residual",
+      "resumen": "La energía que queda tras apagar y aislar se libera o bloquea antes de intervenir.",
+      "paginas": [
+        14
+      ],
+      "peso": 5,
+      "tipoContenido": "advertencia"
+    },
+    {
+      "id": "t09",
+      "titulo": "Dispositivos de bloqueo",
+      "resumen": "Candado personal, tarjeta, pinza y caja grupal, otros bloqueadores.",
+      "paginas": [
+        15,
+        16,
+        17,
+        18,
+        19
+      ],
+      "peso": 3,
+      "tipoContenido": "dato"
+    },
+    {
+      "id": "t10",
+      "titulo": "Inspección de dispositivos",
+      "resumen": "Revisar candados y tarjetas antes de cada uso.",
+      "paginas": [
+        20
+      ],
+      "peso": 2,
+      "tipoContenido": "procedimiento"
+    },
+    {
+      "id": "t11",
+      "titulo": "Los seis pasos del bloqueo",
+      "resumen": "Preparar, avisar, apagar, aislar, bloquear y etiquetar, verificar.",
+      "paginas": [
+        21,
+        22,
+        26
+      ],
+      "peso": 5,
+      "tipoContenido": "procedimiento"
+    },
+    {
+      "id": "t12",
+      "titulo": "Prácticas seguras y un candado por persona",
+      "resumen": "Qué es seguro y qué es riesgoso; cada uno su candado y su única llave.",
+      "paginas": [
+        23,
+        24
+      ],
+      "peso": 5,
+      "tipoContenido": "norma"
+    },
+    {
+      "id": "t13",
+      "titulo": "Bloqueo grupal",
+      "resumen": "Pinza o caja grupal; el equipo se libera cuando sale el último.",
+      "paginas": [
+        17,
+        18,
+        25
+      ],
+      "peso": 4,
+      "tipoContenido": "procedimiento"
+    },
+    {
+      "id": "t14",
+      "titulo": "Verificar energía cero",
+      "resumen": "Intentar arrancar y medir; es el paso que más se omite.",
+      "paginas": [
+        26,
+        27
+      ],
+      "peso": 5,
+      "tipoContenido": "advertencia"
+    },
+    {
+      "id": "t15",
+      "titulo": "Retiro del bloqueo",
+      "resumen": "Revisar, avisar y retirar solo tu candado; en ausencia, solo el supervisor y sin llave maestra.",
+      "paginas": [
+        28
+      ],
+      "peso": 5,
+      "tipoContenido": "procedimiento"
+    },
+    {
+      "id": "t16",
+      "titulo": "Registros y anexos",
+      "resumen": "Formatos F-014-01 y F-014-02, conservación y anexos.",
+      "paginas": [
+        29,
+        30
+      ],
+      "peso": 1,
+      "tipoContenido": "otro"
+    }
+  ],
+  "observaciones": [
+    "El documento no trae objetivos de aprendizaje; se proponen en la etapa 2."
+  ]
+}

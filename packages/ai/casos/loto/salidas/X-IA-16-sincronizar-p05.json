@@ -1,0 +1,27 @@
+{
+  "tipo": "sincronizar-voz",
+  "titulo": "Sincronizar con la voz",
+  "resumen": "El dato clave aparece cuando Ana dice «energía» y la imagen con «calentar».",
+  "patch": [
+    {
+      "op": "add",
+      "path": "/ajustes",
+      "value": {
+        "p05-titulo": {
+          "retardoS": 0
+        },
+        "p05-texto": {
+          "retardoS": 0.3
+        },
+        "p05-imagen": {
+          "retardoS": 1.95,
+          "anclaPalabra": 8
+        },
+        "p05-dato": {
+          "retardoS": 0.85,
+          "anclaPalabra": 2
+        }
+      }
+    }
+  ]
+}

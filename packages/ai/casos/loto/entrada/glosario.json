@@ -1,0 +1,38 @@
+[
+  {
+    "es": "bloqueo y etiquetado",
+    "en": "lockout/tagout"
+  },
+  {
+    "es": "energía cero",
+    "en": "zero energy state"
+  },
+  {
+    "es": "energía peligrosa",
+    "en": "hazardous energy"
+  },
+  {
+    "es": "energía residual",
+    "en": "residual energy"
+  },
+  {
+    "es": "candado personal",
+    "en": "personal lock"
+  },
+  {
+    "es": "tarjeta de bloqueo",
+    "en": "lockout tag"
+  },
+  {
+    "es": "pinza de bloqueo grupal",
+    "en": "group lockout hasp"
+  },
+  {
+    "es": "punto de aislamiento",
+    "en": "isolation point"
+  },
+  {
+    "es": "supervisor",
+    "en": "supervisor"
+  }
+]

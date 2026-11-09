@@ -1,0 +1,64 @@
+{
+  "pedidos": [
+    {
+      "pedidoId": "p05-img",
+      "reutilizarRecursoId": null,
+      "prompt": "An electrical control panel with a lightning warning symbol on its door, closed and labeled. Flat vector illustration, clean geometric shapes, soft rounded corners, limited palette #0F2A44 #1F7A5C #F2A900 on #F5F7FA background, no text, no logos.",
+      "evitar": "text, letters, logos, real brands, photorealism, people faces",
+      "formato": "svg",
+      "relacionAspecto": "1:1",
+      "alt": {
+        "es": "Tablero eléctrico con rayo de advertencia"
+      },
+      "decorativa": false
+    },
+    {
+      "pedidoId": "p08-img",
+      "reutilizarRecursoId": "img-alerta-energia",
+      "prompt": "reutilizar",
+      "evitar": "",
+      "formato": "svg",
+      "relacionAspecto": "1:1",
+      "alt": {
+        "es": "Manguera presurizada y resorte tenso con señal de alerta"
+      },
+      "decorativa": false
+    },
+    {
+      "pedidoId": "p16-img",
+      "reutilizarRecursoId": "ico-candado",
+      "prompt": "reutilizar",
+      "evitar": "",
+      "formato": "svg",
+      "relacionAspecto": "1:1",
+      "alt": {
+        "es": "Mano colocando un candado rojo con tarjeta"
+      },
+      "decorativa": false
+    },
+    {
+      "pedidoId": "p20-img",
+      "reutilizarRecursoId": null,
+      "prompt": "A conveyor belt in a mineral processing plant with an electrical panel on the left, a compressed air valve in the middle and a steam valve on the right, no people. Flat vector illustration, clean geometric shapes, soft rounded corners, limited palette #0F2A44 #1F7A5C #F2A900 on #F5F7FA background, no text, no logos.",
+      "evitar": "text, letters, logos, real brands, photorealism, people faces",
+      "formato": "png",
+      "relacionAspecto": "16:9",
+      "alt": {
+        "es": "Faja transportadora con tablero eléctrico, válvula de aire comprimido y válvula de vapor visibles"
+      },
+      "decorativa": false
+    },
+    {
+      "pedidoId": "p30-img",
+      "reutilizarRecursoId": "img-trofeo",
+      "prompt": "reutilizar",
+      "evitar": "",
+      "formato": "svg",
+      "relacionAspecto": "1:1",
+      "alt": {
+        "es": "Trofeo con estrella"
+      },
+      "decorativa": true
+    }
+  ]
+}

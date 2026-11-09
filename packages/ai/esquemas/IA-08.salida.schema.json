@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-08.json",
+  "title": "IA-08 · Banco de preguntas (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "preguntas": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/preguntaQuiz"
+          },
+          {
+            "required": [
+              "objetivoId"
+            ]
+          }
+        ]
+      },
+      "minItems": 3,
+      "maxItems": 30
+    },
+    "metadatos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "preguntaId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "nivelBloom": {
+            "enum": [
+              "recordar",
+              "comprender",
+              "aplicar",
+              "analizar",
+              "evaluar",
+              "crear"
+            ]
+          },
+          "dificultad": {
+            "enum": [
+              "baja",
+              "media",
+              "alta"
+            ]
+          },
+          "paginas": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "preguntaId",
+          "nivelBloom",
+          "dificultad"
+        ]
+      },
+      "minItems": 3,
+      "maxItems": 30
+    }
+  },
+  "required": [
+    "preguntas",
+    "metadatos"
+  ]
+}

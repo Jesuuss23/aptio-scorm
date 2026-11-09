@@ -1,0 +1,963 @@
+[
+  {
+    "pantallaId": "p07",
+    "tipo": "INT-01",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Encuentra las parejas: cada energía con su ejemplo."
+    },
+    "datos": {
+      "pares": [
+        {
+          "id": "p07-par-1",
+          "a": {
+            "texto": {
+              "es": "Eléctrica"
+            }
+          },
+          "b": {
+            "texto": {
+              "es": "Tableros y motores"
+            }
+          }
+        },
+        {
+          "id": "p07-par-2",
+          "a": {
+            "texto": {
+              "es": "Mecánica"
+            }
+          },
+          "b": {
+            "texto": {
+              "es": "Ejes y resortes"
+            }
+          }
+        },
+        {
+          "id": "p07-par-3",
+          "a": {
+            "texto": {
+              "es": "Hidráulica"
+            }
+          },
+          "b": {
+            "texto": {
+              "es": "Cilindros y mangueras"
+            }
+          }
+        },
+        {
+          "id": "p07-par-4",
+          "a": {
+            "texto": {
+              "es": "Neumática"
+            }
+          },
+          "b": {
+            "texto": {
+              "es": "Aire comprimido"
+            }
+          }
+        },
+        {
+          "id": "p07-par-5",
+          "a": {
+            "texto": {
+              "es": "Térmica"
+            }
+          },
+          "b": {
+            "texto": {
+              "es": "Vapor y superficies"
+            }
+          }
+        },
+        {
+          "id": "p07-par-6",
+          "a": {
+            "texto": {
+              "es": "Química"
+            }
+          },
+          "b": {
+            "texto": {
+              "es": "Tuberías de proceso"
+            }
+          }
+        }
+      ],
+      "intentosMaximos": 12
+    }
+  },
+  {
+    "pantallaId": "p10",
+    "tipo": "INT-02",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Arrastra cada práctica a Seguro o Riesgoso."
+    },
+    "datos": {
+      "grupos": [
+        {
+          "id": "p10-seguro",
+          "etiqueta": {
+            "es": "Seguro"
+          }
+        },
+        {
+          "id": "p10-riesgoso",
+          "etiqueta": {
+            "es": "Riesgoso"
+          }
+        }
+      ],
+      "elementos": [
+        {
+          "id": "p10-el-1",
+          "contenido": {
+            "texto": {
+              "es": "Usar solo mi candado"
+            }
+          },
+          "grupoCorrecto": "p10-seguro",
+          "retroalimentacion": {
+            "es": "Tu candado, tu llave: solo tú lo retiras."
+          }
+        },
+        {
+          "id": "p10-el-2",
+          "contenido": {
+            "texto": {
+              "es": "Bloquear cada fuente de energía"
+            }
+          },
+          "grupoCorrecto": "p10-seguro",
+          "retroalimentacion": {
+            "es": "Un equipo puede tener varias fuentes."
+          }
+        },
+        {
+          "id": "p10-el-3",
+          "contenido": {
+            "texto": {
+              "es": "Guardar mi llave conmigo"
+            }
+          },
+          "grupoCorrecto": "p10-seguro",
+          "retroalimentacion": {
+            "es": "Así nadie puede retirar tu candado."
+          }
+        },
+        {
+          "id": "p10-el-4",
+          "contenido": {
+            "texto": {
+              "es": "Bloquear solo el pulsador de parada"
+            }
+          },
+          "grupoCorrecto": "p10-riesgoso",
+          "retroalimentacion": {
+            "es": "El pulsador no aísla la energía."
+          }
+        },
+        {
+          "id": "p10-el-5",
+          "contenido": {
+            "texto": {
+              "es": "Pedir prestado un candado"
+            }
+          },
+          "grupoCorrecto": "p10-riesgoso",
+          "retroalimentacion": {
+            "es": "Pide uno al supervisor."
+          }
+        },
+        {
+          "id": "p10-el-6",
+          "contenido": {
+            "texto": {
+              "es": "Confiar en que otro ya bloqueó"
+            }
+          },
+          "grupoCorrecto": "p10-riesgoso",
+          "retroalimentacion": {
+            "es": "Cada persona pone su propio candado."
+          }
+        },
+        {
+          "id": "p10-el-7",
+          "contenido": {
+            "texto": {
+              "es": "Dejar la llave en el candado"
+            }
+          },
+          "grupoCorrecto": "p10-riesgoso",
+          "retroalimentacion": {
+            "es": "Cualquiera podría retirarlo."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "pantallaId": "p15",
+    "tipo": "INT-03",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Ordena los seis pasos del bloqueo."
+    },
+    "datos": {
+      "pasos": [
+        {
+          "id": "p15-paso-1",
+          "contenido": {
+            "texto": {
+              "es": "Preparar"
+            }
+          }
+        },
+        {
+          "id": "p15-paso-2",
+          "contenido": {
+            "texto": {
+              "es": "Avisar"
+            }
+          }
+        },
+        {
+          "id": "p15-paso-3",
+          "contenido": {
+            "texto": {
+              "es": "Apagar"
+            }
+          }
+        },
+        {
+          "id": "p15-paso-4",
+          "contenido": {
+            "texto": {
+              "es": "Aislar"
+            }
+          }
+        },
+        {
+          "id": "p15-paso-5",
+          "contenido": {
+            "texto": {
+              "es": "Bloquear y etiquetar"
+            }
+          }
+        },
+        {
+          "id": "p15-paso-6",
+          "contenido": {
+            "texto": {
+              "es": "Verificar energía cero"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "pantallaId": "p17",
+    "tipo": "INT-08",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Elige qué harías."
+    },
+    "datos": {
+      "inicioId": "p17-n1",
+      "nodos": [
+        {
+          "id": "p17-n1",
+          "situacion": {
+            "es": "Tu compañero olvidó su candado y te pide usar el tuyo para avanzar más rápido."
+          },
+          "opciones": [
+            {
+              "id": "p17-o1",
+              "texto": {
+                "es": "Le presto mi candado"
+              },
+              "consecuencia": {
+                "es": "Si tú retiras tu candado, él queda expuesto. Cada uno usa el suyo."
+              },
+              "puntaje": 0
+            },
+            {
+              "id": "p17-o2",
+              "texto": {
+                "es": "Le pido que solicite uno al supervisor"
+              },
+              "consecuencia": {
+                "es": "Correcto: el supervisor le entrega un candado y cada uno protege su vida."
+              },
+              "puntaje": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "pantallaId": "p20",
+    "tipo": "INT-06",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Toca los tres puntos de aislamiento de la faja."
+    },
+    "datos": {
+      "imagenId": "img-p20-faja",
+      "alt": {
+        "es": "Faja transportadora con un tablero eléctrico, una válvula de aire y una válvula de vapor."
+      },
+      "puntos": [
+        {
+          "id": "p20-pt-1",
+          "x": 18,
+          "y": 40,
+          "titulo": {
+            "es": "Tablero eléctrico"
+          },
+          "contenido": {
+            "es": "Abre el interruptor y coloca tu candado y tarjeta."
+          },
+          "obligatorio": true
+        },
+        {
+          "id": "p20-pt-2",
+          "x": 55,
+          "y": 62,
+          "titulo": {
+            "es": "Válvula de aire"
+          },
+          "contenido": {
+            "es": "Cierra, bloquea y purga la línea neumática."
+          },
+          "obligatorio": true
+        },
+        {
+          "id": "p20-pt-3",
+          "x": 82,
+          "y": 35,
+          "titulo": {
+            "es": "Válvula de vapor"
+          },
+          "contenido": {
+            "es": "Cierra y bloquea; espera que la superficie se enfríe."
+          },
+          "obligatorio": true
+        }
+      ]
+    }
+  },
+  {
+    "pantallaId": "p22",
+    "tipo": "INT-05",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Responde las tres preguntas."
+    },
+    "datos": {
+      "preguntas": [
+        {
+          "id": "p22-q1",
+          "enunciado": {
+            "es": "¿Cuándo empiezas a trabajar en el equipo?"
+          },
+          "opciones": [
+            {
+              "id": "p22-q1-a",
+              "contenido": {
+                "texto": {
+                  "es": "Al colocar el candado"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "p22-q1-b",
+              "contenido": {
+                "texto": {
+                  "es": "Después de verificar energía cero"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "p22-q1-c",
+              "contenido": {
+                "texto": {
+                  "es": "Cuando el supervisor lo indica"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Exacto: primero verificas energía cero."
+            },
+            "incorrecta": {
+              "es": "Aún falta verificar energía cero."
+            }
+          },
+          "objetivoId": "obj-3"
+        },
+        {
+          "id": "p22-q2",
+          "enunciado": {
+            "es": "¿Qué haces después de colocar tu candado y tarjeta?"
+          },
+          "opciones": [
+            {
+              "id": "p22-q2-a",
+              "contenido": {
+                "texto": {
+                  "es": "Empiezo a trabajar"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "p22-q2-b",
+              "contenido": {
+                "texto": {
+                  "es": "Intento arrancar el equipo y mido"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "p22-q2-c",
+              "contenido": {
+                "texto": {
+                  "es": "Aviso que terminé"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Así compruebas que no queda energía."
+            },
+            "incorrecta": {
+              "es": "Primero verifica: intenta arrancar y mide."
+            }
+          },
+          "objetivoId": "obj-3"
+        },
+        {
+          "id": "p22-q3",
+          "enunciado": {
+            "es": "¿Qué paso va justo antes de bloquear y etiquetar?"
+          },
+          "opciones": [
+            {
+              "id": "p22-q3-a",
+              "contenido": {
+                "texto": {
+                  "es": "Aislar"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "p22-q3-b",
+              "contenido": {
+                "texto": {
+                  "es": "Verificar"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "p22-q3-c",
+              "contenido": {
+                "texto": {
+                  "es": "Avisar"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Primero cortas cada fuente; luego bloqueas."
+            },
+            "incorrecta": {
+              "es": "El orden es aislar y después bloquear."
+            }
+          },
+          "objetivoId": "obj-3"
+        }
+      ],
+      "barajarOpciones": true
+    }
+  },
+  {
+    "pantallaId": "p25",
+    "tipo": "INT-08",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Elige qué harías."
+    },
+    "datos": {
+      "inicioId": "p25-n1",
+      "nodos": [
+        {
+          "id": "p25-n1",
+          "situacion": {
+            "es": "Terminaste tu turno y ves el candado de un compañero que ya se fue. El equipo debe arrancar."
+          },
+          "opciones": [
+            {
+              "id": "p25-o1",
+              "texto": {
+                "es": "Lo retiro con la llave maestra"
+              },
+              "consecuencia": {
+                "es": "No existe llave maestra: tu compañero podría estar dentro del equipo."
+              },
+              "puntaje": 0
+            },
+            {
+              "id": "p25-o2",
+              "texto": {
+                "es": "Aviso al supervisor para el procedimiento de retiro"
+              },
+              "consecuencia": {
+                "es": "Correcto: solo el supervisor autoriza el retiro y lo registra."
+              },
+              "puntaje": 100
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "pantallaId": "p26",
+    "tipo": "INT-07",
+    "modo": "formativa",
+    "instruccion": {
+      "es": "Desliza a la derecha si es realidad y a la izquierda si es mito."
+    },
+    "datos": {
+      "afirmaciones": [
+        {
+          "id": "p26-af-1",
+          "texto": {
+            "es": "Si el equipo está apagado, no hace falta bloquearlo."
+          },
+          "verdadera": false,
+          "retroalimentacion": {
+            "es": "Mito: apagado no es energía cero."
+          }
+        },
+        {
+          "id": "p26-af-2",
+          "texto": {
+            "es": "Un pulsador de parada no aísla la energía."
+          },
+          "verdadera": true,
+          "retroalimentacion": {
+            "es": "Realidad: hay que operar el dispositivo de aislamiento."
+          }
+        },
+        {
+          "id": "p26-af-3",
+          "texto": {
+            "es": "Puedo usar el candado de un compañero si él está de acuerdo."
+          },
+          "verdadera": false,
+          "retroalimentacion": {
+            "es": "Mito: cada uno usa su propio candado."
+          }
+        },
+        {
+          "id": "p26-af-4",
+          "texto": {
+            "es": "En bloqueo grupal, el equipo se libera cuando sale el último."
+          },
+          "verdadera": true,
+          "retroalimentacion": {
+            "es": "Realidad: mientras haya un candado, nadie energiza."
+          }
+        }
+      ]
+    }
+  },
+  {
+    "pantallaId": "p28",
+    "tipo": "INT-05",
+    "modo": "sumativa",
+    "peso": 100,
+    "instruccion": {
+      "es": "Reto final: 5 preguntas, 30 segundos cada una y 3 vidas."
+    },
+    "datos": {
+      "preguntas": [
+        {
+          "id": "bq-01",
+          "enunciado": {
+            "es": "¿Quién puede retirar tu candado?"
+          },
+          "opciones": [
+            {
+              "id": "bq-01-a",
+              "contenido": {
+                "texto": {
+                  "es": "Solo yo"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-01-b",
+              "contenido": {
+                "texto": {
+                  "es": "Mi supervisor"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-01-c",
+              "contenido": {
+                "texto": {
+                  "es": "Cualquier compañero"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Tu candado, tu llave."
+            },
+            "incorrecta": {
+              "es": "Solo quien lo colocó lo retira (salvo el procedimiento de ausencia)."
+            }
+          },
+          "objetivoId": "obj-2"
+        },
+        {
+          "id": "bq-02",
+          "enunciado": {
+            "es": "¿Cuál de estas es una fuente de energía mecánica?"
+          },
+          "opciones": [
+            {
+              "id": "bq-02-a",
+              "contenido": {
+                "texto": {
+                  "es": "Un resorte tenso"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-02-b",
+              "contenido": {
+                "texto": {
+                  "es": "Aire comprimido"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-02-c",
+              "contenido": {
+                "texto": {
+                  "es": "Un condensador"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Resortes, ejes y piezas elevadas son mecánicos."
+            },
+            "incorrecta": {
+              "es": "El aire es neumático y el condensador es eléctrico."
+            }
+          },
+          "objetivoId": "obj-1"
+        },
+        {
+          "id": "bq-03",
+          "enunciado": {
+            "es": "Apagaste el equipo. ¿Ya no tiene energía peligrosa?"
+          },
+          "opciones": [
+            {
+              "id": "bq-03-a",
+              "contenido": {
+                "texto": {
+                  "es": "Sí, está apagado"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-03-b",
+              "contenido": {
+                "texto": {
+                  "es": "No necesariamente: puede quedar energía residual"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-03-c",
+              "contenido": {
+                "texto": {
+                  "es": "Solo si es eléctrico"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Apagado no es energía cero."
+            },
+            "incorrecta": {
+              "es": "Puede quedar presión, carga o un resorte tenso."
+            }
+          },
+          "objetivoId": "obj-1"
+        },
+        {
+          "id": "bq-04",
+          "enunciado": {
+            "es": "Una manguera hidráulica tiene aceite a presión. ¿Qué tipo de energía es?"
+          },
+          "opciones": [
+            {
+              "id": "bq-04-a",
+              "contenido": {
+                "texto": {
+                  "es": "Hidráulica"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-04-b",
+              "contenido": {
+                "texto": {
+                  "es": "Neumática"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-04-c",
+              "contenido": {
+                "texto": {
+                  "es": "Térmica"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Aceite a presión = hidráulica."
+            },
+            "incorrecta": {
+              "es": "La neumática es aire; la hidráulica, aceite."
+            }
+          },
+          "objetivoId": "obj-1"
+        },
+        {
+          "id": "bq-05",
+          "enunciado": {
+            "es": "Tu compañero te pide tu candado prestado. ¿Qué es lo seguro?"
+          },
+          "opciones": [
+            {
+              "id": "bq-05-a",
+              "contenido": {
+                "texto": {
+                  "es": "Prestárselo un rato"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-05-b",
+              "contenido": {
+                "texto": {
+                  "es": "Que pida uno al supervisor"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-05-c",
+              "contenido": {
+                "texto": {
+                  "es": "Compartir el mismo candado"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Cada persona usa su propio candado."
+            },
+            "incorrecta": {
+              "es": "Prestar candados deja a alguien sin protección."
+            }
+          },
+          "objetivoId": "obj-2"
+        },
+        {
+          "id": "bq-06",
+          "enunciado": {
+            "es": "Terminaste de bloquear. ¿Qué haces antes de empezar?"
+          },
+          "opciones": [
+            {
+              "id": "bq-06-a",
+              "contenido": {
+                "texto": {
+                  "es": "Empiezo de inmediato"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-06-b",
+              "contenido": {
+                "texto": {
+                  "es": "Intento arrancar y mido energía cero"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-06-c",
+              "contenido": {
+                "texto": {
+                  "es": "Retiro la tarjeta"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Verificar es el paso que más se omite."
+            },
+            "incorrecta": {
+              "es": "Primero verifica energía cero."
+            }
+          },
+          "objetivoId": "obj-3"
+        },
+        {
+          "id": "bq-07",
+          "enunciado": {
+            "es": "Trabajan tres personas en la misma faja. ¿Cómo se bloquea?"
+          },
+          "opciones": [
+            {
+              "id": "bq-07-a",
+              "contenido": {
+                "texto": {
+                  "es": "Bloquea solo el supervisor"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-07-b",
+              "contenido": {
+                "texto": {
+                  "es": "Cada uno pone su candado en la pinza grupal"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-07-c",
+              "contenido": {
+                "texto": {
+                  "es": "Basta con la tarjeta"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "Cada uno protege su propia vida."
+            },
+            "incorrecta": {
+              "es": "Cada trabajador coloca su propio candado."
+            }
+          },
+          "objetivoId": "obj-3"
+        },
+        {
+          "id": "bq-08",
+          "enunciado": {
+            "es": "¿Qué es riesgoso durante el bloqueo?"
+          },
+          "opciones": [
+            {
+              "id": "bq-08-a",
+              "contenido": {
+                "texto": {
+                  "es": "Guardar mi llave"
+                }
+              },
+              "correcta": false
+            },
+            {
+              "id": "bq-08-b",
+              "contenido": {
+                "texto": {
+                  "es": "Bloquear solo el pulsador de parada"
+                }
+              },
+              "correcta": true
+            },
+            {
+              "id": "bq-08-c",
+              "contenido": {
+                "texto": {
+                  "es": "Bloquear cada fuente"
+                }
+              },
+              "correcta": false
+            }
+          ],
+          "retroalimentacion": {
+            "correcta": {
+              "es": "El pulsador no aísla la energía."
+            },
+            "incorrecta": {
+              "es": "Bloquear el pulsador no corta la fuente."
+            }
+          },
+          "objetivoId": "obj-2"
+        }
+      ],
+      "segundosPorPregunta": 30,
+      "vidas": 3,
+      "preguntasPorIntento": 5,
+      "barajarOpciones": true
+    }
+  }
+]

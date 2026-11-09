@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-06.json",
+  "title": "IA-06 · Sugerir interacción (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "recomendada": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "enum": [
+            "INT-01",
+            "INT-02",
+            "INT-03",
+            "INT-04",
+            "INT-05",
+            "INT-06",
+            "INT-07",
+            "INT-08"
+          ]
+        },
+        "motivo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "nivelBloom": {
+          "enum": [
+            "recordar",
+            "comprender",
+            "aplicar",
+            "analizar",
+            "evaluar",
+            "crear"
+          ]
+        }
+      },
+      "required": [
+        "tipo",
+        "motivo",
+        "nivelBloom"
+      ]
+    },
+    "alternativas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tipo": {
+            "enum": [
+              "INT-01",
+              "INT-02",
+              "INT-03",
+              "INT-04",
+              "INT-05",
+              "INT-06",
+              "INT-07",
+              "INT-08"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "tipo",
+          "motivo"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 2
+    }
+  },
+  "required": [
+    "recomendada",
+    "alternativas"
+  ]
+}

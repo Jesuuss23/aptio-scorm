@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-03.json",
+  "title": "IA-03 · Resumen fiel por tema (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "temaId": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+    },
+    "fragmentos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "paginas": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          },
+          "tipo": {
+            "enum": [
+              "idea",
+              "dato",
+              "paso",
+              "ejemplo",
+              "advertencia",
+              "definicion"
+            ]
+          },
+          "literal": {
+            "type": "boolean",
+            "description": "true si conserva la redacción del documento (normas, cifras, advertencias)"
+          }
+        },
+        "required": [
+          "id",
+          "texto",
+          "paginas",
+          "tipo",
+          "literal"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 20
+    }
+  },
+  "required": [
+    "temaId",
+    "fragmentos"
+  ]
+}

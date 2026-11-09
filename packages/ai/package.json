@@ -1,0 +1,12 @@
+{
+  "name": "@fabrica/ai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "casos": "node scripts/validar-casos.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

@@ -1,0 +1,308 @@
+[
+  {
+    "temaId": "t04",
+    "fragmentos": [
+      {
+        "id": "t04-f01",
+        "texto": "Bloqueo: colocar un candado personal en un dispositivo de aislamiento para impedir que el equipo se energice.",
+        "paginas": [
+          7
+        ],
+        "tipo": "idea",
+        "literal": true
+      },
+      {
+        "id": "t04-f02",
+        "texto": "Energía cero: estado verificado en el que el equipo no tiene energía capaz de causar daño.",
+        "paginas": [
+          7
+        ],
+        "tipo": "definicion",
+        "literal": true
+      },
+      {
+        "id": "t04-f03",
+        "texto": "Un pulsador de parada no es un dispositivo de aislamiento.",
+        "paginas": [
+          8
+        ],
+        "tipo": "advertencia",
+        "literal": true
+      }
+    ]
+  },
+  {
+    "temaId": "t06",
+    "fragmentos": [
+      {
+        "id": "t06-f01",
+        "texto": "Energía peligrosa es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras se trabaja en un equipo.",
+        "paginas": [
+          12
+        ],
+        "tipo": "definicion",
+        "literal": true
+      },
+      {
+        "id": "t06-f02",
+        "texto": "Un equipo apagado puede seguir teniendo energía peligrosa: apagado no significa energía cero.",
+        "paginas": [
+          12
+        ],
+        "tipo": "advertencia",
+        "literal": true
+      }
+    ]
+  },
+  {
+    "temaId": "t07",
+    "fragmentos": [
+      {
+        "id": "t07-f01",
+        "texto": "Eléctrica: tableros, motores, condensadores.",
+        "paginas": [
+          13
+        ],
+        "tipo": "dato",
+        "literal": true
+      },
+      {
+        "id": "t07-f02",
+        "texto": "Mecánica: ejes, volantes, resortes, piezas elevadas.",
+        "paginas": [
+          13
+        ],
+        "tipo": "dato",
+        "literal": true
+      },
+      {
+        "id": "t07-f03",
+        "texto": "Hidráulica: cilindros y mangueras con aceite a presión.",
+        "paginas": [
+          13
+        ],
+        "tipo": "dato",
+        "literal": true
+      },
+      {
+        "id": "t07-f04",
+        "texto": "Neumática: aire comprimido en líneas y tanques.",
+        "paginas": [
+          13
+        ],
+        "tipo": "dato",
+        "literal": true
+      },
+      {
+        "id": "t07-f05",
+        "texto": "Térmica: vapor, superficies calientes, fluidos a alta temperatura.",
+        "paginas": [
+          13
+        ],
+        "tipo": "dato",
+        "literal": true
+      },
+      {
+        "id": "t07-f06",
+        "texto": "Química: tuberías y tanques de proceso con reactivos.",
+        "paginas": [
+          13
+        ],
+        "tipo": "dato",
+        "literal": true
+      }
+    ]
+  },
+  {
+    "temaId": "t08",
+    "fragmentos": [
+      {
+        "id": "t08-f01",
+        "texto": "Después de apagar y aislar puede quedar presión en una manguera, carga en un condensador o un resorte tenso.",
+        "paginas": [
+          14
+        ],
+        "tipo": "advertencia",
+        "literal": true
+      },
+      {
+        "id": "t08-f02",
+        "texto": "La energía residual se libera o bloquea antes de intervenir: purgar, descargar, bajar o calzar.",
+        "paginas": [
+          14
+        ],
+        "tipo": "paso",
+        "literal": false
+      }
+    ]
+  },
+  {
+    "temaId": "t11",
+    "fragmentos": [
+      {
+        "id": "t11-f01",
+        "texto": "Preparar: identifica todas las fuentes de energía y sus puntos de aislamiento.",
+        "paginas": [
+          21
+        ],
+        "tipo": "paso",
+        "literal": false
+      },
+      {
+        "id": "t11-f02",
+        "texto": "Avisar: informa a operadores y afectados.",
+        "paginas": [
+          21
+        ],
+        "tipo": "paso",
+        "literal": false
+      },
+      {
+        "id": "t11-f03",
+        "texto": "Apagar: detén el equipo con su control normal.",
+        "paginas": [
+          21
+        ],
+        "tipo": "paso",
+        "literal": false
+      },
+      {
+        "id": "t11-f04",
+        "texto": "Aislar: opera cada dispositivo de aislamiento para cortar cada fuente.",
+        "paginas": [
+          22
+        ],
+        "tipo": "paso",
+        "literal": false
+      },
+      {
+        "id": "t11-f05",
+        "texto": "Bloquear y etiquetar: coloca tu candado y tu tarjeta en cada punto de aislamiento.",
+        "paginas": [
+          22
+        ],
+        "tipo": "paso",
+        "literal": false
+      },
+      {
+        "id": "t11-f06",
+        "texto": "Verificar: intenta arrancar y mide la ausencia de energía; luego vuelve el control a apagado.",
+        "paginas": [
+          26
+        ],
+        "tipo": "paso",
+        "literal": false
+      }
+    ]
+  },
+  {
+    "temaId": "t12",
+    "fragmentos": [
+      {
+        "id": "t12-f01",
+        "texto": "Seguro: usar solo tu candado, bloquear cada fuente y guardar tu llave contigo.",
+        "paginas": [
+          23
+        ],
+        "tipo": "idea",
+        "literal": true
+      },
+      {
+        "id": "t12-f02",
+        "texto": "Riesgoso: bloquear solo el pulsador de parada, prestar candados, confiar en que otro bloqueó, dejar la llave puesta.",
+        "paginas": [
+          23
+        ],
+        "tipo": "idea",
+        "literal": true
+      },
+      {
+        "id": "t12-f03",
+        "texto": "Cada trabajador coloca su propio candado y guarda su única llave; nadie más puede retirarlo.",
+        "paginas": [
+          24
+        ],
+        "tipo": "advertencia",
+        "literal": true
+      },
+      {
+        "id": "t12-f04",
+        "texto": "Si olvidaste tu candado, solicita uno al supervisor; nunca uses el de otra persona.",
+        "paginas": [
+          24
+        ],
+        "tipo": "paso",
+        "literal": true
+      }
+    ]
+  },
+  {
+    "temaId": "t13",
+    "fragmentos": [
+      {
+        "id": "t13-f01",
+        "texto": "Si trabajan varios, cada uno pone su candado en la pinza o caja de bloqueo grupal.",
+        "paginas": [
+          25
+        ],
+        "tipo": "paso",
+        "literal": true
+      },
+      {
+        "id": "t13-f02",
+        "texto": "El equipo se libera solo cuando el último trabajador retira su candado.",
+        "paginas": [
+          25
+        ],
+        "tipo": "advertencia",
+        "literal": true
+      }
+    ]
+  },
+  {
+    "temaId": "t14",
+    "fragmentos": [
+      {
+        "id": "t14-f01",
+        "texto": "Intenta arrancar el equipo con su control normal y mide la ausencia de tensión o presión.",
+        "paginas": [
+          26
+        ],
+        "tipo": "paso",
+        "literal": true
+      },
+      {
+        "id": "t14-f02",
+        "texto": "La falta de verificación de energía cero es el error más frecuente en las investigaciones de la empresa.",
+        "paginas": [
+          27
+        ],
+        "tipo": "dato",
+        "literal": true
+      }
+    ]
+  },
+  {
+    "temaId": "t15",
+    "fragmentos": [
+      {
+        "id": "t15-f01",
+        "texto": "Revisa que herramientas y personas estén fuera, avisa que se energizará y retira solo tu candado con tu llave.",
+        "paginas": [
+          28
+        ],
+        "tipo": "paso",
+        "literal": true
+      },
+      {
+        "id": "t15-f02",
+        "texto": "En ausencia del trabajador, solo el supervisor autoriza el retiro; nunca se usa una llave maestra.",
+        "paginas": [
+          28
+        ],
+        "tipo": "advertencia",
+        "literal": true
+      }
+    ]
+  }
+]

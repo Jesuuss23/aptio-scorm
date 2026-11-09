@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-18.json",
+  "title": "IA-18 · Extracción de kit (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "paleta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primario": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "secundario": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "acento": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "texto": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "fondo": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      },
+      "required": [
+        "primario",
+        "secundario",
+        "acento",
+        "texto",
+        "fondo"
+      ]
+    },
+    "tipografias": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "titulos": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "texto": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "alternativasLibres": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "minItems": 0,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "titulos",
+        "texto"
+      ]
+    },
+    "estilo": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ilustracion": {
+          "enum": [
+            "plana",
+            "lineal",
+            "isometrica",
+            "semirrealista",
+            "fotografia"
+          ]
+        },
+        "esquinas": {
+          "enum": [
+            "rectas",
+            "suaves",
+            "redondeadas"
+          ]
+        },
+        "tono": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        }
+      },
+      "required": [
+        "ilustracion",
+        "esquinas",
+        "tono"
+      ]
+    },
+    "contrasteOk": {
+      "type": "boolean",
+      "description": "texto sobre fondo y blanco sobre primario cumplen 4,5:1"
+    },
+    "evidencias": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "minItems": 1,
+      "maxItems": 10
+    },
+    "confianza": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "required": [
+    "paleta",
+    "tipografias",
+    "estilo",
+    "contrasteOk",
+    "evidencias",
+    "confianza"
+  ]
+}

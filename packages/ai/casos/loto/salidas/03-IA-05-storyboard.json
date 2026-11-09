@@ -1,0 +1,510 @@
+{
+  "capsulaId": "cap-loto",
+  "pantallas": [
+    {
+      "id": "p01",
+      "titulo": "Bloqueo y etiquetado",
+      "textoPantalla": "Cápsula de seguridad · 15 min · 3 retos",
+      "narracion": "Hola, te doy la bienvenida a esta cápsula sobre bloqueo y etiquetado.",
+      "visual": "Ana con casco frente a un tablero con candados rojos",
+      "objetivoIds": [],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p02",
+      "titulo": "Al terminar podrás",
+      "textoPantalla": "Identificar las fuentes de energía peligrosa de un equipo · Distinguir prácticas seguras y riesgosas durante el bloqueo · Aplicar los pasos de bloqueo y etiquetado en una situación real",
+      "narracion": "Al terminar podrás identificar, distinguir y aplicar los pasos del bloqueo.",
+      "visual": "Lista con tres íconos de check",
+      "objetivoIds": [
+        "obj-1",
+        "obj-2",
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p03",
+      "titulo": "Te acompaña Ana",
+      "textoPantalla": "Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo.",
+      "narracion": "Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo.",
+      "visual": "Ana de cuerpo entero, explicando",
+      "objetivoIds": [],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p04",
+      "titulo": "Apagado no es lo mismo que seguro",
+      "textoPantalla": "Un equipo puede guardar energía aunque esté apagado.",
+      "narracion": "Ojo: apagado no significa energía cero. Un equipo puede guardar energía aunque esté apagado.",
+      "visual": "Cifra o frase grande con ícono de alerta",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          12
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p05",
+      "titulo": "¿Qué es la energía peligrosa?",
+      "textoPantalla": "Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.",
+      "narracion": "Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada.",
+      "visual": "Tablero eléctrico con rayo de advertencia",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          12
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p06",
+      "titulo": "Seis tipos de energía",
+      "textoPantalla": "Eléctrica · Mecánica · Hidráulica · Neumática · Térmica · Química",
+      "narracion": "Hay seis tipos: eléctrica, mecánica, hidráulica, neumática, térmica y química.",
+      "visual": "Íconos del kit para cada elemento",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          13
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p07",
+      "titulo": "Relaciona cada energía",
+      "textoPantalla": "",
+      "narracion": "Encuentra las parejas: cada energía con su ejemplo.",
+      "visual": "Tarjetas volteables con íconos de energía",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-01",
+        "consigna": "Encuentra las parejas: cada energía con su ejemplo."
+      },
+      "notas": "En inglés, la tarjeta «Cylinders and hoses» desborda: acortar."
+    },
+    {
+      "id": "p08",
+      "titulo": "La energía residual",
+      "textoPantalla": "Después de apagar, puede quedar presión en una manguera, carga en un condensador o un resorte tenso.",
+      "narracion": "Después de apagar puede quedar energía residual: presión, carga o un resorte tenso.",
+      "visual": "Manguera presurizada y resorte tenso con señal de alerta",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          14
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p09",
+      "titulo": "Un ejemplo de planta",
+      "textoPantalla": "La semana pasada una faja se movió sola al liberar la presión del cilindro. Nadie la había bloqueado.",
+      "narracion": "La semana pasada una faja se movió sola al liberar la presión del cilindro. Nadie la había bloqueado.",
+      "visual": "Ana de cuerpo entero, explicando",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p10",
+      "titulo": "¿Seguro o riesgoso?",
+      "textoPantalla": "",
+      "narracion": "Clasifica cada práctica en segura o riesgosa.",
+      "visual": "Dos columnas: Seguro y Riesgoso",
+      "objetivoIds": [
+        "obj-2"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          23
+        ],
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-02",
+        "consigna": "Arrastra cada práctica a Seguro o Riesgoso."
+      }
+    },
+    {
+      "id": "p11",
+      "titulo": "Lo que aprendiste",
+      "textoPantalla": "Apagado no es energía cero · Hay seis tipos de energía peligrosa · La energía residual también se bloquea",
+      "narracion": "Repasemos: apagado no es energía cero, hay seis tipos de energía y la residual también se bloquea.",
+      "visual": "Lista de ideas clave con checks",
+      "objetivoIds": [
+        "obj-1"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p12",
+      "titulo": "Los seis pasos del bloqueo",
+      "textoPantalla": "",
+      "narracion": "Ahora veamos los seis pasos del bloqueo.",
+      "visual": "Número de sección grande",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p13",
+      "titulo": "Pasos 1 a 3",
+      "textoPantalla": "1. Preparar · 2. Avisar · 3. Apagar",
+      "narracion": "Primero preparas, luego avisas y después apagas el equipo.",
+      "visual": "Íconos del kit para cada elemento",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          21
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p14",
+      "titulo": "Pasos 4 a 6",
+      "textoPantalla": "4. Aislar · 5. Bloquear y etiquetar · 6. Verificar",
+      "narracion": "Luego aíslas, bloqueas y etiquetas, y verificas la energía cero.",
+      "visual": "Íconos del kit para cada elemento",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          22,
+          23,
+          24,
+          25,
+          26
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p15",
+      "titulo": "Ordena los pasos",
+      "textoPantalla": "",
+      "narracion": "Ordena los seis pasos del bloqueo.",
+      "visual": "Seis tarjetas de pasos desordenadas",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-03",
+        "consigna": "Ordena los seis pasos del bloqueo."
+      }
+    },
+    {
+      "id": "p16",
+      "titulo": "Tu candado, tu llave",
+      "textoPantalla": "Cada trabajador coloca su propio candado y guarda su única llave. Nadie más puede retirarlo.",
+      "narracion": "Cada trabajador coloca su propio candado y guarda su única llave.",
+      "visual": "Mano colocando un candado rojo con tarjeta",
+      "objetivoIds": [
+        "obj-2"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          24
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p17",
+      "titulo": "¿Qué harías?",
+      "textoPantalla": "Tu compañero olvidó su candado y te pide usar el tuyo para avanzar más rápido.",
+      "narracion": "Tu compañero olvidó su candado y te pide el tuyo. ¿Qué harías?",
+      "visual": "Escena de dos compañeros frente a un equipo bloqueado",
+      "objetivoIds": [
+        "obj-2"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-08",
+        "consigna": "Elige qué harías en esta situación."
+      }
+    },
+    {
+      "id": "p18",
+      "titulo": "Mira el procedimiento",
+      "textoPantalla": "",
+      "narracion": "Mira el procedimiento completo. El video se detendrá para hacerte preguntas.",
+      "visual": "Video del procedimiento real en la planta del cliente",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "notas": "Falta el video del cliente: se usa un marcador de lugar."
+    },
+    {
+      "id": "p19",
+      "titulo": "El paso que más se omite",
+      "textoPantalla": "Según el manual, es el error más frecuente: intenta arrancar el equipo después de bloquearlo.",
+      "narracion": "El paso que más se omite es verificar la energía cero. Intenta arrancar el equipo después de bloquearlo.",
+      "visual": "Cifra o frase grande con ícono de alerta",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          27
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p20",
+      "titulo": "Encuentra los puntos de aislamiento",
+      "textoPantalla": "",
+      "narracion": "Explora la escena y encuentra los tres puntos de aislamiento.",
+      "visual": "Escena de una faja transportadora con tablero y válvulas",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-06",
+        "consigna": "Encuentra los tres puntos de aislamiento."
+      },
+      "notas": "Ilustración genérica: conviene una foto real de la planta del cliente."
+    },
+    {
+      "id": "p21",
+      "titulo": "Bloqueo con varios trabajadores",
+      "textoPantalla": "Si trabajan varios, cada uno pone su candado en una pinza de bloqueo grupal. El equipo se libera solo cuando sale el último.",
+      "narracion": "Si trabajan varios, cada uno pone su candado en una pinza grupal.",
+      "visual": "Ana de cuerpo entero, explicando",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          25
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p22",
+      "titulo": "Comprueba lo aprendido",
+      "textoPantalla": "¿Cuándo empiezas a trabajar en el equipo?",
+      "narracion": "¿Cuándo empiezas a trabajar en el equipo?",
+      "visual": "Pregunta con opciones y temporizador",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-05",
+        "consigna": "Responde antes de que se acabe el tiempo."
+      }
+    },
+    {
+      "id": "p23",
+      "titulo": "Retiro del bloqueo",
+      "textoPantalla": "",
+      "narracion": "Por último, cómo retirar el bloqueo de forma segura.",
+      "visual": "Número de sección grande",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p24",
+      "titulo": "Para retirar el bloqueo",
+      "textoPantalla": "Revisa · Avisa · Retira",
+      "narracion": "Revisa el área, avisa y retira solo tu candado con tu llave.",
+      "visual": "Íconos del kit para cada elemento",
+      "objetivoIds": [
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "documento",
+        "documentoId": "doc-pets-seg-014",
+        "paginas": [
+          28
+        ],
+        "revisado": false
+      }
+    },
+    {
+      "id": "p25",
+      "titulo": "Un candado olvidado",
+      "textoPantalla": "Terminaste tu turno y ves el candado de un compañero que ya se fue. El equipo debe arrancar.",
+      "narracion": "Encuentras el candado de un compañero que ya se fue. ¿Qué haces?",
+      "visual": "Escena de dos compañeros frente a un equipo bloqueado",
+      "objetivoIds": [
+        "obj-2"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-08",
+        "consigna": "Elige qué harías en esta situación."
+      }
+    },
+    {
+      "id": "p26",
+      "titulo": "¿Mito o realidad?",
+      "textoPantalla": "Si el equipo está apagado, no hace falta bloquearlo.",
+      "narracion": "¿Mito o realidad? Si el equipo está apagado, no hace falta bloquearlo.",
+      "visual": "Tarjeta para deslizar: mito o realidad",
+      "objetivoIds": [
+        "obj-2"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-07",
+        "consigna": "Desliza: ¿mito o realidad?"
+      }
+    },
+    {
+      "id": "p27",
+      "titulo": "En resumen",
+      "textoPantalla": "Seis pasos: preparar, avisar, apagar, aislar, bloquear y verificar · Tu candado, tu llave · Siempre verifica energía cero",
+      "narracion": "En resumen: seis pasos, tu candado y tu llave, y siempre verifica la energía cero.",
+      "visual": "Lista de ideas clave con checks",
+      "objetivoIds": [
+        "obj-1",
+        "obj-2",
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p28",
+      "titulo": "Reto final",
+      "textoPantalla": "¿Quién puede retirar tu candado?",
+      "narracion": "Reto final. ¿Quién puede retirar tu candado?",
+      "visual": "Pregunta con opciones y temporizador",
+      "objetivoIds": [
+        "obj-1",
+        "obj-2",
+        "obj-3"
+      ],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      },
+      "actividad": {
+        "tipo": "INT-05",
+        "consigna": "Responde antes de que se acabe el tiempo."
+      }
+    },
+    {
+      "id": "p29",
+      "titulo": "Tus resultados",
+      "textoPantalla": "",
+      "narracion": "Estos son tus resultados.",
+      "visual": "Puntaje, estrellas e insignia",
+      "objetivoIds": [],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    },
+    {
+      "id": "p30",
+      "titulo": "¡Lo lograste!",
+      "textoPantalla": "",
+      "narracion": "¡Lo lograste! Ya sabes bloquear y etiquetar de forma segura.",
+      "visual": "Ana celebrando con trofeo",
+      "objetivoIds": [],
+      "origen": {
+        "tipo": "ia",
+        "revisado": false
+      }
+    }
+  ]
+}

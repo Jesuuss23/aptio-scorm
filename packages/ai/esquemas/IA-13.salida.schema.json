@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-13.json",
+  "title": "IA-13 · Acta de omitidos (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "titulo": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120
+    },
+    "temas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "temaId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "paginas": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "temaId",
+          "titulo",
+          "paginas",
+          "motivo"
+        ]
+      },
+      "minItems": 0
+    },
+    "textoActa": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 6000,
+      "description": "Markdown listo para enviar al cliente"
+    }
+  },
+  "required": [
+    "titulo",
+    "temas",
+    "textoActa"
+  ]
+}

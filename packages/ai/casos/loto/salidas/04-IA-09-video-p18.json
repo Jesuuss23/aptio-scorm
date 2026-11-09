@@ -1,0 +1,133 @@
+{
+  "duracionMs": 150000,
+  "marcadores": [
+    {
+      "id": "vm-1",
+      "tiempoMs": 0,
+      "tipo": "capitulo",
+      "obligatorio": false,
+      "titulo": {
+        "es": "Preparar, avisar y apagar"
+      }
+    },
+    {
+      "id": "vm-2",
+      "tiempoMs": 62000,
+      "tipo": "pregunta",
+      "obligatorio": true,
+      "pregunta": {
+        "id": "vm-2-q",
+        "enunciado": {
+          "es": "¿Qué hizo el técnico justo después de apagar?"
+        },
+        "opciones": [
+          {
+            "id": "vm-2-q-a",
+            "contenido": {
+              "texto": {
+                "es": "Aisló cada fuente"
+              }
+            },
+            "correcta": true
+          },
+          {
+            "id": "vm-2-q-b",
+            "contenido": {
+              "texto": {
+                "es": "Empezó a trabajar"
+              }
+            },
+            "correcta": false
+          },
+          {
+            "id": "vm-2-q-c",
+            "contenido": {
+              "texto": {
+                "es": "Retiró la tarjeta"
+              }
+            },
+            "correcta": false
+          }
+        ],
+        "retroalimentacion": {
+          "correcta": {
+            "es": "Exacto: aislar viene después de apagar."
+          },
+          "incorrecta": {
+            "es": "Después de apagar se aísla cada fuente."
+          }
+        },
+        "objetivoId": "obj-3"
+      }
+    },
+    {
+      "id": "vm-3",
+      "tiempoMs": 95000,
+      "tipo": "punto",
+      "obligatorio": false,
+      "titulo": {
+        "es": "Tarjeta de bloqueo"
+      },
+      "contenido": {
+        "es": "Nombre, área, fecha, hora y motivo."
+      },
+      "posicion": {
+        "x": 62,
+        "y": 48
+      }
+    },
+    {
+      "id": "vm-4",
+      "tiempoMs": 130000,
+      "tipo": "pregunta",
+      "obligatorio": true,
+      "pregunta": {
+        "id": "vm-4-q",
+        "enunciado": {
+          "es": "¿Cómo comprobó el técnico la energía cero?"
+        },
+        "opciones": [
+          {
+            "id": "vm-4-q-a",
+            "contenido": {
+              "texto": {
+                "es": "Miró el tablero"
+              }
+            },
+            "correcta": false
+          },
+          {
+            "id": "vm-4-q-b",
+            "contenido": {
+              "texto": {
+                "es": "Intentó arrancar y midió"
+              }
+            },
+            "correcta": true
+          },
+          {
+            "id": "vm-4-q-c",
+            "contenido": {
+              "texto": {
+                "es": "Preguntó al operador"
+              }
+            },
+            "correcta": false
+          }
+        ],
+        "retroalimentacion": {
+          "correcta": {
+            "es": "Así se verifica."
+          },
+          "incorrecta": {
+            "es": "Hay que intentar arrancar y medir."
+          }
+        },
+        "objetivoId": "obj-3"
+      }
+    }
+  ],
+  "observaciones": [
+    "Video del cliente pendiente: tiempos estimados sobre un guion de 2:30; recalcular con la transcripción real."
+  ]
+}

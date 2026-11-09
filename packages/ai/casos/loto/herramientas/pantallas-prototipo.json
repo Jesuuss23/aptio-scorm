@@ -1,0 +1,352 @@
+[
+ {
+  "t": "Bloqueo y etiquetado",
+  "L": "portada",
+  "sub": "Cápsula de seguridad · 25 min · 3 retos",
+  "n": "Hola, te doy la bienvenida a esta cápsula sobre bloqueo y etiquetado.",
+  "o": "—"
+ },
+ {
+  "t": "Al terminar podrás",
+  "L": "objetivos",
+  "items": [
+   "Identificar las fuentes de energía peligrosa de un equipo",
+   "Distinguir prácticas seguras y riesgosas durante el bloqueo",
+   "Aplicar los pasos de bloqueo y etiquetado en una situación real"
+  ],
+  "n": "Al terminar podrás identificar, distinguir y aplicar los pasos del bloqueo.",
+  "o": "O1–O3"
+ },
+ {
+  "t": "Te acompaña Ana",
+  "L": "personaje",
+  "tx": "Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo.",
+  "n": "Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo.",
+  "o": "—"
+ },
+ {
+  "t": "Apagado no es lo mismo que seguro",
+  "L": "dato",
+  "big": "Apagado ≠ energía cero",
+  "tx": "Un equipo puede guardar energía aunque esté apagado.",
+  "n": "Ojo: apagado no significa energía cero. Un equipo puede guardar energía aunque esté apagado.",
+  "o": "O1",
+  "src": "Manual p. 12"
+ },
+ {
+  "t": "¿Qué es la energía peligrosa?",
+  "L": "idea",
+  "tx": "Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.",
+  "key": "Si puede moverse, calentarse o descargarse, se bloquea.",
+  "img": "tablero",
+  "n": "Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada.",
+  "o": "O1",
+  "src": "Manual p. 12"
+ },
+ {
+  "t": "Seis tipos de energía",
+  "L": "lista",
+  "items": [
+   [
+    "rayo",
+    "Eléctrica",
+    "Tableros y motores"
+   ],
+   [
+    "engranaje",
+    "Mecánica",
+    "Ejes y resortes"
+   ],
+   [
+    "gota",
+    "Hidráulica",
+    "Cilindros y mangueras"
+   ],
+   [
+    "aire",
+    "Neumática",
+    "Aire comprimido"
+   ],
+   [
+    "llama",
+    "Térmica",
+    "Vapor y superficies"
+   ],
+   [
+    "quimica",
+    "Química",
+    "Tuberías de proceso"
+   ]
+  ],
+  "n": "Hay seis tipos: eléctrica, mecánica, hidráulica, neumática, térmica y química.",
+  "o": "O1",
+  "src": "Manual p. 13"
+ },
+ {
+  "t": "Relaciona cada energía",
+  "L": "memoria",
+  "act": 1,
+  "n": "Encuentra las parejas: cada energía con su ejemplo.",
+  "o": "O1",
+  "warn": "En inglés, la tarjeta «Cylinders and hoses» desborda: acortar."
+ },
+ {
+  "t": "La energía residual",
+  "L": "idea",
+  "tx": "Después de apagar, puede quedar presión en una manguera, carga en un condensador o un resorte tenso.",
+  "key": "Libera o bloquea la energía residual antes de intervenir.",
+  "img": "alerta",
+  "n": "Después de apagar puede quedar energía residual: presión, carga o un resorte tenso.",
+  "o": "O1",
+  "src": "Manual p. 14"
+ },
+ {
+  "t": "Un ejemplo de planta",
+  "L": "personaje",
+  "tx": "La semana pasada una faja se movió sola al liberar la presión del cilindro. Nadie la había bloqueado.",
+  "n": "La semana pasada una faja se movió sola al liberar la presión del cilindro. Nadie la había bloqueado.",
+  "o": "O1"
+ },
+ {
+  "t": "¿Seguro o riesgoso?",
+  "L": "clasificar",
+  "act": 1,
+  "n": "Clasifica cada práctica en segura o riesgosa.",
+  "o": "O2",
+  "src": "Manual p. 23"
+ },
+ {
+  "t": "Lo que aprendiste",
+  "L": "resumen",
+  "items": [
+   "Apagado no es energía cero",
+   "Hay seis tipos de energía peligrosa",
+   "La energía residual también se bloquea"
+  ],
+  "n": "Repasemos: apagado no es energía cero, hay seis tipos de energía y la residual también se bloquea.",
+  "o": "O1"
+ },
+ {
+  "t": "Los seis pasos del bloqueo",
+  "L": "seccion",
+  "num": "2",
+  "n": "Ahora veamos los seis pasos del bloqueo.",
+  "o": "O3"
+ },
+ {
+  "t": "Pasos 1 a 3",
+  "L": "lista",
+  "items": [
+   [
+    "aviso",
+    "1. Preparar",
+    "Identifica las energías"
+   ],
+   [
+    "grupo",
+    "2. Avisar",
+    "Informa a los afectados"
+   ],
+   [
+    "power",
+    "3. Apagar",
+    "Detén el equipo normalmente"
+   ]
+  ],
+  "n": "Primero preparas, luego avisas y después apagas el equipo.",
+  "o": "O3",
+  "src": "Manual p. 21"
+ },
+ {
+  "t": "Pasos 4 a 6",
+  "L": "lista",
+  "items": [
+   [
+    "llave",
+    "4. Aislar",
+    "Corta cada fuente"
+   ],
+   [
+    "candado",
+    "5. Bloquear y etiquetar",
+    "Tu candado y tu tarjeta"
+   ],
+   [
+    "lupa",
+    "6. Verificar",
+    "Comprueba energía cero"
+   ]
+  ],
+  "n": "Luego aíslas, bloqueas y etiquetas, y verificas la energía cero.",
+  "o": "O3",
+  "src": "Manual pp. 22–26"
+ },
+ {
+  "t": "Ordena los pasos",
+  "L": "ordenar",
+  "act": 1,
+  "n": "Ordena los seis pasos del bloqueo.",
+  "o": "O3"
+ },
+ {
+  "t": "Tu candado, tu llave",
+  "L": "idea",
+  "tx": "Cada trabajador coloca su propio candado y guarda su única llave. Nadie más puede retirarlo.",
+  "key": "Un candado por persona. Una llave por candado.",
+  "img": "candado",
+  "n": "Cada trabajador coloca su propio candado y guarda su única llave.",
+  "o": "O2",
+  "src": "Manual p. 24"
+ },
+ {
+  "t": "¿Qué harías?",
+  "L": "decision",
+  "act": 1,
+  "sc": "Tu compañero olvidó su candado y te pide usar el tuyo para avanzar más rápido.",
+  "ops": [
+   "Le presto mi candado",
+   "Le pido que solicite uno al supervisor"
+  ],
+  "ok": 1,
+  "n": "Tu compañero olvidó su candado y te pide el tuyo. ¿Qué harías?",
+  "o": "O2"
+ },
+ {
+  "t": "Mira el procedimiento",
+  "L": "video",
+  "act": 1,
+  "n": "Mira el procedimiento completo. El video se detendrá para hacerte preguntas.",
+  "o": "O3",
+  "warn": "Falta el video del cliente: se usa un marcador de lugar."
+ },
+ {
+  "t": "El paso que más se omite",
+  "L": "dato",
+  "big": "Verificar energía cero",
+  "tx": "Según el manual, es el error más frecuente: intenta arrancar el equipo después de bloquearlo.",
+  "n": "El paso que más se omite es verificar la energía cero. Intenta arrancar el equipo después de bloquearlo.",
+  "o": "O3",
+  "src": "Manual p. 27"
+ },
+ {
+  "t": "Encuentra los puntos de aislamiento",
+  "L": "hotspot",
+  "act": 1,
+  "n": "Explora la escena y encuentra los tres puntos de aislamiento.",
+  "o": "O3",
+  "warn": "Ilustración genérica: conviene una foto real de la planta del cliente."
+ },
+ {
+  "t": "Bloqueo con varios trabajadores",
+  "L": "personaje",
+  "tx": "Si trabajan varios, cada uno pone su candado en una pinza de bloqueo grupal. El equipo se libera solo cuando sale el último.",
+  "n": "Si trabajan varios, cada uno pone su candado en una pinza grupal.",
+  "o": "O3",
+  "src": "Manual p. 25"
+ },
+ {
+  "t": "Comprueba lo aprendido",
+  "L": "quiz",
+  "act": 1,
+  "q": "¿Cuándo empiezas a trabajar en el equipo?",
+  "ops": [
+   "Al colocar el candado",
+   "Después de verificar energía cero",
+   "Cuando el supervisor lo indica"
+  ],
+  "ok": 1,
+  "n": "¿Cuándo empiezas a trabajar en el equipo?",
+  "o": "O3"
+ },
+ {
+  "t": "Retiro del bloqueo",
+  "L": "seccion",
+  "num": "3",
+  "n": "Por último, cómo retirar el bloqueo de forma segura.",
+  "o": "O3"
+ },
+ {
+  "t": "Para retirar el bloqueo",
+  "L": "lista",
+  "items": [
+   [
+    "lupa",
+    "Revisa",
+    "Herramientas y personas fuera"
+   ],
+   [
+    "grupo",
+    "Avisa",
+    "Informa que se energizará"
+   ],
+   [
+    "llave",
+    "Retira",
+    "Solo tu candado, con tu llave"
+   ]
+  ],
+  "n": "Revisa el área, avisa y retira solo tu candado con tu llave.",
+  "o": "O3",
+  "src": "Manual p. 28"
+ },
+ {
+  "t": "Un candado olvidado",
+  "L": "decision",
+  "act": 1,
+  "sc": "Terminaste tu turno y ves el candado de un compañero que ya se fue. El equipo debe arrancar.",
+  "ops": [
+   "Lo retiro con la llave maestra",
+   "Aviso al supervisor para el procedimiento de retiro"
+  ],
+  "ok": 1,
+  "n": "Encuentras el candado de un compañero que ya se fue. ¿Qué haces?",
+  "o": "O2"
+ },
+ {
+  "t": "¿Mito o realidad?",
+  "L": "vf",
+  "act": 1,
+  "stm": "Si el equipo está apagado, no hace falta bloquearlo.",
+  "ok": 0,
+  "n": "¿Mito o realidad? Si el equipo está apagado, no hace falta bloquearlo.",
+  "o": "O2"
+ },
+ {
+  "t": "En resumen",
+  "L": "resumen",
+  "items": [
+   "Seis pasos: preparar, avisar, apagar, aislar, bloquear y verificar",
+   "Tu candado, tu llave",
+   "Siempre verifica energía cero"
+  ],
+  "n": "En resumen: seis pasos, tu candado y tu llave, y siempre verifica la energía cero.",
+  "o": "O1–O3"
+ },
+ {
+  "t": "Reto final",
+  "L": "quiz",
+  "act": 1,
+  "sum": 1,
+  "q": "¿Quién puede retirar tu candado?",
+  "ops": [
+   "Solo yo",
+   "Mi supervisor",
+   "Cualquier compañero"
+  ],
+  "ok": 0,
+  "n": "Reto final. ¿Quién puede retirar tu candado?",
+  "o": "O1–O3"
+ },
+ {
+  "t": "Tus resultados",
+  "L": "resultados",
+  "n": "Estos son tus resultados.",
+  "o": "—"
+ },
+ {
+  "t": "¡Lo lograste!",
+  "L": "cierre",
+  "n": "¡Lo lograste! Ya sabes bloquear y etiquetar de forma segura.",
+  "o": "—"
+ }
+]

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-10.json",
+  "title": "IA-10 · Traducción ES↔EN (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "idiomaDestino": {
+      "enum": [
+        "en",
+        "es"
+      ]
+    },
+    "traducciones": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Ruta JSON Pointer del texto en el curso"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limiteCaracteres": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "terminosGlosario": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "ruta",
+          "texto"
+        ]
+      },
+      "minItems": 1
+    },
+    "dudas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ruta": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "ruta",
+          "motivo"
+        ]
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "idiomaDestino",
+    "traducciones"
+  ]
+}

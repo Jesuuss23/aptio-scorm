@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-11.json",
+  "title": "IA-11 · Prompt de imagen (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pedidos": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pedidoId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "reutilizarRecursoId": {
+            "oneOf": [
+              {
+                "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 900
+          },
+          "evitar": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 300
+          },
+          "formato": {
+            "enum": [
+              "svg",
+              "png"
+            ]
+          },
+          "relacionAspecto": {
+            "enum": [
+              "1:1",
+              "4:3",
+              "16:9",
+              "3:4",
+              "9:16"
+            ]
+          },
+          "alt": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/textoI18n"
+          },
+          "decorativa": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pedidoId",
+          "reutilizarRecursoId",
+          "prompt",
+          "formato",
+          "relacionAspecto",
+          "decorativa"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 40
+    }
+  },
+  "required": [
+    "pedidos"
+  ]
+}

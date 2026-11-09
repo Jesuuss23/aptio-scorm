@@ -1,0 +1,557 @@
+[
+  {
+    "pantallaId": "p01",
+    "disposicion": "portada",
+    "fondo": "primario",
+    "campos": {
+      "titulo": "Bloqueo y etiquetado",
+      "subtitulo": "Cápsula de seguridad · 15 min · 3 retos"
+    },
+    "pedidosImagen": [],
+    "motivo": "Portada del kit con el personaje."
+  },
+  {
+    "pantallaId": "p02",
+    "disposicion": "objetivos",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Al terminar podrás",
+      "items": [
+        {
+          "icono": "check",
+          "titulo": "Identificar",
+          "texto": "las fuentes de energía peligrosa de un equipo"
+        },
+        {
+          "icono": "check",
+          "titulo": "Distinguir",
+          "texto": "prácticas seguras y riesgosas durante el bloqueo"
+        },
+        {
+          "icono": "check",
+          "titulo": "Aplicar",
+          "texto": "los pasos de bloqueo y etiquetado en una situación real"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Lista corta de objetivos con verbo."
+  },
+  {
+    "pantallaId": "p03",
+    "disposicion": "personaje",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Te acompaña Ana",
+      "burbuja": "Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo."
+    },
+    "pedidosImagen": [],
+    "motivo": "El mensaje es testimonial: lo dice Ana.",
+    "personaje": {
+      "pose": "explicando",
+      "lado": "izquierda"
+    }
+  },
+  {
+    "pantallaId": "p04",
+    "disposicion": "dato",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Apagado no es lo mismo que seguro",
+      "datoGrande": "Apagado ≠ energía cero",
+      "texto": "Un equipo puede guardar energía aunque esté apagado."
+    },
+    "pedidosImagen": [],
+    "motivo": "Una idea contundente se lee mejor como dato grande.",
+    "personaje": {
+      "pose": "advirtiendo",
+      "lado": "derecha"
+    }
+  },
+  {
+    "pantallaId": "p05",
+    "disposicion": "idea",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "¿Qué es la energía peligrosa?",
+      "texto": "Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.",
+      "dato": "Si puede moverse, calentarse o descargarse, se bloquea."
+    },
+    "pedidosImagen": [
+      {
+        "id": "p05-img",
+        "uso": "principal",
+        "descripcion": "Tablero eléctrico con rayo de advertencia"
+      }
+    ],
+    "motivo": "Concepto con imagen de apoyo y dato clave."
+  },
+  {
+    "pantallaId": "p06",
+    "disposicion": "lista",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Seis tipos de energía",
+      "items": [
+        {
+          "icono": "rayo",
+          "titulo": "Eléctrica",
+          "texto": "Tableros y motores"
+        },
+        {
+          "icono": "engranaje",
+          "titulo": "Mecánica",
+          "texto": "Ejes y resortes"
+        },
+        {
+          "icono": "gota",
+          "titulo": "Hidráulica",
+          "texto": "Cilindros y mangueras"
+        },
+        {
+          "icono": "aire",
+          "titulo": "Neumática",
+          "texto": "Aire comprimido"
+        },
+        {
+          "icono": "llama",
+          "titulo": "Térmica",
+          "texto": "Vapor y superficies"
+        },
+        {
+          "icono": "quimica",
+          "titulo": "Química",
+          "texto": "Tuberías de proceso"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Varios elementos paralelos con ícono."
+  },
+  {
+    "pantallaId": "p07",
+    "disposicion": "memoria",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Relaciona cada energía"
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-01"
+    }
+  },
+  {
+    "pantallaId": "p08",
+    "disposicion": "idea",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "La energía residual",
+      "texto": "Después de apagar, puede quedar presión en una manguera, carga en un condensador o un resorte tenso.",
+      "dato": "Libera o bloquea la energía residual antes de intervenir."
+    },
+    "pedidosImagen": [
+      {
+        "id": "p08-img",
+        "uso": "principal",
+        "descripcion": "Manguera presurizada y resorte tenso con señal de alerta"
+      }
+    ],
+    "motivo": "Concepto con imagen de apoyo y dato clave."
+  },
+  {
+    "pantallaId": "p09",
+    "disposicion": "personaje",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Un ejemplo de planta",
+      "burbuja": "La semana pasada una faja se movió sola al liberar la presión del cilindro. Nadie la había bloqueado."
+    },
+    "pedidosImagen": [],
+    "motivo": "El mensaje es testimonial: lo dice Ana.",
+    "personaje": {
+      "pose": "explicando",
+      "lado": "izquierda"
+    }
+  },
+  {
+    "pantallaId": "p10",
+    "disposicion": "clasificar",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "¿Seguro o riesgoso?"
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-02"
+    }
+  },
+  {
+    "pantallaId": "p11",
+    "disposicion": "resumen",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Lo que aprendiste",
+      "items": [
+        {
+          "icono": "check",
+          "titulo": "Apagado no es energía cero"
+        },
+        {
+          "icono": "check",
+          "titulo": "Hay seis tipos de energía peligrosa"
+        },
+        {
+          "icono": "check",
+          "titulo": "La energía residual también se bloquea"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Repaso en lista corta."
+  },
+  {
+    "pantallaId": "p12",
+    "disposicion": "seccion",
+    "fondo": "primario",
+    "campos": {
+      "titulo": "Los seis pasos del bloqueo",
+      "numero": "2"
+    },
+    "pedidosImagen": [],
+    "motivo": "Separador de parte."
+  },
+  {
+    "pantallaId": "p13",
+    "disposicion": "lista",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Pasos 1 a 3",
+      "items": [
+        {
+          "icono": "aviso",
+          "titulo": "1. Preparar",
+          "texto": "Identifica las energías"
+        },
+        {
+          "icono": "grupo",
+          "titulo": "2. Avisar",
+          "texto": "Informa a los afectados"
+        },
+        {
+          "icono": "power",
+          "titulo": "3. Apagar",
+          "texto": "Detén el equipo normalmente"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Varios elementos paralelos con ícono."
+  },
+  {
+    "pantallaId": "p14",
+    "disposicion": "lista",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Pasos 4 a 6",
+      "items": [
+        {
+          "icono": "llave",
+          "titulo": "4. Aislar",
+          "texto": "Corta cada fuente"
+        },
+        {
+          "icono": "candado",
+          "titulo": "5. Bloquear y etiquetar",
+          "texto": "Tu candado y tu tarjeta"
+        },
+        {
+          "icono": "lupa",
+          "titulo": "6. Verificar",
+          "texto": "Comprueba energía cero"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Varios elementos paralelos con ícono."
+  },
+  {
+    "pantallaId": "p15",
+    "disposicion": "ordenar",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Ordena los pasos"
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-03"
+    }
+  },
+  {
+    "pantallaId": "p16",
+    "disposicion": "idea",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Tu candado, tu llave",
+      "texto": "Cada trabajador coloca su propio candado y guarda su única llave. Nadie más puede retirarlo.",
+      "dato": "Un candado por persona. Una llave por candado."
+    },
+    "pedidosImagen": [
+      {
+        "id": "p16-img",
+        "uso": "principal",
+        "descripcion": "Mano colocando un candado rojo con tarjeta"
+      }
+    ],
+    "motivo": "Concepto con imagen de apoyo y dato clave."
+  },
+  {
+    "pantallaId": "p17",
+    "disposicion": "decision",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "¿Qué harías?",
+      "situacion": "Tu compañero olvidó su candado y te pide usar el tuyo para avanzar más rápido.",
+      "opciones": [
+        "Le presto mi candado",
+        "Le pido que solicite uno al supervisor"
+      ],
+      "correcta": 1
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-08"
+    }
+  },
+  {
+    "pantallaId": "p18",
+    "disposicion": "video",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Mira el procedimiento"
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo."
+  },
+  {
+    "pantallaId": "p19",
+    "disposicion": "dato",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "El paso que más se omite",
+      "datoGrande": "Verificar energía cero",
+      "texto": "Según el manual, es el error más frecuente: intenta arrancar el equipo después de bloquearlo."
+    },
+    "pedidosImagen": [],
+    "motivo": "Una idea contundente se lee mejor como dato grande.",
+    "personaje": {
+      "pose": "advirtiendo",
+      "lado": "derecha"
+    }
+  },
+  {
+    "pantallaId": "p20",
+    "disposicion": "hotspot",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Encuentra los puntos de aislamiento"
+    },
+    "pedidosImagen": [
+      {
+        "id": "p20-img",
+        "uso": "escena",
+        "descripcion": "Faja transportadora con tablero eléctrico, válvula de aire comprimido y válvula de vapor visibles"
+      }
+    ],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-06"
+    }
+  },
+  {
+    "pantallaId": "p21",
+    "disposicion": "personaje",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Bloqueo con varios trabajadores",
+      "burbuja": "Si trabajan varios, cada uno pone su candado en una pinza de bloqueo grupal. El equipo se libera solo cuando sale el último."
+    },
+    "pedidosImagen": [],
+    "motivo": "El mensaje es testimonial: lo dice Ana.",
+    "personaje": {
+      "pose": "explicando",
+      "lado": "izquierda"
+    }
+  },
+  {
+    "pantallaId": "p22",
+    "disposicion": "quiz",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Comprueba lo aprendido",
+      "pregunta": "¿Cuándo empiezas a trabajar en el equipo?",
+      "opciones": [
+        "Al colocar el candado",
+        "Después de verificar energía cero",
+        "Cuando el supervisor lo indica"
+      ],
+      "correcta": 1
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-05"
+    }
+  },
+  {
+    "pantallaId": "p23",
+    "disposicion": "seccion",
+    "fondo": "primario",
+    "campos": {
+      "titulo": "Retiro del bloqueo",
+      "numero": "3"
+    },
+    "pedidosImagen": [],
+    "motivo": "Separador de parte."
+  },
+  {
+    "pantallaId": "p24",
+    "disposicion": "lista",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Para retirar el bloqueo",
+      "items": [
+        {
+          "icono": "lupa",
+          "titulo": "Revisa",
+          "texto": "Herramientas y personas fuera"
+        },
+        {
+          "icono": "grupo",
+          "titulo": "Avisa",
+          "texto": "Informa que se energizará"
+        },
+        {
+          "icono": "llave",
+          "titulo": "Retira",
+          "texto": "Solo tu candado, con tu llave"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Varios elementos paralelos con ícono."
+  },
+  {
+    "pantallaId": "p25",
+    "disposicion": "decision",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Un candado olvidado",
+      "situacion": "Terminaste tu turno y ves el candado de un compañero que ya se fue. El equipo debe arrancar.",
+      "opciones": [
+        "Lo retiro con la llave maestra",
+        "Aviso al supervisor para el procedimiento de retiro"
+      ],
+      "correcta": 1
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-08"
+    }
+  },
+  {
+    "pantallaId": "p26",
+    "disposicion": "vf",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "¿Mito o realidad?",
+      "afirmacion": "Si el equipo está apagado, no hace falta bloquearlo.",
+      "correcta": 0
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-07"
+    }
+  },
+  {
+    "pantallaId": "p27",
+    "disposicion": "resumen",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "En resumen",
+      "items": [
+        {
+          "icono": "check",
+          "titulo": "Seis pasos: preparar, avisar, apagar, aislar, bloquear y verificar"
+        },
+        {
+          "icono": "check",
+          "titulo": "Tu candado, tu llave"
+        },
+        {
+          "icono": "check",
+          "titulo": "Siempre verifica energía cero"
+        }
+      ]
+    },
+    "pedidosImagen": [],
+    "motivo": "Repaso en lista corta."
+  },
+  {
+    "pantallaId": "p28",
+    "disposicion": "quiz",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Reto final",
+      "pregunta": "¿Quién puede retirar tu candado?",
+      "opciones": [
+        "Solo yo",
+        "Mi supervisor",
+        "Cualquier compañero"
+      ],
+      "correcta": 0
+    },
+    "pedidosImagen": [],
+    "motivo": "Actividad del catálogo según el objetivo.",
+    "actividad": {
+      "tipo": "INT-05"
+    }
+  },
+  {
+    "pantallaId": "p29",
+    "disposicion": "resultados",
+    "fondo": "fondo",
+    "campos": {
+      "titulo": "Tus resultados",
+      "subtitulo": "Tu puntaje y tu insignia"
+    },
+    "pedidosImagen": [],
+    "motivo": "Pantalla fija de resultados."
+  },
+  {
+    "pantallaId": "p30",
+    "disposicion": "cierre",
+    "fondo": "primario",
+    "campos": {
+      "titulo": "¡Lo lograste!",
+      "subtitulo": "Ya sabes bloquear y etiquetar de forma segura."
+    },
+    "pedidosImagen": [
+      {
+        "id": "p30-img",
+        "uso": "icono",
+        "descripcion": "Trofeo con estrella"
+      }
+    ],
+    "motivo": "Cierre con celebración.",
+    "personaje": {
+      "pose": "celebrando",
+      "lado": "derecha"
+    }
+  }
+]

@@ -1,0 +1,415 @@
+{
+  "objetivos": [
+    {
+      "id": "obj-1",
+      "texto": {
+        "es": "Identificar las fuentes de energía peligrosa de un equipo."
+      },
+      "nivelBloom": "recordar",
+      "verbo": "identificar"
+    },
+    {
+      "id": "obj-2",
+      "texto": {
+        "es": "Distinguir prácticas seguras de prácticas riesgosas durante el bloqueo."
+      },
+      "nivelBloom": "comprender",
+      "verbo": "distinguir"
+    },
+    {
+      "id": "obj-3",
+      "texto": {
+        "es": "Aplicar los pasos de bloqueo y etiquetado en una situación de trabajo."
+      },
+      "nivelBloom": "aplicar",
+      "verbo": "aplicar"
+    }
+  ],
+  "modulos": [
+    {
+      "id": "mod-1",
+      "titulo": {
+        "es": "Control de energías peligrosas"
+      },
+      "capsulas": [
+        {
+          "id": "cap-loto",
+          "titulo": {
+            "es": "Bloqueo y etiquetado"
+          },
+          "objetivoIds": [
+            "obj-1",
+            "obj-2",
+            "obj-3"
+          ],
+          "duracionEstimadaMin": 15,
+          "pantallas": [
+            {
+              "id": "p01",
+              "tipo": "portada",
+              "proposito": "Presentar el tema y motivar",
+              "objetivoIds": [],
+              "fragmentoIds": []
+            },
+            {
+              "id": "p02",
+              "tipo": "objetivos",
+              "proposito": "Mostrar lo que el participante logrará",
+              "objetivoIds": [
+                "obj-1",
+                "obj-2",
+                "obj-3"
+              ],
+              "fragmentoIds": []
+            },
+            {
+              "id": "p03",
+              "tipo": "contenido",
+              "proposito": "Te acompaña Ana",
+              "objetivoIds": [],
+              "fragmentoIds": []
+            },
+            {
+              "id": "p04",
+              "tipo": "contenido",
+              "proposito": "Apagado no es lo mismo que seguro",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t06-f02"
+              ]
+            },
+            {
+              "id": "p05",
+              "tipo": "contenido",
+              "proposito": "¿Qué es la energía peligrosa?",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t06-f01"
+              ]
+            },
+            {
+              "id": "p06",
+              "tipo": "contenido",
+              "proposito": "Seis tipos de energía",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t07-f01",
+                "t07-f02",
+                "t07-f03",
+                "t07-f04",
+                "t07-f05",
+                "t07-f06"
+              ]
+            },
+            {
+              "id": "p07",
+              "tipo": "actividad",
+              "proposito": "Relaciona cada energía",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t07-f01",
+                "t07-f02",
+                "t07-f03",
+                "t07-f04",
+                "t07-f05",
+                "t07-f06"
+              ],
+              "actividadSugerida": "INT-01"
+            },
+            {
+              "id": "p08",
+              "tipo": "contenido",
+              "proposito": "La energía residual",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t08-f01",
+                "t08-f02"
+              ]
+            },
+            {
+              "id": "p09",
+              "tipo": "contenido",
+              "proposito": "Un ejemplo de planta",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t08-f01"
+              ]
+            },
+            {
+              "id": "p10",
+              "tipo": "actividad",
+              "proposito": "¿Seguro o riesgoso?",
+              "objetivoIds": [
+                "obj-2"
+              ],
+              "fragmentoIds": [
+                "t12-f01",
+                "t12-f02"
+              ],
+              "actividadSugerida": "INT-02"
+            },
+            {
+              "id": "p11",
+              "tipo": "resumen",
+              "proposito": "Repasar las ideas clave",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "fragmentoIds": [
+                "t06-f02",
+                "t08-f02"
+              ]
+            },
+            {
+              "id": "p12",
+              "tipo": "seccion",
+              "proposito": "Abrir una nueva parte",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": []
+            },
+            {
+              "id": "p13",
+              "tipo": "contenido",
+              "proposito": "Pasos 1 a 3",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t11-f01",
+                "t11-f02",
+                "t11-f03"
+              ]
+            },
+            {
+              "id": "p14",
+              "tipo": "contenido",
+              "proposito": "Pasos 4 a 6",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t11-f04",
+                "t11-f05",
+                "t11-f06"
+              ]
+            },
+            {
+              "id": "p15",
+              "tipo": "actividad",
+              "proposito": "Ordena los pasos",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t11-f01",
+                "t11-f02",
+                "t11-f03",
+                "t11-f04",
+                "t11-f05",
+                "t11-f06"
+              ],
+              "actividadSugerida": "INT-03"
+            },
+            {
+              "id": "p16",
+              "tipo": "contenido",
+              "proposito": "Tu candado, tu llave",
+              "objetivoIds": [
+                "obj-2"
+              ],
+              "fragmentoIds": [
+                "t12-f03"
+              ]
+            },
+            {
+              "id": "p17",
+              "tipo": "actividad",
+              "proposito": "¿Qué harías?",
+              "objetivoIds": [
+                "obj-2"
+              ],
+              "fragmentoIds": [
+                "t12-f04"
+              ],
+              "actividadSugerida": "INT-08"
+            },
+            {
+              "id": "p18",
+              "tipo": "actividad",
+              "proposito": "Mira el procedimiento",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t11-f01",
+                "t11-f02",
+                "t11-f03",
+                "t11-f04",
+                "t11-f05",
+                "t11-f06"
+              ]
+            },
+            {
+              "id": "p19",
+              "tipo": "contenido",
+              "proposito": "El paso que más se omite",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t14-f01",
+                "t14-f02"
+              ]
+            },
+            {
+              "id": "p20",
+              "tipo": "actividad",
+              "proposito": "Encuentra los puntos de aislamiento",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t04-f01",
+                "t11-f04"
+              ],
+              "actividadSugerida": "INT-06"
+            },
+            {
+              "id": "p21",
+              "tipo": "contenido",
+              "proposito": "Bloqueo con varios trabajadores",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t13-f01",
+                "t13-f02"
+              ]
+            },
+            {
+              "id": "p22",
+              "tipo": "actividad",
+              "proposito": "Comprueba lo aprendido",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t11-f06",
+                "t14-f01"
+              ],
+              "actividadSugerida": "INT-05"
+            },
+            {
+              "id": "p23",
+              "tipo": "seccion",
+              "proposito": "Abrir una nueva parte",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": []
+            },
+            {
+              "id": "p24",
+              "tipo": "contenido",
+              "proposito": "Para retirar el bloqueo",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t15-f01"
+              ]
+            },
+            {
+              "id": "p25",
+              "tipo": "actividad",
+              "proposito": "Un candado olvidado",
+              "objetivoIds": [
+                "obj-2"
+              ],
+              "fragmentoIds": [
+                "t15-f02"
+              ],
+              "actividadSugerida": "INT-08"
+            },
+            {
+              "id": "p26",
+              "tipo": "actividad",
+              "proposito": "¿Mito o realidad?",
+              "objetivoIds": [
+                "obj-2"
+              ],
+              "fragmentoIds": [
+                "t06-f02"
+              ],
+              "actividadSugerida": "INT-07"
+            },
+            {
+              "id": "p27",
+              "tipo": "resumen",
+              "proposito": "Repasar las ideas clave",
+              "objetivoIds": [
+                "obj-1",
+                "obj-2",
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t11-f06",
+                "t12-f03",
+                "t14-f01"
+              ]
+            },
+            {
+              "id": "p28",
+              "tipo": "evaluacion",
+              "proposito": "Reto final",
+              "objetivoIds": [
+                "obj-1",
+                "obj-2",
+                "obj-3"
+              ],
+              "fragmentoIds": [
+                "t12-f03",
+                "t11-f06",
+                "t14-f01",
+                "t07-f01"
+              ],
+              "actividadSugerida": "INT-05"
+            },
+            {
+              "id": "p29",
+              "tipo": "resultados",
+              "proposito": "Mostrar puntaje y estado",
+              "objetivoIds": [],
+              "fragmentoIds": []
+            },
+            {
+              "id": "p30",
+              "tipo": "cierre",
+              "proposito": "Cerrar y felicitar",
+              "objetivoIds": [],
+              "fragmentoIds": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "supuestos": [
+    "Sin objetivos del cliente: se proponen tres (recordar, comprender, aplicar).",
+    "Responsabilidades y dispositivos van como ficha descargable."
+  ]
+}

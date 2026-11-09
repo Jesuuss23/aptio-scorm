@@ -1,0 +1,34 @@
+{
+  "cliente": {
+    "id": "minera-andina",
+    "nombre": "Minera Andina S.A.C. (ficticia)"
+  },
+  "titulo": "Bloqueo y etiquetado",
+  "tema": "Bloqueo y etiquetado de energías peligrosas (LOTO)",
+  "publico": "Operarios y técnicos de mantenimiento de planta",
+  "nivel": "basico",
+  "metaMinutos": 15,
+  "pantallasMeta": 30,
+  "idiomas": [
+    "es",
+    "en"
+  ],
+  "modoIdioma": "mismo-paquete",
+  "dispositivoPrincipal": "celular",
+  "gamificacion": true,
+  "tono": "cercano",
+  "personaje": {
+    "nombre": "Ana",
+    "rol": "supervisora de seguridad",
+    "recursoId": "svg-ana"
+  },
+  "objetivos": null,
+  "documentos": [
+    {
+      "id": "doc-pets-seg-014",
+      "nombre": "PETS-SEG-014 Bloqueo y etiquetado.pdf",
+      "archivo": "manual-loto.md",
+      "paginas": 30
+    }
+  ]
+}

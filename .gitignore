@@ -1,0 +1,33 @@
+# Dependencias (se reinstalan con pnpm install)
+node_modules/
+.pnpm-store/
+
+# Salidas de compilación y empaquetado
+dist/
+build/
+*.tsbuildinfo
+
+# Variables de entorno y secretos
+.env
+.env.local
+.env.*.local
+
+# Binarios y archivos temporales de infraestructura
+minio-linux
+Dockerfile.minio
+*.tar
+*.iso
+
+# Logs y depuración
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+*.swo

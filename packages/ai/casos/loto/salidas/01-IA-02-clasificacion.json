@@ -1,0 +1,86 @@
+{
+  "metaMinutos": 15,
+  "minutosEstimados": 15,
+  "clasificacion": [
+    {
+      "temaId": "t01",
+      "decision": "omitir",
+      "motivo": "Información administrativa del documento; no aporta al desempeño."
+    },
+    {
+      "temaId": "t02",
+      "decision": "omitir",
+      "motivo": "El alcance se menciona en una frase de la portada; no requiere pantalla."
+    },
+    {
+      "temaId": "t03",
+      "decision": "omitir",
+      "motivo": "Referencias normativas; quedan en el documento original."
+    },
+    {
+      "temaId": "t04",
+      "decision": "conservar",
+      "motivo": "Los términos clave se enseñan dentro de las pantallas que los usan."
+    },
+    {
+      "temaId": "t05",
+      "decision": "complementario",
+      "motivo": "Útil para supervisores; se entrega como ficha descargable."
+    },
+    {
+      "temaId": "t06",
+      "decision": "conservar",
+      "motivo": "Concepto base de la cápsula."
+    },
+    {
+      "temaId": "t07",
+      "decision": "conservar",
+      "motivo": "Necesario para identificar fuentes (objetivo 1)."
+    },
+    {
+      "temaId": "t08",
+      "decision": "conservar",
+      "motivo": "Advertencia crítica de seguridad."
+    },
+    {
+      "temaId": "t09",
+      "decision": "complementario",
+      "motivo": "Detalle técnico de dispositivos; va en la ficha descargable."
+    },
+    {
+      "temaId": "t10",
+      "decision": "complementario",
+      "motivo": "Se incluye como consejo en la ficha descargable."
+    },
+    {
+      "temaId": "t11",
+      "decision": "conservar",
+      "motivo": "Procedimiento central (objetivo 3)."
+    },
+    {
+      "temaId": "t12",
+      "decision": "conservar",
+      "motivo": "Prácticas que el participante debe distinguir (objetivo 2)."
+    },
+    {
+      "temaId": "t13",
+      "decision": "conservar",
+      "motivo": "Situación frecuente en planta."
+    },
+    {
+      "temaId": "t14",
+      "decision": "conservar",
+      "motivo": "Paso más omitido según la empresa."
+    },
+    {
+      "temaId": "t15",
+      "decision": "conservar",
+      "motivo": "Cierre seguro del procedimiento."
+    },
+    {
+      "temaId": "t16",
+      "decision": "omitir",
+      "motivo": "Formatos internos; los gestiona Seguridad."
+    }
+  ]
+}

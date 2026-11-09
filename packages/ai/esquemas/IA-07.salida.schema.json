@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-07.json",
+  "title": "IA-07 · Datos de una interacción (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "pantallaId": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+    },
+    "tipo": {
+      "enum": [
+        "INT-01",
+        "INT-02",
+        "INT-03",
+        "INT-04",
+        "INT-05",
+        "INT-06",
+        "INT-07",
+        "INT-08"
+      ]
+    },
+    "modo": {
+      "enum": [
+        "formativa",
+        "sumativa"
+      ]
+    },
+    "peso": {
+      "type": "number",
+      "minimum": 0
+    },
+    "instruccion": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/textoI18n"
+    },
+    "datos": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "tipo",
+    "modo",
+    "instruccion",
+    "datos"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-01"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosMemoria"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-02"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosClasificar"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-03"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosOrdenar"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-04"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosTarjetas"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-05"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosQuiz"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-06"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosExploracion"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-07"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosDeslizar"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "tipo": {
+            "const": "INT-08"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "datos": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/datosDecision"
+          }
+        }
+      }
+    }
+  ]
+}

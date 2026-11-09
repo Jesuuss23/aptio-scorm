@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-01.json",
+  "title": "IA-01 · Mapa de temas de un documento (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "documentoId": {
+      "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+    },
+    "totalPaginas": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "temas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "titulo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "resumen": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "paginas": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          },
+          "peso": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Importancia para el público y el objetivo: 5 = imprescindible"
+          },
+          "tipoContenido": {
+            "enum": [
+              "concepto",
+              "procedimiento",
+              "norma",
+              "caso",
+              "dato",
+              "advertencia",
+              "otro"
+            ]
+          },
+          "objetivosRelacionados": {
+            "type": "array",
+            "items": {
+              "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+            },
+            "minItems": 0
+          }
+        },
+        "required": [
+          "id",
+          "titulo",
+          "resumen",
+          "paginas",
+          "peso",
+          "tipoContenido"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 40
+    },
+    "observaciones": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "minItems": 0,
+      "maxItems": 10
+    }
+  },
+  "required": [
+    "documentoId",
+    "totalPaginas",
+    "temas"
+  ]
+}

@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Rol {
+  SUPERADMIN               // Rol de plataforma global (HU-1501)
+  ADMINISTRADOR            // Administrador de la organización tenant
+  DISENADOR_INSTRUCCIONAL
+  PRODUCTOR
+  REVISOR
+}
+
+model Organizacion {
+  id          String     @id @default(uuid())
+  nombre      String
+  slug        String     @unique
+  ruc         String?    // Para facturación SUNAT (HU-1707)
+  activo      Boolean    @default(true)
+  creadoEn    DateTime   @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  usuarios    Usuario[]
+  clientes    Cliente[]
+  proyectos   Proyecto[]
+}
+
+model Usuario {
+  id             String        @id @default(uuid())
+  nombre         String
+  email          String        @unique
+  password       String
+  rol            Rol           @default(PRODUCTOR)
+  intentos       Int           @default(0)
+  bloqueadoHasta DateTime?
+  
+  // Si es SUPERADMIN de plataforma puede no pertenecer a una org específica (HU-1501)
+  organizacionId String?
+  organizacion   Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  creadoEn       DateTime      @default(now())
+  actualizadoEn  DateTime      @updatedAt
+}
+
+model Cliente {
+  id             String       @id @default(uuid())
+  nombre         String
+  lmsHabitual    String?
+  idiomas        String[]     @default(["ES"])
+  
+  // Aislamiento multi-tenant (HU-1701)
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  creadoEn       DateTime     @default(now())
+  proyectos      Proyecto[]
+}
+
+model Proyecto {
+  id             String       @id @default(uuid())
+  nombre         String
+  
+  // Aislamiento multi-tenant (HU-1701)
+  organizacionId String
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  clienteId      String
+  cliente        Cliente      @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  creadoEn       DateTime     @default(now())
+}

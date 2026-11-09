@@ -1,0 +1,214 @@
+{
+  "idiomaDestino": "en",
+  "traducciones": [
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/0/titulo",
+      "texto": "Lockout/tagout",
+      "limiteCaracteres": 25,
+      "terminosGlosario": [
+        "lockout/tagout"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/0/bloques/0/contenido",
+      "texto": "Lockout/tagout",
+      "limiteCaracteres": 25,
+      "terminosGlosario": [
+        "lockout/tagout"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/0/bloques/1/contenido",
+      "texto": "Safety capsule · 15 min · 3 challenges",
+      "limiteCaracteres": 48
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/0/narracion/texto",
+      "texto": "Hi, welcome to this capsule on lockout/tagout.",
+      "limiteCaracteres": 86,
+      "terminosGlosario": [
+        "lockout/tagout"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/1/titulo",
+      "texto": "By the end, you can",
+      "limiteCaracteres": 22
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/1/bloques/0/contenido",
+      "texto": "By the end, you can",
+      "limiteCaracteres": 22
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/1/bloques/1/contenido",
+      "texto": "Identify the hazardous energy sources of a machine",
+      "limiteCaracteres": 71,
+      "terminosGlosario": [
+        "hazardous energy"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/1/bloques/2/contenido",
+      "texto": "Tell safe from unsafe practices during lockout",
+      "limiteCaracteres": 73
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/1/bloques/3/contenido",
+      "texto": "Apply the lockout/tagout steps in a real situation",
+      "limiteCaracteres": 78,
+      "terminosGlosario": [
+        "lockout/tagout"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/1/narracion/texto",
+      "texto": "When you finish, you will be able to identify, distinguish and apply the lockout steps.",
+      "limiteCaracteres": 93
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/2/titulo",
+      "texto": "Meet Ana",
+      "limiteCaracteres": 20
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/2/bloques/0/contenido",
+      "texto": "Meet Ana",
+      "limiteCaracteres": 20
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/2/bloques/1/contenido",
+      "texto": "I'm Ana, a safety supervisor. I'll show you how to protect yourself when you work on a machine.",
+      "limiteCaracteres": 121,
+      "terminosGlosario": [
+        "supervisor"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/2/narracion/texto",
+      "texto": "I'm Ana, a safety supervisor. I'll show you how to protect yourself when you work on a machine.",
+      "limiteCaracteres": 121,
+      "terminosGlosario": [
+        "supervisor"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/3/titulo",
+      "texto": "Off is not the same as safe",
+      "limiteCaracteres": 41
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/3/bloques/0/contenido",
+      "texto": "Off is not the same as safe",
+      "limiteCaracteres": 41
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/3/bloques/1/contenido",
+      "texto": "Off ≠ zero energy state",
+      "limiteCaracteres": 27,
+      "terminosGlosario": [
+        "zero energy state"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/3/bloques/2/contenido",
+      "texto": "A machine can store energy even when it is off.",
+      "limiteCaracteres": 65
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/3/narracion/texto",
+      "texto": "Careful: off does not mean zero energy state. A machine can store energy even when it is off.",
+      "limiteCaracteres": 115,
+      "terminosGlosario": [
+        "zero energy state"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/4/titulo",
+      "texto": "What is hazardous energy?",
+      "limiteCaracteres": 36,
+      "terminosGlosario": [
+        "hazardous energy"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/4/bloques/0/contenido",
+      "texto": "What is hazardous energy?",
+      "limiteCaracteres": 36,
+      "terminosGlosario": [
+        "hazardous energy"
+      ]
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/4/bloques/1/contenido",
+      "texto": "It is any energy that can move, heat or release something unexpectedly while you work on a machine.",
+      "limiteCaracteres": 141
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/4/bloques/2/contenido",
+      "texto": "If it can move, heat up or discharge, lock it out.",
+      "limiteCaracteres": 68
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/4/bloques/3/alt",
+      "texto": "Electrical panel with a lightning warning sign",
+      "limiteCaracteres": 51
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/4/narracion/texto",
+      "texto": "It is any energy that can move, heat or release something unexpectedly.",
+      "limiteCaracteres": 102
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/titulo",
+      "texto": "Six types of energy",
+      "limiteCaracteres": 26
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/0/contenido",
+      "texto": "Six types of energy",
+      "limiteCaracteres": 26
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/1/contenido",
+      "texto": "Electrical: Panels and motors",
+      "limiteCaracteres": 36
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/2/contenido",
+      "texto": "Mechanical: Shafts and springs",
+      "limiteCaracteres": 31
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/3/contenido",
+      "texto": "Hydraulic: Cylinders and hoses",
+      "limiteCaracteres": 41
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/4/contenido",
+      "texto": "Pneumatic: Compressed air",
+      "limiteCaracteres": 32
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/5/contenido",
+      "texto": "Thermal: Steam and surfaces",
+      "limiteCaracteres": 35
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/bloques/6/contenido",
+      "texto": "Chemical: Process pipes",
+      "limiteCaracteres": 35
+    },
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/5/narracion/texto",
+      "texto": "There are six types: electrical, mechanical, hydraulic, pneumatic, thermal and chemical.",
+      "limiteCaracteres": 97
+    }
+  ],
+  "dudas": [
+    {
+      "ruta": "/modulos/0/capsulas/0/pantallas/3/bloques/1/contenido",
+      "motivo": "«≠» se mantiene; confirmar con el cliente si prefiere «Off is not zero energy»."
+    }
+  ]
+}

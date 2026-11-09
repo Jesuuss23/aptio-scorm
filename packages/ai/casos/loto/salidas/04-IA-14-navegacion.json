@@ -1,0 +1,25 @@
+{
+  "recomendado": {
+    "patron": "historias",
+    "motivo": "Público operativo que verá la cápsula en el celular: toques cortos, una idea por pantalla."
+  },
+  "alternativa": {
+    "patron": "clasico",
+    "motivo": "Si se proyecta en sala o se usa en computadora, el clásico con botones es más familiar."
+  },
+  "navegacion": {
+    "patron": "historias",
+    "modo": "condiciones",
+    "siguienteSeHabilita": "actividad",
+    "reanudar": "preguntar",
+    "mostrar": [
+      "progreso",
+      "temario",
+      "puntos",
+      "idioma",
+      "accesibilidad"
+    ],
+    "objetivosAlInicio": true,
+    "atajosTeclado": true
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-17.json",
+  "title": "IA-17 · Corrección de alineación (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "resumen": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "cambios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tipo": {
+            "enum": [
+              "nueva-pregunta",
+              "nueva-pantalla",
+              "ajustar-pregunta",
+              "ajustar-objetivo"
+            ]
+          },
+          "objetivoId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          },
+          "nivelBloom": {
+            "enum": [
+              "recordar",
+              "comprender",
+              "aplicar",
+              "analizar",
+              "evaluar",
+              "crear"
+            ]
+          },
+          "motivo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "pantallaId": {
+            "$ref": "https://aulaseducativas.local/esquemas/curso/v0.json#/$defs/id"
+          }
+        },
+        "required": [
+          "tipo",
+          "objetivoId",
+          "nivelBloom",
+          "motivo"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 10
+    },
+    "patch": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "enum": [
+              "add",
+              "remove",
+              "replace",
+              "move",
+              "copy",
+              "test"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "value": {},
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "op",
+          "path"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 60
+    }
+  },
+  "required": [
+    "resumen",
+    "cambios",
+    "patch"
+  ]
+}

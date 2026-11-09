@@ -1,0 +1,20 @@
+{
+  "name": "aptio-scorm",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev:infra": "docker compose up -d",
+    "stop:infra": "docker compose down",
+    "dev": "pnpm --filter \"./apps/*\" --parallel dev",
+    "db:migrate": "pnpm --filter api exec prisma migrate dev",
+    "db:seed": "pnpm --filter api exec prisma db seed"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

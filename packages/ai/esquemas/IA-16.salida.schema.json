@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-16.json",
+  "title": "IA-16 · Propuesta de retoque (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tipo": {
+      "enum": [
+        "mas-visual",
+        "menos-texto",
+        "actividad",
+        "variantes",
+        "ilustracion",
+        "libre",
+        "sincronizar-voz"
+      ]
+    },
+    "titulo": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "resumen": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+    },
+    "patch": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "enum": [
+              "add",
+              "remove",
+              "replace",
+              "move",
+              "copy",
+              "test"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "value": {},
+          "from": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "op",
+          "path"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 60
+    },
+    "variantes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "disposicion": {
+            "enum": [
+              "portada",
+              "objetivos",
+              "personaje",
+              "dato",
+              "idea",
+              "lista",
+              "memoria",
+              "clasificar",
+              "ordenar",
+              "decision",
+              "video",
+              "hotspot",
+              "quiz",
+              "vf",
+              "resumen",
+              "seccion",
+              "resultados",
+              "cierre"
+            ]
+          },
+          "campos": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "titulo": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 70
+              },
+              "subtitulo": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "texto": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 220
+              },
+              "dato": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 140,
+                "description": "Idea clave destacada"
+              },
+              "datoGrande": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 40
+              },
+              "numero": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "icono": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 30
+                    },
+                    "titulo": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "texto": {
+                      "type": "string",
+                      "minLength": 0,
+                      "maxLength": 120
+                    }
+                  },
+                  "required": [
+                    "titulo"
+                  ]
+                },
+                "minItems": 2,
+                "maxItems": 6
+              },
+              "burbuja": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 220,
+                "description": "Lo que dice el personaje en globo"
+              },
+              "situacion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 240
+              },
+              "pregunta": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "afirmacion": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "opciones": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 90
+                },
+                "minItems": 2,
+                "maxItems": 4
+              },
+              "correcta": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "retroOk": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              },
+              "retroNo": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "titulo"
+            ]
+          },
+          "patch": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "op": {
+                  "enum": [
+                    "add",
+                    "remove",
+                    "replace",
+                    "move",
+                    "copy",
+                    "test"
+                  ]
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "value": {},
+                "from": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "op",
+                "path"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 60
+          }
+        },
+        "required": [
+          "nombre",
+          "disposicion",
+          "campos",
+          "patch"
+        ]
+      },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  },
+  "required": [
+    "tipo",
+    "titulo",
+    "resumen"
+  ],
+  "oneOf": [
+    {
+      "required": [
+        "patch"
+      ]
+    },
+    {
+      "required": [
+        "variantes"
+      ]
+    }
+  ]
+}
