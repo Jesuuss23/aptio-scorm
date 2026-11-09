@@ -2,27 +2,25 @@
 
 > v0.2 agrega a cada pantalla `disposicion` (composición generada), `fondo`, `ajustes` (retoques del editor por elemento) y `extras` (elementos agregados a mano). Resuelve DA-07. El ejemplo está en 0.2.0 y valida; los 17 casos de prueba pasan.
 
-El curso es un documento JSON que valida contra `esquema-curso-v0.schema.json` (JSON Schema 2020-12). Es la fuente de verdad que comparten el editor, la vista previa, la IA y los exportadores.
+El curso es un documento JSON que valida contra el esquema JSON Schema 2020-12 del paquete `@aptio/schema` (HU-0102). Es la fuente de verdad que comparten el editor, la vista previa, la IA y los exportadores. Este documento conserva las decisiones del modelo; los archivos viven en el paquete.
 
 ## Archivos
 
 | Archivo | Contenido |
 | --- | --- |
-| `esquema-curso-v0.schema.json` | Esquema: metadatos, idiomas, objetivos, módulos, cápsulas, pantallas, bloques, interacciones INT-01 a INT-08, narración con bocas, video con marcadores, seguimiento, gamificación y recursos |
-| `ejemplo-capsula.json` | Cápsula bilingüe "Bloqueo y etiquetado" (7 pantallas): portada, contenido con personaje y narración, memoria, clasificar, video del cliente con pregunta, quiz sumativo y cierre |
-| `validar.mjs` | Validación del esquema + reglas adicionales: ids únicos, referencias a recursos y objetivos, traducciones completas en cursos bilingües, grupos de clasificar, banco del quiz, nodos de decisión, personaje de la narración |
-| `pruebas.mjs` | 17 casos (1 válido y 16 inválidos) que deben comportarse como se espera |
+| `packages/schema/esquemas/curso-v0.schema.json` | Esquema: metadatos, idiomas, objetivos, módulos, cápsulas, pantallas, bloques, interacciones INT-01 a INT-08, narración con bocas, video con marcadores, seguimiento, gamificación y recursos |
+| `packages/schema/ejemplos/ejemplo-capsula.json` | Cápsula bilingüe "Bloqueo y etiquetado" (7 pantallas): portada, contenido con personaje y narración, memoria, clasificar, video del cliente con pregunta, quiz sumativo y cierre |
+| `packages/schema/src/validar.ts` | `validarCurso()`: esquema + reglas adicionales (ids únicos, referencias a recursos y objetivos, traducciones completas en cursos bilingües, grupos de clasificar, banco del quiz, nodos de decisión, personaje de la narración) y advertencias para exportar |
+| `packages/schema/src/curso.generado.ts` | Tipos TypeScript generados desde el esquema (`pnpm --filter @aptio/schema generar`) |
+| `packages/schema/test/curso.test.ts` | Los 17 casos (1 válido y 16 inválidos), el curso esperado LOTO y la comprobación de que los tipos están al día |
 
 ## Ejecutar
 
 ```bash
-npm install
-npm run validar            # valida ejemplo-capsula.json
-node validar.mjs otro.json # valida otro curso
-npm test                   # casos negativos
+pnpm schema:test                                  # pruebas del esquema
+pnpm --filter @aptio/schema validar               # valida el ejemplo
+pnpm --filter @aptio/schema validar otro.json     # valida otro curso
 ```
-
-Resultado verificado al entregar este paquete: el ejemplo es válido, con 6 advertencias de exportación (pantallas sin aprobar y narración en inglés pendiente), y los 14 casos de prueba se comportan como se espera.
 
 ## Decisiones del modelo
 
@@ -36,4 +34,4 @@ Resultado verificado al entregar este paquete: el ejemplo es válido, con 6 adve
 
 ## Evolución
 
-`versionEsquema` es `0.1.0`. Cada cambio incompatible sube la versión e incluye una función de migración en `packages/schema/migraciones/`.
+`versionEsquema` es `0.2.0`. Cada cambio incompatible sube la versión e incluye una función de migración en `packages/schema/migraciones/`.

@@ -14,7 +14,7 @@ El equipo, los plazos y la estimación los define el ingeniero a cargo; este paq
 | 4 | `docs/01-arquitectura.md` | Arquitectura en Node.js, módulos del monorepo, flujos de datos. |
 | 5 | `docs/02-pantallas.md` | Ventanas y opciones del software (PNT-01 a PNT-14). Base del prototipo visual. |
 | 6 | `docs/03-requisitos.md` | Requisitos con identificador, prioridad y criterio de aceptación. |
-| 7 | `docs/04-modelo-contenido/` | Esquema JSON v0 del curso, ejemplo validado y script de validación. |
+| 7 | `docs/04-modelo-contenido/` + `packages/schema/` | Decisiones del modelo de contenido; el esquema JSON v0.2, el ejemplo, los tipos y el validador viven en `@aptio/schema`. |
 | 8 | `docs/05-interacciones.md` | Catálogo de las 8 interacciones del MVP (INT-01 a INT-08). |
 | 9 | `docs/06-ia.md` | Tareas de IA con Claude, salidas estructuradas y revisión humana. |
 | 10 | `docs/07-voz-personaje-idiomas.md` | TTS, sincronización labial, subtítulos y bilingüismo. |
@@ -50,7 +50,6 @@ El equipo, los plazos y la estimación los define el ingeniero a cargo; este paq
 ## Validar el ejemplo del modelo de contenido
 
 ```bash
-cd docs/04-modelo-contenido
-npm install
-npm run validar
+pnpm schema:test                     # 17 casos del esquema + curso LOTO
+pnpm --filter @aptio/schema validar   # valida ejemplos/ejemplo-capsula.json
 ```

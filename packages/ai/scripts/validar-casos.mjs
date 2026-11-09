@@ -10,7 +10,7 @@ const raiz = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repo = join(raiz, "..", "..");
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
-ajv.addSchema(JSON.parse(readFileSync(join(repo, "docs/04-modelo-contenido/esquema-curso-v0.schema.json"), "utf8")));
+ajv.addSchema(JSON.parse(readFileSync(join(repo, "packages/schema/esquemas/curso-v0.schema.json"), "utf8")));
 const esquemas = {};
 for (const f of readdirSync(join(raiz, "esquemas")).filter((f) => f.endsWith(".salida.schema.json"))) {
   const s = JSON.parse(readFileSync(join(raiz, "esquemas", f), "utf8"));

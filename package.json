@@ -8,8 +8,8 @@
     "dev": "pnpm --filter \"./apps/*\" --parallel dev",
     "db:migrate": "pnpm --filter @aptio/db exec prisma migrate dev",
     "db:seed": "pnpm --filter @aptio/db exec prisma db seed",
-    "schema:test": "node docs/04-modelo-contenido/pruebas.mjs",
-    "ia:casos": "node packages/ai/scripts/validar-casos.mjs && node docs/04-modelo-contenido/validar.mjs packages/ai/casos/loto/curso-esperado-es.json",
+    "schema:test": "pnpm --filter @aptio/schema test",
+    "ia:casos": "node packages/ai/scripts/validar-casos.mjs && pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.json",
     "openapi:lint": "npx @redocly/cli lint docs/api/openapi.yaml",
     "db:test": "pnpm --filter @aptio/db test"
   },

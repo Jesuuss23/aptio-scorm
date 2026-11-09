@@ -4,7 +4,7 @@ El esquema físico está en `packages/db/prisma/schema.prisma` (PostgreSQL, Pris
 
 ## Criterio de diseño
 
-- **El curso es un documento.** Pantallas, bloques, interacciones, navegación, ajustes del editor y textos por idioma viven en `Curso.documento` (JSONB). Ese documento valida contra `docs/04-modelo-contenido/esquema-curso-v0.schema.json` (versión 0.2.0).
+- **El curso es un documento.** Pantallas, bloques, interacciones, navegación, ajustes del editor y textos por idioma viven en `Curso.documento` (JSONB). Ese documento valida contra `packages/schema/esquemas/curso-v0.schema.json` (versión 0.2.0).
 - **Las tablas guardan solo lo que necesita una base relacional:** permisos, búsquedas, costos, historial, estados de trabajo y archivos.
 - **Bloqueo optimista.** `Curso.version` aumenta con cada cambio guardado. Una escritura con una versión vieja recibe `409 Conflict`.
 - **Historial completo.** Cada cambio que se guarda deja una fila en `CursoVersion` con su motivo (generación, propuesta aplicada, edición, restauración). Así se puede volver atrás aunque se cierre el navegador.

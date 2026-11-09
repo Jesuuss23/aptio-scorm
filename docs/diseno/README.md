@@ -9,4 +9,4 @@
 | `sitio-comercial.html` | Prototipo de la fase comercial: sitio público (Inicio, Producto, Precios con pago, Blog, Agendar demo, popups, chatbot, cookies) y panel superadmin de 15 vistas. Todo se edita en el panel y se puede mostrar u ocultar; los cambios se ven en el sitio. Datos ficticios. Se abre con doble clic. |
 | `stitch/sitio/` | Las 21 pantallas de Stitch del sitio y el panel, solo como referencia de marca. Revisión en `docs/23-sitio-comercial-y-facturacion.md`. |
 
-El prototipo visual usa datos de ejemplo (cliente "Minera Andina (ejemplo)", cápsula "Bloqueo y etiquetado") que coinciden con `docs/04-modelo-contenido/ejemplo-capsula.json`. Las pantallas PNT-07, PNT-08, PNT-12, PNT-14, PNT-15 y PNT-16 están descritas en `docs/02-pantallas.md` pero no dibujadas.
+El prototipo visual usa datos de ejemplo (cliente "Minera Andina (ejemplo)", cápsula "Bloqueo y etiquetado") que coinciden con `packages/schema/ejemplos/ejemplo-capsula.json`. Las pantallas PNT-07, PNT-08, PNT-12, PNT-14, PNT-15 y PNT-16 están descritas en `docs/02-pantallas.md` pero no dibujadas.
