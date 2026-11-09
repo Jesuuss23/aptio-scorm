@@ -1,21 +1,25 @@
 {
   "name": "@aptio/schema",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "build": "tsc"
+    "generar": "node scripts/generar-tipos.mjs",
+    "validar": "tsx scripts/validar.ts",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
   "dependencies": {
-    "zod": "^4.6.7"
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
-    "typescript": "^7.0.2"
+    "json-schema-to-typescript": "^16.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
   }
 }

@@ -1,6 +1,6 @@
 // Esquema físico de la base de datos (PostgreSQL) — Aptio SCORM
 // El documento del curso vive en Curso.documento (JSONB) y valida contra
-// docs/04-modelo-contenido/esquema-curso-v0.schema.json (v0.2).
+// packages/schema/esquemas/curso-v0.schema.json (v0.2).
 // Las tablas guardan lo que necesita consultas, permisos, costos o historial.
 //
 // Multi-organización (ADR-012): las tablas raíz de cada organización llevan

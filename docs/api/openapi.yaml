@@ -3605,7 +3605,7 @@ components:
           type: integer
         documento:
           type: object
-          description: Valida contra docs/04-modelo-contenido/esquema-curso-v0.schema.json
+          description: Valida contra packages/schema/esquemas/curso-v0.schema.json
         actualizadoEn:
           type: string
           format: date-time

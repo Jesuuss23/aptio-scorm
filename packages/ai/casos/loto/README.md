@@ -11,7 +11,7 @@ Material ficticio de un cliente ficticio (Minera Andina S.A.C.) con **la salida 
 
 ```bash
 node packages/ai/scripts/validar-casos.mjs                                        # 63 salidas contra sus esquemas
-node docs/04-modelo-contenido/validar.mjs packages/ai/casos/loto/curso-esperado-es.json   # curso final
+pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.json   # curso final
 ```
 
 ## Entradas
