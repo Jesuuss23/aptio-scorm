@@ -1,0 +1,53 @@
+/* Tokens de Aptio SCORM (docs/diseno/DESIGN.md). Solo la interfaz de la herramienta:
+   las cápsulas usan el kit de cada cliente. */
+:root {
+  color-scheme: light;
+
+  /* Color */
+  --color-fondo: #f4f6f9;
+  --color-superficie: #ffffff;
+  --color-borde: #e2e8f0;
+  --color-suave: #f1f5f9;
+  --color-texto: #0b1c30;
+  --color-texto-sec: #64748b;
+  --color-cobalto: #004ecc;
+  --color-cobalto-activo: #003ea3;
+  --color-cobalto-suave: #eff6ff;
+  --color-naranja: #ff6b35; /* marca e IA, nunca acciones normales */
+  --color-naranja-texto: #ab3500;
+  --color-naranja-suave: #fff1eb;
+  --color-naranja-borde: #ffd3c2;
+  --color-validado: #0f766e;
+  --color-validado-suave: #ccfbf1;
+  --color-aviso: #92400e;
+  --color-aviso-suave: #fef3c7;
+  --color-error: #ba1a1a;
+  --color-error-suave: #ffdad6;
+
+  /* Tipografía: escala única de 6 tamaños (CP-014). No se usa ningún otro tamaño. */
+  --fuente-ui: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --fuente-num: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --texto-xs: 11px; /* etiquetas en mayúsculas */
+  --texto-sm: 12px; /* ayudas, metadatos, chips */
+  --texto-base: 14px; /* texto, botones, campos */
+  --titulo-panel: 16px; /* títulos de tarjeta y panel */
+  --dato: 20px; /* cifras de indicadores, en JetBrains Mono */
+  --titulo-pagina: 26px; /* solo el h1 de cada vista */
+
+  /* Forma y elevación */
+  --radio-tarjeta: 16px;
+  --radio-control: 8px;
+  --sombra: 0 2px 8px -2px rgba(15, 23, 42, 0.06), 0 1px 4px -1px rgba(15, 23, 42, 0.04);
+  --sombra-alta: 0 12px 24px -6px rgba(0, 78, 204, 0.1), 0 4px 8px -2px rgba(15, 23, 42, 0.04);
+
+  /* Márgenes (CP-013): 32 px desde la barra lateral en escritorio, 16 px en celular */
+  --ancho-barra: 240px;
+  --margen: 32px;
+  --ancho-max: 1600px;
+}
+
+@media (max-width: 900px) {
+  :root {
+    --margen: 16px;
+  }
+}

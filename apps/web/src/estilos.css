@@ -1,0 +1,46 @@
+/* Estilos propios de apps/web. Los tokens y la estructura vienen de @aptio/ui. */
+.acceso {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px var(--margen);
+  background: linear-gradient(180deg, var(--color-cobalto) 0 42%, var(--color-fondo) 42%);
+}
+.acceso-tarjeta {
+  width: min(420px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+}
+.acceso-tarjeta h1 + p {
+  margin-top: 4px;
+}
+.acceso-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-texto);
+}
+.acceso-marca .ap-nombre span {
+  color: var(--color-naranja-texto);
+}
+.acceso-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ayuda {
+  font-size: var(--texto-sm);
+  color: var(--color-texto-sec);
+  margin-top: -8px;
+}
+.ayuda.error {
+  color: var(--color-error);
+}
+.vacio {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 760px;
+}
