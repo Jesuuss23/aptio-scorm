@@ -6,11 +6,12 @@
     "dev:infra": "docker compose up -d",
     "stop:infra": "docker compose down",
     "dev": "pnpm --filter \"./apps/*\" --parallel dev",
-    "db:migrate": "pnpm --filter api exec prisma migrate dev",
-    "db:seed": "pnpm --filter api exec prisma db seed",
+    "db:migrate": "pnpm --filter @aptio/db exec prisma migrate dev",
+    "db:seed": "pnpm --filter @aptio/db exec prisma db seed",
     "schema:test": "node docs/04-modelo-contenido/pruebas.mjs",
     "ia:casos": "node packages/ai/scripts/validar-casos.mjs && node docs/04-modelo-contenido/validar.mjs packages/ai/casos/loto/curso-esperado-es.json",
-    "openapi:lint": "npx @redocly/cli lint docs/api/openapi.yaml"
+    "openapi:lint": "npx @redocly/cli lint docs/api/openapi.yaml",
+    "db:test": "pnpm --filter @aptio/db test"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
@@ -19,7 +20,10 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "esbuild"
+      "@prisma/client",
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
     ]
   },
   "engines": {

@@ -1,9 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@aptio/db';
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());

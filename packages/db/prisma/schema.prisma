@@ -1,0 +1,641 @@
+// Esquema físico de la base de datos (PostgreSQL) — Aptio SCORM
+// El documento del curso vive en Curso.documento (JSONB) y valida contra
+// docs/04-modelo-contenido/esquema-curso-v0.schema.json (v0.2).
+// Las tablas guardan lo que necesita consultas, permisos, costos o historial.
+//
+// Multi-organización (ADR-012): las tablas raíz de cada organización llevan
+// `organizacionId`; las tablas hijas (kit, versiones, etapas, narraciones…)
+// heredan el aislamiento por la relación con su padre. Ver docs/12-modelo-datos.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Organizaciones (ADR-012) ----------
+
+enum EstadoOrganizacion {
+  ACTIVA
+  SOLO_LECTURA // cobranza vencida (HU-1708)
+  CANCELADA
+}
+
+model Organizacion {
+  id            String             @id @default(uuid()) @db.Uuid
+  nombre        String
+  slug          String             @unique
+  ruc           String? // para comprobantes SUNAT (HU-1707)
+  estado        EstadoOrganizacion @default(ACTIVA)
+  creadoEn      DateTime           @default(now())
+  actualizadoEn DateTime           @updatedAt
+
+  usuarios      Usuario[]
+  clientes      Cliente[]
+  proyectos     Proyecto[]
+  cursos        Curso[]
+  generaciones  Generacion[]
+  trabajosIA    TrabajoIA[]
+  recursos      Recurso[]
+  exportaciones Exportacion[]
+  mediciones    MedicionProceso[]
+  auditoria     Auditoria[]
+}
+
+// ---------- Personas y acceso ----------
+
+enum Rol {
+  SUPERADMIN // plataforma; sin organización (ADR-011, HU-1501)
+  ADMINISTRADOR
+  DISENADOR_INSTRUCCIONAL
+  DISENADOR_GRAFICO
+  PRODUCTOR
+  REVISOR_CLIENTE
+}
+
+model Usuario {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizacionId   String?   @db.Uuid
+  email            String    @unique
+  nombre           String
+  hashClave        String? // argon2id; null si solo ingresa con Google (ADR-009)
+  googleSub        String?   @unique // identificador de Google (OpenID Connect), se vincula por correo verificado
+  emailVerificado  Boolean   @default(false)
+  intentosFallidos Int       @default(0)
+  bloqueadoHasta   DateTime? // 5 intentos fallidos = 15 minutos
+  rol              Rol
+  clienteId        String?   @db.Uuid // solo para REVISOR_CLIENTE
+  // organizacionId es null solo para SUPERADMIN
+  activo           Boolean   @default(true)
+  creadoEn         DateTime  @default(now())
+  ultimoIngreso    DateTime?
+
+  cliente             Cliente?      @relation(fields: [clienteId], references: [id])
+  proyectos           Proyecto[]    @relation("ProyectoCreador")
+  comentarios         Comentario[]
+  propuestasResueltas Propuesta[]   @relation("PropuestaResuelta")
+  exportaciones       Exportacion[]
+  auditoria           Auditoria[]
+  tokens              TokenAcceso[]
+  organizacion        Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([organizacionId])
+}
+
+// ---------- Clientes y kits de marca ----------
+
+model Cliente {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizacionId          String   @db.Uuid
+  nombre                  String
+  retencionDocumentosDias Int      @default(180) // días tras la entrega para borrar documentos fuente del cliente (ADR-009)
+  lmsHabitual             String?
+  idiomas                 String[] @default(["es"])
+  notas                   String?
+  activo                  Boolean  @default(true)
+  creadoEn                DateTime @default(now())
+
+  kit           KitMarca?
+  proyectos     Proyecto[]
+  recursos      Recurso[]
+  glosario      GlosarioTermino[]
+  pronunciacion PronunciacionTermino[]
+  fichasLms     FichaCompatibilidad[]
+  usuarios      Usuario[]
+  organizacion  Organizacion           @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([organizacionId])
+}
+
+model KitMarca {
+  id            String   @id @default(uuid()) @db.Uuid
+  clienteId     String   @unique @db.Uuid
+  estilo        String // Industrial, Corporativo, Institucional, Infantil aula, Salud…
+  paleta        Json // { primario, secundario, acento, fondo, texto } en hex
+  tipografias   Json // { titulos, textos } con licencia
+  logoRecursoId String?  @db.Uuid
+  personaje     Json? // { recursoId, nombre, capas[], bocasDisponibles[] }
+  voces         Json // { es: { proveedor, voz, velocidad }, en: {...} }
+  version       Int      @default(1)
+  actualizadoEn DateTime @updatedAt
+
+  cliente         Cliente          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  pantallasModelo PantallaModelo[]
+}
+
+model PantallaModelo {
+  id                 String  @id @default(uuid()) @db.Uuid
+  kitId              String  @db.Uuid
+  disposicion        String // portada, idea, lista, clasificar… (enum del esquema del curso)
+  nombre             String
+  definicion         Json // componentes, posiciones relativas y estilos base
+  miniaturaRecursoId String? @db.Uuid
+  orden              Int     @default(0)
+  activa             Boolean @default(true)
+
+  kit KitMarca @relation(fields: [kitId], references: [id], onDelete: Cascade)
+
+  @@index([kitId, disposicion])
+}
+
+model GlosarioTermino {
+  id         String  @id @default(uuid()) @db.Uuid
+  clienteId  String  @db.Uuid
+  termino    String
+  traduccion String?
+  noTraducir Boolean @default(false)
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, termino])
+}
+
+model PronunciacionTermino {
+  id          String @id @default(uuid()) @db.Uuid
+  clienteId   String @db.Uuid
+  idioma      String // es | en
+  escrito     String
+  pronunciado String // texto o SSML
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@unique([clienteId, idioma, escrito])
+}
+
+model FichaCompatibilidad {
+  id                   String   @id @default(uuid()) @db.Uuid
+  clienteId            String   @db.Uuid
+  lmsNombre            String
+  lmsVersion           String?
+  limiteSubidaMb       Int?
+  notas                String?
+  resultadoDiagnostico Json? // lo que devolvió el modo diagnóstico del paquete
+  actualizadoEn        DateTime @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Proyectos, material y curso ----------
+
+enum EstadoProyecto {
+  BORRADOR
+  GENERANDO
+  REVISION
+  ENTREGADO
+  ARCHIVADO
+}
+
+model Proyecto {
+  id                    String         @id @default(uuid()) @db.Uuid
+  organizacionId        String         @db.Uuid
+  clienteId             String         @db.Uuid
+  nombre                String
+  estado                EstadoProyecto @default(BORRADOR)
+  idiomas               String[]       @default(["es"])
+  modoIdioma            String         @default("unico") // unico | separados | mismo-paquete
+  publico               String?
+  tono                  String?
+  pantallasObjetivo     Int?
+  porcentajeActividades Int?
+  datosTecnicos         Json? // OPCIONAL: { lms, formato, horasCapacitacion, porcentajeScorm, fechaEntrega }
+  creadoPorId           String         @db.Uuid
+  creadoEn              DateTime       @default(now())
+  actualizadoEn         DateTime       @updatedAt
+
+  cliente      Cliente          @relation(fields: [clienteId], references: [id])
+  creadoPor    Usuario          @relation("ProyectoCreador", fields: [creadoPorId], references: [id])
+  materiales   MaterialFuente[]
+  curso        Curso?
+  generaciones Generacion[]
+  trabajosIA   TrabajoIA[]
+  recursos     Recurso[]
+  organizacion Organizacion     @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, estado])
+  @@index([organizacionId, estado])
+}
+
+enum TipoMaterial {
+  PDF
+  WORD
+  POWERPOINT
+  VIDEO
+  AUDIO
+  IMAGEN
+  TEMA
+}
+
+model MaterialFuente {
+  id            String       @id @default(uuid()) @db.Uuid
+  proyectoId    String       @db.Uuid
+  tipo          TipoMaterial
+  recursoId     String?      @db.Uuid // null cuando tipo = TEMA
+  tema          String?
+  estado        String       @default("pendiente") // pendiente | procesando | listo | error
+  paginas       Json? // [{ n, texto, escaneada }]
+  transcripcion Json? // [{ desde, hasta, texto }]
+  mapaTemas     Json? // [{ tema, paginas, decision: conservar|complementario|omitir, motivo }]
+  creadoEn      DateTime     @default(now())
+
+  proyecto Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+}
+
+model Curso {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizacionId   String   @db.Uuid
+  proyectoId       String   @unique @db.Uuid
+  versionEsquema   String // 0.2.0
+  documento        Json // documento del curso validado
+  version          Int      @default(1) // bloqueo optimista
+  actualizadoEn    DateTime @updatedAt
+  actualizadoPorId String?  @db.Uuid
+
+  proyecto      Proyecto       @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  versiones     CursoVersion[]
+  propuestas    Propuesta[]
+  observaciones Observacion[]
+  narraciones   Narracion[]
+  traducciones  Traduccion[]
+  exportaciones Exportacion[]
+  comentarios   Comentario[]
+  organizacion  Organizacion   @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+}
+
+model CursoVersion {
+  id          String   @id @default(uuid()) @db.Uuid
+  cursoId     String   @db.Uuid
+  version     Int
+  documento   Json
+  motivo      String // "generación", "propuesta IA aplicada", "edición", "restauración"
+  creadoPorId String?  @db.Uuid
+  creadoEn    DateTime @default(now())
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, version])
+}
+
+// ---------- Generación e IA ----------
+
+enum EstadoTrabajo {
+  EN_COLA
+  EN_CURSO
+  COMPLETADO
+  ERROR
+  CANCELADO
+}
+
+model Generacion {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizacionId String        @db.Uuid
+  proyectoId     String        @db.Uuid
+  estado         EstadoTrabajo @default(EN_COLA)
+  parametros     Json // pantallas, idiomas, público, tono, % actividades, kit
+  costoUsd       Decimal       @default(0) @db.Decimal(10, 4)
+  iniciadoPorId  String        @db.Uuid
+  creadoEn       DateTime      @default(now())
+  terminadoEn    DateTime?
+
+  proyecto     Proyecto          @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
+  etapas       GeneracionEtapa[]
+  trabajos     TrabajoIA[]
+  organizacion Organizacion      @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+}
+
+enum EtapaGeneracion {
+  RESUMEN_MATERIAL
+  OBJETIVOS_ESTRUCTURA
+  STORYBOARD_GUION
+  PANTALLAS
+  ILUSTRACIONES
+  VOZ_ES
+  BOCA
+  SUBTITULOS
+  VERSION_EN
+  CONTROL_CALIDAD
+  PAQUETE
+}
+
+model GeneracionEtapa {
+  id           String          @id @default(uuid()) @db.Uuid
+  generacionId String          @db.Uuid
+  etapa        EtapaGeneracion
+  orden        Int
+  estado       EstadoTrabajo   @default(EN_COLA)
+  detalle      Json? // resumen para la pantalla de Producción
+  inicio       DateTime?
+  fin          DateTime?
+  costoUsd     Decimal         @default(0) @db.Decimal(10, 4)
+
+  generacion Generacion @relation(fields: [generacionId], references: [id], onDelete: Cascade)
+
+  @@unique([generacionId, etapa])
+}
+
+enum TareaProveedor {
+  TEXTO
+  PANTALLAS
+  IMAGEN
+  VOZ
+  BOCA
+  TRADUCCION
+  TRANSCRIPCION
+  CALIDAD
+}
+
+model TrabajoIA {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizacionId String         @db.Uuid
+  proyectoId     String?        @db.Uuid
+  generacionId   String?        @db.Uuid
+  tarea          String // IA-01 … IA-14
+  tipo           TareaProveedor
+  proveedor      String
+  modelo         String
+  versionPrompt  String?
+  tokensEntrada  Int?
+  tokensSalida   Int?
+  caracteres     Int?
+  imagenes       Int?
+  segundosAudio  Int?
+  costoUsd       Decimal        @default(0) @db.Decimal(10, 4)
+  estado         EstadoTrabajo  @default(EN_COLA)
+  intentos       Int            @default(0)
+  error          String?
+  duracionMs     Int?
+  creadoEn       DateTime       @default(now())
+
+  proyecto     Proyecto?    @relation(fields: [proyectoId], references: [id])
+  generacion   Generacion?  @relation(fields: [generacionId], references: [id])
+  propuestas   Propuesta[]
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([proyectoId, creadoEn])
+  @@index([tipo, creadoEn])
+  @@index([organizacionId, creadoEn])
+}
+
+enum EstadoPropuesta {
+  PENDIENTE
+  APLICADA
+  DESCARTADA
+  VENCIDA // el curso cambió y la propuesta ya no aplica
+}
+
+model Propuesta {
+  id            String          @id @default(uuid()) @db.Uuid
+  cursoId       String          @db.Uuid
+  pantallaId    String? // id de pantalla dentro del documento
+  tipo          String // mas-visual, menos-texto, actividad, variantes, alineacion, patron-navegacion, traduccion…
+  titulo        String
+  descripcion   String
+  cambios       Json // JSON Patch (RFC 6902) sobre el documento del curso
+  versionBase   Int // versión del curso sobre la que se calculó
+  estado        EstadoPropuesta @default(PENDIENTE)
+  trabajoIAId   String?         @db.Uuid
+  resueltoPorId String?         @db.Uuid
+  resueltoEn    DateTime?
+  creadoEn      DateTime        @default(now())
+
+  curso       Curso      @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  trabajoIA   TrabajoIA? @relation(fields: [trabajoIAId], references: [id])
+  resueltoPor Usuario?   @relation("PropuestaResuelta", fields: [resueltoPorId], references: [id])
+
+  @@index([cursoId, estado])
+}
+
+enum TipoObservacion {
+  CALIDAD
+  ALINEACION
+  IDIOMA
+  ACCESIBILIDAD
+  MATERIAL_FALTANTE
+}
+
+model Observacion {
+  id         String          @id @default(uuid()) @db.Uuid
+  cursoId    String          @db.Uuid
+  pantallaId String?
+  tipo       TipoObservacion
+  severidad  String // info | aviso | bloquea-entrega
+  mensaje    String
+  origen     String // regla | ia | usuario
+  resuelta   Boolean         @default(false)
+  creadoEn   DateTime        @default(now())
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@index([cursoId, resuelta])
+}
+
+// ---------- Recursos, voz e idiomas ----------
+
+enum TipoRecurso {
+  IMAGEN
+  SVG
+  AUDIO
+  VIDEO
+  DOCUMENTO
+  FUENTE
+  SUBTITULO
+  PAQUETE
+}
+
+enum OrigenRecurso {
+  BIBLIOTECA
+  GENERADO
+  SUBIDO
+  CLIENTE
+}
+
+model Recurso {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizacionId String        @db.Uuid
+  clienteId      String?       @db.Uuid
+  proyectoId     String?       @db.Uuid
+  tipo           TipoRecurso
+  origen         OrigenRecurso
+  claveS3        String        @unique
+  mime           String
+  bytes          BigInt
+  ancho          Int?
+  alto           Int?
+  duracionMs     Int?
+  hash           String // sha256 del contenido
+  nombre         String
+  alt            Json? // { es, en }
+  licencia       String? // condición de uso del proveedor (ADR-010)
+  proveedor      String? // recraft | firefly | google | ... (solo GENERADO)
+  modelo         String? // modelo y versión usados (solo GENERADO)
+  eliminarEn     DateTime? // borrado programado de documentos del cliente (ADR-009)
+  metadatos      Json? // prompt de generación, capas SVG, etc.
+  creadoEn       DateTime      @default(now())
+
+  cliente      Cliente?     @relation(fields: [clienteId], references: [id])
+  proyecto     Proyecto?    @relation(fields: [proyectoId], references: [id])
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, tipo])
+  @@index([organizacionId, tipo])
+}
+
+enum EstadoNarracion {
+  ACTUALIZADA
+  DESACTUALIZADA
+  GENERANDO
+  ERROR
+}
+
+model Narracion {
+  id                 String          @id @default(uuid()) @db.Uuid
+  cursoId            String          @db.Uuid
+  pantallaId         String
+  idioma             String
+  textoHash          String // sha256 del texto + diccionario + voz: si cambia, queda DESACTUALIZADA
+  origen             String // tts | grabacion
+  voz                String?
+  velocidad          Decimal?        @db.Decimal(3, 2)
+  audioRecursoId     String?         @db.Uuid
+  subtituloRecursoId String?         @db.Uuid
+  bocas              Json? // [[ms, "A".."X"], …]
+  estado             EstadoNarracion @default(DESACTUALIZADA)
+  actualizadoEn      DateTime        @updatedAt
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, pantallaId, idioma])
+}
+
+enum EstadoTraduccion {
+  PENDIENTE
+  TRADUCIDA_IA
+  REVISADA
+  DESBORDE
+}
+
+model Traduccion {
+  id              String           @id @default(uuid()) @db.Uuid
+  cursoId         String           @db.Uuid
+  ruta            String // JSON Pointer al texto dentro del documento
+  idioma          String
+  textoOrigenHash String
+  estado          EstadoTraduccion @default(PENDIENTE)
+  actualizadoEn   DateTime         @updatedAt
+
+  curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+
+  @@unique([cursoId, ruta, idioma])
+}
+
+// ---------- Revisión y entrega ----------
+
+model Comentario {
+  id         String   @id @default(uuid()) @db.Uuid
+  cursoId    String   @db.Uuid
+  pantallaId String
+  autorId    String   @db.Uuid
+  texto      String
+  resuelto   Boolean  @default(false)
+  creadoEn   DateTime @default(now())
+
+  curso Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  autor Usuario @relation(fields: [autorId], references: [id])
+}
+
+enum FormatoExportacion {
+  SCORM12
+  SCORM2004
+  CMI5
+  HTML
+  JSON
+  KIT_GAMIFICACION
+}
+
+model Exportacion {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizacionId String             @db.Uuid
+  cursoId        String             @db.Uuid
+  versionCurso   Int
+  formato        FormatoExportacion
+  perfilLms      String             @default("generico") // generico | moodle | blackboard | chamilo | canvas
+  modoIdioma     String
+  estado         EstadoTrabajo      @default(EN_COLA)
+  bytes          BigInt?
+  informe        Json? // validaciones, advertencias, suspend_data estimado
+  recursoId      String?            @db.Uuid // ZIP en S3
+  creadoPorId    String             @db.Uuid
+  creadoEn       DateTime           @default(now())
+
+  curso        Curso        @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  creadoPor    Usuario      @relation(fields: [creadoPorId], references: [id])
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+}
+
+// ---------- Configuración, negocio y auditoría ----------
+
+model ConfigProveedor {
+  id                    String         @id @default(uuid()) @db.Uuid
+  tarea                 TareaProveedor @unique
+  proveedor             String
+  modelo                String
+  parametros            Json? // sin claves: las claves van en variables de entorno
+  costoUnitario         Json? // precios vigentes para estimar
+  limiteGastoMensualUsd Decimal?       @db.Decimal(10, 2)
+  activo                Boolean        @default(true)
+  actualizadoEn         DateTime       @updatedAt
+}
+
+model ParametrosNegocio {
+  id            String   @id @default("unico")
+  datos         Json // precio actual, precio competencia, tarifa hora, personas, horas productivas, licencias, tipo de cambio…
+  actualizadoEn DateTime @updatedAt
+}
+
+model MedicionProceso {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizacionId String       @db.Uuid
+  proyectoRef    String // nombre del proyecto medido (puede ser anterior a la herramienta)
+  escenario      String // hoy | generador
+  etapa          String
+  horas          Decimal      @db.Decimal(6, 2)
+  notas          String?
+  registradoPor  String?
+  creadoEn       DateTime     @default(now())
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([proyectoRef, escenario])
+}
+
+model Auditoria {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizacionId String?  @db.Uuid
+  usuarioId      String?  @db.Uuid
+  accion         String
+  entidad        String
+  entidadId      String?
+  datos          Json?
+  creadoEn       DateTime @default(now())
+
+  usuario      Usuario?      @relation(fields: [usuarioId], references: [id])
+  organizacion Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([entidad, entidadId])
+}
+
+// Invitaciones y cambios de clave (ADR-009). Se guarda solo el hash del token.
+model TokenAcceso {
+  id        String    @id @default(uuid()) @db.Uuid
+  usuarioId String    @db.Uuid
+  tipo      String // INVITACION | RESTABLECER_CLAVE
+  hashToken String    @unique
+  expira    DateTime
+  usadoEn   DateTime?
+  creadoEn  DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId, tipo])
+}

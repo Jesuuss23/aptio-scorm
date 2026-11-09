@@ -1,6 +1,6 @@
 # Modelo de datos
 
-El esquema físico está en `packages/db/prisma/schema.prisma` (PostgreSQL, Prisma). Fue validado con el motor de Prisma 5.22.
+El esquema físico está en `packages/db/prisma/schema.prisma` (PostgreSQL, Prisma). Está validado con Prisma 6.19 y tiene migraciones en `packages/db/prisma/migrations`.
 
 ## Criterio de diseño
 
@@ -11,6 +11,12 @@ El esquema físico está en `packages/db/prisma/schema.prisma` (PostgreSQL, Pris
 - **La IA nunca escribe directo en el curso.** Escribe una `Propuesta` con un JSON Patch (RFC 6902) y la `versionBase` sobre la que se calculó. Solo una acción del usuario la aplica. Si el curso cambió desde esa versión, la propuesta queda `VENCIDA` y se recalcula.
 - **Archivos en S3.** El documento referencia recursos por id (`Recurso.id`), nunca por ruta. La API entrega URLs firmadas.
 - **Claves de proveedores fuera de la base.** Viven en variables de entorno; `ConfigProveedor` guarda solo proveedor, modelo y parámetros.
+
+## Multi-organización (ADR-012, HU-0103)
+
+`Organizacion` es la raíz de los datos de cada productora. Llevan `organizacionId` las tablas que se consultan o listan por sí solas: `Usuario` (nulo solo para `SUPERADMIN`), `Cliente`, `Proyecto`, `Curso`, `Generacion`, `TrabajoIA`, `Recurso`, `Exportacion`, `MedicionProceso` y `Auditoria` (nulo para acciones de plataforma). Las tablas hijas heredan el aislamiento por la relación con su padre: `KitMarca`, `PantallaModelo`, `GlosarioTermino`, `PronunciacionTermino` y `FichaCompatibilidad` por `Cliente`; `MaterialFuente` por `Proyecto`; `CursoVersion`, `Propuesta`, `Observacion`, `Narracion`, `Traduccion` y `Comentario` por `Curso`; `GeneracionEtapa` por `Generacion`; `TokenAcceso` por `Usuario`.
+
+`ConfigProveedor` y `ParametrosNegocio` siguen siendo de plataforma (SUP-09). Las tablas de planes, suscripciones y facturación se agregan en S13 y S14 (`23-sitio-comercial-y-facturacion.md`, sección 8).
 
 ## Diagrama entidad-relación
 

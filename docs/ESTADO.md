@@ -18,8 +18,11 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 | SUP-06 | Rhubarb Lip Sync (reconocedor fonético) da calidad aceptable en español. | Prueba técnica PT-01 |
 | SUP-07 | La generación de imágenes mantiene un estilo consistente con el kit del cliente. | Prueba técnica PT-02 |
 | SUP-08 | En local, el almacenamiento S3 se emula con LocalStack 3.8.0 en el puerto 9000 en lugar de MinIO (la edición comunitaria de MinIO se archivó). En la nube se usa S3 real. | Ingeniero a cargo, al montar el entorno de pruebas (HU-1405) |
+| SUP-09 | `ConfigProveedor` (proveedor y modelo por tarea) y `ParametrosNegocio` son de plataforma, no de cada organización, hasta que S13 defina si cada organización elige sus proveedores. | Responsable del producto, en S13 (HU-1701) |
 
 ## Cambios recientes
+
+- **HU-0103 · Base de datos (2026-11-09):** Prisma pasa a `packages/db` (`@aptio/db`) con los 26 modelos de `12-modelo-datos.md` más `Organizacion`, y `organizacionId` en las tablas raíz. Roles alineados (se suman `SUPERADMIN` y `DISENADOR_GRAFICO`; `REVISOR` pasa a `REVISOR_CLIENTE`). Claves con argon2id en `hashClave`. La migración `esquema_completo` vacía los datos de ejemplo de la migración inicial, porque los ids pasan de texto a UUID; se recargan con `pnpm db:seed`. Pruebas de CP-003 en `packages/db/src/seed.test.ts`.
 
 - **Inicio del S0 (2026-11-09):** se incorpora la especificación al repositorio (`CLAUDE.md`, `docs/`, `jira/`, `.claude/commands/`) y `pnpm ia:casos` y `pnpm schema:test` quedan en verde. Decisiones confirmadas por el responsable del producto:
   - La API se migra de Express a **NestJS** (ADR-001) con módulos, DTOs, guardas y OpenAPI (HU-0101).
