@@ -74,7 +74,7 @@ async function appPrueba(rol?: string) {
   app = modulo.createNestApplication();
   // Simula la sesión de HU-0104 colocando el usuario en la solicitud.
   if (rol) app.use((req: { usuario?: unknown }, _res: unknown, next: () => void) => {
-    req.usuario = { id: 'u1', rol, organizacionId: 'o1' };
+    req.usuario = { id: 'u1', rol, organizacionId: 'o1', clienteId: null };
     next();
   });
   configurarApp(app);
@@ -85,7 +85,7 @@ async function appPrueba(rol?: string) {
 describe('validación y formato de errores', () => {
   it('rechaza datos inválidos con { codigo, mensaje, detalles }', async () => {
     const res = await request(await appPrueba()).post('/api/v1/prueba/publica').send({ email: 'no-es-correo', nombre: 'x' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     expect(res.body.codigo).toBe('NO_VALIDO');
     expect(res.body.detalles).toHaveLength(2);
   });
@@ -94,7 +94,7 @@ describe('validación y formato de errores', () => {
     const res = await request(await appPrueba())
       .post('/api/v1/prueba/publica')
       .send({ email: 'a@b.test', nombre: 'Ana', rol: 'SUPERADMIN' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
   });
 
   it('acepta datos válidos', async () => {

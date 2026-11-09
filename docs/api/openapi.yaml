@@ -91,7 +91,7 @@ paths:
         '422':
           $ref: '#/components/responses/NoValido'
         '401':
-          description: Credenciales incorrectas o correo no invitado
+          description: 'CREDENCIALES (correo o clave incorrectos, misma respuesta exista o no el correo) o CUENTA_BLOQUEADA'
           content:
             application/json:
               schema:
@@ -155,7 +155,7 @@ paths:
       - Acceso
       summary: Pedir cambio de clave
       operationId: post_auth_clave_olvido
-      description: 'Envía un enlace de un solo uso por correo (vence en 60 min). Límite: 3 pedidos por hora.'
+      description: 'Envía un enlace de un solo uso por correo (vence en 60 min). Responde 202 exista o no el correo. Límite: 3 pedidos por hora.'
       requestBody:
         required: true
         content:
@@ -174,7 +174,7 @@ paths:
       - Acceso
       summary: Restablecer clave
       operationId: post_auth_clave_restablecer
-      description: Invalida el token y cierra las otras sesiones del usuario.
+      description: Crea la clave desde una invitación o la restablece. Invalida el token y cierra las otras sesiones del usuario. 422 ENLACE_NO_VALIDO si el enlace ya se usó o venció.
       requestBody:
         required: true
         content:
@@ -229,7 +229,7 @@ paths:
       - Acceso
       summary: Crear usuario
       operationId: post_usuarios
-      description: Solo ADMINISTRADOR
+      description: Solo ADMINISTRADOR. Crea el usuario sin clave y le envía una invitación con enlace de un solo uso (60 min). 409 CORREO_EN_USO si el correo ya existe.
       requestBody:
         required: true
         content:
@@ -255,7 +255,7 @@ paths:
       - Acceso
       summary: Cambiar rol o desactivar
       operationId: patch_usuarios_usuarioId
-      description: Solo ADMINISTRADOR
+      description: Solo ADMINISTRADOR, dentro de su organización (404 si el usuario es de otra). No puede desactivarse ni quitarse el rol a sí mismo.
       parameters:
       - name: usuarioId
         in: path
@@ -268,7 +268,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UsuarioEntrada'
+              $ref: '#/components/schemas/UsuarioCambio'
       responses:
         '200':
           description: OK
@@ -2725,7 +2725,9 @@ components:
       description: Texto por idioma
     Rol:
       type: string
+      description: SUPERADMIN es de plataforma (ADR-011); un administrador no puede asignarlo.
       enum:
+      - SUPERADMIN
       - ADMINISTRADOR
       - DISENADOR_INSTRUCCIONAL
       - DISENADOR_GRAFICO
@@ -2779,9 +2781,20 @@ components:
         clienteId:
           type: string
           format: uuid
-        claveTemporal:
+          description: Obligatorio para REVISOR_CLIENTE; debe ser un cliente de la organización.
+    UsuarioCambio:
+      type: object
+      description: Cambiar el rol o desactivar cierra las sesiones abiertas del usuario.
+      properties:
+        nombre:
           type: string
-          minLength: 10
+        rol:
+          $ref: '#/components/schemas/Rol'
+        clienteId:
+          type: string
+          format: uuid
+        activo:
+          type: boolean
     Ingreso:
       type: object
       required:
