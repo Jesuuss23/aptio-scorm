@@ -68,6 +68,83 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Salud'
+  /eventos:
+    get:
+      tags:
+      - Plataforma
+      summary: Avance de los trabajos de la organización en vivo (SSE, CP-016)
+      operationId: get_eventos
+      description: 'text/event-stream. `event: trabajo` con un EventoTrabajo en cada cambio de estado o avance; `event: latido` cada 15 s. Solo los trabajos de la organización de la sesión. Equipo de producción (no REVISOR_CLIENTE ni SUPERADMIN).'
+      responses:
+        '200':
+          description: Flujo de eventos
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/EventoTrabajo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /trabajos/simulados:
+    post:
+      tags:
+      - Plataforma
+      summary: Encolar un trabajo simulado
+      operationId: post_trabajos_simulados
+      description: 'Encola un trabajo que el worker responde con la salida grabada del caso LOTO (modo simulado). Sirve para probar colas y eventos sin gastar. Solo existe con PROVEEDORES_MODO=simulado (404 en otro caso). 422 TAREA_DESCONOCIDA si no hay salida grabada.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - tarea
+              properties:
+                tarea:
+                  type: string
+                  pattern: ^(IA-\d\d|VOZ|BOCA)$
+                  example: IA-04
+      responses:
+        '202':
+          description: Encolado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /trabajos/{trabajoId}:
+    get:
+      tags:
+      - Plataforma
+      summary: Estado de un trabajo
+      operationId: get_trabajos_trabajoId
+      parameters:
+      - name: trabajoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Trabajo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /auth/ingresar:
     post:
       tags:
@@ -3580,6 +3657,91 @@ components:
           type: string
           format: date-time
         terminadoEn:
+          type: string
+          format: date-time
+    Trabajo:
+      type: object
+      description: Trabajo largo en una cola (TrabajoIA). Amplía Trabajo202.
+      required:
+      - id
+      - tarea
+      - cola
+      - estado
+      - eventos
+      properties:
+        id:
+          type: string
+          format: uuid
+        tarea:
+          type: string
+          example: IA-04
+        cola:
+          type: string
+          enum:
+          - ia
+          - voz
+          - media
+          - export
+        estado:
+          $ref: '#/components/schemas/EstadoTrabajo'
+        proveedor:
+          type: string
+        modelo:
+          type: string
+        error:
+          type: string
+          nullable: true
+        duracionMs:
+          type: integer
+          nullable: true
+        creadoEn:
+          type: string
+          format: date-time
+        eventos:
+          type: string
+          format: uri
+          description: URL de eventos (SSE)
+    EventoTrabajo:
+      type: object
+      required:
+      - tipo
+      - trabajoId
+      - cola
+      - tarea
+      - estado
+      - progreso
+      - en
+      properties:
+        tipo:
+          type: string
+          enum:
+          - estado
+          - progreso
+        trabajoId:
+          type: string
+          format: uuid
+        organizacionId:
+          type: string
+          format: uuid
+        cola:
+          type: string
+          enum:
+          - ia
+          - voz
+          - media
+          - export
+        tarea:
+          type: string
+        estado:
+          $ref: '#/components/schemas/EstadoTrabajo'
+        progreso:
+          type: integer
+          minimum: 0
+          maximum: 100
+        mensaje:
+          type: string
+          description: Detalle del error cuando estado = ERROR
+        en:
           type: string
           format: date-time
     Trabajo202:
