@@ -6,3 +6,5 @@ allowBuilds:
   '@prisma/engines': true
   esbuild: false
   prisma: true
+
+minimumReleaseAge: 0
