@@ -1,0 +1,885 @@
+{
+  "versionEsquema": "0.2.0",
+  "id": "curso-loto-demo",
+  "metadatos": {
+    "titulo": {
+      "es": "Bloqueo y etiquetado de energías",
+      "en": "Energy Lockout and Tagout"
+    },
+    "descripcion": {
+      "es": "Cápsula de ejemplo para el prototipo: identificar energías peligrosas y aplicar los pasos de bloqueo.",
+      "en": "Sample capsule for the prototype: identify hazardous energy and apply the lockout steps."
+    },
+    "cliente": {
+      "id": "cliente-ejemplo",
+      "nombre": "Cliente de ejemplo (industria)"
+    },
+    "publico": "Operarios y técnicos de mantenimiento",
+    "nivel": "basico",
+    "duracionEstimadaMin": 8,
+    "autor": "AulasEducativas",
+    "creado": "2026-10-29T10:00:00-05:00",
+    "actualizado": "2026-10-29T10:00:00-05:00"
+  },
+  "idiomas": [
+    "es",
+    "en"
+  ],
+  "modoIdioma": "mismo-paquete",
+  "kitMarcaId": "kit-cliente-ejemplo",
+  "objetivos": [
+    {
+      "id": "obj-1",
+      "texto": {
+        "es": "Identificar las fuentes de energía peligrosa de un equipo.",
+        "en": "Identify the hazardous energy sources of a machine."
+      },
+      "nivelBloom": "recordar"
+    },
+    {
+      "id": "obj-2",
+      "texto": {
+        "es": "Distinguir prácticas seguras de prácticas riesgosas durante el bloqueo.",
+        "en": "Distinguish safe from unsafe practices during lockout."
+      },
+      "nivelBloom": "comprender"
+    },
+    {
+      "id": "obj-3",
+      "texto": {
+        "es": "Aplicar los pasos de bloqueo y etiquetado en una situación de trabajo.",
+        "en": "Apply lockout and tagout steps in a work situation."
+      },
+      "nivelBloom": "aplicar"
+    }
+  ],
+  "modulos": [
+    {
+      "id": "mod-1",
+      "titulo": {
+        "es": "Control de energías peligrosas",
+        "en": "Hazardous energy control"
+      },
+      "capsulas": [
+        {
+          "id": "cap-loto",
+          "titulo": {
+            "es": "Bloqueo y etiquetado",
+            "en": "Lockout and tagout"
+          },
+          "objetivoIds": [
+            "obj-1",
+            "obj-2",
+            "obj-3"
+          ],
+          "duracionEstimadaMin": 8,
+          "pantallas": [
+            {
+              "id": "p01-portada",
+              "titulo": {
+                "es": "Portada",
+                "en": "Cover"
+              },
+              "tipo": "portada",
+              "plantilla": "industrial-portada",
+              "estado": "aprobado",
+              "obligatoria": true,
+              "fondoRecursoId": "img-fondo-planta",
+              "bloques": [
+                {
+                  "id": "b01-titulo",
+                  "tipo": "texto",
+                  "rol": "titulo",
+                  "contenido": {
+                    "es": "Bloqueo y etiquetado",
+                    "en": "Lockout and tagout"
+                  },
+                  "origen": {
+                    "tipo": "manual",
+                    "revisado": true
+                  },
+                  "animacion": {
+                    "movimiento": "aparecer",
+                    "duracionMs": 400
+                  }
+                }
+              ]
+            },
+            {
+              "id": "p02-energias",
+              "titulo": {
+                "es": "¿Qué energías hay en un equipo?",
+                "en": "What energy does a machine hold?"
+              },
+              "tipo": "contenido",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "plantilla": "industrial-personaje-texto",
+              "estado": "aprobado",
+              "obligatoria": true,
+              "bloques": [
+                {
+                  "id": "b02-personaje",
+                  "tipo": "personaje",
+                  "recursoId": "svg-supervisora",
+                  "pose": "explicando",
+                  "lado": "derecha"
+                },
+                {
+                  "id": "b02-texto",
+                  "tipo": "texto",
+                  "rol": "cuerpo",
+                  "contenido": {
+                    "es": "Un equipo puede guardar energía eléctrica, mecánica, hidráulica, neumática o térmica, incluso apagado.",
+                    "en": "A machine can store electrical, mechanical, hydraulic, pneumatic or thermal energy, even when switched off."
+                  },
+                  "origen": {
+                    "tipo": "documento",
+                    "documentoId": "doc-manual-seguridad",
+                    "paginas": [
+                      12,
+                      13
+                    ],
+                    "revisado": true
+                  }
+                }
+              ],
+              "narracion": {
+                "personajeBloqueId": "b02-personaje",
+                "texto": {
+                  "es": "Antes de intervenir un equipo, recuerda que puede guardar energía aunque esté apagado. Vamos a reconocerlas.",
+                  "en": "Before working on a machine, remember it can store energy even when it is off. Let's recognize those sources."
+                },
+                "porIdioma": {
+                  "es": {
+                    "estado": "generado",
+                    "recursoAudioId": "aud-p02-es",
+                    "voz": {
+                      "proveedor": "azure",
+                      "voz": "es-PE-voz-ejemplo",
+                      "velocidad": 1.0
+                    },
+                    "hashTexto": "3f9a1c2e7b4d5a60",
+                    "duracionMs": 6200,
+                    "bocas": [
+                      [
+                        0,
+                        "X"
+                      ],
+                      [
+                        120,
+                        "B"
+                      ],
+                      [
+                        260,
+                        "C"
+                      ],
+                      [
+                        410,
+                        "A"
+                      ],
+                      [
+                        520,
+                        "D"
+                      ],
+                      [
+                        700,
+                        "E"
+                      ],
+                      [
+                        880,
+                        "B"
+                      ],
+                      [
+                        1050,
+                        "X"
+                      ]
+                    ],
+                    "subtitulosId": "vtt-p02-es"
+                  },
+                  "en": {
+                    "estado": "pendiente",
+                    "voz": {
+                      "proveedor": "azure",
+                      "voz": "en-US-voz-ejemplo"
+                    },
+                    "hashTexto": "8b2e44c1d09f7a35"
+                  }
+                }
+              },
+              "disposicion": "idea",
+              "ajustes": {
+                "titulo": {
+                  "tamanoCqw": 5.6,
+                  "color": "primario"
+                },
+                "imagen-tablero": {
+                  "escala": 1.1,
+                  "desplazamiento": {
+                    "x": -4,
+                    "y": 2,
+                    "dispositivo": "escritorio"
+                  }
+                }
+              },
+              "extras": [
+                {
+                  "id": "x-boton-continuar",
+                  "tipo": "boton",
+                  "texto": {
+                    "es": "Continuar",
+                    "en": "Continue"
+                  },
+                  "x": 40,
+                  "y": 80,
+                  "ancho": 14,
+                  "alClic": "siguiente"
+                }
+              ]
+            },
+            {
+              "id": "p03-memoria",
+              "titulo": {
+                "es": "Relaciona cada energía",
+                "en": "Match each energy"
+              },
+              "tipo": "interactiva",
+              "objetivoIds": [
+                "obj-1"
+              ],
+              "plantilla": "industrial-interaccion",
+              "estado": "propuesta-ia",
+              "obligatoria": true,
+              "bloques": [
+                {
+                  "id": "b03-memoria",
+                  "tipo": "interaccion",
+                  "interaccion": {
+                    "tipo": "INT-01",
+                    "modo": "formativa",
+                    "instruccion": {
+                      "es": "Encuentra las parejas.",
+                      "en": "Find the pairs."
+                    },
+                    "datos": {
+                      "pares": [
+                        {
+                          "id": "par-electrica",
+                          "a": {
+                            "texto": {
+                              "es": "Eléctrica",
+                              "en": "Electrical"
+                            }
+                          },
+                          "b": {
+                            "recursoId": "ico-tablero",
+                            "alt": {
+                              "es": "Tablero eléctrico",
+                              "en": "Electrical panel"
+                            }
+                          }
+                        },
+                        {
+                          "id": "par-hidraulica",
+                          "a": {
+                            "texto": {
+                              "es": "Hidráulica",
+                              "en": "Hydraulic"
+                            }
+                          },
+                          "b": {
+                            "recursoId": "ico-cilindro",
+                            "alt": {
+                              "es": "Cilindro hidráulico",
+                              "en": "Hydraulic cylinder"
+                            }
+                          }
+                        },
+                        {
+                          "id": "par-neumatica",
+                          "a": {
+                            "texto": {
+                              "es": "Neumática",
+                              "en": "Pneumatic"
+                            }
+                          },
+                          "b": {
+                            "recursoId": "ico-compresor",
+                            "alt": {
+                              "es": "Compresor de aire",
+                              "en": "Air compressor"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "p04-clasificar",
+              "titulo": {
+                "es": "¿Seguro o riesgoso?",
+                "en": "Safe or unsafe?"
+              },
+              "tipo": "interactiva",
+              "objetivoIds": [
+                "obj-2"
+              ],
+              "plantilla": "industrial-interaccion",
+              "estado": "borrador",
+              "obligatoria": true,
+              "bloques": [
+                {
+                  "id": "b04-clasificar",
+                  "tipo": "interaccion",
+                  "interaccion": {
+                    "tipo": "INT-02",
+                    "modo": "formativa",
+                    "instruccion": {
+                      "es": "Arrastra cada práctica a su grupo.",
+                      "en": "Drag each practice to its group."
+                    },
+                    "datos": {
+                      "grupos": [
+                        {
+                          "id": "g-seguro",
+                          "etiqueta": {
+                            "es": "Seguro",
+                            "en": "Safe"
+                          }
+                        },
+                        {
+                          "id": "g-riesgoso",
+                          "etiqueta": {
+                            "es": "Riesgoso",
+                            "en": "Unsafe"
+                          }
+                        }
+                      ],
+                      "elementos": [
+                        {
+                          "id": "e1",
+                          "contenido": {
+                            "texto": {
+                              "es": "Colocar mi propio candado",
+                              "en": "Apply my own lock"
+                            }
+                          },
+                          "grupoCorrecto": "g-seguro"
+                        },
+                        {
+                          "id": "e2",
+                          "contenido": {
+                            "texto": {
+                              "es": "Usar el candado de un compañero",
+                              "en": "Use a coworker's lock"
+                            }
+                          },
+                          "grupoCorrecto": "g-riesgoso",
+                          "retroalimentacion": {
+                            "es": "Cada persona controla su propio bloqueo.",
+                            "en": "Each person controls their own lock."
+                          }
+                        },
+                        {
+                          "id": "e3",
+                          "contenido": {
+                            "texto": {
+                              "es": "Verificar energía cero antes de intervenir",
+                              "en": "Verify zero energy before working"
+                            }
+                          },
+                          "grupoCorrecto": "g-seguro"
+                        },
+                        {
+                          "id": "e4",
+                          "contenido": {
+                            "texto": {
+                              "es": "Confiar en que el equipo está apagado",
+                              "en": "Assume the machine is off"
+                            }
+                          },
+                          "grupoCorrecto": "g-riesgoso"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "p05-video",
+              "titulo": {
+                "es": "Mira el procedimiento",
+                "en": "Watch the procedure"
+              },
+              "tipo": "video",
+              "objetivoIds": [
+                "obj-3"
+              ],
+              "plantilla": "industrial-video",
+              "estado": "borrador",
+              "obligatoria": true,
+              "bloques": [
+                {
+                  "id": "b05-video",
+                  "tipo": "video",
+                  "recursoId": "vid-procedimiento-cliente",
+                  "subtitulos": {
+                    "es": "vtt-video-es",
+                    "en": "vtt-video-en"
+                  },
+                  "reglas": {
+                    "impedirAdelantar": true,
+                    "porcentajeMinimo": 80
+                  },
+                  "marcadores": [
+                    {
+                      "id": "m1",
+                      "tiempoMs": 0,
+                      "tipo": "capitulo",
+                      "obligatorio": false,
+                      "titulo": {
+                        "es": "Preparación",
+                        "en": "Preparation"
+                      }
+                    },
+                    {
+                      "id": "m2",
+                      "tiempoMs": 45000,
+                      "tipo": "pregunta",
+                      "obligatorio": true,
+                      "origen": {
+                        "tipo": "ia",
+                        "revisado": false
+                      },
+                      "pregunta": {
+                        "id": "pv-1",
+                        "objetivoId": "obj-3",
+                        "enunciado": {
+                          "es": "¿Qué hace el técnico antes de colocar el candado?",
+                          "en": "What does the technician do before applying the lock?"
+                        },
+                        "opciones": [
+                          {
+                            "id": "o1",
+                            "contenido": {
+                              "texto": {
+                                "es": "Avisa a las personas afectadas",
+                                "en": "Notifies affected people"
+                              }
+                            },
+                            "correcta": true
+                          },
+                          {
+                            "id": "o2",
+                            "contenido": {
+                              "texto": {
+                                "es": "Retira las guardas",
+                                "en": "Removes the guards"
+                              }
+                            },
+                            "correcta": false
+                          },
+                          {
+                            "id": "o3",
+                            "contenido": {
+                              "texto": {
+                                "es": "Enciende el equipo",
+                                "en": "Turns the machine on"
+                              }
+                            },
+                            "correcta": false
+                          }
+                        ],
+                        "retroalimentacion": {
+                          "correcta": {
+                            "es": "Correcto: primero se comunica.",
+                            "en": "Correct: communication comes first."
+                          },
+                          "incorrecta": {
+                            "es": "Revisa el inicio del video.",
+                            "en": "Review the beginning of the video."
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "p06-quiz",
+              "titulo": {
+                "es": "Reto final",
+                "en": "Final challenge"
+              },
+              "tipo": "evaluacion",
+              "objetivoIds": [
+                "obj-1",
+                "obj-2",
+                "obj-3"
+              ],
+              "plantilla": "industrial-quiz",
+              "estado": "borrador",
+              "obligatoria": true,
+              "bloques": [
+                {
+                  "id": "b06-quiz",
+                  "tipo": "interaccion",
+                  "interaccion": {
+                    "tipo": "INT-05",
+                    "modo": "sumativa",
+                    "peso": 1,
+                    "datos": {
+                      "segundosPorPregunta": 30,
+                      "vidas": 3,
+                      "preguntasPorIntento": 3,
+                      "barajarOpciones": true,
+                      "preguntas": [
+                        {
+                          "id": "q1",
+                          "objetivoId": "obj-1",
+                          "enunciado": {
+                            "es": "¿Un equipo apagado puede guardar energía?",
+                            "en": "Can a switched-off machine store energy?"
+                          },
+                          "opciones": [
+                            {
+                              "id": "q1-a",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Sí",
+                                  "en": "Yes"
+                                }
+                              },
+                              "correcta": true
+                            },
+                            {
+                              "id": "q1-b",
+                              "contenido": {
+                                "texto": {
+                                  "es": "No",
+                                  "en": "No"
+                                }
+                              },
+                              "correcta": false
+                            }
+                          ],
+                          "retroalimentacion": {
+                            "correcta": {
+                              "es": "Sí: resortes, presión o calor pueden quedar acumulados.",
+                              "en": "Yes: springs, pressure or heat can remain stored."
+                            },
+                            "incorrecta": {
+                              "es": "Apagar no elimina la energía acumulada.",
+                              "en": "Switching off does not remove stored energy."
+                            }
+                          }
+                        },
+                        {
+                          "id": "q2",
+                          "objetivoId": "obj-2",
+                          "enunciado": {
+                            "es": "¿Quién retira tu candado?",
+                            "en": "Who removes your lock?"
+                          },
+                          "opciones": [
+                            {
+                              "id": "q2-a",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Solo yo",
+                                  "en": "Only me"
+                                }
+                              },
+                              "correcta": true
+                            },
+                            {
+                              "id": "q2-b",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Mi supervisor",
+                                  "en": "My supervisor"
+                                }
+                              },
+                              "correcta": false
+                            },
+                            {
+                              "id": "q2-c",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Cualquier técnico",
+                                  "en": "Any technician"
+                                }
+                              },
+                              "correcta": false
+                            }
+                          ],
+                          "retroalimentacion": {
+                            "correcta": {
+                              "es": "Correcto.",
+                              "en": "Correct."
+                            },
+                            "incorrecta": {
+                              "es": "Cada persona retira su propio candado, salvo procedimiento de excepción.",
+                              "en": "Each person removes their own lock, except under an exception procedure."
+                            }
+                          }
+                        },
+                        {
+                          "id": "q3",
+                          "objetivoId": "obj-3",
+                          "enunciado": {
+                            "es": "¿Qué paso va justo después de bloquear?",
+                            "en": "Which step comes right after locking out?"
+                          },
+                          "opciones": [
+                            {
+                              "id": "q3-a",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Verificar energía cero",
+                                  "en": "Verify zero energy"
+                                }
+                              },
+                              "correcta": true
+                            },
+                            {
+                              "id": "q3-b",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Iniciar el trabajo",
+                                  "en": "Start working"
+                                }
+                              },
+                              "correcta": false
+                            },
+                            {
+                              "id": "q3-c",
+                              "contenido": {
+                                "texto": {
+                                  "es": "Retirar la etiqueta",
+                                  "en": "Remove the tag"
+                                }
+                              },
+                              "correcta": false
+                            }
+                          ],
+                          "retroalimentacion": {
+                            "correcta": {
+                              "es": "Correcto: siempre se verifica.",
+                              "en": "Correct: always verify."
+                            },
+                            "incorrecta": {
+                              "es": "Después de bloquear, se verifica energía cero.",
+                              "en": "After locking out, verify zero energy."
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "p07-cierre",
+              "titulo": {
+                "es": "¡Lo lograste!",
+                "en": "You did it!"
+              },
+              "tipo": "cierre",
+              "plantilla": "industrial-cierre",
+              "estado": "borrador",
+              "obligatoria": true,
+              "bloques": [
+                {
+                  "id": "b07-texto",
+                  "tipo": "texto",
+                  "rol": "destacado",
+                  "contenido": {
+                    "es": "Bloquear, etiquetar y verificar: tres pasos que protegen tu vida.",
+                    "en": "Lock, tag and verify: three steps that protect your life."
+                  },
+                  "origen": {
+                    "tipo": "ia",
+                    "revisado": false
+                  },
+                  "animacion": {
+                    "movimiento": "rebotar"
+                  }
+                },
+                {
+                  "id": "b07-personaje",
+                  "tipo": "personaje",
+                  "recursoId": "svg-supervisora",
+                  "pose": "celebrando",
+                  "lado": "izquierda"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "seguimiento": {
+    "criterioCompletado": "sumativa",
+    "notaMinima": 70,
+    "intentosMaximos": 3,
+    "notaReportada": "mejor"
+  },
+  "gamificacion": {
+    "nivel": "ligera",
+    "puntosPorAcierto": 10,
+    "insignias": [
+      {
+        "id": "ins-loto",
+        "nombre": {
+          "es": "Guardián de la energía",
+          "en": "Energy Guardian"
+        },
+        "recursoId": "img-insignia-loto",
+        "condicion": {
+          "tipo": "nota-minima-interaccion",
+          "refId": "b06-quiz",
+          "valor": 70
+        }
+      }
+    ]
+  },
+  "recursos": [
+    {
+      "id": "img-fondo-planta",
+      "tipo": "imagen",
+      "origen": "generado",
+      "nombre": "Fondo planta industrial",
+      "mime": "image/webp",
+      "bytes": 182000
+    },
+    {
+      "id": "svg-supervisora",
+      "tipo": "svg",
+      "origen": "subido",
+      "nombre": "Personaje supervisora",
+      "mime": "image/svg+xml",
+      "bytes": 48000,
+      "capas": [
+        "personaje",
+        "cabeza",
+        "ojos_abiertos",
+        "ojos_cerrados",
+        "boca_A",
+        "boca_B",
+        "boca_C",
+        "boca_D",
+        "boca_E",
+        "boca_F",
+        "boca_G",
+        "boca_H",
+        "boca_X",
+        "brazo_izq",
+        "brazo_der"
+      ]
+    },
+    {
+      "id": "ico-tablero",
+      "tipo": "svg",
+      "origen": "biblioteca",
+      "nombre": "Ícono tablero eléctrico",
+      "mime": "image/svg+xml",
+      "licencia": "Biblioteca interna"
+    },
+    {
+      "id": "ico-cilindro",
+      "tipo": "svg",
+      "origen": "biblioteca",
+      "nombre": "Ícono cilindro hidráulico",
+      "mime": "image/svg+xml",
+      "licencia": "Biblioteca interna"
+    },
+    {
+      "id": "ico-compresor",
+      "tipo": "svg",
+      "origen": "biblioteca",
+      "nombre": "Ícono compresor",
+      "mime": "image/svg+xml",
+      "licencia": "Biblioteca interna"
+    },
+    {
+      "id": "aud-p02-es",
+      "tipo": "audio",
+      "origen": "generado",
+      "nombre": "Narración p02 ES",
+      "mime": "audio/mpeg",
+      "idioma": "es",
+      "bytes": 49600
+    },
+    {
+      "id": "vtt-p02-es",
+      "tipo": "subtitulos",
+      "origen": "generado",
+      "nombre": "Subtítulos p02 ES",
+      "mime": "text/vtt",
+      "idioma": "es"
+    },
+    {
+      "id": "vid-procedimiento-cliente",
+      "tipo": "video",
+      "origen": "cliente",
+      "nombre": "Video procedimiento LOTO",
+      "mime": "video/mp4",
+      "bytes": 21500000
+    },
+    {
+      "id": "vtt-video-es",
+      "tipo": "subtitulos",
+      "origen": "generado",
+      "nombre": "Subtítulos video ES",
+      "mime": "text/vtt",
+      "idioma": "es"
+    },
+    {
+      "id": "vtt-video-en",
+      "tipo": "subtitulos",
+      "origen": "generado",
+      "nombre": "Subtítulos video EN",
+      "mime": "text/vtt",
+      "idioma": "en"
+    },
+    {
+      "id": "img-insignia-loto",
+      "tipo": "imagen",
+      "origen": "generado",
+      "nombre": "Insignia Guardián de la energía",
+      "mime": "image/png"
+    },
+    {
+      "id": "doc-manual-seguridad",
+      "tipo": "documento",
+      "origen": "cliente",
+      "nombre": "Manual de seguridad.pdf",
+      "mime": "application/pdf"
+    }
+  ],
+  "navegacion": {
+    "patron": "historias",
+    "modo": "condiciones",
+    "siguienteSeHabilita": "actividad",
+    "reanudar": "preguntar",
+    "mostrar": [
+      "temario",
+      "progreso",
+      "puntos",
+      "ayuda",
+      "accesibilidad",
+      "idioma"
+    ],
+    "objetivosAlInicio": true,
+    "atajosTeclado": true
+  }
+}

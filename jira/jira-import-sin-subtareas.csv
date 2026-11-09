@@ -1,0 +1,1713 @@
+﻿"Issue Id","Parent Id","Issue Type","Summary","Description","Priority","Labels","Labels","Labels","Epic Name"
+"E01","","Epic","E01 · Base técnica y acceso","Monorepo, entorno local, CI, base de datos, almacenamiento, colas, eventos, sesión y roles.
+
+Módulos: M01, M15","High","fabrica-capsulas","e01","","E01 · Base técnica y acceso"
+"E02","","Epic","E02 · Clientes y kits de marca","Clientes, kit (paleta, tipografías, personaje, voces), pantallas modelo, glosario y pronunciación.
+
+Módulos: M02, M14","High","fabrica-capsulas","e02","","E02 · Clientes y kits de marca"
+"E03","","Epic","E03 · Proyectos y Nuevo SCORM","Crear proyectos con datos técnicos opcionales, subir material y extraer texto o transcripción.
+
+Módulos: M03","High","fabrica-capsulas","e03","","E03 · Proyectos y Nuevo SCORM"
+"E04","","Epic","E04 · Generador","Las 11 etapas que convierten el material en un SCORM completo y revisable.
+
+Módulos: M04","High","fabrica-capsulas","e04","","E04 · Generador"
+"E05","","Epic","E05 · Revisión y calidad","Revisar, ajustar con IA, regenerar en cascada, controlar calidad y aprobar.
+
+Módulos: M05","High","fabrica-capsulas","e05","","E05 · Revisión y calidad"
+"E06","","Epic","E06 · Editor de pantalla","Retoques estilo Canva/Genially sobre la pantalla generada.
+
+Módulos: M06, M14","High","fabrica-capsulas","e06","","E06 · Editor de pantalla"
+"E07","","Epic","E07 · Personaje y voz","Narración, boca sincronizada desde el audio y audio del cliente.
+
+Módulos: M07","High","fabrica-capsulas","e07","","E07 · Personaje y voz"
+"E08","","Epic","E08 · Idiomas y subtítulos","Traducción con glosario, revisión, desbordes y subtítulos ES/EN.
+
+Módulos: M08","High","fabrica-capsulas","e08","","E08 · Idiomas y subtítulos"
+"E09","","Epic","E09 · Video interactivo","Pausas con preguntas en el video del cliente.
+
+Módulos: M09","High","fabrica-capsulas","e09","","E09 · Video interactivo"
+"E10","","Epic","E10 · Alineación pedagógica","Matriz objetivos × presentar/practicar/evaluar con Bloom y propuestas.
+
+Módulos: M10","High","fabrica-capsulas","e10","","E10 · Alineación pedagógica"
+"E11","","Epic","E11 · Navegación y reproductor","Reproductor único, patrones de navegación, reglas y vista previa.
+
+Módulos: M11","High","fabrica-capsulas","e11","","E11 · Navegación y reproductor"
+"E12","","Epic","E12 · Entrega y LMS","Validación y exportación SCORM 1.2, HTML, bilingüe, modo diagnóstico y kit de gamificación.
+
+Módulos: M12","High","fabrica-capsulas","e12","","E12 · Entrega y LMS"
+"E13","","Epic","E13 · Costos, rentabilidad y conexiones IA","Registro de costos, calculadora, mediciones y proveedor por tarea.
+
+Módulos: M13","High","fabrica-capsulas","e13","","E13 · Costos, rentabilidad y conexiones IA"
+"E14","","Epic","E14 · Calidad transversal y seguridad","Accesibilidad, seguridad de archivos y datos, observabilidad y respaldo.
+
+Módulos: M15","High","fabrica-capsulas","e14","","E14 · Calidad transversal y seguridad"
+"E15","","Epic","E15 · Sitio comercial y contenido","Sitio público multipágina administrable por el superadmin: páginas por bloques, contenido con orden y mostrar/ocultar, menú y pie, blog, SEO, SEO para IA, idiomas y ajustes.
+
+Módulos: M16
+Fase comercial (ADR-011, ADR-012)","High","fabrica-capsulas","e15","fase-comercial","E15 · Sitio comercial y contenido"
+"E16","","Epic","E16 · Captación y CRM","Popups, chatbot, agendamiento de demos, leads con origen y UTM, integración con CRM, consentimiento de cookies y resumen del sitio.
+
+Módulos: M17
+Fase comercial (ADR-011, ADR-012)","High","fabrica-capsulas","e16","fase-comercial","E16 · Captación y CRM"
+"E17","","Epic","E17 · Planes, suscripciones y facturación","Organizaciones (multi-tenant), planes administrables, alta de suscripción, pasarelas, cuotas, comprobantes electrónicos SUNAT, cobranza, cupones y panel de ingresos.
+
+Módulos: M18
+Fase comercial (ADR-011, ADR-012)","High","fabrica-capsulas","e17","fase-comercial","E17 · Planes, suscripciones y facturación"
+"HU-0101","E01","Story","HU-0101 · Entorno local con un comando","Como desarrollador, quiero levantar API, web, worker, PostgreSQL, Redis y MinIO con un comando para trabajar igual que todo el equipo.
+
+Requisitos: REQ-108
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-001 · Entorno limpio
+  Dado un equipo con Docker y Node LTS
+  Cuando ejecuto `pnpm i && pnpm dev:infra && pnpm dev`
+  Entonces la web abre en localhost:5173 y `GET /api/v1/salud` responde 200
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0102","E01","Story","HU-0102 · Paquete del esquema del curso","Como desarrollador, quiero `packages/schema` con el esquema v0.2, tipos TypeScript y validador para que web, API y worker compartan el modelo.
+
+Requisitos: REQ-101
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-002 · Validación compartida
+  Dado el ejemplo de cápsula
+  Cuando lo valido desde la API y desde el worker
+  Entonces ambos devuelven los mismos errores; las 17 pruebas del esquema pasan en CI
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0103","E01","Story","HU-0103 · Base de datos y migraciones","Como desarrollador, quiero el esquema Prisma con migraciones y datos de ejemplo para empezar con un caso real.
+
+Requisitos: —
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-003 · Migración inicial
+  Dado una base vacía
+  Cuando ejecuto `pnpm db:migrate && pnpm db:seed`
+  Entonces existen el cliente Minera Andina con su kit, 5 usuarios de prueba y el proyecto LOTO
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0104","E01","Story","HU-0104 · Sesión y roles","Como administrador, quiero crear usuarios con rol para que cada persona vea y haga solo lo que le toca.
+
+Requisitos: REQ-107
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-004 · Ingreso correcto
+  Dado un usuario activo
+  Cuando ingresa con su correo y clave
+  Entonces ve el menú de su rol
+CP-005 · Bloqueo por intentos
+  Dado un usuario
+  Cuando falla la clave 5 veces
+  Entonces la cuenta queda bloqueada 15 minutos
+CP-006 · Permiso en la API
+  Dado un PRODUCTOR
+  Cuando llama a `PUT /conexiones-ia/VOZ`
+  Entonces recibe 403
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0108","E01","Story","HU-0108 · Ingresar con Google","Como usuario invitado, quiero entrar con mi cuenta de Google para no recordar otra clave.
+
+Requisitos: REQ-060
+Módulo: M01, M15
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-007 · Correo invitado
+  Dado un usuario invitado con su correo de Google
+  Cuando pulsa «Ingresar con Google» y acepta
+  Entonces entra con su rol y su cuenta queda vinculada
+CP-008 · Correo no invitado
+  Dado una cuenta de Google que nadie invitó
+  Cuando intenta ingresar
+  Entonces ve «Tu correo no tiene acceso» y no se crea ninguna cuenta
+CP-009 · Correo no verificado
+  Dado Google devuelve email_verified = false
+  Cuando vuelve al sistema
+  Entonces no ingresa
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e01","sprint-s1",""
+"HU-0109","E01","Story","HU-0109 · Invitación y cambio de clave","Como administrador, quiero invitar usuarios por correo, y como usuario, quiero recuperar mi clave sin pedir ayuda.
+
+Requisitos: REQ-060, REQ-107
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-010 · Invitación
+  Dado un administrador
+  Cuando invita a un correo con rol PRODUCTOR
+  Entonces llega un enlace de un solo uso que vence en 60 minutos para crear la clave
+CP-011 · Olvidé mi clave
+  Dado un usuario
+  Cuando pide cambiar su clave
+  Entonces recibe un enlace; la API responde igual exista o no el correo
+CP-012 · Enlace usado
+  Dado un enlace ya usado o vencido
+  Cuando se abre
+  Entonces muestra «Enlace no válido» y permite pedir otro
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0110","E01","Story","HU-0110 · Sistema visual Aptio SCORM","Como desarrollador, quiero los tokens de color, la escala de 6 tamaños de letra, los márgenes y la estructura base (barra lateral cobalto y barra superior con ruta) en packages/ui, para que todas las vistas se vean iguales al prototipo.
+
+Requisitos: REQ-063
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-013 · Margen
+  Dado cualquier vista a 1280, 1440 y 1920 px de ancho
+  Cuando se mide la distancia entre la barra lateral y el contenido
+  Entonces es de 32 px en todas
+CP-014 · Escala tipográfica
+  Dado cualquier vista
+  Cuando se recorren los tamaños de letra fuera de las cápsulas
+  Entonces solo aparecen 11, 12, 14, 16, 20 y 26 px, y solo el h1 usa 26 px
+CP-015 · Celular
+  Dado cualquier vista a 390 px de ancho
+  Cuando se carga
+  Entonces no hay desborde horizontal
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0105","E01","Story","HU-0105 · Colas y eventos en vivo","Como usuario, quiero ver el avance de los trabajos largos en vivo para no tener que recargar.
+
+Requisitos: REQ-103
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-016 · Evento recibido
+  Dado un trabajo en la cola `ia`
+  Cuando cambia de estado
+  Entonces la web recibe el evento por SSE en menos de 2 s
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0106","E01","Story","HU-0106 · Pruebas técnicas PT-01 a PT-03","Como equipo, quiero ejecutar las pruebas técnicas de boca, imágenes y salidas de IA para confirmar los supuestos antes de construir.
+
+Requisitos: —
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-017 · Resultado documentado
+  Dado las pruebas ejecutadas
+  Cuando termina el sprint
+  Entonces existe `docs/pruebas/PT-0X.md` con resultado y decisión, y ESTADO.md está actualizado
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e01","sprint-s0",""
+"HU-0107","E01","Story","HU-0107 · Integración continua","Como desarrollador, quiero que cada cambio corra lint, tipos y pruebas para no romper lo que ya funciona.
+
+Requisitos: —
+Módulo: M01, M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-018 · CI en rojo
+  Dado un cambio que rompe una prueba
+  Cuando abro la solicitud de cambio
+  Entonces CI falla y no se puede fusionar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e01","sprint-s0",""
+"HU-0201","E02","Story","HU-0201 · Crear cliente","Como diseñador instruccional, quiero registrar un cliente con su LMS habitual e idiomas para asociarle proyectos.
+
+Requisitos: REQ-001
+Módulo: M02, M14
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-019 · Alta mínima
+  Dado la lista de clientes
+  Cuando creo uno solo con el nombre
+  Entonces aparece en la lista y puedo crearle el kit
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e02","sprint-s1",""
+"HU-0202","E02","Story","HU-0202 · Kit de marca con vista previa","Como diseñador gráfico, quiero definir paleta, estilo, tipografías y logo del cliente y ver sus pantallas actualizarse al instante.
+
+Requisitos: REQ-002, REQ-003
+Módulo: M02, M14
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-020 · Cambio en vivo
+  Dado el kit de Minera Andina
+  Cuando cambio el color primario
+  Entonces las pantallas modelo se actualizan sin recargar
+CP-021 · Contraste bajo
+  Dado texto #9AA0A6 sobre fondo blanco
+  Cuando guardo
+  Entonces veo una advertencia de contraste menor a 4,5:1 y el guardado no se bloquea
+CP-022 · Edición simultánea
+  Dado dos personas editan el kit
+  Cuando la segunda guarda con versión vieja
+  Entonces recibe 409 y opción de recargar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e02","sprint-s1",""
+"HU-0203","E02","Story","HU-0203 · Personaje con bocas","Como diseñador gráfico, quiero subir el personaje SVG y ver qué bocas A–X tiene para saber si falta alguna.
+
+Requisitos: REQ-019, REQ-020
+Módulo: M02, M14
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-023 · Boca faltante
+  Dado un SVG sin la capa de la boca G
+  Cuando lo subo
+  Entonces el kit marca «G falta» y la reemplaza por B
+CP-024 · SVG peligroso
+  Dado un SVG con `<script>`
+  Cuando lo subo
+  Entonces se guarda sin el script y sin atributos `on*`
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e02","sprint-s1",""
+"HU-0204","E02","Story","HU-0204 · Pantallas modelo del kit","Como diseñador gráfico, quiero crear las pantallas modelo del cliente para que la IA genere con nuestra calidad visual.
+
+Requisitos: REQ-050
+Módulo: M02, M14
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-025 · Modelo disponible
+  Dado una pantalla modelo «Idea + ilustración»
+  Cuando la activo
+  Entonces el generador la usa en las próximas generaciones
+CP-026 · Sin modelos
+  Dado un cliente sin pantallas modelo
+  Cuando genero
+  Entonces se usan las del estilo base
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e02","sprint-s1",""
+"HU-0205","E02","Story","HU-0205 · Glosario y pronunciación","Como productor, quiero registrar términos que no se traducen y cómo se pronuncian para que la voz y el inglés sean correctos.
+
+Requisitos: REQ-028
+Módulo: M02, M14
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-027 · Pronunciación
+  Dado «LOTO» → «lo-to»
+  Cuando escucho una muestra
+  Entonces la voz dice «lo-to»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e02","sprint-s1",""
+"HU-0206","E02","Story","HU-0206 · Extraer kit de un curso anterior","Como diseñador gráfico, quiero que la IA proponga el kit desde un curso anterior o un manual de marca para ahorrar tiempo.
+
+Requisitos: —
+Módulo: M02, M14
+Sprint sugerido: S9 · Video, ilustraciones y biblioteca
+
+Criterios de aceptación:
+CP-028 · Propuesta revisable
+  Dado un ZIP de un curso anterior
+  Cuando pido extraer
+  Entonces recibo una propuesta de paleta y tipografías que puedo aplicar o descartar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Low","fabrica-capsulas","e02","sprint-s9",""
+"HU-0301","E03","Story","HU-0301 · Lista de proyectos","Como diseñador instruccional, quiero ver los proyectos con estado, avance y costo de IA para saber qué atender.
+
+Requisitos: REQ-001
+Módulo: M03
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-029 · Filtro
+  Dado 20 proyectos de 3 clientes
+  Cuando filtro por un cliente
+  Entonces solo veo los suyos
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e03","sprint-s1",""
+"HU-0302","E03","Story","HU-0302 · Nuevo SCORM sin datos obligatorios","Como diseñador instruccional, quiero crear un proyecto solo con cliente y nombre, y dejar los datos técnicos para después.
+
+Requisitos: REQ-043, REQ-044
+Módulo: M03
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-030 · Mínimo
+  Dado el formulario Nuevo SCORM
+  Cuando lleno solo cliente y nombre
+  Entonces el proyecto se crea y puedo generar
+CP-031 · Datos técnicos vacíos
+  Dado un proyecto sin LMS
+  Cuando llego a Entrega
+  Entonces el perfil propuesto es Genérico
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e03","sprint-s1",""
+"HU-0303","E03","Story","HU-0303 · Estimación opcional","Como diseñador instruccional, quiero estimar pantallas y SCORM desde las horas que pide el cliente para planificar.
+
+Requisitos: REQ-004
+Módulo: M03
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-032 · Cálculo
+  Dado 48 horas, 50 % en SCORM, 30 pantallas por SCORM
+  Cuando escribo los datos
+  Entonces veo ≈ 1.200 pantallas y 40 SCORM con los supuestos editables
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e03","sprint-s1",""
+"HU-0304","E03","Story","HU-0304 · Subir material y extraer texto","Como diseñador instruccional, quiero subir PDF, Word o PowerPoint y ver el texto por página para que la IA trabaje con el contenido real.
+
+Requisitos: REQ-006
+Módulo: M03
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-033 · PDF de 84 páginas
+  Dado el manual de ejemplo
+  Cuando lo subo
+  Entonces veo el texto de cada página; las escaneadas pasan por OCR y se marcan
+CP-034 · Archivo no permitido
+  Dado un .exe renombrado a .pdf
+  Cuando lo subo
+  Entonces se rechaza por tipo real
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e03","sprint-s1",""
+"HU-0305","E03","Story","HU-0305 · Video o audio como material","Como productor, quiero subir video o audio del cliente y obtener su transcripción con tiempos.
+
+Requisitos: REQ-026
+Módulo: M03
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-035 · Transcripción
+  Dado un video de 2:30
+  Cuando lo subo
+  Entonces veo la transcripción con marcas de tiempo
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e03","sprint-s2",""
+"HU-0401","E04","Story","HU-0401 · Lanzar generación con avance visible","Como diseñador instruccional, quiero lanzar la generación y ver cada etapa avanzar con su costo.
+
+Requisitos: REQ-049
+Módulo: M04
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-036 · Avance
+  Dado un proyecto con material
+  Cuando pulso «Generar SCORM»
+  Entonces veo las 11 etapas con estado, detalle y costo, actualizadas en vivo
+CP-037 · Solo una
+  Dado una generación en curso
+  Cuando intento lanzar otra
+  Entonces recibo un aviso y no se crea
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s2",""
+"HU-0402","E04","Story","HU-0402 · Resumen e ideas clave con origen","Como diseñador instruccional, quiero que la IA resuma el material indicando la página de cada idea y lo que omitió con motivo.
+
+Requisitos: REQ-007, REQ-008, REQ-010
+Módulo: M04
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-038 · Trazabilidad
+  Dado el manual de 84 páginas
+  Cuando termina la etapa 1
+  Entonces cada idea clave tiene su página y existe un acta de temas omitidos
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s2",""
+"HU-0403","E04","Story","HU-0403 · Objetivos y estructura","Como diseñador instruccional, quiero objetivos con nivel de Bloom y una estructura de pantallas según la extensión pedida.
+
+Requisitos: REQ-009
+Módulo: M04
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-039 · Extensión
+  Dado 30 pantallas y 40 % de actividades
+  Cuando termina la etapa 2
+  Entonces hay 30 pantallas, al menos 12 con actividad, cada una ligada a un objetivo
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s2",""
+"HU-0404","E04","Story","HU-0404 · Guion por pantalla","Como diseñador instruccional, quiero texto corto en pantalla y narración para cada pantalla.
+
+Requisitos: REQ-009
+Módulo: M04
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-040 · Texto corto
+  Dado el guion generado
+  Cuando lo valido
+  Entonces ninguna pantalla supera 30 palabras en pantalla sin advertencia
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s2",""
+"HU-0405","E04","Story","HU-0405 · Salidas validadas y reintentos","Como desarrollador, quiero que toda salida de IA valide contra el esquema con hasta 2 reintentos para nunca guardar datos a medias.
+
+Requisitos: REQ-101, REQ-038
+Módulo: M04
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-041 · Salida inválida
+  Dado una respuesta de IA sin un campo obligatorio
+  Cuando se valida
+  Entonces se reintenta con el error; si falla 3 veces la etapa queda en ERROR con «Reintentar etapa»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s2",""
+"HU-0406","E04","Story","HU-0406 · Componer pantallas con el kit","Como diseñador instruccional, quiero que cada pantalla salga armada con una disposición y los componentes del kit, sin HTML generado por la IA.
+
+Requisitos: REQ-050
+Módulo: M04
+Sprint sugerido: S3 · Pantallas, reproductor y revisión básica
+
+Criterios de aceptación:
+CP-042 · Disposición válida
+  Dado el guion de 30 pantallas
+  Cuando termina la etapa 4
+  Entonces todas tienen `disposicion` válida y se dibujan en la vista previa
+CP-043 · Pantallas en vivo
+  Dado la etapa 4 en curso
+  Cuando una pantalla queda lista
+  Entonces aparece en Producción sin esperar al resto
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s3",""
+"HU-0407","E04","Story","HU-0407 · Datos de las actividades","Como productor, quiero que la IA genere los datos de cada actividad (memoria, clasificar, quiz…) desde el contenido.
+
+Requisitos: REQ-016
+Módulo: M04
+Sprint sugerido: S3 · Pantallas, reproductor y revisión básica
+
+Criterios de aceptación:
+CP-044 · Clasificar
+  Dado una pantalla de clasificar
+  Cuando se genera
+  Entonces tiene 2 grupos y al menos 4 elementos con su grupo correcto y retroalimentación
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e04","sprint-s3",""
+"HU-0408","E04","Story","HU-0408 · Cancelar y reintentar etapas","Como diseñador instruccional, quiero cancelar una generación o reintentar una etapa sin perder lo hecho.
+
+Requisitos: REQ-049
+Módulo: M04
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-045 · Cancelar
+  Dado una generación en la etapa 3
+  Cuando la cancelo
+  Entonces las etapas 1 y 2 se conservan y puedo continuar después
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e04","sprint-s2",""
+"HU-0501","E05","Story","HU-0501 · Revisar pantallas","Como diseñador instruccional, quiero revisar cada pantalla animada con filtros y su origen.
+
+Requisitos: REQ-010, REQ-030
+Módulo: M05
+Sprint sugerido: S3 · Pantallas, reproductor y revisión básica
+
+Criterios de aceptación:
+CP-046 · Filtro
+  Dado 30 pantallas, 3 con observaciones
+  Cuando filtro «Revisar»
+  Entonces veo solo las 3
+CP-047 · Origen
+  Dado una pantalla tomada del manual
+  Cuando la abro
+  Entonces veo «Manual p. 12»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e05","sprint-s3",""
+"HU-0502","E05","Story","HU-0502 · Aprobar una o por lote","Como diseñador instruccional, quiero aprobar pantallas una por una o todas las que no tienen observaciones.
+
+Requisitos: REQ-011, REQ-052
+Módulo: M05
+Sprint sugerido: S3 · Pantallas, reproductor y revisión básica
+
+Criterios de aceptación:
+CP-048 · Lote
+  Dado 27 pantallas sin observaciones y 3 con
+  Cuando pulso «Aprobar todas las que no tienen observaciones»
+  Entonces quedan 27 aprobadas y 3 pendientes
+CP-049 · Aprobada que cambia
+  Dado una pantalla aprobada
+  Cuando edito su texto
+  Entonces vuelve a borrador
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e05","sprint-s3",""
+"HU-0503","E05","Story","HU-0503 · Regeneración en cascada","Como revisor interno, quiero cambiar un texto y que voz, boca, subtítulos e inglés se actualicen solos.
+
+Requisitos: REQ-051
+Módulo: M05
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-050 · Solo lo afectado
+  Dado la narración de la pantalla 5
+  Cuando la cambio
+  Entonces se crean trabajos solo para la pantalla 5 en ES y EN y los chips pasan a verde al terminar
+CP-051 · Sin gasto por tecla
+  Dado escribo una frase
+  Cuando tecleo durante 5 s
+  Entonces se lanza un solo trabajo, 1 s después de dejar de escribir
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e05","sprint-s5",""
+"HU-0504","E05","Story","HU-0504 · Propuestas de la IA","Como productor, quiero pedir «más visual», «menos texto», «convertir en actividad», «3 variantes», «otra ilustración» o un pedido libre, y aplicar o descartar.
+
+Requisitos: REQ-038, REQ-052
+Módulo: M05
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-052 · Aplicar y deshacer
+  Dado una propuesta «Más visual»
+  Cuando la aplico
+  Entonces la pantalla cambia, se crea una versión y Deshacer la revierte
+CP-053 · Propuesta vencida
+  Dado una propuesta calculada sobre la versión 12
+  Cuando el curso ya está en la 13
+  Entonces al aplicar recibo «Recalcular propuesta»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e05","sprint-s5",""
+"HU-0505","E05","Story","HU-0505 · Control de calidad automático","Como diseñador instruccional, quiero observaciones automáticas de alineación, accesibilidad, longitud y ortografía.
+
+Requisitos: REQ-035, REQ-105
+Módulo: M05
+Sprint sugerido: S7 · Inglés y control de calidad
+
+Criterios de aceptación:
+CP-054 · Imagen sin alternativo
+  Dado una imagen no decorativa sin texto alternativo
+  Cuando corre el control
+  Entonces aparece una observación de accesibilidad en esa pantalla
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e05","sprint-s7",""
+"HU-0506","E05","Story","HU-0506 · Comentarios del revisor del cliente","Como revisor del cliente, quiero comentar pantallas sin poder editarlas.
+
+Requisitos: REQ-058
+Módulo: M05
+Sprint sugerido: S10 · Costos, rentabilidad y cierre
+
+Criterios de aceptación:
+CP-055 · Solo comentar
+  Dado un revisor del cliente
+  Cuando intenta guardar una pantalla
+  Entonces recibe 403; sí puede comentar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e05","sprint-s10",""
+"HU-0601","E06","Story","HU-0601 · Editar texto sobre la pantalla","Como productor, quiero hacer doble clic en un texto y escribir ahí mismo.
+
+Requisitos: REQ-045
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-056 · Edición en el lugar
+  Dado un título
+  Cuando hago doble clic, escribo y pulso Enter
+  Entonces el texto queda guardado; Esc cancela
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e06","sprint-s5",""
+"HU-0602","E06","Story","HU-0602 · Barra contextual y propiedades","Como productor, quiero cambiar tamaño, color del kit, alineación y animación del elemento elegido.
+
+Requisitos: REQ-045
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-057 · Color del kit
+  Dado un texto elegido
+  Cuando elijo el color Acento
+  Entonces cambia y solo se ofrecen colores del kit
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e06","sprint-s5",""
+"HU-0603","E06","Story","HU-0603 · Modo libre","Como diseñador gráfico, quiero mover elementos con el mouse o las flechas en modo Libre.
+
+Requisitos: REQ-053
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-058 · Posición relativa
+  Dado una imagen
+  Cuando la arrastro
+  Entonces se guarda un desplazamiento en % del ancho y se ve igual en otra resolución
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e06","sprint-s5",""
+"HU-0604","E06","Story","HU-0604 · Retoques separados del contenido","Como productor, quiero que mis retoques se conserven aunque la IA regenere el texto.
+
+Requisitos: REQ-053
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-059 · Regenerar sin perder
+  Dado una pantalla con imagen movida y botón agregado
+  Cuando aplico «Menos texto»
+  Entonces la imagen sigue movida y el botón sigue ahí
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e06","sprint-s5",""
+"HU-0605","E06","Story","HU-0605 · Cambiar diseño de la pantalla","Como productor, quiero ver la misma pantalla en otras composiciones y elegir una.
+
+Requisitos: REQ-052
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-060 · Diseño
+  Dado una pantalla «Idea + ilustración»
+  Cuando elijo «Tarjetas con íconos»
+  Entonces se conserva el contenido y se puede deshacer
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e06","sprint-s5",""
+"HU-0606","E06","Story","HU-0606 · Agregar elementos y capas","Como productor, quiero agregar título, texto, botón, imagen, insignia, forma o personaje, y ocultar o mostrar capas.
+
+Requisitos: REQ-045
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-061 · Agregar
+  Dado el panel Agregar
+  Cuando elijo «Botón»
+  Entonces aparece en la pantalla, seleccionado y listo para mover
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e06","sprint-s5",""
+"HU-0607","E06","Story","HU-0607 · Deshacer, rehacer y guardado automático","Como productor, quiero deshacer y que todo se guarde solo.
+
+Requisitos: REQ-013, REQ-054
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-062 · Recargar
+  Dado varios cambios
+  Cuando recargo la página
+  Entonces siguen ahí
+CP-063 · Deshacer
+  Dado 20 cambios
+  Cuando pulso Ctrl+Z 20 veces
+  Entonces vuelvo al estado inicial
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e06","sprint-s5",""
+"HU-0608","E06","Story","HU-0608 · Línea de tiempo de la pantalla","Como diseñador gráfico, quiero ver bajo la pantalla una línea de tiempo con la narración (palabra por palabra), los subtítulos, la boca de Ana y una barra por elemento, y arrastrar las barras para decidir cuándo aparece y sale cada uno.
+
+Requisitos: REQ-045, REQ-059
+Módulo: M06, M14
+Sprint sugerido: S5 · Editor y regeneración en cascada
+
+Criterios de aceptación:
+CP-064 · Arrastrar entrada
+  Dado un elemento que aparece a los 0,3 s
+  Cuando arrastro su barra hasta la palabra «residual»
+  Entonces la barra se imanta a esa palabra, se guarda `retardoS` y `anclaPalabra`, y la vista previa lo respeta
+CP-065 · Salida
+  Dado un elemento sin salida
+  Cuando arrastro el borde derecho de su barra a los 4 s
+  Entonces se guarda `finS` = 4 y el elemento desaparece a los 4 s en la vista previa y en el paquete
+CP-066 · Reproducir y recorrer
+  Dado la pantalla 05
+  Cuando pulso Reproducir o hago clic en la regla a los 2 s
+  Entonces la aguja avanza, la palabra actual se resalta, la boca y los subtítulos coinciden, y solo se ven los elementos activos en ese segundo
+CP-067 · Cambiar la narración
+  Dado un elemento anclado a una palabra
+  Cuando edito la narración y se regenera la voz
+  Entonces el elemento sigue apareciendo con su palabra con las marcas de la nueva voz; si la palabra ya no existe, conserva el segundo y se marca para revisar
+CP-068 · Sincronizar con la voz
+  Dado una pantalla con 4 elementos
+  Cuando pulso «✦ Sincronizar con la voz»
+  Entonces llega una propuesta que hace aparecer cada elemento cuando Ana lo nombra; al aplicarla se puede deshacer
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e06","sprint-s5",""
+"HU-0610","E06","Story","HU-0610 · Disparadores simples","Como diseñador gráfico, quiero definir disparadores sin código: cuando termina la voz o llega un segundo de la línea de tiempo, mostrar, ocultar o ir a otra pantalla.
+
+Requisitos: REQ-045
+Módulo: M06, M14
+Sprint sugerido: S8 · Alineación y navegación
+
+Criterios de aceptación:
+CP-069 · Disparador por tiempo
+  Dado un botón oculto
+  Cuando defino «a los 3 s → mostrar botón»
+  Entonces en la vista previa el botón aparece a los 3 s
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Low","fabrica-capsulas","e06","sprint-s8",""
+"HU-0609","E06","Story","HU-0609 · Imágenes propias y biblioteca","Como diseñador gráfico, quiero subir imágenes o arrastrarlas al lienzo y usar la biblioteca del kit.
+
+Requisitos: REQ-046, REQ-017
+Módulo: M06, M14
+Sprint sugerido: S9 · Video, ilustraciones y biblioteca
+
+Criterios de aceptación:
+CP-070 · Arrastrar archivo
+  Dado una imagen del escritorio
+  Cuando la suelto en la pantalla
+  Entonces queda donde la solté y en la biblioteca del proyecto
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e06","sprint-s9",""
+"HU-0701","E07","Story","HU-0701 · Narración con la voz del kit","Como productor, quiero que cada pantalla tenga narración con la voz del cliente.
+
+Requisitos: REQ-021
+Módulo: M07
+Sprint sugerido: S4 · Voz, boca y subtítulos
+
+Criterios de aceptación:
+CP-071 · Narración completa
+  Dado un curso generado
+  Cuando termina la etapa 6
+  Entonces todas las pantallas con narración tienen audio y estado «Lista»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e07","sprint-s4",""
+"HU-0702","E07","Story","HU-0702 · Boca sincronizada","Como productor, quiero ver a Ana hablar con la boca sincronizada sin usar video.
+
+Requisitos: REQ-022
+Módulo: M07
+Sprint sugerido: S4 · Voz, boca y subtítulos
+
+Criterios de aceptación:
+CP-072 · Sincronía
+  Dado una narración de 10 s
+  Cuando la reproduzco
+  Entonces la boca cambia según las marcas; desfase perceptible menor a 100 ms (PT-01)
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e07","sprint-s4",""
+"HU-0703","E07","Story","HU-0703 · Narraciones desactualizadas","Como productor, quiero saber qué narraciones están desactualizadas y regenerar solo esas.
+
+Requisitos: REQ-021
+Módulo: M07
+Sprint sugerido: S4 · Voz, boca y subtítulos
+
+Criterios de aceptación:
+CP-073 · Cambio de pronunciación
+  Dado «LOTO» en 4 pantallas
+  Cuando cambio su pronunciación
+  Entonces solo esas 4 quedan «Por regenerar»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e07","sprint-s4",""
+"HU-0704","E07","Story","HU-0704 · Audio del cliente","Como productor, quiero limpiar, re-locutar o usar el audio del cliente con boca automática.
+
+Requisitos: REQ-023, REQ-024
+Módulo: M07
+Sprint sugerido: S9 · Video, ilustraciones y biblioteca
+
+Criterios de aceptación:
+CP-074 · Boca desde grabación
+  Dado un audio del gerente
+  Cuando elijo «Usar con boca automática»
+  Entonces Ana mueve la boca con esa grabación
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e07","sprint-s9",""
+"HU-0801","E08","Story","HU-0801 · Subtítulos","Como productor, quiero subtítulos WebVTT sincronizados en cada idioma.
+
+Requisitos: REQ-025
+Módulo: M08
+Sprint sugerido: S4 · Voz, boca y subtítulos
+
+Criterios de aceptación:
+CP-075 · Sincronía
+  Dado una narración
+  Cuando se genera
+  Entonces existe su archivo VTT y se muestra en la vista previa
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e08","sprint-s4",""
+"HU-0802","E08","Story","HU-0802 · Traducir con glosario","Como productor, quiero traducir al inglés respetando el glosario y sin tocar lo revisado.
+
+Requisitos: REQ-028
+Módulo: M08
+Sprint sugerido: S7 · Inglés y control de calidad
+
+Criterios de aceptación:
+CP-076 · Glosario
+  Dado «LOTO» marcado como no traducir
+  Cuando traduzco
+  Entonces sigue como «LOTO»
+CP-077 · Revisado intacto
+  Dado un texto marcado Revisado
+  Cuando pulso «Traducir pendientes»
+  Entonces no cambia
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e08","sprint-s7",""
+"HU-0803","E08","Story","HU-0803 · Desbordes por idioma","Como productor, quiero saber qué textos no caben en su espacio en algún idioma.
+
+Requisitos: REQ-029
+Módulo: M08
+Sprint sugerido: S7 · Inglés y control de calidad
+
+Criterios de aceptación:
+CP-078 · Desborde
+  Dado una tarjeta que en inglés excede su espacio
+  Cuando corre la validación
+  Entonces queda «Desborde» con propuesta de versión corta
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e08","sprint-s7",""
+"HU-0804","E08","Story","HU-0804 · Bilingüe en un paquete","Como participante, quiero cambiar de idioma sin perder mi avance.
+
+Requisitos: REQ-034
+Módulo: M08
+Sprint sugerido: S7 · Inglés y control de calidad
+
+Criterios de aceptación:
+CP-079 · Cambio de idioma
+  Dado voy en la pantalla 8
+  Cuando cambio a inglés
+  Entonces sigo en la 8 con mis puntos
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e08","sprint-s7",""
+"HU-0901","E09","Story","HU-0901 · Preguntas en el video","Como productor, quiero marcar tiempos del video donde se pausa y aparece una pregunta.
+
+Requisitos: REQ-026
+Módulo: M09
+Sprint sugerido: S9 · Video, ilustraciones y biblioteca
+
+Criterios de aceptación:
+CP-080 · Pausa
+  Dado una pregunta en 0:45
+  Cuando reproduzco
+  Entonces el video se detiene en 0:45 y muestra la pregunta
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e09","sprint-s9",""
+"HU-0902","E09","Story","HU-0902 · Impedir adelantar","Como diseñador instruccional, quiero impedir que salten preguntas no respondidas.
+
+Requisitos: REQ-026
+Módulo: M09
+Sprint sugerido: S9 · Video, ilustraciones y biblioteca
+
+Criterios de aceptación:
+CP-081 · Bloqueo
+  Dado una pregunta pendiente en 1:20
+  Cuando intento ir a 2:00
+  Entonces no se permite y se explica por qué
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e09","sprint-s9",""
+"HU-0903","E09","Story","HU-0903 · Pausas propuestas por IA","Como productor, quiero que la IA proponga pausas desde la transcripción.
+
+Requisitos: REQ-027
+Módulo: M09
+Sprint sugerido: S9 · Video, ilustraciones y biblioteca
+
+Criterios de aceptación:
+CP-082 · Propuesta
+  Dado una transcripción con 4 cambios de tema
+  Cuando pido proponer
+  Entonces recibo al menos un marcador por cambio de tema para aplicar o descartar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Low","fabrica-capsulas","e09","sprint-s9",""
+"HU-1001","E10","Story","HU-1001 · Matriz de alineación","Como diseñador instruccional, quiero ver por objetivo qué pantallas presentan, practican y evalúan, con su nivel de Bloom.
+
+Requisitos: REQ-042
+Módulo: M10
+Sprint sugerido: S8 · Alineación y navegación
+
+Criterios de aceptación:
+CP-083 · Alerta de nivel
+  Dado un objetivo «aplicar» evaluado solo con preguntas «recordar»
+  Cuando abro Alineación
+  Entonces veo la alerta en ese objetivo
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e10","sprint-s8",""
+"HU-1002","E10","Story","HU-1002 · Corregir con IA","Como diseñador instruccional, quiero que la IA proponga cómo corregir las alertas.
+
+Requisitos: REQ-042
+Módulo: M10
+Sprint sugerido: S8 · Alineación y navegación
+
+Criterios de aceptación:
+CP-084 · Corrección
+  Dado 2 alertas
+  Cuando aplico la propuesta
+  Entonces quedan 0 alertas y las pantallas nuevas quedan por revisar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e10","sprint-s8",""
+"HU-1101","E11","Story","HU-1101 · Reproductor único","Como desarrollador, quiero que la vista previa y el paquete usen el mismo reproductor para que lo que se ve sea lo que se entrega.
+
+Requisitos: Decisión 3, REQ-104
+Módulo: M11
+Sprint sugerido: S3 · Pantallas, reproductor y revisión básica
+
+Criterios de aceptación:
+CP-085 · Mismo código
+  Dado la vista previa y el SCORM exportado
+  Cuando comparo una pantalla
+  Entonces se ven iguales; el reproductor pesa menos de 300 KB comprimido
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e11","sprint-s3",""
+"HU-1102","E11","Story","HU-1102 · Vista previa clásica","Como diseñador instruccional, quiero recorrer la cápsula como el participante en escritorio y celular.
+
+Requisitos: REQ-030, REQ-055
+Módulo: M11
+Sprint sugerido: S3 · Pantallas, reproductor y revisión básica
+
+Criterios de aceptación:
+CP-086 · Bloqueo por actividad
+  Dado regla «actividades obligatorias»
+  Cuando intento pasar una actividad sin hacerla
+  Entonces Siguiente está deshabilitado y dice por qué
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e11","sprint-s3",""
+"HU-1103","E11","Story","HU-1103 · Patrones de navegación","Como diseñador instruccional, quiero elegir entre 7 patrones y combinarlos con cualquier regla.
+
+Requisitos: REQ-047
+Módulo: M11
+Sprint sugerido: S8 · Alineación y navegación
+
+Criterios de aceptación:
+CP-087 · Combinación
+  Dado patrón Historias y regla Secuencial
+  Cuando pruebo la vista previa
+  Entonces se avanza tocando los lados, con teclado y con botones, y respeta el orden
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e11","sprint-s8",""
+"HU-1104","E11","Story","HU-1104 · Patrón recomendado o creado por IA","Como diseñador instruccional, quiero que la IA recomiende un patrón o cree uno desde mi descripción.
+
+Requisitos: REQ-048
+Módulo: M11
+Sprint sugerido: S8 · Alineación y navegación
+
+Criterios de aceptación:
+CP-088 · Personalizado
+  Dado «tablero de misiones de seguridad»
+  Cuando pido crear
+  Entonces recibo una configuración válida con miniatura para aplicar
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Low","fabrica-capsulas","e11","sprint-s8",""
+"HU-1105","E11","Story","HU-1105 · Reanudación","Como participante, quiero continuar donde lo dejé.
+
+Requisitos: REQ-041
+Módulo: M11
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-089 · Volver
+  Dado salgo en la pantalla 12
+  Cuando vuelvo a entrar
+  Entonces me pregunta si continúo y vuelvo a la 12 con mis puntos
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e11","sprint-s6",""
+"HU-1201","E12","Story","HU-1201 · Validar antes de exportar","Como diseñador instruccional, quiero ver errores y advertencias antes de exportar.
+
+Requisitos: REQ-035, REQ-040
+Módulo: M12
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-090 · Tamaño
+  Dado un paquete de 300 MB
+  Cuando valido
+  Entonces veo una advertencia con alternativas y puedo exportar igual
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e12","sprint-s6",""
+"HU-1202","E12","Story","HU-1202 · Exportar SCORM 1.2","Como diseñador instruccional, quiero exportar un SCORM 1.2 que funcione en cualquier LMS.
+
+Requisitos: REQ-033, REQ-039
+Módulo: M12
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-091 · SCORM Cloud
+  Dado el curso LOTO
+  Cuando exporto y lo subo a SCORM Cloud
+  Entonces registra avance, nota y estado
+CP-092 · Moodle
+  Dado el mismo paquete
+  Cuando lo subo a Moodle 4.5 de pruebas
+  Entonces reanuda donde quedé
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e12","sprint-s6",""
+"HU-1203","E12","Story","HU-1203 · Exportar HTML","Como productor, quiero una versión HTML que abra sin LMS ni conexión.
+
+Requisitos: REQ-032
+Módulo: M12
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-093 · Sin conexión
+  Dado la carpeta exportada
+  Cuando abro index.html sin internet
+  Entonces funciona completa
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e12","sprint-s6",""
+"HU-1204","E12","Story","HU-1204 · Modo diagnóstico","Como soporte, quiero un modo diagnóstico dentro del paquete para LMS desconocidos.
+
+Requisitos: REQ-039
+Módulo: M12
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-094 · API no encontrada
+  Dado un LMS que no expone la API
+  Cuando abro el paquete
+  Entonces el modo diagnóstico muestra qué encontró y se puede copiar a la ficha del cliente
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e12","sprint-s6",""
+"HU-1205","E12","Story","HU-1205 · Kit de gamificación para el LMS","Como diseñador instruccional, quiero descargar insignias con la marca y la guía para configurarlas en el LMS del cliente.
+
+Requisitos: REQ-036
+Módulo: M12
+Sprint sugerido: S10 · Costos, rentabilidad y cierre
+
+Criterios de aceptación:
+CP-095 · Descarga
+  Dado el kit de Minera Andina
+  Cuando exporto el kit
+  Entonces obtengo las insignias y la guía del LMS elegido
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Low","fabrica-capsulas","e12","sprint-s10",""
+"HU-1301","E13","Story","HU-1301 · Registrar costo por trabajo","Como administrador, quiero que cada llamada a un proveedor registre consumo y costo.
+
+Requisitos: REQ-037
+Módulo: M13
+Sprint sugerido: S2 · Generador: del material al guion
+
+Criterios de aceptación:
+CP-096 · Registro
+  Dado una etapa del generador
+  Cuando termina
+  Entonces existe un TrabajoIA con proveedor, modelo, consumo y costo
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e13","sprint-s2",""
+"HU-1302","E13","Story","HU-1302 · Resumen de costos","Como administrador, quiero ver el costo de IA por proyecto, cliente y proveedor.
+
+Requisitos: REQ-037
+Módulo: M13
+Sprint sugerido: S10 · Costos, rentabilidad y cierre
+
+Criterios de aceptación:
+CP-097 · Por proyecto
+  Dado 3 proyectos con generaciones
+  Cuando abro Costos
+  Entonces veo el total de cada uno y el promedio por SCORM
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e13","sprint-s10",""
+"HU-1303","E13","Story","HU-1303 · Rentabilidad y mediciones","Como gerente, quiero comparar el costo por SCORM hoy y con el generador usando horas medidas.
+
+Requisitos: REQ-056
+Módulo: M13
+Sprint sugerido: S10 · Costos, rentabilidad y cierre
+
+Criterios de aceptación:
+CP-098 · Con mediciones
+  Dado las horas reales de 2 proyectos
+  Cuando elijo fuente «mediciones»
+  Entonces el costo por SCORM y el margen usan esos promedios
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e13","sprint-s10",""
+"HU-1304","E13","Story","HU-1304 · Proveedor por tarea","Como administrador, quiero cambiar el proveedor o modelo de cada tarea y probar la conexión.
+
+Requisitos: REQ-057
+Módulo: M13
+Sprint sugerido: S10 · Costos, rentabilidad y cierre
+
+Criterios de aceptación:
+CP-099 · Cambio en caliente
+  Dado voz en Google
+  Cuando cambio a ElevenLabs y pruebo
+  Entonces la siguiente narración usa ElevenLabs sin reiniciar
+CP-100 · Límite de gasto
+  Dado un límite mensual alcanzado
+  Cuando llega un trabajo nuevo
+  Entonces se pausa y se avisa al administrador
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e13","sprint-s10",""
+"HU-1401","E14","Story","HU-1401 · Accesibilidad de las cápsulas","Como participante con discapacidad, quiero usar la cápsula con teclado y lector de pantalla.
+
+Requisitos: REQ-105
+Módulo: M15
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-101 · Teclado
+  Dado cualquier actividad
+  Cuando la hago solo con teclado
+  Entonces se puede completar con foco visible
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e14","sprint-s6",""
+"HU-1402","E14","Story","HU-1402 · Seguridad de archivos y datos","Como responsable, quiero que los archivos se verifiquen y que los textos del cliente no puedan cambiar las instrucciones de la IA.
+
+Requisitos: REQ-107
+Módulo: M15
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-102 · Inyección en documento
+  Dado un PDF con «ignora tus instrucciones»
+  Cuando se genera
+  Entonces la salida sigue el esquema y no obedece ese texto
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e14","sprint-s1",""
+"HU-1404","E14","Story","HU-1404 · Documentos cifrados y borrado programado","Como responsable, quiero que los documentos del cliente estén cifrados y se borren solos después de la entrega, según el contrato.
+
+Requisitos: REQ-061
+Módulo: M15
+Sprint sugerido: S1 · Clientes, kits y proyectos
+
+Criterios de aceptación:
+CP-103 · Cifrado
+  Dado un PDF subido
+  Cuando reviso el objeto en el almacenamiento
+  Entonces está cifrado con la clave KMS y solo se descarga con URL firmada de 15 minutos
+CP-104 · Borrado programado
+  Dado un proyecto entregado de un cliente con retención de 180 días
+  Cuando pasan 180 días
+  Entonces se borran los documentos fuente, se conserva el curso y queda registro en Auditoría
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e14","sprint-s1",""
+"HU-1405","E14","Story","HU-1405 · Entorno de pruebas en la nube","Como responsable del producto, quiero un enlace estable de pruebas para revisar la demo de cada sprint.
+
+Requisitos: REQ-061
+Módulo: M15
+Sprint sugerido: S0 · Fundaciones y pruebas técnicas
+
+Criterios de aceptación:
+CP-105 · Despliegue
+  Dado un cambio aprobado en main
+  Cuando termina la integración continua
+  Entonces se despliega en pruebas con HTTPS y sin secretos en el repositorio
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","High","fabrica-capsulas","e14","sprint-s0",""
+"HU-1406","E14","Story","HU-1406 · Licencias y créditos de IA","Como gerente, quiero saber con qué proveedor y licencia se generó cada recurso y que la cápsula lo indique en los créditos.
+
+Requisitos: REQ-062
+Módulo: M15
+Sprint sugerido: S6 · Entrega SCORM y piloto
+
+Criterios de aceptación:
+CP-106 · Registro
+  Dado una ilustración generada
+  Cuando abro el recurso
+  Entonces veo proveedor, modelo y licencia
+CP-107 · Créditos
+  Dado una cápsula exportada
+  Cuando abro los créditos
+  Entonces dice «Voz e ilustraciones generadas con IA y revisadas por AulasEducativas»
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e14","sprint-s6",""
+"HU-1403","E14","Story","HU-1403 · Observabilidad y respaldo","Como administrador, quiero ver errores por proveedor, colas pendientes y tener copias de seguridad diarias.
+
+Requisitos: —
+Módulo: M15
+Sprint sugerido: S10 · Costos, rentabilidad y cierre
+
+Criterios de aceptación:
+CP-108 · Restauración
+  Dado una copia de la noche anterior
+  Cuando la restauro en un entorno de prueba
+  Entonces el sistema funciona con los datos de esa copia
+
+Referencias: docs/14-modulos.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/prototipo-unificado.html","Medium","fabrica-capsulas","e14","sprint-s10",""
+"HU-1501","E15","Story","HU-1501 · Rol superadmin y menú del sitio","Como superadmin, quiero un rol de plataforma separado del administrador de cada organización y un menú «Sitio web», «Captación» y «Ventas» solo para mí, para gestionar el sitio sin dar ese acceso a los clientes.
+
+Requisitos: REQ-064
+Módulo: M16
+Pantalla: PNT-24
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-109 · Acceso del administrador de organización
+  Dado un usuario con rol Administrador de una organización
+  Cuando pide GET /api/v1/sitio/paginas
+  Entonces recibe 403 y no ve el grupo «Sitio web» en la barra lateral
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1502","E15","Story","HU-1502 · Páginas con estados y programación","Como superadmin, quiero crear páginas con ruta, idioma y estado (borrador, programada, publicada) para publicar el sitio por partes.
+
+Requisitos: REQ-065
+Módulo: M16
+Pantalla: PNT-25
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-110 · Borrador no visible
+  Dado una página en estado Borrador
+  Cuando un visitante abre su ruta
+  Entonces el sitio responde 404 y la página no aparece en el sitemap
+CP-111 · Publicación programada
+  Dado una página programada para las 09:00
+  Cuando llega la hora
+  Entonces queda publicada antes de las 09:01 y entra al sitemap
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1503","E15","Story","HU-1503 · Editor de página por bloques","Como superadmin, quiero armar cada página con bloques que puedo ordenar, mostrar u ocultar, para cambiar el sitio sin programar.
+
+Requisitos: REQ-066
+Módulo: M16
+Pantalla: PNT-26
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-112 · Ocultar un bloque
+  Dado el bloque Testimonios visible en Inicio
+  Cuando lo oculto y publico
+  Entonces Inicio deja de mostrarlo y el bloque sigue guardado con sus datos
+CP-113 · Reordenar
+  Dado los bloques Cifras y Logos
+  Cuando muevo Logos arriba de Cifras y publico
+  Entonces el sitio los muestra en ese orden
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1504","E15","Story","HU-1504 · Contenido administrable con mostrar/ocultar","Como superadmin, quiero administrar las cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas frecuentes con orden y mostrar/ocultar, para que todos los datos del sitio salgan del panel.
+
+Requisitos: REQ-066
+Módulo: M16
+Pantalla: PNT-27
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-114 · Testimonio oculto
+  Dado un testimonio oculto
+  Cuando cualquier página que usa Testimonios se publica
+  Entonces ese testimonio no aparece en ninguna página
+CP-115 · Elemento nuevo
+  Dado una cifra nueva agregada en Contenido
+  Cuando la guardo
+  Entonces queda oculta por defecto hasta que la active
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1505","E15","Story","HU-1505 · Datos ficticios y bloqueo de publicación","Como superadmin, quiero marcar datos como ficticios y que la publicación en producción se bloquee mientras haya alguno visible, para no publicar métricas o testimonios inventados.
+
+Requisitos: REQ-067
+Módulo: M16
+Pantalla: PNT-27
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-116 · Bloqueo por ficticios
+  Dado 2 testimonios ficticios visibles
+  Cuando publico en producción
+  Entonces recibo 409 con la lista de los 2 elementos y un botón «Ocultar todos los ficticios»
+CP-117 · Pruebas permitido
+  Dado los mismos datos
+  Cuando publico en el entorno de pruebas
+  Entonces se publica y el panel muestra el aviso
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1506","E15","Story","HU-1506 · Menú y pie administrables","Como superadmin, quiero el menú principal y el pie de página con enlaces que puedo ordenar, mostrar u ocultar, para controlar la navegación del sitio.
+
+Requisitos: REQ-066
+Módulo: M16
+Pantalla: PNT-25
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-118 · Enlace oculto
+  Dado el enlace «Casos» oculto
+  Cuando se publica
+  Entonces no aparece en la cabecera ni en el menú de celular
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e15","sprint-s11",""
+"HU-1507","E15","Story","HU-1507 · Vista previa, versiones y restauración","Como superadmin, quiero vista previa en escritorio y celular con los cambios sin publicar, publicación con versiones y restauración, para revisar antes de que lo vea un cliente.
+
+Requisitos: REQ-068
+Módulo: M16
+Pantalla: PNT-26
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-119 · Restaurar versión
+  Dado 3 publicaciones de Inicio
+  Cuando restauro la versión 1
+  Entonces el sitio queda igual a la versión 1 y se crea la versión 4
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1508","E15","Story","HU-1508 · Sitio público rápido y accesible","Como visitante, quiero que el sitio cargue rápido en el celular y sea accesible, para no abandonar antes de ver la propuesta.
+
+Requisitos: REQ-109
+Módulo: M16
+Pantalla: PNT-39
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-120 · Rendimiento
+  Dado el inicio publicado
+  Cuando lo mido con Lighthouse en celular
+  Entonces LCP < 2.5 s, SEO ≥ 90 y accesibilidad ≥ 90
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1509","E15","Story","HU-1509 · Ajustes del sitio","Como superadmin, quiero ajustar dominio con SSL, marca, analítica, WhatsApp, correo de leads y modo mantenimiento, para operar el sitio sin ayuda técnica.
+
+Requisitos: REQ-073
+Módulo: M16
+Pantalla: PNT-38
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-121 · Mantenimiento
+  Dado el modo mantenimiento activo
+  Cuando un visitante abre cualquier ruta
+  Entonces ve la página de aviso con código 503 y el superadmin sigue viendo el sitio
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e15","sprint-s11",""
+"HU-1510","E15","Story","HU-1510 · Sitio en español e inglés","Como superadmin, quiero el sitio en español e inglés con selector y hreflang, para atender a clientes de la región.
+
+Requisitos: REQ-069
+Módulo: M16
+Pantalla: PNT-25
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-122 · Página sin traducción
+  Dado Precios publicada en ES y en borrador en EN
+  Cuando un visitante cambia a EN
+  Entonces va a /en y no a una página EN en borrador; hreflang solo enlaza versiones publicadas
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e15","sprint-s12",""
+"HU-1511","E15","Story","HU-1511 · Sección Blog desde WordPress con filtro por categoría","Como visitante, quiero ver al final de cada página una sección con los artículos publicados en el WordPress de la empresa y filtrarlos por categoría, y como superadmin, quiero elegir qué categorías y artículos se muestran, para que el contenido se escriba solo en WordPress.
+
+Requisitos: REQ-070
+Módulo: M16
+Pantalla: PNT-28
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-123 · Filtro por categoría
+  Dado 7 artículos visibles, 2 de la categoría Guías
+  Cuando el visitante elige Guías en la sección Blog
+  Entonces ve solo esos 2 y cada filtro muestra su número de artículos
+CP-154 · Sincronización
+  Dado un artículo recién publicado en WordPress
+  Cuando pasa la siguiente sincronización (15 min como máximo)
+  Entonces aparece en la sección Blog; los borradores y artículos privados nunca aparecen
+CP-155 · Categoría oculta
+  Dado la categoría Noticias internas oculta en el panel
+  Cuando un visitante abre cualquier página con la sección Blog
+  Entonces no ve ese filtro ni sus artículos, tampoco en «Últimos artículos» del pie
+CP-156 · WordPress sin responder
+  Dado WordPress caído
+  Cuando un visitante abre una página con la sección Blog
+  Entonces ve la última copia sincronizada y el panel muestra el error de conexión
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e15","sprint-s12",""
+"HU-1514","E15","Story","HU-1514 · Landings por sector","Como superadmin, quiero crear landings por sector (minería, banca, retail, educación, sector público…) con su propia portada, testimonios del sector, preguntas y categoría inicial del blog, para hablarle a cada mercado con su lenguaje.
+
+Requisitos: REQ-092
+Módulo: M16
+Pantalla: PNT-25, PNT-26
+Sprint sugerido: S11 · Superadmin y sitio comercial
+
+Criterios de aceptación:
+CP-157 · Testimonios del sector
+  Dado la landing de Minería y energía y 2 testimonios marcados con ese sector
+  Cuando un visitante la abre
+  Entonces ve solo esos 2 testimonios; si el sector no tuviera testimonios, vería todos los visibles
+CP-158 · Landing en borrador
+  Dado la landing de Sector público en borrador
+  Cuando un visitante abre el inicio
+  Entonces no aparece en el bloque «Sectores» ni en la columna «Sectores» del pie, y su ruta responde 404
+CP-159 · Categoría inicial del blog
+  Dado la landing de Banca y seguros con categoría inicial Estándares
+  Cuando un visitante la abre
+  Entonces la sección Blog aparece filtrada por Estándares y puede cambiar a «Todas»
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s11",""
+"HU-1512","E15","Story","HU-1512 · SEO técnico","Como superadmin, quiero editar meta título, descripción, URL, canonical, indexación y datos estructurados por página, y gestionar sitemap, robots y redirecciones 301, para posicionar el sitio.
+
+Requisitos: REQ-071
+Módulo: M16
+Pantalla: PNT-29
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-124 · Redirección
+  Dado la redirección /planes → /precios activa
+  Cuando un visitante abre /planes
+  Entonces recibe 301 a /precios
+CP-125 · No indexar
+  Dado una página con «Indexar» apagado
+  Cuando se publica
+  Entonces lleva meta robots noindex y no entra al sitemap
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e15","sprint-s12",""
+"HU-1513","E15","Story","HU-1513 · SEO para IA","Como superadmin, quiero editar llms.txt, seguir preguntas objetivo por asistente de IA, permitir o bloquear rastreadores de IA y recibir propuestas de contenido, para que los asistentes citen el sitio.
+
+Requisitos: REQ-072
+Módulo: M16
+Pantalla: PNT-30
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-126 · Rastreador bloqueado
+  Dado GPTBot bloqueado
+  Cuando se publica
+  Entonces robots.txt incluye Disallow para GPTBot
+CP-127 · Propuesta revisable
+  Dado las preguntas objetivo cargadas
+  Cuando pido propuestas a la IA
+  Entonces llegan como borradores de página y nada se publica sin aprobación
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e15","sprint-s12",""
+"HU-1601","E16","Story","HU-1601 · Leads con origen y UTM","Como superadmin, quiero que cada lead guarde origen, página de entrada y UTM, venga de un formulario, popup, chatbot, agendador o suscripción, para saber qué canal funciona.
+
+Requisitos: REQ-074
+Módulo: M17
+Pantalla: PNT-34
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-128 · Origen y UTM
+  Dado un visitante que llegó con utm_source=linkedin
+  Cuando deja su correo en el popup
+  Entonces tiene origen Popup, la página de entrada y utm linkedin
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e16","sprint-s12",""
+"HU-1602","E16","Story","HU-1602 · Integración con CRM","Como superadmin, quiero enviar los leads a HubSpot, Pipedrive, Zoho o a un webhook firmado, con mapeo de campos y reintentos, para que ventas trabaje en su CRM.
+
+Requisitos: REQ-075
+Módulo: M17
+Pantalla: PNT-34
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-129 · Reintento
+  Dado el CRM caído (responde 500)
+  Cuando se envía un lead
+  Entonces se reintenta 3 veces con espera creciente y queda «Error» con el motivo si no entra
+CP-130 · Webhook firmado
+  Dado un webhook configurado
+  Cuando se envía un lead
+  Entonces la petición lleva firma HMAC verificable con la clave del panel
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e16","sprint-s12",""
+"HU-1603","E16","Story","HU-1603 · Popups","Como superadmin, quiero crear popups (modal, deslizable o barra) con disparador, páginas, frecuencia y resultado, para captar contactos sin molestar.
+
+Requisitos: REQ-076
+Módulo: M17
+Pantalla: PNT-31
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-131 · Frecuencia
+  Dado un popup de salida ya mostrado a un visitante
+  Cuando vuelve en menos de 7 días
+  Entonces no se le muestra otra vez
+CP-132 · Popup inactivo
+  Dado un popup apagado
+  Cuando un visitante cumple su disparador
+  Entonces no se muestra
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e16","sprint-s12",""
+"HU-1604","E16","Story","HU-1604 · Chatbot del sitio","Como visitante, quiero un chat que responda con la información del sitio, me ofrezca agendar una demo y me pase a una persona, para resolver dudas sin esperar.
+
+Requisitos: REQ-077
+Módulo: M17
+Pantalla: PNT-32
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-133 · Fuera de la base
+  Dado una pregunta que no está en la base de conocimiento
+  Cuando el visitante la hace
+  Entonces el chat no inventa: ofrece agendar o pasar a una persona
+CP-134 · Agendar en el chat
+  Dado un horario elegido en el chat
+  Cuando el visitante confirma con su correo
+  Entonces la cita aparece en Agendamiento y el lead tiene origen Chatbot
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e16","sprint-s12",""
+"HU-1605","E16","Story","HU-1605 · Agendamiento de demos","Como visitante, quiero agendar una demo eligiendo día y hora en horario de Lima y recibir la invitación y recordatorios, para no coordinar por correo.
+
+Requisitos: REQ-078
+Módulo: M17
+Pantalla: PNT-33
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-135 · Horario ocupado
+  Dado una franja ya tomada en el calendario del asesor
+  Cuando otro visitante abre el agendador
+  Entonces esa franja no aparece
+CP-136 · Invitación
+  Dado una demo confirmada
+  Cuando termina el agendamiento
+  Entonces el visitante recibe invitación con enlace de videollamada y recordatorios a las 24 h y 1 h
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e16","sprint-s12",""
+"HU-1606","E16","Story","HU-1606 · Consentimiento de cookies","Como visitante, quiero aceptar o rechazar cookies por categoría, y como responsable, quiero que las etiquetas de analítica solo se carguen con consentimiento, para cumplir la Ley 29733.
+
+Requisitos: REQ-079
+Módulo: M17
+Pantalla: PNT-39
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-137 · Rechazo
+  Dado un visitante que rechazó las cookies de analítica
+  Cuando navega el sitio
+  Entonces no se carga GA4, Tag Manager ni Meta Pixel
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e16","sprint-s12",""
+"HU-1607","E16","Story","HU-1607 · Resumen del sitio","Como superadmin, quiero un resumen con visitas, leads, demos, suscripciones nuevas y origen de los leads, para decidir dónde invertir.
+
+Requisitos: REQ-080
+Módulo: M17
+Pantalla: PNT-24
+Sprint sugerido: S12 · SEO, blog y captación
+
+Criterios de aceptación:
+CP-138 · Cifras consistentes
+  Dado 10 leads del período en la tabla de leads
+  Cuando abro el Resumen
+  Entonces el indicador Leads muestra 10 y el reparto por origen suma 100 %
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e16","sprint-s12",""
+"HU-1701","E17","Story","HU-1701 · Organizaciones (multi-tenant)","Como responsable de la plataforma, quiero organizaciones aisladas entre sí, cada una con sus usuarios, clientes, kits y proyectos, para vender Aptio SCORM a otras productoras.
+
+Requisitos: REQ-081
+Módulo: M18
+Pantalla: —
+Sprint sugerido: S13 · Organizaciones, planes y suscripciones
+
+Criterios de aceptación:
+CP-139 · Aislamiento
+  Dado dos organizaciones con proyectos
+  Cuando un usuario de la primera pide un proyecto de la segunda por su id
+  Entonces recibe 404 y queda registrado en auditoría
+CP-140 · Migración
+  Dado los datos actuales de AulasEducativas
+  Cuando se aplica la migración
+  Entonces quedan en la organización «AulasEducativas» sin pérdida
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s13",""
+"HU-1702","E17","Story","HU-1702 · Planes administrables","Como superadmin, quiero administrar los planes (precio mensual y anual, cuota de cápsulas, usuarios, cápsula adicional, características visibles y plan destacado), para cambiar la oferta sin programar.
+
+Requisitos: REQ-082
+Módulo: M18
+Pantalla: PNT-35
+Sprint sugerido: S13 · Organizaciones, planes y suscripciones
+
+Criterios de aceptación:
+CP-141 · Precio en el sitio
+  Dado el plan Productora con precio nuevo de S/ 1,390
+  Cuando publico el cambio
+  Entonces /precios y el resumen del pago muestran S/ 1,390; las suscripciones vigentes mantienen su precio hasta renovar
+CP-142 · Plan oculto
+  Dado el plan Inicial oculto
+  Cuando un visitante abre /precios
+  Entonces no lo ve y no puede comprarlo por URL
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s13",""
+"HU-1703","E17","Story","HU-1703 · Alta de suscripción desde /precios","Como visitante, quiero suscribirme desde /precios en tres pasos (empresa, resumen con IGV, pago) y entrar a mi organización nueva, para empezar sin hablar con ventas.
+
+Requisitos: REQ-083
+Módulo: M18
+Pantalla: PNT-39
+Sprint sugerido: S13 · Organizaciones, planes y suscripciones
+
+Criterios de aceptación:
+CP-143 · Alta completa
+  Dado un pago aprobado
+  Cuando termina el paso 3
+  Entonces se crea la organización, el usuario administrador y la suscripción activa, y llega el correo de bienvenida
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s13",""
+"HU-1704","E17","Story","HU-1704 · Pasarelas de pago y webhooks","Como responsable de la plataforma, quiero cobrar con pasarelas intercambiables en soles y dólares, confirmando el pago solo por webhook firmado e idempotente y sin guardar datos de tarjeta, para cobrar con seguridad.
+
+Requisitos: REQ-084, REQ-110
+Módulo: M18
+Pantalla: PNT-37
+Sprint sugerido: S13 · Organizaciones, planes y suscripciones
+
+Criterios de aceptación:
+CP-144 · Webhook repetido
+  Dado un mismo evento de pago enviado dos veces por la pasarela
+  Cuando se procesan
+  Entonces se registra un solo cobro y un solo comprobante
+CP-145 · Firma inválida
+  Dado un webhook con firma incorrecta
+  Cuando llega
+  Entonces se rechaza con 401 y no cambia ninguna suscripción
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s13",""
+"HU-1705","E17","Story","HU-1705 · Cuotas de cápsulas","Como organización, quiero ver mi cuota de cápsulas del mes y comprar adicionales, sin que se bloquee una cápsula que ya está en revisión, para no frenar entregas.
+
+Requisitos: REQ-085
+Módulo: M18
+Pantalla: PNT-36
+Sprint sugerido: S13 · Organizaciones, planes y suscripciones
+
+Criterios de aceptación:
+CP-146 · Cuota agotada
+  Dado 20 de 20 cápsulas usadas
+  Cuando intento crear una cápsula nueva
+  Entonces se ofrece comprar una adicional o subir de plan; las cápsulas en revisión siguen editables
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s13",""
+"HU-1706","E17","Story","HU-1706 · Cambio de plan y cancelación","Como organización, quiero cambiar de plan con prorrateo y cancelar al fin del período, para ajustar el gasto.
+
+Requisitos: REQ-086
+Módulo: M18
+Pantalla: PNT-36
+Sprint sugerido: S13 · Organizaciones, planes y suscripciones
+
+Criterios de aceptación:
+CP-147 · Prorrateo
+  Dado un cambio de Inicial a Productora a mitad del mes
+  Cuando se confirma
+  Entonces se cobra la diferencia proporcional y la cuota nueva rige de inmediato
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e17","sprint-s13",""
+"HU-1707","E17","Story","HU-1707 · Comprobantes electrónicos SUNAT","Como responsable de facturación, quiero que cada cobro emita su factura o boleta electrónica (y notas de crédito) por un OSE/PSE, con estado SUNAT, PDF, XML y reenvío, para cumplir con SUNAT sin trabajo manual.
+
+Requisitos: REQ-087
+Módulo: M18
+Pantalla: PNT-37
+Sprint sugerido: S14 · Facturación electrónica y cobranza
+
+Criterios de aceptación:
+CP-148 · Factura con RUC
+  Dado un cobro aprobado a una organización con RUC
+  Cuando se emite
+  Entonces sale una factura de la serie F001 aceptada en el ambiente de pruebas, con PDF y XML enviados al correo de facturación
+CP-149 · Rechazo del OSE
+  Dado un comprobante observado por el OSE
+  Cuando llega la respuesta
+  Entonces queda «Observado» con el motivo y se puede corregir y reenviar
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s14",""
+"HU-1708","E17","Story","HU-1708 · Cobranza y suspensión","Como responsable de la plataforma, quiero reintentos de cobro, avisos y suspensión a solo lectura cuando un pago falla, para recuperar ingresos sin cortar el trabajo de golpe.
+
+Requisitos: REQ-088
+Módulo: M18
+Pantalla: PNT-36
+Sprint sugerido: S14 · Facturación electrónica y cobranza
+
+Criterios de aceptación:
+CP-150 · Suspensión
+  Dado 3 reintentos fallidos
+  Cuando pasa el día 10
+  Entonces la organización queda en solo lectura, puede exportar lo entregado y ve cómo regularizar
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","High","fabrica-capsulas","e17","sprint-s14",""
+"HU-1709","E17","Story","HU-1709 · Cupones y convenios","Como superadmin, quiero crear cupones y convenios con vigencia y límite de usos, para campañas y alianzas con universidades.
+
+Requisitos: REQ-089
+Módulo: M18
+Pantalla: PNT-37
+Sprint sugerido: S14 · Facturación electrónica y cobranza
+
+Criterios de aceptación:
+CP-151 · Cupón vencido
+  Dado un cupón vencido
+  Cuando se aplica en el pago
+  Entonces se rechaza con el motivo y el total no cambia
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Low","fabrica-capsulas","e17","sprint-s14",""
+"HU-1710","E17","Story","HU-1710 · Panel de ingresos","Como gerente, quiero ver el ingreso mensual recurrente, la cancelación y el ingreso promedio por cliente, para seguir el negocio.
+
+Requisitos: REQ-090
+Módulo: M18
+Pantalla: PNT-35
+Sprint sugerido: S14 · Facturación electrónica y cobranza
+
+Criterios de aceptación:
+CP-152 · Ingreso recurrente
+  Dado suscripciones activas por S/ 13,834 al mes
+  Cuando abro Planes
+  Entonces el indicador muestra S/ 13,834 y excluye las canceladas y suspendidas
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e17","sprint-s14",""
+"HU-1711","E17","Story","HU-1711 · Portal de facturación de la organización","Como administrador de una organización, quiero ver mi plan, consumo, comprobantes y medio de pago, y actualizar mis datos de facturación, para no escribir a soporte.
+
+Requisitos: REQ-091
+Módulo: M18
+Pantalla: PNT-40
+Sprint sugerido: S14 · Facturación electrónica y cobranza
+
+Criterios de aceptación:
+CP-153 · Descarga de comprobantes
+  Dado 3 comprobantes emitidos
+  Cuando abro Facturación en mi organización
+  Entonces descargo PDF y XML de cada uno y no veo los de otras organizaciones
+
+Referencias: docs/23-sitio-comercial-y-facturacion.md, docs/16-historias-y-pruebas.md, prototipo docs/diseno/sitio-comercial.html","Medium","fabrica-capsulas","e17","sprint-s14",""

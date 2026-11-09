@@ -31,3 +31,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+# Skills generadas por herramientas (p. ej. `prisma skills sync`)
+apps/*/.agents/
+apps/*/.cursor/
+apps/*/.devin/
+apps/*/.claude/

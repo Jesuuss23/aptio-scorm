@@ -1,0 +1,13 @@
+{
+  "name": "modelo-contenido-v0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "validar": "node validar.mjs",
+    "test": "node pruebas.mjs"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}
