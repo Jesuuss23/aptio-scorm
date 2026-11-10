@@ -1278,11 +1278,12 @@ paths:
       summary: Agregar material o tema
       operationId: post_proyectos_proyectoId_materiales
       description: >-
-        HU-0304. Con recursoId (un archivo ya subido y verificado por su tipo real, CP-034) encola la extracción de
-        texto por página en la cola media; las páginas escaneadas pasan por OCR (CP-033). Con tema, el material queda
-        listo sin archivo. Agregar dos veces el mismo archivo devuelve el material existente. Roles: administración,
-        diseño instruccional y producción. Errores 422: MATERIAL_INCOMPLETO (ni archivo ni tema, o ambos),
-        TIPO_NO_PERMITIDO (no es PDF, .docx ni .pptx), TRANSCRIPCION_PENDIENTE (video y audio llegan con HU-0305, S2).
+        HU-0304 y HU-0305. Con recursoId (un archivo ya subido y verificado por su tipo real, CP-034) encola en la
+        cola media la extracción de texto por página (las páginas escaneadas pasan por OCR, CP-033) o, si es video o
+        audio, la transcripción con marcas de tiempo (tarea TRANSCRIBIR, CP-035). Con tema, el material queda listo sin
+        archivo. Agregar dos veces el mismo archivo devuelve el material existente. Roles: administración, diseño
+        instruccional y producción. Errores 422: MATERIAL_INCOMPLETO (ni archivo ni tema, o ambos), TIPO_NO_PERMITIDO
+        (no es PDF, .docx, .pptx, video ni audio).
       parameters:
       - name: proyectoId
         in: path
@@ -3817,6 +3818,31 @@ components:
                 description: >-
                   El texto parece una orden dirigida a la IA (HU-1402). Se trata como dato del cliente, delimitado en
                   el prompt, y se avisa en la interfaz (CP-102).
+        transcripcion:
+          type: array
+          description: >-
+            Video o audio (HU-0305): fragmentos con marcas de tiempo en segundos. Vacío hasta que el worker termina la
+            transcripción, y en los documentos.
+          items:
+            type: object
+            required:
+            - desde
+            - hasta
+            - texto
+            properties:
+              desde:
+                type: number
+              hasta:
+                type: number
+              texto:
+                type: string
+              posibleInstruccion:
+                type: boolean
+                description: El texto parece dar órdenes a la IA; se trata como dato y se avisa (HU-1402).
+        duracionS:
+          type: number
+          nullable: true
+          description: Video o audio, duración en segundos; null en los documentos o hasta terminar la transcripción.
         creadoEn:
           type: string
           format: date-time

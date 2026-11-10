@@ -18,6 +18,13 @@ class PaginaDto {
   @ApiPropertyOptional({ description: 'El texto parece dar órdenes a la IA: se trata como dato y se avisa (HU-1402)' }) posibleInstruccion?: boolean;
 }
 
+class SegmentoDto {
+  @ApiProperty({ description: 'Segundo de inicio (con un decimal)' }) desde: number;
+  @ApiProperty({ description: 'Segundo de fin (con un decimal)' }) hasta: number;
+  @ApiProperty() texto: string;
+  @ApiPropertyOptional({ description: 'El texto parece dar órdenes a la IA: se trata como dato y se avisa (HU-1402)' }) posibleInstruccion?: boolean;
+}
+
 export class MaterialDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ enum: ['PDF', 'WORD', 'POWERPOINT', 'VIDEO', 'AUDIO', 'IMAGEN', 'TEMA'] }) tipo: string;
@@ -27,5 +34,7 @@ export class MaterialDto {
   @ApiProperty({ enum: ['pendiente', 'procesando', 'listo', 'error'] }) estado: string;
   @ApiProperty({ nullable: true }) error: string | null;
   @ApiProperty({ type: [PaginaDto] }) paginas: PaginaDto[];
+  @ApiProperty({ type: [SegmentoDto], description: 'Video o audio: transcripción con marcas de tiempo (HU-0305)' }) transcripcion: SegmentoDto[];
+  @ApiProperty({ nullable: true, description: 'Video o audio: duración en segundos' }) duracionS: number | null;
   @ApiProperty() creadoEn: string;
 }

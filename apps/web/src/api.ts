@@ -122,7 +122,17 @@ export interface Material {
   estado: 'pendiente' | 'procesando' | 'listo' | 'error';
   error: string | null;
   paginas: PaginaMaterial[];
+  /** Video o audio: transcripción con marcas de tiempo (HU-0305). */
+  transcripcion: SegmentoTranscripcion[];
+  duracionS: number | null;
   creadoEn: string;
+}
+
+export interface SegmentoTranscripcion {
+  desde: number;
+  hasta: number;
+  texto: string;
+  posibleInstruccion?: boolean;
 }
 
 export interface TerminoGlosario {
