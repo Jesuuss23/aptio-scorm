@@ -4080,10 +4080,66 @@ components:
           datos:
             type: object
             nullable: true
-            description: Lo que guardó la etapa. En RESUMEN_MATERIAL, un ResumenMaterial; las demás etapas definen el suyo.
+            description: >-
+              Lo que guardó la etapa. En RESUMEN_MATERIAL, un ResumenMaterial; en OBJETIVOS_ESTRUCTURA, una
+              EstructuraCurso; las demás etapas definen el suyo.
             anyOf:
             - $ref: '#/components/schemas/ResumenMaterial'
+            - $ref: '#/components/schemas/EstructuraCurso'
             - type: object
+    EstructuraCurso:
+      type: object
+      description: >-
+        Resultado de la etapa 2 (HU-0403, IA-04 v2): objetivos con nivel de Bloom y pantallas con tipo, objetivos,
+        fragmentos, actividad sugerida y páginas de origen. Con N pantallas y P % de actividades hay exactamente N
+        pantallas y al menos ⌈N × P / 100⌉ con actividad, cada una ligada a un objetivo (CP-039).
+      required:
+      - objetivos
+      - modulos
+      - actividades
+      properties:
+        objetivos:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              texto:
+                type: object
+                properties:
+                  es:
+                    type: string
+                  en:
+                    type: string
+              nivelBloom:
+                type: string
+                enum:
+                - recordar
+                - comprender
+                - aplicar
+                - analizar
+                - evaluar
+                - crear
+              verbo:
+                type: string
+        modulos:
+          type: array
+          description: Módulos con sus cápsulas; cada cápsula lleva sus pantallas (id, tipo, proposito, objetivoIds, fragmentoIds, actividadSugerida, paginas)
+          items:
+            type: object
+        supuestos:
+          type: array
+          items:
+            type: string
+        actividades:
+          type: object
+          properties:
+            minimas:
+              type: integer
+              nullable: true
+            total:
+              type: integer
     ResumenMaterial:
       type: object
       description: Resultado de la etapa 1 (HU-0402). Todo es propuesta de la IA para que el diseñador decida.

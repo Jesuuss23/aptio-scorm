@@ -2,9 +2,10 @@
 // (SSE con consulta periódica de respaldo). Se cancela conservando lo hecho (CP-045) y se continúa desde la etapa
 // con error o cancelada. Una sola generación activa por proyecto (CP-037).
 import { DETALLE_PROXIMAMENTE, NOMBRE_ETAPA } from '@aptio/schema/generacion';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { api, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
 import { usd } from '../formato';
+import { EstructuraVista } from './EstructuraVista';
 import { ResumenMaterialVista } from './ResumenMaterialVista';
 
 const ACTIVAS = new Set<Generacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -13,6 +14,11 @@ const NOMBRE_ESTADO: Record<Generacion['estado'], string> = {
 };
 const CHIP: Partial<Record<Generacion['estado'], string>> = { EN_CURSO: 'ia', COMPLETADO: 'validado', ERROR: 'error', CANCELADO: 'aviso' };
 const CONSULTA_MS = 2000;
+/** Etapas cuyo resultado se puede abrir desde la lista (cada historia agrega la suya). */
+const RESULTADOS: Partial<Record<EtapaGeneracion['etapa'], { ver: string; ocultar: string; Vista: (p: { generacionId: string }) => ReactNode }>> = {
+  RESUMEN_MATERIAL: { ver: 'Ver resumen', ocultar: 'Ocultar resumen', Vista: ResumenMaterialVista },
+  OBJETIVOS_ESTRUCTURA: { ver: 'Ver estructura', ocultar: 'Ocultar estructura', Vista: EstructuraVista },
+};
 
 function titulo(g: Generacion): string {
   if (g.estado === 'EN_COLA') return 'En cola: el generador empieza en unos segundos';
@@ -40,7 +46,7 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
-  const [verResumen, setVerResumen] = useState(false);
+  const [abierta, setAbierta] = useState<EtapaGeneracion['etapa'] | null>(null);
   const activa = Boolean(g && ACTIVAS.has(g.estado));
 
   useEffect(() => {
@@ -137,7 +143,9 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
           </div>
           <span className="barra" aria-hidden="true"><i style={{ width: `${g.avance}%` }} /></span>
           <ol className="etapas" aria-label="Etapas de la generación">
-            {g.etapas.map((e) => (
+            {g.etapas.map((e) => {
+              const resultado = e.estado === 'COMPLETADO' ? RESULTADOS[e.etapa] : undefined;
+              return (
               <li key={e.etapa} className={`etapa ${e.estado === 'COMPLETADO' ? 'hecha' : e.estado === 'EN_CURSO' ? 'en-curso' : ''}`} aria-label={NOMBRE_ETAPA[e.etapa]}>
                 <span className="etapa-numero" aria-hidden="true">{e.estado === 'COMPLETADO' ? '✓' : e.orden}</span>
                 <span className="etapa-texto">
@@ -148,14 +156,15 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
                   <span className={`chip ${CHIP[e.estado] ?? ''}`}>{NOMBRE_ESTADO[e.estado]}</span>
                   {e.costoUsd > 0 ? <span className="sec num">{usd(e.costoUsd)}</span> : null}
                 </span>
-                {e.etapa === 'RESUMEN_MATERIAL' && e.estado === 'COMPLETADO' ? (
-                  <button className="boton etapa-ver" type="button" aria-expanded={verResumen} onClick={() => setVerResumen(!verResumen)}>
-                    {verResumen ? 'Ocultar resumen' : 'Ver resumen'}
+                {resultado ? (
+                  <button className="boton etapa-ver" type="button" aria-expanded={abierta === e.etapa} onClick={() => setAbierta(abierta === e.etapa ? null : e.etapa)}>
+                    {abierta === e.etapa ? resultado.ocultar : resultado.ver}
                   </button>
                 ) : null}
-                {e.etapa === 'RESUMEN_MATERIAL' && e.estado === 'COMPLETADO' && verResumen ? <div className="etapa-resultado"><ResumenMaterialVista generacionId={g.id} /></div> : null}
+                {resultado && abierta === e.etapa ? <div className="etapa-resultado"><resultado.Vista generacionId={g.id} /></div> : null}
               </li>
-            ))}
+              );
+            })}
           </ol>
           {pendientes ? <p className="sec">{pendientes} etapas se habilitan en los próximos sprints; por ahora quedan en espera.</p> : null}
         </>

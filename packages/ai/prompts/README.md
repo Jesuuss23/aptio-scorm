@@ -9,7 +9,7 @@ Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confia
 | [IA-01](IA-01.v1.md) | Mapa de temas de un documento | 1 · RESUMEN_MATERIAL | `ANTHROPIC_MODEL_TEXTO` | 0.2 |
 | [IA-02](IA-02.v1.md) | Propuesta conservar/complementario/omitir | 1 · RESUMEN_MATERIAL | `ANTHROPIC_MODEL_TEXTO` | 0.2 |
 | [IA-03](IA-03.v1.md) | Resumen fiel por tema | 1 · RESUMEN_MATERIAL | `ANTHROPIC_MODEL_RAPIDO` | 0.1 |
-| [IA-04](IA-04.v1.md) | Estructura del curso | 2 · OBJETIVOS_ESTRUCTURA | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
+| [IA-04](IA-04.v2.md) (v2; [v1](IA-04.v1.md)) | Estructura del curso | 2 · OBJETIVOS_ESTRUCTURA | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
 | [IA-05](IA-05.v1.md) | Storyboard de una cápsula | 3 · STORYBOARD_GUION | `ANTHROPIC_MODEL_TEXTO` | 0.5 |
 | [IA-06](IA-06.v1.md) | Sugerir interacción | 4 · PANTALLAS (bajo pedido) | `ANTHROPIC_MODEL_RAPIDO` | 0.3 |
 | [IA-07](IA-07.v1.md) | Datos de una interacción | 4 · PANTALLAS | `ANTHROPIC_MODEL_RAPIDO` | 0.4 |
