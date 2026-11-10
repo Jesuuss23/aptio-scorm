@@ -114,3 +114,25 @@ test('CP-039 · la estructura muestra 30 pantallas, 12 con actividad, cada una c
   await expect(p07).toContainText('Objetivo 1');
   await expect(p07).toContainText('p. 13');
 });
+
+test('CP-040 · el guion muestra texto y narración por pantalla y advierte la que pasa de 30 palabras', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const gen = await conTema(page);
+  await gen.getByRole('button', { name: 'Generar SCORM' }).click();
+  const fila = etapa(gen, 'Storyboard y guion');
+  await expect(fila).toContainText('1 pantalla supera 30 palabras en pantalla', { timeout: 15_000 });
+  await fila.getByRole('button', { name: 'Ver guion' }).click();
+  const vista = gen.getByRole('region', { name: 'Guion por pantalla' });
+  await expect(vista.getByRole('status')).toContainText('1 pantalla supera el límite de palabras');
+  await expect(vista.getByRole('listitem')).toHaveCount(30);
+  const p05 = vista.getByRole('listitem', { name: 'Pantalla p05' });
+  await expect(p05).toContainText('Supera el límite: 34 palabras en pantalla (máximo 30)');
+  await expect(p05).toContainText('INT-04 · Tarjetas');
+  // p02 tiene justo 30 palabras (los «·» no cuentan): sin advertencia.
+  const p02 = vista.getByRole('listitem', { name: 'Pantalla p02' });
+  await expect(p02).toContainText('28 / 30 palabras');
+  await expect(p02).not.toContainText('Supera el límite');
+  await expect(p02).toContainText('Agregado por la IA');
+  await expect(vista.getByRole('listitem', { name: 'Pantalla p06' })).toContainText('p. 13 · PETS-SEG-014 Bloqueo y etiquetado.pdf');
+  await expect(vista.getByText(/^Supera el límite:/)).toHaveCount(1);
+});

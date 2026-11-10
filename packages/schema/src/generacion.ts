@@ -116,3 +116,55 @@ export interface EstructuraCurso {
 const TIPOS_ACTIVIDAD: readonly string[] = ['actividad', 'evaluacion'];
 /** Cuenta como pantalla con actividad la de tipo actividad o evaluación, o la que sugiere una interacción (CP-039). */
 export const conActividad = (p: { tipo: string; actividadSugerida?: string }) => TIPOS_ACTIVIDAD.includes(p.tipo) || Boolean(p.actividadSugerida);
+
+// ---------- Etapa 3 · Storyboard y guion (HU-0404) ----------
+
+/** Palabras máximas por pantalla (CP-040): pasar el límite no rechaza el guion, lo deja con advertencia. */
+export const LIMITE_PALABRAS = { textoPantalla: 30, narracion: 45 } as const;
+export type CampoGuion = keyof typeof LIMITE_PALABRAS;
+
+/** Cuenta palabras: separadas por espacios y con al menos una letra o cifra («·» o «—» sueltos no cuentan). */
+export const contarPalabras = (texto: string) => texto.split(/\s+/).filter((t) => /[\p{L}\p{N}]/u.test(t)).length;
+
+export interface OrigenGuion {
+  tipo: 'documento' | 'ia' | 'manual';
+  documentoId?: string;
+  /** Nombre del archivo del cliente, para mostrar la trazabilidad sin otra consulta. */
+  archivo?: string;
+  paginas?: number[];
+  revisado: boolean;
+}
+
+export interface PantallaGuion {
+  id: string;
+  tipo: TipoPantalla;
+  titulo: string;
+  textoPantalla: string;
+  narracion: string;
+  visual: string;
+  actividad?: { tipo: string; consigna: string };
+  objetivoIds: string[];
+  origen: OrigenGuion;
+  notas?: string;
+  palabras: Record<CampoGuion, number>;
+}
+
+export interface AdvertenciaGuion {
+  pantallaId: string;
+  campo: CampoGuion;
+  palabras: number;
+  limite: number;
+}
+
+/** Lo que guarda la etapa STORYBOARD_GUION (salida de IA-05 por cápsula) y recibe la etapa 4. */
+export interface GuionCurso {
+  capsulas: { id: string; moduloId: string; titulo: { es?: string; en?: string }; pantallas: PantallaGuion[] }[];
+  advertencias: AdvertenciaGuion[];
+}
+
+/** Advertencias de longitud de un guion: cada campo de cada pantalla que pasa su límite de palabras. */
+export function advertenciasDeLongitud(pantallas: Pick<PantallaGuion, 'id' | 'textoPantalla' | 'narracion'>[]): AdvertenciaGuion[] {
+  return pantallas.flatMap((p) => (Object.keys(LIMITE_PALABRAS) as CampoGuion[])
+    .map((campo) => ({ pantallaId: p.id, campo, palabras: contarPalabras(p[campo]), limite: LIMITE_PALABRAS[campo] }))
+    .filter((a) => a.palabras > a.limite));
+}

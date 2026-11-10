@@ -7,3 +7,15 @@ export function paginas(l: number[]): string {
   const seguidas = l.every((p, i) => i === 0 || p === l[i - 1]! + 1);
   return seguidas ? `pp. ${l[0]}–${l.at(-1)}` : `pp. ${l.join(', ')}`;
 }
+
+/** Nombre de cada tipo de pantalla de la estructura (IA-04). */
+export const NOMBRE_TIPO_PANTALLA: Record<string, string> = {
+  portada: 'Portada', objetivos: 'Objetivos', contenido: 'Contenido', actividad: 'Actividad', evaluacion: 'Reto final',
+  seccion: 'Sección', resumen: 'Resumen', resultados: 'Resultados', cierre: 'Cierre',
+};
+
+/** Catálogo cerrado de interacciones (docs/05-interacciones.md). */
+export const NOMBRE_INTERACCION: Record<string, string> = {
+  'INT-01': 'Memoria', 'INT-02': 'Clasificar', 'INT-03': 'Ordenar pasos', 'INT-04': 'Tarjetas', 'INT-05': 'Quiz',
+  'INT-06': 'Exploración', 'INT-07': 'Deslizar', 'INT-08': 'Decisión',
+};

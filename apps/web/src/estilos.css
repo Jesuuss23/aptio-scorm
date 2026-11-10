@@ -739,3 +739,29 @@
   border-radius: var(--radio-control);
   padding: 12px;
 }
+
+/* HU-0404 · Guion por pantalla. */
+.guion-campos {
+  display: grid;
+  grid-template-columns: minmax(80px, max-content) minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+}
+.guion-campos > div {
+  display: contents;
+}
+.guion-campos dt {
+  font-size: var(--texto-sm);
+  color: var(--color-texto-sec);
+}
+.guion-campos dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.guion-conteo {
+  display: block;
+  margin-top: 2px;
+}
+.guion-conteo .chip {
+  white-space: normal;
+}
