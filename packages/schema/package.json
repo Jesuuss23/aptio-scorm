@@ -25,6 +25,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./marca": "./src/marca.ts",
-    "./voz": "./src/voz.ts"
+    "./voz": "./src/voz.ts",
+    "./proyecto": "./src/proyecto.ts"
   }
 }
