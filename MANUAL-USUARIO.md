@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.12 · actualizado con la primera entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.13 · actualizado con la segunda entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -280,6 +280,21 @@ Cuando la generación ya armó las pantallas, el proyecto muestra el botón **Re
 
 Si la pantalla ya estaba aprobada, al guardar vuelve a «Borrador» para que alguien la apruebe de nuevo. Así nada cambia sin una nueva revisión. Si otra persona guardó un cambio en el curso justo antes que tú, verás un aviso y la pantalla se actualiza con lo último. Revisa y vuelve a guardar.
 
+**Ajustar con IA (derecha).** Pide a la IA que mejore la pantalla que estás viendo:
+- **Más visual:** menos párrafo y más imagen, ícono o dato grande.
+- **Menos texto:** acorta lo que se lee sin perder la idea.
+- **Convertir en actividad:** cambia la explicación por una actividad, por ejemplo «¿Mito o realidad?».
+- **Ver 3 variantes:** la misma idea en tres composiciones distintas.
+- **Pedido libre:** escribe lo que quieres (por ejemplo, «que lo diga con un ejemplo de la planta») y pulsa **Enviar**.
+- **Otra ilustración** aparece desactivada: llegará con las ilustraciones.
+
+En unos segundos aparece una franja naranja sobre la pantalla con lo que propone la IA. La pantalla no cambia hasta que decidas:
+- **Aplicar:** la pantalla cambia y vuelve a «Borrador». Junto al aviso aparece **Deshacer**, que la deja como estaba.
+- **Descartar:** la propuesta desaparece sin cambiar nada.
+- Con **Ver 3 variantes**, pulsa cada variante para verla en la pantalla y luego **Aplicar esta variante**.
+
+Si la pantalla cambió después de pedir la propuesta (por ejemplo, alguien corrigió el título), la franja lo avisa y ofrece **Recalcular propuesta** para pedirla de nuevo sobre lo último. Lo que cambia la IA queda marcado como propuesto por la IA hasta que lo revises. La IA no cambia la narración: esa se corrige a mano en **Textos**. Lo usan los mismos que corrigen textos; el revisor del cliente no lo ve.
+
 **Control de calidad, origen y aprobación (derecha).**
 - **Control de calidad:** las observaciones de la pantalla. Unas son avisos (por ejemplo, demasiadas palabras en pantalla o una narración muy larga). Otras **bloquean la entrega**, como una imagen sin descripción para personas con discapacidad visual. La aplicación revisa esto sola cada vez que se guarda un cambio.
 - **Origen:** de dónde sale el contenido. Puede venir del material del cliente, con su página (por ejemplo, «Manual p. 12»), puede haberlo redactado la IA a partir del objetivo, o puede haberlo escrito el equipo.
@@ -340,7 +355,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
-- Pedir ajustes a la IA desde la revisión («más visual», «menos texto», «convertir en actividad»), comentarios del cliente y retoques en un editor visual.
+- Otra ilustración desde la revisión, comentarios del cliente y retoques en un editor visual.
 
 ---
 
@@ -348,6 +363,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
 | 0.12 | 2026-11-10 | Regeneración automática: al corregir la narración en Revisión se rehacen solos su voz, su boca y sus subtítulos, con las marcas de avance. |
 | 0.11 | 2026-11-10 | Subtítulos: la etapa 8 del generador y el botón CC de la vista previa, que muestra la frase que se está diciendo. |
 | 0.10 | 2026-11-10 | Narraciones «Por regenerar»: cuándo aparecen, el aviso en Producción y el botón para regenerar solo las que cambiaron. |

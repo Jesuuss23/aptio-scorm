@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.12 · actualizado con la primera entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.13 · actualizado con la segunda entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -201,6 +201,13 @@ La regeneración en cascada (HU-0503) es un trabajo aparte, `CASCADA` en la cola
 - La API (`CursosService.editar`) encola con `ColasService.encolarConEspera(cola, datos, jobId, esperaMs)`: un trabajo diferido de id `cascada-{curso}-{pantalla}`. Si hay uno pendiente con ese id, lo borra y lo vuelve a crear (CP-051). Si ya está activo, usa `{id}-tras`.
 - La web (`RevisionVista.tsx`, `ChipsCascada`) consulta `GET /cursos/{id}/narraciones` y `GET /proyectos/{id}/generaciones` cada 2 s durante 2 min. Voz lista = ACTUALIZADA; boca = hay `bocas`; subtítulos = hay `subtitulosUrl`.
 
+Las propuestas de la IA (HU-0504) son la tarea IA-16 v2 en la cola `ia`.
+- `@aptio/schema/patch`: `aplicarPatch(doc, operaciones)` (RFC 6902, puro, lanza `ErrorPatch` con el número de operación).
+- `@aptio/schema/propuesta`: `rutaProtegida` y `erroresRutas` (`/id`, `/estado`, `/narracion`), `aplicarEnPantalla` (marca `origen.tipo = ia` en los textos cambiados), `cursoConPropuesta`, `patchDe(cambios, varianteIndice)`, `huellaPantalla` (vencimiento, sin estado ni datos de voz) y `pantallaParaPrompt`.
+- La API (`PropuestasService`) crea el `TrabajoIA` y encola `{ trabajoId, tarea: 'IA-16', pantallaId, propuesta: { cursoId, tipo, texto } }`. El worker (`apps/worker/src/propuesta.ts`) usa `tareaRegistrada` con `trabajoId` para no crear otro registro, y `validarExtra = erroresPropuesta`. Guarda en `Propuesta.cambios` `{ patch | variantes, huella }`.
+- Aplicar usa `CursosService.guardar` y compara la huella dentro del guardado. Restaurar (`/versiones/{v}/restaurar`) copia la versión vieja pero conserva la narración de cada pantalla y `recursos`.
+- En modo simulado, `ajustarAlPedido` elige la salida por `tipoPedido = "…"` de `X-IA-16-propuestas-p05.json`.
+
 En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg` y `cargarSubtitulos`; la vista previa usa `urlsRecursos`, `svgPersonajes` y `subtitulos` de `GET /proyectos/{id}/curso`. `packages/player/src/subtitulos.ts` tiene `leerVtt` (texto plano, sin HTML) y `cueEn(cues, ms)`; mientras suena el audio, un `requestAnimationFrame` actualiza la línea de «CC». La preferencia vive en `localStorage['aptio-subtitulos']`, dentro de un try/catch.
 
 ### 7.2 Agregar un proveedor
@@ -275,6 +282,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
 | 0.12 | 2026-11-10 | Regeneración en cascada: trabajo `CASCADA` (`crearCascada`), `encolarConEspera` en la API y chips en Revisión. |
 | 0.11 | 2026-11-10 | Etapa 8 de subtítulos (`crearEtapaSubtitulos`, `subtitulosDeNarracion`, `aVtt`) y `cargarSubtitulos` en el reproductor. |
 | 0.10 | 2026-11-10 | Regenerar narraciones (`regenerarVoz`, `intento()`, id de trabajo con «-») y marcas «Por regenerar» desde Revisión. |

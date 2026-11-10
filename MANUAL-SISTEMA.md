@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.12 · actualizado con la primera entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.13 · actualizado con la segunda entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -131,6 +131,27 @@ sequenceDiagram
 
 Varios guardados seguidos dejan un solo trabajo, que corre 1 s después del último (CP-051). El costo de la voz queda en `TrabajoIA` con el proyecto y sin generación. Si la voz falla, la narración queda en ERROR y los chips en rojo.
 
+### 3.3.0b Propuestas de la IA
+
+```mermaid
+sequenceDiagram
+  participant W as Web (Revisión)
+  participant A as API
+  participant Q as Cola ia
+  participant K as Worker
+  W->>A: POST /cursos/{id}/propuestas {tipo, pantallaId}
+  A->>Q: IA-16 con el TrabajoIA
+  A-->>W: 202 {id del trabajo}
+  Q->>K: IA-16 v2 → JSON Patch sobre la pantalla
+  K->>K: Ajv + rutas protegidas + curso válido (3 intentos)
+  K->>K: Propuesta {cambios, huella, versionBase}
+  W->>A: GET /trabajos/{id} cada 2 s, luego GET /propuestas
+  W->>A: POST /propuestas/{id}/aplicar
+  A-->>W: 200 nueva versión · 409 PROPUESTA_VENCIDA si cambió la pantalla
+```
+
+La IA nunca cambia el curso por su cuenta: solo la acción Aplicar crea una versión. Deshacer restaura la anterior conservando la narración y su audio (SUP-39).
+
 ### 3.3.1 Narración con boca sincronizada
 
 La vista previa pide `GET /proyectos/{id}/curso`, que trae las URL firmadas de los audios (15 minutos) y el SVG del personaje. El reproductor dibuja el SVG en línea y, mientras suena el audio, muestra en cada cuadro la boca que marca `audio.currentTime` (CP-072: desfase máximo medido de 16 ms). Con «Siguiente se habilita al terminar la narración», no se avanza hasta el evento `ended` del audio.
@@ -241,6 +262,7 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 
 - **SUP-24:** las etapas sin ejecutor quedan «En espera» sin frenar a las siguientes. El proyecto no pasa a Revisión hasta que estén las 11.
+- **SUP-39:** las propuestas no tocan la narración; vencen solo si cambió su pantalla. «Otra ilustración» llega en el S9 e IA-16 v2 aún no se probó con un modelo real.
 - **SUP-38:** la regeneración en cascada solo cubre el español hasta el S7 y no muestra el motivo de un error de voz. Espera hasta 30 min a una generación en curso.
 - **SUP-37:** los subtítulos se generan por letras sobre la duración del audio, no con marcas de tiempo del proveedor de voz (pendiente de probar con Google). Muestran el texto escrito. La preferencia de «CC» queda en el navegador del participante. Inglés en el S7.
 - **SUP-36:** regenerar continúa la última generación, sin crear otra. El hash RN-07-1 decide qué se vuelve a narrar; el revisor del cliente no puede regenerar. CP-073 usa «pasos» (p02, p12, p15 y p27 del caso LOTO).
@@ -260,6 +282,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.13 | 2026-11-10 | Propuestas de la IA (IA-16 v2, aplicar, vencer y deshacer) y SUP-39. |
 | 0.12 | 2026-11-10 | Regeneración en cascada desde Revisión (trabajo CASCADA en la cola voz) y SUP-38. |
 | 0.11 | 2026-11-10 | Etapa 8 de subtítulos, WebVTT en la vista previa y SUP-37. |
 | 0.10 | 2026-11-10 | Flujo para regenerar narraciones desactualizadas, id de trabajo en la cola y SUP-36. |
