@@ -1,7 +1,14 @@
 // Documentos de prueba generados en la prueba: así no se guardan binarios en el repositorio.
-import { createCanvas } from '@napi-rs/canvas';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import JSZip from 'jszip';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
+
+// El texto de la página escaneada se dibuja con una fuente conocida: la máquina de CI puede no tener fuentes del sistema.
+const FUENTE = 'Liberation Sans Prueba';
+const fuentes = join(dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json')), 'standard_fonts');
+GlobalFonts.registerFromPath(join(fuentes, 'LiberationSans-Bold.ttf'), FUENTE);
 
 /** PDF con páginas de texto y, en las indicadas, una imagen con texto (página escaneada). */
 export async function pdfDePrueba(total: number, escaneadas: number[] = [], textoEscaneado = 'BLOQUEO Y ETIQUETADO'): Promise<Uint8Array> {
@@ -15,7 +22,7 @@ export async function pdfDePrueba(total: number, escaneadas: number[] = [], text
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, 1190, 400);
       ctx.fillStyle = '#000000';
-      ctx.font = 'bold 72px sans-serif';
+      ctx.font = `72px "${FUENTE}"`;
       ctx.fillText(textoEscaneado, 60, 220);
       const png = await pdf.embedPng(lienzo.toBuffer('image/png'));
       pagina.drawImage(png, { x: 0, y: 500, width: 595, height: 200 });
