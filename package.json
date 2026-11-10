@@ -31,8 +31,8 @@
     "onlyBuiltDependencies": [
       "@prisma/client",
       "@prisma/engines",
-      "esbuild",
-      "prisma"
+      "prisma",
+      "tesseract.js"
     ],
     "overrides": {
       "wasm-feature-detect": "1.8.0"
