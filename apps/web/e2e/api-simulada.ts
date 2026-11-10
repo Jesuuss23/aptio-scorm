@@ -133,6 +133,9 @@ function pantallasLoto(listas: number) {
   };
 }
 
+/** El curso esperado del caso LOTO (30 pantallas, 9 actividades): el que dibuja el reproductor en la vista previa. */
+export const cursoLoto = () => JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8')) as Record<string, unknown>;
+
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
 const ETAPAS_SIMULADAS = [
   { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
@@ -414,6 +417,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       }
       avanzar(g);
       return responder(200, conAvance(g));
+    }
+    // HU-1101: el proyecto con pantallas tiene el curso del caso LOTO; los demás aún no.
+    const deCurso = ruta.match(/^\/proyectos\/([0-9a-f-]+)\/curso$/);
+    if (deCurso) {
+      const p = proyectos.find((x) => x.id === deCurso[1]);
+      if (!p || !(p.avance as { total: number }).total) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El proyecto aún no tiene curso: genera las pantallas en Producción' });
+      return responder(200, { id: '00000000-0000-4000-8000-000000000990', proyectoId: p.id, versionEsquema: '0.2.0', version: 1, documento: cursoLoto(), actualizadoEn: '2026-11-10T10:00:00.000Z' });
     }
     const unProyecto = ruta.match(/^\/proyectos\/([0-9a-f-]+)$/);
     if (unProyecto) {

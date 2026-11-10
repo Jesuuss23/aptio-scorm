@@ -1612,7 +1612,7 @@ paths:
       - Curso
       summary: Ver documento del curso
       operationId: get_proyectos_proyectoId_curso
-      description: ETag = versión
+      description: ETag = versión. Lo lee la vista previa con el reproductor único (HU-1101); 404 si aún no se generaron las pantallas.
       parameters:
       - name: proyectoId
         in: path

@@ -4,7 +4,7 @@ import { avanceDe, type DatosTecnicos, perfilPropuesto } from '@aptio/schema/pro
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
-import type { FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
+import type { CursoDto, FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 const incluir = { cliente: { select: { nombre: true } }, curso: { select: { documento: true } } } as const;
@@ -117,6 +117,17 @@ export class ProyectosService {
   }
 
   /** Archivar no borra: el proyecto sale de la lista y se puede consultar con estado=ARCHIVADO. */
+  /** HU-1101 · Documento del curso generado (etapa 4). Sin curso todavía: 404. */
+  async curso(u: UsuarioSesion, id: string): Promise<CursoDto> {
+    await this.buscar(u, id);
+    const c = await this.bd.curso.findUnique({ where: { proyectoId: id } });
+    if (!c) throw new NotFoundException('El proyecto aún no tiene curso: genera las pantallas en Producción');
+    return {
+      id: c.id, proyectoId: c.proyectoId, versionEsquema: c.versionEsquema, version: c.version,
+      documento: c.documento as Record<string, unknown>, actualizadoEn: c.actualizadoEn.toISOString(),
+    };
+  }
+
   async archivar(u: UsuarioSesion, id: string): Promise<void> {
     const organizacionId = organizacionDe(u);
     await this.buscar(u, id);

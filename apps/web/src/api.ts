@@ -210,6 +210,16 @@ export interface Generacion {
   terminadoEn: string | null;
 }
 
+/** HU-1101 · Documento del curso del proyecto (lo dibuja el reproductor). */
+export interface Curso {
+  id: string;
+  proyectoId: string;
+  versionEsquema: string;
+  version: number;
+  documento: Record<string, unknown>;
+  actualizadoEn: string;
+}
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -253,6 +263,7 @@ export const api = {
   cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
+  curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
   guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
   pantallasModelo: (clienteId: string) => pedir<PantallaModelo[]>(`/clientes/${clienteId}/kit/pantallas-modelo`),

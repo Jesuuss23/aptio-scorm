@@ -1,5 +1,6 @@
 // HU-0301 a HU-0303 · Proyectos y Nuevo SCORM (CP-029 a CP-031) contra PostgreSQL real. Se salta sin DATABASE_URL, salvo en CI.
 import 'reflect-metadata';
+import { readFileSync } from 'node:fs';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { hashearClave, prisma, Rol } from '@aptio/db';
@@ -117,5 +118,20 @@ describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', ()
     const ajeno = (await como('productor').get(`/proyectos?clienteId=${clientes[0]}`)).body[0].id as string;
     expect((await como('ajeno').get(`/proyectos/${ajeno}`)).status).toBe(404);
     expect((await como('ajeno').post('/proyectos', { clienteId: clientes[0], nombre: 'Intruso' })).status).toBe(404);
+  });
+  it('HU-1101: devuelve el curso del proyecto con su versión en ETag; sin curso, 404', async () => {
+    const id = (await como('productor').get(`/proyectos?clienteId=${clientes[0]}`)).body[0].id as string;
+    const sin = await como('grafico').get(`/proyectos/${id}/curso`);
+    expect(sin.status).toBe(404);
+    const documento = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
+    await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: id, versionEsquema: '0.2.0', documento, version: 3 } });
+    const r = await como('grafico').get(`/proyectos/${id}/curso`);
+    expect(r.status).toBe(200);
+    expect(r.headers.etag).toBe('"3"');
+    expect(r.body).toMatchObject({ proyectoId: id, version: 3, versionEsquema: '0.2.0' });
+    expect(r.body.documento.modulos[0].capsulas[0].pantallas).toHaveLength(30);
+    // El revisor de otro cliente y otra organización no lo ven.
+    expect((await como('revisor').get(`/proyectos/${id}/curso`)).status).toBe(404);
+    expect((await como('ajeno').get(`/proyectos/${id}/curso`)).status).toBe(404);
   });
 });
