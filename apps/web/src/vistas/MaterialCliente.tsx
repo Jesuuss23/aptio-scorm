@@ -32,7 +32,7 @@ function resumen(m: Material): string {
   return `${m.paginas.length} ${unidad}${m.paginas.length === 1 ? '' : 's'}${ocr ? ` · ${ocr} con OCR` : ''}`;
 }
 
-export function MaterialCliente({ proyectoId, puedeEditar }: { proyectoId: string; puedeEditar: boolean }) {
+export function MaterialCliente({ proyectoId, puedeEditar, alCambiar }: { proyectoId: string; puedeEditar: boolean; alCambiar?: (materiales: Material[]) => void }) {
   const [materiales, setMateriales] = useState<Material[] | null>(null);
   const [errores, setErrores] = useState<string[]>([]);
   const [subiendo, setSubiendo] = useState(false);
@@ -44,6 +44,10 @@ export function MaterialCliente({ proyectoId, puedeEditar }: { proyectoId: strin
     api.materiales(proyectoId).then(setMateriales, (e: unknown) =>
       setErrores([e instanceof ErrorApi ? e.message : 'No se pudo cargar el material']));
   }, [proyectoId]);
+
+  useEffect(() => {
+    if (materiales) alCambiar?.(materiales);
+  }, [materiales, alCambiar]);
 
   // Mientras el worker extrae el texto, se consulta cada 2 s.
   useEffect(() => {

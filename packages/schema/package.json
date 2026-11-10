@@ -26,6 +26,7 @@
     ".": "./src/index.ts",
     "./marca": "./src/marca.ts",
     "./voz": "./src/voz.ts",
-    "./proyecto": "./src/proyecto.ts"
+    "./proyecto": "./src/proyecto.ts",
+    "./generacion": "./src/generacion.ts"
   }
 }
