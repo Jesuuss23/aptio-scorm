@@ -33,7 +33,10 @@
       "@prisma/engines",
       "esbuild",
       "prisma"
-    ]
+    ],
+    "overrides": {
+      "wasm-feature-detect": "1.8.0"
+    }
   },
   "engines": {
     "node": ">=22"

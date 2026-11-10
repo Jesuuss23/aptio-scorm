@@ -3,6 +3,8 @@ import { ApiCookieAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse,
 import { EQUIPO } from '../comun/organizacion.js';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
+import { MaterialDto, MaterialEntradaDto } from './material.dto.js';
+import { MaterialesService } from './materiales.service.js';
 import { FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
 import { ProyectosService } from './proyectos.service.js';
 
@@ -14,7 +16,10 @@ const CREAN = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'] as const
 @Controller('proyectos')
 @Roles(...EQUIPO, 'REVISOR_CLIENTE')
 export class ProyectosController {
-  constructor(private readonly proyectos: ProyectosService) {}
+  constructor(
+    private readonly proyectos: ProyectosService,
+    private readonly materiales: MaterialesService,
+  ) {}
 
   @Get()
   @ApiOkResponse({ type: ProyectoDto, isArray: true, description: 'El revisor del cliente solo ve los de su cliente' })
@@ -48,5 +53,18 @@ export class ProyectosController {
   @ApiNoContentResponse({ description: 'Pasa a ARCHIVADO; no borra' })
   archivar(@UsuarioActual() u: UsuarioSesion, @Param('proyectoId', ParseUUIDPipe) id: string): Promise<void> {
     return this.proyectos.archivar(u, id);
+  }
+
+  @Get(':proyectoId/materiales')
+  @ApiOkResponse({ type: MaterialDto, isArray: true })
+  listarMateriales(@UsuarioActual() u: UsuarioSesion, @Param('proyectoId', ParseUUIDPipe) id: string): Promise<MaterialDto[]> {
+    return this.materiales.listar(u, id);
+  }
+
+  @Post(':proyectoId/materiales')
+  @Roles(...CREAN)
+  @ApiCreatedResponse({ type: MaterialDto, description: 'Con archivo, encola la extracción de texto por página (cola media)' })
+  agregarMaterial(@UsuarioActual() u: UsuarioSesion, @Param('proyectoId', ParseUUIDPipe) id: string, @Body() dto: MaterialEntradaDto): Promise<MaterialDto> {
+    return this.materiales.agregar(u, id, dto);
   }
 }

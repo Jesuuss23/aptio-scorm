@@ -1,10 +1,12 @@
 // HU-0302 · Detalle del proyecto: resumen, datos técnicos que se completan después y perfil de entrega propuesto (CP-031).
+// HU-0304 · Material del cliente con el texto por página.
 import { Cabecera } from '@aptio/ui';
 import { FORMATOS, LMS_DESTINO, NOMBRE_ESTADO, NOMBRE_PERFIL, perfilPropuesto } from '@aptio/schema/proyecto';
 import { type FormEvent, useEffect, useState } from 'react';
 import { api, CREAN_PROYECTOS, ErrorApi, type Proyecto, type Rol } from '../api';
 import { navegar } from '../ruta';
 import { usd } from '../formato';
+import { MaterialCliente } from './MaterialCliente';
 
 const NOMBRE_FORMATO: Record<(typeof FORMATOS)[number], string> = {
   SCORM12: 'SCORM 1.2', SCORM2004: 'SCORM 2004', HTML: 'HTML autocontenido', NO_DEFINIDO: 'Aún no se sabe',
@@ -123,6 +125,7 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
           {puedeEditar ? <div className="acciones-form"><button className="boton primario" type="submit">Guardar datos técnicos</button></div> : null}
         </form>
       </div>
+      <MaterialCliente proyectoId={proyecto.id} puedeEditar={puedeEditar && proyecto.estado !== 'ARCHIVADO'} />
     </>
   );
 }

@@ -18,12 +18,20 @@
     "@aptio/colas": "workspace:*",
     "@aptio/db": "workspace:*",
     "@aptio/schema": "workspace:*",
+    "@napi-rs/canvas": "^0.1.100",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
+    "@xmldom/xmldom": "^0.9.12",
     "bullmq": "^6.7.2",
     "dotenv": "^18.0.9",
-    "ioredis": "^6.0.0"
+    "ioredis": "^6.0.0",
+    "jszip": "^3.10.2",
+    "pdfjs-dist": "^5.7.284",
+    "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
+    "pdf-lib": "^1.17.1",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vitest": "^3.2.7"
