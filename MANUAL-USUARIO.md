@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.3 · actualizado al cierre del Sprint 2 (10 de noviembre de 2026)**
+**Versión 0.4 · actualizado con la primera entrega del Sprint 3 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -202,14 +202,17 @@ Solo puede haber una generación en curso por proyecto. Si otra persona ya la la
 | 1 | **Leer y resumir el material** | Las ideas clave del material, cada una con su archivo y página, y el **acta de temas omitidos**: qué partes del material no se usarán y por qué. | **Ver resumen** |
 | 2 | **Objetivos y estructura** | Los objetivos de aprendizaje (con su nivel, como «Recordar» o «Aplicar») y la lista de pantallas con su tipo, la actividad sugerida y la página de origen. | **Ver estructura** |
 | 3 | **Storyboard y guion** | Para cada pantalla: título, texto en pantalla, lo que dirá el narrador, qué se verá, la actividad y de qué página sale. | **Ver guion** |
+| 4 | **Pantallas con el kit** | Cada pantalla armada con un diseño de las pantallas modelo y los colores del kit del cliente: portada, idea clave, lista, pregunta, cierre, etc. | **Ver pantallas** |
 
-Las etapas 4 a 11 (pantallas con el kit, ilustraciones, voz, boca del personaje, subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente».
+Las etapas 5 a 11 (ilustraciones, voz, boca del personaje, subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente».
 
 ### 8.3 Cómo revisar cada resultado
 
 - **Resumen:** comprueba que las ideas clave sean fieles al material y revisa el acta de temas omitidos antes de enviarla al cliente. El acta es una propuesta.
 - **Estructura:** revisa que los objetivos tengan sentido y que haya suficientes actividades. Por ejemplo, con 30 pantallas y 40 % de actividades, habrá al menos 12 pantallas con actividad.
 - **Guion:** cada pantalla muestra cuántas palabras tiene. El texto en pantalla debe tener **30 palabras como máximo** y la narración, **45 como máximo**. Si una pantalla se pasa, verás el aviso **«Supera el límite»** para que la acortes. No se rechaza: tú decides.
+
+- **Pantallas:** mientras la etapa 4 trabaja, las pantallas aparecen solas en una rejilla a medida que quedan listas; las que faltan se ven como espacios en espera. Al terminar, pulsa **Ver pantallas** para verlas todas y cambia entre **Celular** y **Escritorio** para ver cómo quedan en cada uno. Debajo de cada pantalla está su número, su título y el diseño que eligió la IA (por ejemplo, «Lista» o «Clasificar»). Las imágenes, la voz y el contenido de las actividades todavía no aparecen: se agregan en las etapas siguientes. Si el cliente no tiene kit, se usan los colores y diseños base y verás un aviso.
 
 Las pantallas que la IA agregó por su cuenta (una transición o un ejemplo) llevan la marca **«Agregado por la IA»**. Las que salen del material muestran su página y archivo.
 
@@ -250,7 +253,8 @@ Por ahora la etapa 1 resume documentos. La lectura de transcripciones en la gene
 
 Estas funciones se agregarán en las próximas entregas y este manual se actualizará cuando estén disponibles:
 
-- Pantallas armadas con el kit del cliente, ilustraciones y actividades interactivas.
+- Ilustraciones y el contenido de las actividades interactivas (memoria, clasificar, quiz…).
+- Vista previa para recorrer la cápsula como la verá el participante.
 - Voz del narrador, boca animada del personaje y subtítulos.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
@@ -262,4 +266,5 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.4 | 2026-11-10 | Etapa 4: pantallas armadas con el kit, que aparecen en vivo. |
 | 0.3 | 2026-11-10 | Primera versión: ingreso, clientes y kits, proyectos, material (documentos, video y audio) y etapas 1 a 3 de la generación. |

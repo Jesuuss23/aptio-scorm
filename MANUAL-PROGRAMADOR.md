@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.3 · actualizado al cierre del Sprint 2 (10 de noviembre de 2026)**
+**Versión 0.4 · actualizado con la primera entrega del Sprint 3 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -131,15 +131,18 @@ Las 11 etapas están en `ETAPAS` (`packages/schema/src/generacion.ts`). Una etap
 1. Define en `@aptio/schema/generacion` el tipo de lo que guarda (por ejemplo, `GuionCurso`) y las funciones compartidas con la web.
 2. Escribe el ejecutor en `apps/worker/src/etapas/<nombre>.ts` con la firma `EjecutorEtapa`:
    - recibe `ctx` con `generacionId`, `organizacionId`, `proyectoId`, `parametros`, `anteriores` (los `datos` de las etapas terminadas), `bd`, `proveedor` e `ia<T>(tarea, variables, opciones)`;
-   - devuelve `{ texto, datos? }`: `texto` es la línea que ve el usuario y `datos` se guarda en `GeneracionEtapa.detalle`.
+   - devuelve `{ texto, datos? }`: `texto` es la línea que ve el usuario y `datos` se guarda en `GeneracionEtapa.detalle`;
+   - para mostrar resultados parciales mientras corre, llama a `ctx.avance(texto, datos)`: guarda el avance y lo avisa por SSE, y la API lo devuelve con la etapa en curso. La etapa 4 lo usa para cada pantalla lista (encadena las llamadas para que un avance viejo no pise a uno nuevo).
 3. Si falta el resultado de la etapa anterior, lanza un error claro (la etapa queda en ERROR sin llamar a la IA).
 4. Regístralo en `EJECUTORES` (`apps/worker/src/etapas/index.ts`).
-5. En la web, crea la vista del resultado y agrégala a `RESULTADOS` en `GeneracionScorm.tsx`. Lee los datos con `api.etapaGeneracion<T>(id, etapa)`.
+5. En la web, crea la vista del resultado y agrégala a `RESULTADOS` en `GeneracionScorm.tsx`. Lee los datos con `api.etapaGeneracion<T>(id, etapa)`. Con `enVivo: true` la vista se muestra sola mientras la etapa corre y recibe `clave` (el detalle de la etapa), que cambia con cada avance para volver a pedir los datos.
 6. Pruebas:
    - worker: con `apps/worker/test/apoyo-generacion.ts`, que trae `escenario()`, `comoReal()` (proveedor «real» sobre salidas grabadas, con consumo) y `etapaDe()`;
    - unitarias de las reglas propias;
    - Playwright del CP.
 7. Documenta: esquema en OpenAPI (`EtapaResultado`), entrada en ESTADO y supuesto si aplica.
+
+La etapa 4 (`apps/worker/src/etapas/pantallas.ts`) es el ejemplo más completo: corre IA-15 en paralelo (`EN_PARALELO = 4`), convierte los campos en bloques con `bloquesDe` y guarda el documento del curso validado con `validarCurso` en `Curso` y `CursoVersion`.
 
 `ctx.ia` comprueba antes de cada llamada que la etapa siga en curso: si cancelan, lanza `GeneracionCancelada` y el costo gastado se conserva.
 
@@ -210,4 +213,5 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.4 | 2026-11-10 | `ctx.avance` y vistas en vivo; la etapa 4 como ejemplo de etapa en paralelo que guarda el curso. |
 | 0.3 | 2026-11-10 | Primera versión, al cierre del S2: entorno, estructura, patrones, cómo agregar etapas, proveedores y materiales, pruebas y CI. |
