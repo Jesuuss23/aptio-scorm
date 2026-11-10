@@ -1,8 +1,9 @@
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useState } from 'react';
-import { api, type Cliente, EDITAN_CLIENTES, ErrorApi, OPCIONES_LMS, type Rol } from '../api';
+import { api, type Cliente, EDITAN_CLIENTES, ErrorApi, OPCIONES_LMS, type Rol, VEN_KIT } from '../api';
+import { KitMarca } from './KitMarca';
 
-/** Datos del cliente. El kit de marca, el glosario y las pantallas modelo se suman con sus historias. */
+/** Datos del cliente y su kit de marca (HU-0202). El glosario y las pantallas modelo se suman con sus historias. */
 export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; alCargar: (nombre: string) => void }) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [error, setError] = useState('');
@@ -86,12 +87,10 @@ export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; al
             ) : null}
           </fieldset>
         </form>
-        <section className="tarjeta formulario" aria-label="Kit de marca">
-          <h2>Kit de marca</h2>
-          <span>{cliente.tieneKit ? <span className="chip validado">Kit listo</span> : <span className="chip aviso">Sin kit</span>}</span>
-          <p className="sec">Paleta, tipografías, logo, personaje y pantallas modelo. Se habilita en la próxima entrega del S1.</p>
-        </section>
       </div>
+      {VEN_KIT.includes(rol) ? (
+        <KitMarca clienteId={cliente.id} rol={rol} conIngles={cliente.idiomas.includes('en')} alGuardar={() => setCliente({ ...cliente, tieneKit: true })} />
+      ) : null}
     </>
   );
 }

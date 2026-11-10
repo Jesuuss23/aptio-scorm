@@ -42,7 +42,7 @@ test('buscar filtra la lista y abrir un cliente muestra su nombre en la ruta', a
   await expect(page.getByRole('link', { name: 'Clientes y kits' })).toHaveAttribute('aria-current', 'page');
 
   await page.getByLabel('Notas').fill('Cliente desde 2024');
-  await page.getByRole('button', { name: 'Guardar' }).click();
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Cambios guardados');
 });
 
@@ -53,5 +53,5 @@ test('el diseñador gráfico ve los clientes pero no el botón de crear ni el de
   await expect(page.getByRole('button', { name: 'Nuevo cliente' })).toHaveCount(0);
   await page.getByRole('link', { name: /Minera Andina/ }).click();
   await expect(page.getByLabel('Nombre')).toBeDisabled();
-  await expect(page.getByRole('button', { name: 'Guardar' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Guardar', exact: true })).toHaveCount(0);
 });

@@ -1,4 +1,6 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
+import type { Paleta } from '@aptio/schema/marca';
+
 export interface Usuario {
   id: string;
   email: string;
@@ -36,6 +38,41 @@ export const OPCIONES_LMS = ['Moodle 4.5 o superior', 'Blackboard', 'Chamilo', '
 
 /** Roles que registran y editan clientes (la API lo vuelve a verificar). */
 export const EDITAN_CLIENTES: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
+
+/** Roles que editan el kit de marca; el productor solo lo ve y el revisor no entra (docs/14-modulos.md). */
+export const EDITAN_KIT: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO'];
+export const VEN_KIT: Rol[] = [...EDITAN_KIT, 'PRODUCTOR'];
+
+export interface Voz {
+  proveedor: 'google' | 'azure' | 'elevenlabs';
+  voz: string;
+  velocidad?: number;
+}
+export interface KitEntrada {
+  estilo: string;
+  paleta: Paleta;
+  tipografias: { titulos: string; textos: string };
+  logoRecursoId: string | null;
+  voces: { es?: Voz; en?: Voz };
+  version: number;
+}
+export interface Kit extends KitEntrada {
+  id: string;
+  clienteId: string;
+  logoUrl?: string;
+  personaje: object | null;
+  actualizadoEn: string;
+  contraste: { textoFondo: number; cumpleAA: boolean };
+  advertencias: { codigo: string; mensaje: string; colores: string[]; relacion: number }[];
+}
+export interface Recurso {
+  id: string;
+  tipo: string;
+  nombre: string;
+  mime: string;
+  bytes: number;
+  url?: string;
+}
 
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
@@ -77,4 +114,21 @@ export const api = {
   cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
+  kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
+  guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
+  /** Sube un archivo directo al almacenamiento cifrado (HU-1404): pide la URL firmada, envía el PUT y confirma. */
+  async subir(archivo: File, destino: { clienteId?: string; proyectoId?: string; origen?: 'SUBIDO' | 'CLIENTE' }): Promise<Recurso> {
+    const subida = await pedir<{ subidaId: string; url: string; cabeceras: Record<string, string> }>(
+      '/recursos/subidas',
+      json({ nombre: archivo.name, mime: archivo.type, bytes: archivo.size, ...destino }),
+    );
+    let res: Response;
+    try {
+      res = await fetch(subida.url, { method: 'PUT', headers: subida.cabeceras, body: archivo });
+    } catch {
+      throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.');
+    }
+    if (!res.ok) throw new ErrorApi(res.status, 'SUBIDA_FALLIDA', 'El almacenamiento rechazó el archivo');
+    return pedir<Recurso>(`/recursos/subidas/${subida.subidaId}/confirmar`, { method: 'POST' });
+  },
 };

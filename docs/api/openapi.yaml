@@ -478,7 +478,9 @@ paths:
       - Clientes y kits
       summary: Ver kit de marca
       operationId: get_clientes_clienteId_kit
-      description: Incluye contraste calculado
+      description: >-
+        Incluye el contraste calculado y las advertencias. 404 SIN_KIT si el cliente todavía no tiene kit.
+        Lo ven administración, diseño instruccional, diseño gráfico y producción; el revisor del cliente no.
       parameters:
       - name: clienteId
         in: path
@@ -504,7 +506,10 @@ paths:
       - Clientes y kits
       summary: Guardar kit de marca
       operationId: put_clientes_clienteId_kit
-      description: 409 si la versión cambió; las miniaturas se regeneran en segundo plano
+      description: >-
+        Crea el kit con version 0 o lo actualiza con la versión leída. 409 KIT_DESACTUALIZADO si otra persona
+        guardó antes (RN-02-3). Un contraste bajo no bloquea: vuelve en `advertencias` (RN-02-2).
+        Lo guardan administración, diseño instruccional y diseño gráfico. El personaje se sube aparte (HU-0203).
       parameters:
       - name: clienteId
         in: path
@@ -3061,20 +3066,19 @@ components:
           type: string
           format: uuid
         estilo:
-          type: string
+          $ref: '#/components/schemas/EstiloKit'
         paleta:
           $ref: '#/components/schemas/Paleta'
         tipografias:
-          type: object
-          properties:
-            titulos:
-              type: string
-            textos:
-              type: string
+          $ref: '#/components/schemas/Tipografias'
         logoRecursoId:
           type: string
           format: uuid
           nullable: true
+        logoUrl:
+          type: string
+          format: uri
+          description: URL firmada de 15 minutos del logo
         personaje:
           type: object
           properties:
@@ -3106,6 +3110,9 @@ components:
               $ref: '#/components/schemas/Voz'
         version:
           type: integer
+        actualizadoEn:
+          type: string
+          format: date-time
         contraste:
           type: object
           properties:
@@ -3114,31 +3121,46 @@ components:
             cumpleAA:
               type: boolean
           description: Calculado
+        advertencias:
+          type: array
+          description: Avisos que no bloquean el guardado, como el contraste menor a 4,5:1 (RN-02-2)
+          items:
+            type: object
+            required:
+            - codigo
+            - mensaje
+            properties:
+              codigo:
+                type: string
+                example: CONTRASTE_BAJO
+              mensaje:
+                type: string
+              colores:
+                type: array
+                items:
+                  type: string
+              relacion:
+                type: number
     KitMarcaEntrada:
       type: object
       required:
       - estilo
       - paleta
+      - tipografias
       - voces
       - version
       properties:
         estilo:
-          type: string
+          $ref: '#/components/schemas/EstiloKit'
         paleta:
           $ref: '#/components/schemas/Paleta'
         tipografias:
-          type: object
-          properties:
-            titulos:
-              type: string
-            textos:
-              type: string
+          $ref: '#/components/schemas/Tipografias'
         logoRecursoId:
           type: string
           format: uuid
-        personaje:
-          type: object
-          additionalProperties: true
+          nullable: true
+          description: Imagen PNG, JPEG o WebP subida para este cliente
         voces:
           type: object
           properties:
@@ -3148,7 +3170,40 @@ components:
               $ref: '#/components/schemas/Voz'
         version:
           type: integer
-          description: Versión leída (bloqueo optimista)
+          minimum: 0
+          description: Versión leída (bloqueo optimista); 0 para crear el kit
+    EstiloKit:
+      type: string
+      enum:
+      - Industrial
+      - Corporativo
+      - Institucional
+      - Infantil aula
+      - Salud
+    Tipografias:
+      type: object
+      description: Lista cerrada de fuentes con licencia OFL 1.1 (FUENTES_KIT en @aptio/schema/marca)
+      required:
+      - titulos
+      - textos
+      properties:
+        titulos:
+          $ref: '#/components/schemas/FuenteKit'
+        textos:
+          $ref: '#/components/schemas/FuenteKit'
+    FuenteKit:
+      type: string
+      enum:
+      - Barlow Condensed
+      - Montserrat
+      - Poppins
+      - Merriweather
+      - Plus Jakarta Sans
+      - Atkinson Hyperlegible
+      - Open Sans
+      - Nunito
+      - Lato
+      - Source Sans 3
     Disposicion:
       type: string
       enum:
