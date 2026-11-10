@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.7 · actualizado con la cuarta entrega del Sprint 3 (10 de noviembre de 2026)**
+**Versión 0.8 · actualizado con la primera entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -163,7 +163,18 @@ Las 11 etapas están en `ETAPAS` (`packages/schema/src/generacion.ts`). Una etap
 
 La etapa 4 (`apps/worker/src/etapas/pantallas.ts`) es el ejemplo más completo. Encadena dos tareas por pantalla: IA-15 la compone y, si tiene actividad, IA-07 escribe sus datos (`apps/worker/src/etapas/actividades.ts`, con las fichas del catálogo y `interaccionDe`, que antepone el id de la pantalla a los ids para que no choquen). Además corre IA-15 en paralelo (`EN_PARALELO = 4`), convierte los campos en bloques con `bloquesDe` y guarda el documento del curso validado con `validarCurso` en `Curso` y `CursoVersion`.
 
-`ctx.ia` comprueba antes de cada llamada que la etapa siga en curso: si cancelan, lanza `GeneracionCancelada` y el costo gastado se conserva.
+`ctx.ia` comprueba antes de cada llamada que la etapa siga en curso: si cancelan, lanza `GeneracionCancelada` y el costo gastado se conserva. Las etapas que no llaman a la IA de texto usan `ctx.gastar(usd)` (suma el costo y luego revisa la cancelación) y `ctx.comprobar()`.
+
+Una etapa sin ejecutor ya no frena a las siguientes: si alguna posterior sí tiene ejecutor, queda «En espera» y el bucle sigue (SUP-24).
+
+La etapa 6 (`apps/worker/src/etapas/voz.ts`) es el modelo para etapas de medios. `crearEtapaVoz({ sintetizar, subir, esperaMs })` recibe el sintetizador y la subida al almacenamiento para que las pruebas los reemplacen. Para cada pantalla:
+
+- calcula `hashNarracion(texto, voz, velocidad, términos)` (`@aptio/ai`, RN-07-1) y reutiliza la `Narracion` ACTUALIZADA con el mismo hash;
+- aplica `aplicarPronunciacion` y reintenta hasta `INTENTOS_VOZ = 3`;
+- mide la duración con `duracionAudio` (WAV y MP3);
+- guarda `Recurso` y `Narracion` en una transacción, y un `TrabajoIA` con `costoVoz`.
+
+Al final actualiza el curso con bloqueo optimista y una `CursoVersion` con motivo `voz`. En el worker se registra en `index.ts` con `sintetizadorDesdeEntorno(process.env)`.
 
 ### 7.2 Agregar un proveedor
 
@@ -210,7 +221,7 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL_*`, `ANTHROPIC_ESFUERZO` | worker | IA de texto |
 | `GOOGLE_STT_API_KEY`, `GOOGLE_STT_MODELO` | worker | Transcripción |
-| `GOOGLE_TTS_API_KEY` | api | Muestra de voz |
+| `GOOGLE_TTS_API_KEY` | api, worker | Muestra de voz (api) y narración de la etapa 6 en modo real (worker) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | api | Ingreso con Google |
 
 Ninguna clave real va al repositorio.
@@ -223,6 +234,7 @@ Ninguna clave real va al repositorio.
 | `PrismaClientInitializationError` | Base no disponible o `DATABASE_URL` sin definir | Revisa `packages/db/.env` |
 | El material de video queda en error «No se pudo extraer el audio» | El archivo no tiene pista de sonido, o falta ffmpeg | Instala ffmpeg o revisa el archivo |
 | En modo real, la transcripción falla con `GOOGLE_STT_API_KEY` | Falta la clave | Agrégala al `.env` del worker |
+| La etapa 6 falla con «La voz de azure todavía no está disponible» | El kit usa una voz que no es de Google | Elige una voz de Google en el kit (SUP-34) |
 | `openapi:lint` con más de 7 avisos | Un componente sin usar o `nullable` sin `type` | Usa el componente o agrega `type` |
 | oxlint «solo exportar componentes» | Una función auxiliar en un `.tsx` | Muévela a `formato.ts` |
 
@@ -232,6 +244,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.8 | 2026-11-10 | Etapa 6 de voz (`crearEtapaVoz`), `ctx.gastar` y `ctx.comprobar`, `hashNarracion`, `duracionAudio`, `costoVoz` y `GET /cursos/{id}/narraciones`. |
 | 0.7 | 2026-11-10 | Módulo `cursos` (observaciones, editar y aprobar con bloqueo optimista), `@aptio/schema/revision` y la opción `marco` del reproductor. |
 | 0.6 | 2026-11-10 | Paquete `@aptio/player` (reproductor único), `GET /proyectos/{id}/curso` y la vista previa. |
 | 0.5 | 2026-11-10 | IA-07 dentro de la etapa 4 (datos de las actividades). |

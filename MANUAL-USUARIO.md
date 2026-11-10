@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.7 · actualizado con la cuarta entrega del Sprint 3 (10 de noviembre de 2026)**
+**Versión 0.8 · actualizado con la primera entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -204,7 +204,9 @@ Solo puede haber una generación en curso por proyecto. Si otra persona ya la la
 | 3 | **Storyboard y guion** | Para cada pantalla: título, texto en pantalla, lo que dirá el narrador, qué se verá, la actividad y de qué página sale. | **Ver guion** |
 | 4 | **Pantallas con el kit** | Cada pantalla armada con un diseño de las pantallas modelo y los colores del kit del cliente (portada, idea clave, lista, pregunta, cierre, etc.), y cada actividad con su contenido: las parejas de la memoria, los grupos y elementos de clasificar, las preguntas del reto… | **Ver pantallas** |
 
-Las etapas 5 a 11 (ilustraciones, voz, boca del personaje, subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente».
+| 6 | **Voz en español** | La narración de cada pantalla leída con la voz del kit del cliente, respetando su lista de pronunciación. Mientras trabaja verás «12 de 30 narraciones listas»; al terminar, el total y cuánto dura todo el audio. | **Escuchar narraciones** |
+
+La etapa 5 (ilustraciones) y las etapas 7 a 11 (boca del personaje, subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
 
 ### 8.3 Cómo revisar cada resultado
 
@@ -215,6 +217,8 @@ Las etapas 5 a 11 (ilustraciones, voz, boca del personaje, subtítulos, versión
 - **Pantallas:** mientras la etapa 4 trabaja, las pantallas aparecen solas en una rejilla a medida que quedan listas; las que faltan se ven como espacios en espera. Al terminar, pulsa **Ver pantallas** para verlas todas y cambia entre **Celular** y **Escritorio** para ver cómo quedan en cada uno. Debajo de cada pantalla está su número, su título y el diseño que eligió la IA (por ejemplo, «Lista» o «Clasificar»). En las pantallas con actividad, la miniatura dice lo que trae, por ejemplo «Clasificar: 2 grupos · 7 elementos». El reto final, el que pone la nota, lleva la marca **«Calificada»**; las demás actividades son de práctica y no califican. Las imágenes y la voz todavía no aparecen: se agregan en las etapas siguientes. Si el cliente no tiene kit, se usan los colores y diseños base y verás un aviso.
 
 Las pantallas que la IA agregó por su cuenta (una transición o un ejemplo) llevan la marca **«Agregado por la IA»**. Las que salen del material muestran su página y archivo.
+
+- **Voz:** pulsa **Escuchar narraciones**. Cada pantalla aparece con su número, su título, cuánto dura y la marca **«Lista»**. Debajo está el texto que lee el narrador y, si aplicó alguna regla de tu lista de pronunciación, verás «Pronunciación del diccionario: …». Pulsa el botón de reproducir para escucharla. Si una palabra suena mal, agrégala en **Glosario y pronunciación** del cliente y continúa la generación. Si una narración falla tres veces, la etapa se detiene con el motivo; al pulsar **Continuar**, solo se rehacen las que faltan.
 
 ### 8.4 Cancelar, continuar o generar de nuevo
 
@@ -242,7 +246,7 @@ Todas las actividades se juegan de verdad: memoria, clasificar, ordenar pasos, t
 
 Por ahora:
 - La vista previa usa el recorrido «Clásico» (barra arriba y botones Anterior y Siguiente abajo). Si el curso pide otro recorrido, verás un aviso.
-- Las imágenes, el personaje y el video aparecen como un recuadro con su descripción, hasta que lleguen las ilustraciones y la voz.
+- Las imágenes, el personaje y el video aparecen como un recuadro con su descripción, hasta que lleguen las ilustraciones y el personaje animado.
 
 ### 8.7 Revisar y aprobar las pantallas
 
@@ -309,7 +313,8 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 - Ilustraciones.
 - Otros recorridos de la cápsula (historias, mapa de misiones, menú de temas y más).
-- Voz del narrador, boca animada del personaje y subtítulos.
+- Boca animada del personaje y subtítulos.
+- Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
 - Pedir ajustes a la IA desde la revisión («más visual», «menos texto», «convertir en actividad»), comentarios del cliente y retoques en un editor visual.
@@ -320,6 +325,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.8 | 2026-11-10 | Voz en español: la generación narra cada pantalla con la voz del kit y se escuchan en «Escuchar narraciones». |
 | 0.7 | 2026-11-10 | Revisión: filtros, corregir título y narración, control de calidad, origen y aprobación de pantallas una por una o todas las que no tienen observaciones. |
 | 0.6 | 2026-11-10 | Vista previa: recorrer la cápsula en celular, tableta o escritorio, con las actividades jugables y el seguimiento simulado. |
 | 0.5 | 2026-11-10 | Las actividades salen con su contenido y el reto final con la marca «Calificada». |
