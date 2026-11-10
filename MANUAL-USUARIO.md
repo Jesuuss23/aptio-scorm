@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.6 · actualizado con la tercera entrega del Sprint 3 (10 de noviembre de 2026)**
+**Versión 0.7 · actualizado con la cuarta entrega del Sprint 3 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -27,9 +27,9 @@ Cada persona entra con su propio usuario y ve solo lo que le corresponde a su ro
 | Rol | Qué hace en Aptio SCORM |
 | --- | --- |
 | **Administración** | Invita a las personas del equipo, crea clientes y proyectos, y ve todo. |
-| **Diseño instruccional** | Crea proyectos, sube el material, lanza la generación y decide qué se conserva y qué no. |
-| **Diseño gráfico** | Prepara el kit de marca de cada cliente (colores, letras, logo, personaje y pantallas modelo). |
-| **Producción** | Crea proyectos, sube material y sigue el avance de la generación. |
+| **Diseño instruccional** | Crea proyectos, sube el material, lanza la generación, decide qué se conserva y aprueba las pantallas. |
+| **Diseño gráfico** | Prepara el kit de marca de cada cliente (colores, letras, logo, personaje y pantallas modelo) y corrige textos de las pantallas. |
+| **Producción** | Crea proyectos, sube material, sigue el avance de la generación y corrige textos de las pantallas. |
 | **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos. No puede modificar la configuración. |
 
 ---
@@ -244,6 +244,32 @@ Por ahora:
 - La vista previa usa el recorrido «Clásico» (barra arriba y botones Anterior y Siguiente abajo). Si el curso pide otro recorrido, verás un aviso.
 - Las imágenes, el personaje y el video aparecen como un recuadro con su descripción, hasta que lleguen las ilustraciones y la voz.
 
+### 8.7 Revisar y aprobar las pantallas
+
+Cuando la generación ya armó las pantallas, el proyecto muestra el botón **Revisión**. Ahí el equipo revisa cada pantalla, corrige lo que haga falta y la aprueba. Arriba ves cuántas pantallas están aprobadas (por ejemplo, 27 / 30) y cuántas tienen observaciones.
+
+**La lista de pantallas (izquierda).** Cada pantalla muestra su número, su título y su estado: «Propuesta de la IA», «Borrador» o «Aprobada». Si tiene observaciones, lo indica (por ejemplo, «1 obs.»). Puedes filtrar:
+- **Todas:** las 30 pantallas.
+- **Revisar:** solo las que tienen observaciones pendientes.
+- **Actividades:** solo las pantallas con una actividad.
+
+**La pantalla (centro).** Se ve tal como la verá el participante. Usa **Anterior** y **Siguiente** para pasar de una a otra. Debajo está la tarjeta **Textos**:
+1. Corrige el **Título en pantalla** o la **Narración**.
+2. Pulsa **Guardar cambios**.
+
+Si la pantalla ya estaba aprobada, al guardar vuelve a «Borrador» para que alguien la apruebe de nuevo. Así nada cambia sin una nueva revisión. Si otra persona guardó un cambio en el curso justo antes que tú, verás un aviso y la pantalla se actualiza con lo último. Revisa y vuelve a guardar.
+
+**Control de calidad, origen y aprobación (derecha).**
+- **Control de calidad:** las observaciones de la pantalla. Unas son avisos (por ejemplo, demasiadas palabras en pantalla o una narración muy larga). Otras **bloquean la entrega**, como una imagen sin descripción para personas con discapacidad visual. La aplicación revisa esto sola cada vez que se guarda un cambio.
+- **Origen:** de dónde sale el contenido. Puede venir del material del cliente, con su página (por ejemplo, «Manual p. 12»), puede haberlo redactado la IA a partir del objetivo, o puede haberlo escrito el equipo.
+- **Aprobar pantalla:** la marca como aprobada. No se puede aprobar mientras tenga una observación que bloquea la entrega.
+
+**Aprobar todas las que no tienen observaciones.** Este botón, al pie de la lista, aprueba de una vez todas las pantallas sin observaciones pendientes. Las que tienen observaciones quedan pendientes para revisarlas una por una.
+
+Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Producción pueden corregir textos. Revisión del cliente puede mirar las pantallas, pero no cambiarlas.
+
+Por ahora, al cambiar la narración, la voz, la boca del personaje y la versión en inglés no se rehacen solas. Eso llegará con la voz.
+
 ---
 
 ## 9. Preguntas frecuentes
@@ -266,6 +292,12 @@ Sí. La vista previa y el paquete usan el mismo reproductor, así que las pantal
 **¿Por qué no puedo pasar a la siguiente pantalla en la vista previa?**
 Porque la pantalla tiene una actividad obligatoria. Complétala y el botón **Siguiente** se activa. Si solo quieres revisar, cambia a **Revisión**.
 
+**¿Por qué no puedo aprobar una pantalla?**
+Porque tiene una observación que bloquea la entrega (míralas en **Control de calidad**). Resuélvela y podrás aprobarla. Si no ves el botón, tu rol no aprueba pantallas: pídeselo a Diseño instruccional.
+
+**Corregí una pantalla aprobada y volvió a «Borrador». ¿Es un error?**
+No. Todo cambio en una pantalla aprobada necesita una nueva aprobación, para que nada llegue al cliente sin revisar.
+
 **¿Por qué un proyecto con solo un video empieza desde el tema?**
 Por ahora la etapa 1 resume documentos. La lectura de transcripciones en la generación llega en una próxima entrega.
 
@@ -280,7 +312,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Voz del narrador, boca animada del personaje y subtítulos.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
-- Revisión pantalla por pantalla y retoques en un editor visual.
+- Pedir ajustes a la IA desde la revisión («más visual», «menos texto», «convertir en actividad»), comentarios del cliente y retoques en un editor visual.
 
 ---
 
@@ -288,6 +320,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.7 | 2026-11-10 | Revisión: filtros, corregir título y narración, control de calidad, origen y aprobación de pantallas una por una o todas las que no tienen observaciones. |
 | 0.6 | 2026-11-10 | Vista previa: recorrer la cápsula en celular, tableta o escritorio, con las actividades jugables y el seguimiento simulado. |
 | 0.5 | 2026-11-10 | Las actividades salen con su contenido y el reto final con la marca «Calificada». |
 | 0.4 | 2026-11-10 | Etapa 4: pantallas armadas con el kit, que aparecen en vivo. |

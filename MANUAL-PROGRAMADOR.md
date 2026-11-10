@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.6 · actualizado con la tercera entrega del Sprint 3 (10 de noviembre de 2026)**
+**Versión 0.7 · actualizado con la cuarta entrega del Sprint 3 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -51,7 +51,7 @@ packages/
 docs/         especificación: módulos, historias, API, ADR, diseño, ESTADO.md
 ```
 
-`@aptio/schema` se importa por subrutas (`@aptio/schema/generacion`, `@aptio/schema/proyecto`, `@aptio/schema/marca`, `@aptio/schema/voz`) para que la web cargue solo lo que usa.
+`@aptio/schema` se importa por subrutas (`@aptio/schema/generacion`, `@aptio/schema/proyecto`, `@aptio/schema/marca`, `@aptio/schema/voz`, `@aptio/schema/revision`) para que la web cargue solo lo que usa.
 
 ## 4. Comandos
 
@@ -121,12 +121,22 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 ### 6.5 Reproductor (`@aptio/player`)
 
 - Es el mismo código en la vista previa y en el paquete (decisión 3). Sin dependencias: no agregues librerías, el empaquetado debe seguir bajo 300 KB comprimido (`test/paquete.test.ts`, CP-085; hoy pesa 12 KB).
-- Entrada: `montar(contenedor, curso, { kit, revision, inicio, urlRecurso, alCambiar })`. Se monta en un Shadow DOM propio; los estilos viven en `src/estilos.ts` con variables `--ap-*` que salen del kit.
+- Entrada: `montar(contenedor, curso, { kit, revision, inicio, marco, urlRecurso, alCambiar })`. Con `marco: false` dibuja solo la pantalla, sin barra, pie ni atajos de teclado (lo usa la Revisión). Se monta en un Shadow DOM propio; los estilos viven en `src/estilos.ts` con variables `--ap-*` que salen del kit.
 - Las reglas de avance (`src/navegacion.ts`) y el seguimiento (`src/seguimiento.ts`) son funciones puras: cualquier patrón nuevo las reutiliza.
 - Cada interacción es una función `(datos, ctx) => HTMLElement` en `src/interacciones/` que llama `ctx.terminar({ completada, puntaje })`. Todo con botones; el orden barajado usa `barajar(lista, clave)` con el id de la pantalla para que vista previa y paquete coincidan.
 - Para el paquete: `pnpm --filter @aptio/player construir` deja `packages/player/dist/aptio-reproductor.js` con `window.AptioReproductor.montar`.
 
-### 6.6 TypeScript
+### 6.6 Cambios al documento del curso (M05)
+
+- Todo cambio al curso pasa por `CursosService.guardar(u, cursoId, versionLeida, motivo, cambiar)` (`apps/api/src/cursos/`):
+  - Compara la versión leída. Si otra persona guardó antes, responde 409 `VERSION_CAMBIO`.
+  - Aplica `cambiar` sobre una copia del documento y la valida con `erroresCurso`. Si no valida, responde 422 y nada se guarda.
+  - En una transacción, actualiza solo si la versión no cambió, crea un `CursoVersion` con el motivo y recalcula las observaciones por reglas.
+- Las observaciones por reglas (`observacionesRegla`) y el origen de una pantalla (`origenDe`) viven en `@aptio/schema/revision`. Las usan el worker (al terminar la etapa 4), la API (en cada guardado) y la web. Las observaciones `origen: regla` se borran y se vuelven a crear; las de la IA y las de personas no se tocan.
+- RN-05-1: aprobar exige que no haya una observación abierta `bloquea-entrega`. RN-05-2: editar deja la pantalla en `borrador`. Lo que escribe una persona cambia `origen.tipo` a `manual` y conserva el documento y la página.
+- Al cambiar la narración se recalcula `hashTexto` (sha256 de texto, voz y velocidad) y el audio `generado` pasa a `desactualizado`. Así la regeneración en cascada (S5) sabe qué rehacer.
+
+### 6.7 TypeScript
 
 - `strict` con `exactOptionalPropertyTypes`: no asignes `undefined` a una propiedad opcional, sino que omítela con `...(x ? { x } : {})`.
 - Para leer columnas `Json` de Prisma, convierte con `as unknown as Tipo`.
@@ -222,6 +232,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.7 | 2026-11-10 | Módulo `cursos` (observaciones, editar y aprobar con bloqueo optimista), `@aptio/schema/revision` y la opción `marco` del reproductor. |
 | 0.6 | 2026-11-10 | Paquete `@aptio/player` (reproductor único), `GET /proyectos/{id}/curso` y la vista previa. |
 | 0.5 | 2026-11-10 | IA-07 dentro de la etapa 4 (datos de las actividades). |
 | 0.4 | 2026-11-10 | `ctx.avance` y vistas en vivo; la etapa 4 como ejemplo de etapa en paralelo que guarda el curso. |
