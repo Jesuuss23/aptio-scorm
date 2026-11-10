@@ -1,0 +1,87 @@
+# Integración continua (HU-0107, CP-018): lint, tipos, pruebas, casos de IA, contrato y flujos.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    name: Lint, tipos y pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: aptio_scorm
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Solo para la base efímera de CI; no es un secreto.
+      DATABASE_URL: postgresql://postgres:password123@localhost:5432/aptio_scorm?schema=public
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      PROVEEDORES_MODO: simulado
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm lint
+      - name: Cliente de Prisma
+        run: pnpm db:generate
+      - name: Tipos
+        run: pnpm typecheck
+      - name: Migraciones y datos de ejemplo
+        run: pnpm db:deploy && pnpm db:seed
+      - name: Pruebas (Vitest)
+        run: pnpm test
+      - name: Salidas de IA del caso LOTO
+        run: pnpm ia:casos
+      - name: Contrato OpenAPI
+        run: pnpm openapi:lint
+
+  flujos:
+    name: Flujos de la web (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Navegador
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Auditoría visual y acceso
+        run: pnpm web:e2e
+      - name: Resultados si falla
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: apps/web/test-results
+          retention-days: 7

@@ -43,7 +43,7 @@ Cada módulo de `14-modulos.md` es un módulo de NestJS en `apps/api/src/<modulo
 | --- | --- |
 | Idioma del código | Identificadores en inglés o español, pero uno solo por paquete; textos de interfaz en español con archivo de traducciones (`es`, `en`) |
 | TypeScript | `strict`, sin `any` salvo justificado con comentario |
-| Formato | Prettier + ESLint; el CI falla con errores |
+| Formato | oxlint (reglas compatibles con ESLint) con `--deny-warnings`; el CI falla con errores o avisos. Prettier queda pendiente (SUP-12) |
 | Ramas | `main` protegida; ramas `feat/HU-0406-componer-pantallas`, `fix/...` |
 | Commits | Conventional Commits con el id de la historia: `feat(generador): componer pantallas HU-0406` |
 | Solicitudes de cambio | Una historia por PR cuando sea posible; enlazar el issue de Jira; captura o video si cambia la interfaz |

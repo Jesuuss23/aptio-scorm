@@ -18,7 +18,8 @@ const redisListo = await (async () => {
 })();
 const baseLista = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
 
-describe.skipIf(!redisListo || !baseLista)('worker con proveedores simulados', () => {
+// En CI los servicios son obligatorios: si faltan, la prueba falla en vez de saltarse.
+describe.skipIf((!redisListo || !baseLista) && !process.env.CI)('worker con proveedores simulados', () => {
   const sufijo = Math.random().toString(36).slice(2, 8);
   const publicador = crearRedis();
   const oyente = crearRedis();
