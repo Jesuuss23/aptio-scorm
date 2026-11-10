@@ -1,5 +1,5 @@
 import { HttpException, HttpStatus, Injectable, UnprocessableEntityException } from '@nestjs/common';
-import { hashearClave, verificarClave, type Prisma } from '@aptio/db';
+import { hashearClave, verificarClave, type Prisma, type Usuario } from '@aptio/db';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { CorreoService } from '../correo/correo.service.js';
 import { aUsuarioDto, type UsuarioDto } from '../usuarios/usuario.dto.js';
@@ -45,11 +45,17 @@ export class AuthService {
       throw new HttpException({ codigo: 'CREDENCIALES', mensaje: 'Correo o clave incorrectos' }, HttpStatus.UNAUTHORIZED);
     }
 
+    return this.abrirSesion(u, 'clave');
+  }
+
+  /** Firma la sesión de un usuario ya autenticado (con clave o con Google) y registra el ingreso. */
+  async abrirSesion(u: Usuario, metodo: 'clave' | 'google'): Promise<{ token: string; expira: Date; usuario: UsuarioDto }> {
+    const ahora = new Date();
     await this.bd.usuario.update({
       where: { id: u.id },
       data: { intentosFallidos: 0, bloqueadoHasta: null, ultimoIngreso: ahora },
     });
-    await this.auditar(u.id, u.organizacionId, 'INGRESO');
+    await this.auditar(u.id, u.organizacionId, 'INGRESO', metodo === 'google' ? { metodo } : undefined);
     const expira = new Date(ahora.getTime() + this.config.ttlMs);
     const token = firmarSesion({ u: u.id, v: u.versionSesion, exp: expira.getTime() }, this.config.secreto);
     return { token, expira, usuario: aUsuarioDto(u) };

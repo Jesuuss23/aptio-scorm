@@ -65,3 +65,24 @@ test('crear la clave desde la invitación y avisar si el enlace venció', async 
   await expect(page.getByRole('alert')).toContainText('Enlace no válido o vencido');
   await expect(page.getByRole('link', { name: 'Pedir un enlace nuevo' })).toBeVisible();
 });
+
+test('HU-0108 · Ingresar con Google lleva a la API, que redirige a Google', async ({ page }) => {
+  await simularApi(page, { conSesion: false });
+  await page.goto('/ingresar');
+  const google = page.getByRole('link', { name: 'Ingresar con Google' });
+  await expect(google).toHaveAttribute('href', '/api/v1/auth/google');
+  await expect(page.getByText('Solo para correos invitados por un administrador.')).toBeVisible();
+});
+
+test('CP-008 · un correo de Google no invitado ve «Tu correo no tiene acceso»', async ({ page }) => {
+  await simularApi(page, { conSesion: false });
+  await page.goto('/ingresar?error=sin_acceso');
+  await expect(page.getByRole('alert')).toHaveText('Tu correo no tiene acceso. Pide a un administrador que te invite.');
+});
+
+test('CP-009 · si Google no confirmó el correo, se explica y no ingresa', async ({ page }) => {
+  await simularApi(page, { conSesion: false });
+  await page.goto('/ingresar?error=correo_no_verificado');
+  await expect(page.getByRole('alert')).toContainText('Google no confirmó tu correo');
+  await expect(page.getByRole('heading', { name: 'Ingresar' })).toBeVisible();
+});
