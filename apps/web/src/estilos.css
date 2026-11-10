@@ -840,3 +840,72 @@
 .zona.llena {
   border-color: transparent;
 }
+
+/* HU-1102 · Vista previa (PNT-12): el reproductor dentro de un marco de celular, tableta o escritorio. */
+.vista-previa-controles {
+  align-items: flex-end;
+}
+.vista-previa-ir {
+  min-width: 240px;
+}
+.vista-previa {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: flex-start;
+}
+.vista-previa-marco {
+  flex: 1 1 560px;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  border-radius: var(--radio-tarjeta);
+  background: #1e2a3a;
+}
+.vista-previa-reproductor {
+  width: 100%;
+  max-width: 1024px;
+  height: 640px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-superficie);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
+}
+.vista-previa-marco.tableta .vista-previa-reproductor {
+  max-width: 768px;
+  height: 680px;
+  border: 10px solid #111;
+  border-radius: 24px;
+}
+.vista-previa-marco.celular .vista-previa-reproductor {
+  max-width: 360px;
+  height: 680px;
+  border: 8px solid #111;
+  border-radius: 28px;
+}
+.vista-previa-seguimiento {
+  flex: 0 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vista-previa-seguimiento h2 {
+  margin: 0;
+  font-size: var(--titulo-panel);
+}
+.vista-previa-seguimiento code {
+  font-family: var(--fuente-num);
+  font-size: var(--texto-sm);
+  color: var(--color-texto-sec);
+}
+@media (max-width: 720px) {
+  .vista-previa-marco {
+    padding: 8px;
+  }
+  .vista-previa-reproductor,
+  .vista-previa-marco.tableta .vista-previa-reproductor,
+  .vista-previa-marco.celular .vista-previa-reproductor {
+    height: 600px;
+  }
+}

@@ -79,7 +79,14 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
       <Cabecera
         titulo={proyecto.nombre}
         subtitulo={`${proyecto.clienteNombre} · ${NOMBRE_ESTADO[proyecto.estado]}`}
-        accion={puedeEditar && proyecto.estado !== 'ARCHIVADO' ? <button className="boton" type="button" onClick={() => void archivar()}>Archivar</button> : undefined}
+        accion={
+          <div className="acciones-form">
+            {proyecto.avance.total ? (
+              <a className="boton primario" href={`/proyectos/${proyecto.id}/vista-previa`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/vista-previa`); }}>Vista previa</a>
+            ) : null}
+            {puedeEditar && proyecto.estado !== 'ARCHIVADO' ? <button className="boton" type="button" onClick={() => void archivar()}>Archivar</button> : null}
+          </div>
+        }
       />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       <div className="columnas">
