@@ -67,7 +67,7 @@ test('HU-0408 · tras un error, continuar retoma desde esa etapa', async ({ page
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('Lista');
   await gen.getByRole('button', { name: 'Continuar' }).click();
   await expect(etapa(gen, 'Storyboard y guion')).toContainText('Lista', { timeout: 15_000 });
-  await expect(etapa(gen, 'Objetivos y estructura')).toContainText('3 objetivos con nivel de Bloom');
+  await expect(etapa(gen, 'Objetivos y estructura')).toContainText('3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad');
 });
 
 test('el diseñador gráfico ve la generación pero no la lanza', async ({ page }) => {
@@ -94,4 +94,23 @@ test('CP-038 · el resumen muestra cada idea clave con su página y el acta de t
   const acta = vista.getByRole('region', { name: 'Acta de temas omitidos' });
   await expect(acta.getByRole('heading', { name: 'Acta de temas omitidos · Bloqueo y etiquetado' })).toBeVisible();
   await expect(acta).toContainText('Registros y anexos');
+});
+
+test('CP-039 · la estructura muestra 30 pantallas, 12 con actividad, cada una con su objetivo', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const gen = await conTema(page);
+  await gen.getByRole('button', { name: 'Generar SCORM' }).click();
+  await etapa(gen, 'Objetivos y estructura').getByRole('button', { name: 'Ver estructura' }).click({ timeout: 15_000 });
+  const vista = gen.getByRole('region', { name: 'Estructura del curso' });
+  const objetivos = vista.getByRole('region', { name: 'Objetivos de aprendizaje' }).getByRole('listitem');
+  await expect(objetivos).toHaveCount(3);
+  await expect(objetivos.last()).toContainText('Aplicar');
+  const pantallas = vista.getByRole('region', { name: 'Pantallas' });
+  await expect(pantallas.getByRole('heading')).toContainText('30 en total · 12 con actividad (mínimo 12)');
+  await expect(pantallas.getByRole('listitem')).toHaveCount(30);
+  const p07 = pantallas.getByRole('listitem', { name: 'Pantalla p07' });
+  await expect(p07).toContainText('Actividad');
+  await expect(p07).toContainText('INT-01 · Memoria');
+  await expect(p07).toContainText('Objetivo 1');
+  await expect(p07).toContainText('p. 13');
 });
