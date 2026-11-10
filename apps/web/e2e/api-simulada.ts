@@ -43,6 +43,9 @@ export interface OpcionesSimulacion {
 export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }: OpcionesSimulacion) {
   let conflicto = Boolean(kitEnConflicto);
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
+  const subidas = new Map<string, { nombre: string; mime: string }>();
+  // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
+  await page.route('**/s3-simulado/**', (route) => route.fulfill({ status: 200, body: '' }));
   let sesion = conSesion;
   const usuario = { ...USUARIO, ...(rol ? { rol } : {}) };
   const clientes = [
@@ -87,6 +90,42 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
       const nuevo = clienteBase(`00000000-0000-4000-8000-${String(clientes.length + 1).padStart(12, '0')}`, datos.nombre.trim(), datos);
       clientes.push(nuevo);
       return responder(201, nuevo);
+    }
+    if (ruta === '/recursos/subidas' && req.method() === 'POST') {
+      const datos = req.postDataJSON() as { nombre: string; mime: string };
+      const subidaId = `00000000-0000-4000-8000-${String(subidas.size + 1).padStart(12, '0')}`;
+      subidas.set(subidaId, datos);
+      return responder(201, {
+        subidaId, url: `${new URL(req.url()).origin}/s3-simulado/${subidaId}`, cabeceras: { 'Content-Type': datos.mime }, expira: new Date(Date.now() + 900_000).toISOString(),
+      });
+    }
+    const confirmar = ruta.match(/^\/recursos\/subidas\/([0-9a-f-]+)\/confirmar$/);
+    if (confirmar) {
+      const s = subidas.get(confirmar[1]!)!;
+      const svg = s.mime === 'image/svg+xml';
+      return responder(201, {
+        id: confirmar[1], tipo: svg ? 'SVG' : 'IMAGEN', origen: 'SUBIDO', nombre: s.nombre, mime: s.mime, bytes: 100,
+        ...(svg ? { eliminadosAlSanear: s.nombre.includes('peligrosa') ? ['script', 'atributos on*'] : [] } : {}),
+        url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><rect width="30" height="40" fill="#12355B"/></svg>')}`,
+      });
+    }
+    const personaje = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/personaje$/);
+    if (personaje) {
+      const actual = kits.get(personaje[1]!)!;
+      const datos = req.postDataJSON() as { recursoId: string; nombre: string; version: number };
+      if (subidas.get(datos.recursoId)?.nombre.includes('boceto')) {
+        return responder(422, {
+          codigo: 'PERSONAJE_INCOMPLETO', mensaje: 'Al personaje le faltan capas obligatorias. Revísalo con docs/diseno/personaje/validar-personaje.mjs',
+          detalles: [{ error: 'Falta la capa obligatoria «cabeza»' }],
+        });
+      }
+      actual.version = (actual.version as number) + 1;
+      actual.personaje = {
+        recursoId: datos.recursoId, nombre: datos.nombre, bocasDisponibles: ['A', 'B', 'C', 'D', 'E', 'F', 'H', 'X'], bocasFaltantes: ['G'],
+        reemplazos: { G: 'B' }, poses: ['neutral', 'explicando'], avisos: ['G falta: se usa la B hasta que se agregue'], eliminadosAlSanear: [],
+        url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><rect width="30" height="40" fill="#12355B"/></svg>')}`,
+      };
+      return responder(200, actual);
     }
     const kit = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit$/);
     if (kit) {

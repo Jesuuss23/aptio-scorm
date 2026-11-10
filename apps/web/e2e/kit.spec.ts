@@ -77,3 +77,29 @@ test('el revisor del cliente no ve el kit', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Minera Andina');
   await expect(page.getByRole('region', { name: 'Kit de marca' })).toHaveCount(0);
 });
+
+test('CP-023 · al subir el personaje sin la boca G se marca «G falta» y se reemplaza por B', async ({ page }) => {
+  await simularApi(page, { conSesion: true, rol: 'DISENADOR_GRAFICO' });
+  await page.goto(`/clientes/${CLIENTE_ID}`);
+  const personaje = page.getByRole('group', { name: 'Personaje' });
+  await expect(personaje.getByText('Sin personaje')).toBeVisible();
+  await personaje.getByLabel('Archivo del personaje').setInputFiles({
+    name: 'Ana peligrosa.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+  });
+  const bocas = personaje.getByRole('list', { name: 'Bocas' });
+  await expect(bocas.getByText('G falta')).toBeVisible();
+  await expect(bocas.getByText('B ✓')).toBeVisible();
+  await expect(personaje.getByText('G falta: se usa la B hasta que se agregue')).toBeVisible();
+  await expect(personaje.getByText('Se quitó del SVG por seguridad: script, atributos on*.')).toBeVisible();
+  await expect(page.getByText('Versión 4')).toBeVisible();
+});
+
+test('un personaje sin capas obligatorias muestra qué falta', async ({ page }) => {
+  await simularApi(page, { conSesion: true, rol: 'DISENADOR_GRAFICO' });
+  await page.goto(`/clientes/${CLIENTE_ID}`);
+  const personaje = page.getByRole('group', { name: 'Personaje' });
+  await personaje.getByLabel('Archivo del personaje').setInputFiles({
+    name: 'boceto.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'),
+  });
+  await expect(personaje.getByRole('alert')).toContainText('Falta la capa obligatoria «cabeza»');
+});

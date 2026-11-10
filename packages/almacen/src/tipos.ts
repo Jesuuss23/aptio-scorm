@@ -19,6 +19,8 @@ export const PERMITIDOS: Record<string, { tipo: TipoRecurso; maxBytes: number }>
   'video/mp4': { tipo: 'VIDEO', maxBytes: 4096 * MB },
   'video/webm': { tipo: 'VIDEO', maxBytes: 4096 * MB },
   'font/woff2': { tipo: 'FUENTE', maxBytes: 5 * MB },
+  // El SVG no se reconoce por su cabecera: se sanea al confirmar (sanearSvg) y se guarda solo la versión limpia.
+  'image/svg+xml': { tipo: 'SVG', maxBytes: 2 * MB },
 };
 
 /** Equivalencias: file-type puede dar un mime distinto pero compatible con el declarado. */
@@ -40,6 +42,7 @@ export interface Verificacion {
 /** Compara el contenido real con el tipo declarado (CP-034: un .exe renombrado a .pdf se rechaza). */
 export async function verificarTipo(cabecera: Uint8Array, mimeDeclarado: string): Promise<Verificacion> {
   if (!PERMITIDOS[mimeDeclarado]) return { valido: false, motivo: `Tipo no permitido: ${mimeDeclarado}` };
+  if (mimeDeclarado === 'image/svg+xml') return { valido: false, motivo: 'Un SVG se verifica al sanearlo, no por su cabecera' };
   const real = await fileTypeFromBuffer(cabecera);
   if (!real) return { valido: false, motivo: 'No se reconoce el contenido del archivo' };
   const aceptados = [mimeDeclarado, ...(EQUIVALENTES[mimeDeclarado] ?? [])];

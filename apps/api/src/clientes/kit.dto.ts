@@ -40,6 +40,24 @@ export class KitEntradaDto {
   @ApiProperty({ description: 'Versión leída (bloqueo optimista, RN-02-3). 0 para crear el kit.' }) @IsInt() @Min(0) version: number;
 }
 
+export class PersonajeEntradaDto {
+  @ApiProperty({ format: 'uuid', description: 'SVG subido (y saneado) para este cliente' }) @IsUUID() recursoId: string;
+  @ApiProperty({ example: 'Ana' }) @IsString() @MaxLength(60) nombre: string;
+  @ApiProperty({ description: 'Versión leída del kit (RN-02-3)' }) @IsInt() @Min(1) version: number;
+}
+
+export class PersonajeDto {
+  @ApiProperty({ format: 'uuid' }) recursoId: string;
+  @ApiProperty() nombre: string;
+  @ApiProperty({ type: [String], example: ['A', 'B', 'C', 'D', 'E', 'F', 'H', 'X'] }) bocasDisponibles: string[];
+  @ApiProperty({ type: [String], example: ['G'] }) bocasFaltantes: string[];
+  @ApiProperty({ example: { G: 'B' }, description: 'Boca que reemplaza a la que falta (RN-07-3)' }) reemplazos: Record<string, string>;
+  @ApiProperty({ type: [String] }) poses: string[];
+  @ApiProperty({ type: [String] }) avisos: string[];
+  @ApiProperty({ type: [String], description: 'Lo que se quitó al sanear el SVG' }) eliminadosAlSanear: string[];
+  @ApiPropertyOptional({ format: 'uri', description: 'URL firmada de 15 minutos del SVG saneado' }) url?: string;
+}
+
 export class ContrasteDto {
   @ApiProperty() textoFondo: number;
   @ApiProperty() cumpleAA: boolean;
@@ -60,7 +78,7 @@ export class KitDto {
   @ApiProperty({ type: TipografiasDto }) tipografias: TipografiasDto;
   @ApiProperty({ format: 'uuid', nullable: true }) logoRecursoId: string | null;
   @ApiPropertyOptional({ format: 'uri', description: 'URL firmada de 15 minutos del logo' }) logoUrl?: string;
-  @ApiProperty({ nullable: true, description: 'Lo completa HU-0203' }) personaje: object | null;
+  @ApiProperty({ type: PersonajeDto, nullable: true }) personaje: PersonajeDto | null;
   @ApiProperty({ type: VocesDto }) voces: VocesDto;
   @ApiProperty() version: number;
   @ApiProperty() actualizadoEn: string;

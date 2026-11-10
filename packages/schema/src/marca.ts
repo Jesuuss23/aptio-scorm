@@ -87,3 +87,58 @@ export function revisarPaleta(p: Paleta): { textoFondo: number; cumpleAA: boolea
   const textoFondo = redondear(contraste(p.texto, p.fondo));
   return { textoFondo, cumpleAA: textoFondo >= CONTRASTE_AA, advertencias };
 }
+
+// ---------- Personaje (HU-0203, docs/20-guia-diseno.md §1) ----------
+
+export const BOCAS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'X'] as const;
+export type Boca = (typeof BOCAS)[number];
+
+/** Capas sin las que el reproductor no puede animar al personaje. */
+export const CAPAS_OBLIGATORIAS = [
+  'personaje', 'cabeza', 'ojos_abiertos', 'ojos_cerrados', 'pose_neutral', 'pose_explicando',
+  'boca_A', 'boca_B', 'boca_C', 'boca_D', 'boca_E', 'boca_F', 'boca_X',
+] as const;
+export const CAPAS_RECOMENDADAS = ['boca_G', 'boca_H', 'pose_celebrando', 'pose_advirtiendo', 'pose_pensando', 'cejas'] as const;
+
+/** Si falta una boca recomendada, el reproductor usa la más parecida (RN-07-3). */
+export const REEMPLAZO_BOCA: Partial<Record<Boca, Boca>> = { G: 'B', H: 'C' };
+
+/** Peso máximo del personaje: más pesado se nota en el celular. */
+export const MAX_BYTES_PERSONAJE = 200 * 1024;
+const BYTES_IDEALES_PERSONAJE = 120 * 1024;
+
+export interface RevisionPersonaje {
+  bocasDisponibles: Boca[];
+  bocasFaltantes: Boca[];
+  /** Boca que la reemplaza mientras el diseñador la agrega: { G: 'B' }. */
+  reemplazos: Partial<Record<Boca, Boca>>;
+  poses: string[];
+  /** Bloquean: el personaje no se puede usar. */
+  errores: string[];
+  /** No bloquean. */
+  avisos: string[];
+}
+
+export function revisarPersonaje({ ids, viewBox, bytes }: { ids: readonly string[]; viewBox: string | null; bytes: number }): RevisionPersonaje {
+  const hay = new Set(ids);
+  const bocasDisponibles = BOCAS.filter((b) => hay.has(`boca_${b}`));
+  const bocasFaltantes = BOCAS.filter((b) => !hay.has(`boca_${b}`));
+  const reemplazos: Partial<Record<Boca, Boca>> = {};
+  for (const b of bocasFaltantes) {
+    const r = REEMPLAZO_BOCA[b];
+    if (r && hay.has(`boca_${r}`)) reemplazos[b] = r;
+  }
+  const errores = CAPAS_OBLIGATORIAS.filter((c) => !hay.has(c)).map((c) => `Falta la capa obligatoria «${c}»`);
+  if (bytes > MAX_BYTES_PERSONAJE) errores.push(`Pesa ${Math.round(bytes / 1024)} KB; el máximo es 200 KB`);
+  const avisos = CAPAS_RECOMENDADAS.filter((c) => !hay.has(c)).map((c) => {
+    const boca = c.startsWith('boca_') ? (c.slice(5) as Boca) : null;
+    return boca && reemplazos[boca] ? `${boca} falta: se usa la ${reemplazos[boca]} hasta que se agregue` : `Falta la capa recomendada «${c}»`;
+  });
+  if (!viewBox) avisos.push('Falta viewBox: el personaje no se adaptará a la pantalla');
+  else {
+    const [, , ancho, alto] = viewBox.trim().split(/[\s,]+/).map(Number);
+    if (ancho && alto && Math.abs(ancho / alto - 0.75) > 0.02) avisos.push(`Proporción ${ancho}:${alto}; se espera 3:4 (por ejemplo 300 × 400)`);
+  }
+  if (bytes > BYTES_IDEALES_PERSONAJE && bytes <= MAX_BYTES_PERSONAJE) avisos.push(`Pesa ${Math.round(bytes / 1024)} KB; lo ideal es menos de 120 KB`);
+  return { bocasDisponibles, bocasFaltantes, reemplazos, poses: ids.filter((i) => i.startsWith('pose_')).map((i) => i.slice(5)), errores, avisos };
+}

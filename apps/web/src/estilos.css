@@ -285,3 +285,21 @@
   background: var(--k-secundario);
   color: #fff;
 }
+.kit-personaje {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+}
+.kit-personaje > img {
+  width: 90px;
+  aspect-ratio: 3 / 4;
+  object-fit: contain;
+  background: var(--color-suave);
+  border-radius: 10px;
+}
+.kit-personaje .fila-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}

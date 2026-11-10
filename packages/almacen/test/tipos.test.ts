@@ -28,8 +28,9 @@ describe('tipo real de los archivos (RN-14-1)', () => {
     expect(await verificarTipo(new TextEncoder().encode('texto plano'), 'application/pdf')).toMatchObject({ valido: false });
   });
 
-  it('rechaza tipos fuera de la lista, como SVG hasta que se sanee (HU-0203)', async () => {
-    expect(PERMITIDOS['image/svg+xml']).toBeUndefined();
+  it('rechaza tipos fuera de la lista; el SVG no se acepta por cabecera porque se sanea aparte', async () => {
+    expect(PERMITIDOS['image/svg+xml']).toMatchObject({ tipo: 'SVG' });
+    expect((await verificarTipo(PNG, 'image/svg+xml')).valido).toBe(false);
     expect(await verificarTipo(PNG, 'application/x-msdownload')).toMatchObject({ valido: false });
   });
 

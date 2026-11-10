@@ -540,6 +540,60 @@ paths:
           $ref: '#/components/responses/NoValido'
         '409':
           $ref: '#/components/responses/Conflicto'
+  /clientes/{clienteId}/kit/personaje:
+    put:
+      tags:
+      - Clientes y kits
+      summary: Guardar personaje del kit
+      operationId: put_clientes_clienteId_kit_personaje
+      description: >-
+        Asigna al kit un SVG ya subido y saneado (HU-0203). Revisa las capas de docs/20-guia-diseno.md: guarda
+        qué bocas tiene, cuáles faltan y con cuál se reemplazan (G por B, H por C; CP-023). Sin las capas
+        obligatorias o con más de 200 KB responde 422 PERSONAJE_INCOMPLETO. Usa la versión del kit (409 si cambió).
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - recursoId
+              - nombre
+              - version
+              properties:
+                recursoId:
+                  type: string
+                  format: uuid
+                nombre:
+                  type: string
+                  example: Ana
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KitMarca'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /clientes/{clienteId}/kit/extraer:
     post:
       tags:
@@ -1079,7 +1133,8 @@ paths:
       description: >-
         Verifica que el objeto esté cifrado con KMS, que su contenido real coincida con el tipo declarado
         (CP-034) y calcula su hash. Si no coincide, borra el objeto y responde 422 TIPO_NO_COINCIDE.
-        Confirmar dos veces devuelve el mismo recurso. Los SVG se aceptarán saneados desde HU-0203.
+        Confirmar dos veces devuelve el mismo recurso. Un SVG se reconstruye sin scripts, atributos on* ni
+        recursos externos y solo se guarda la versión limpia (CP-024); lo quitado vuelve en eliminadosAlSanear.
       parameters:
       - name: subidaId
         in: path
@@ -3081,6 +3136,7 @@ components:
           description: URL firmada de 15 minutos del logo
         personaje:
           type: object
+          nullable: true
           properties:
             recursoId:
               type: string
@@ -3090,17 +3146,32 @@ components:
             bocasDisponibles:
               type: array
               items:
+                $ref: '#/components/schemas/Boca'
+            bocasFaltantes:
+              type: array
+              items:
+                $ref: '#/components/schemas/Boca'
+            reemplazos:
+              type: object
+              description: Boca que reemplaza a la que falta, por ejemplo { "G" = "B" } (RN-07-3)
+              additionalProperties:
+                $ref: '#/components/schemas/Boca'
+            poses:
+              type: array
+              items:
                 type: string
-                enum:
-                - A
-                - B
-                - C
-                - D
-                - E
-                - F
-                - G
-                - H
-                - X
+            avisos:
+              type: array
+              items:
+                type: string
+            eliminadosAlSanear:
+              type: array
+              items:
+                type: string
+            url:
+              type: string
+              format: uri
+              description: URL firmada de 15 minutos del SVG saneado
         voces:
           type: object
           properties:
@@ -3172,6 +3243,18 @@ components:
           type: integer
           minimum: 0
           description: Versión leída (bloqueo optimista); 0 para crear el kit
+    Boca:
+      type: string
+      enum:
+      - A
+      - B
+      - C
+      - D
+      - E
+      - F
+      - G
+      - H
+      - X
     EstiloKit:
       type: string
       enum:
@@ -3646,6 +3729,11 @@ components:
         creadoEn:
           type: string
           format: date-time
+        eliminadosAlSanear:
+          type: array
+          items:
+            type: string
+          description: Solo SVG. Lo que se quitó al sanearlo
         alt:
           $ref: '#/components/schemas/TextoI18n'
         url:
