@@ -175,6 +175,10 @@ describe.skipIf(!hayBase && !process.env.CI)('generación del SCORM (HU-0401, HU
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ etapa: 'RESUMEN_MATERIAL', estado: 'COMPLETADO', detalle: '30 páginas → 1 idea clave', datos });
     expect((await como('grafico').get(`/generaciones/${g.id}/etapas/OBJETIVOS_ESTRUCTURA`)).body).toMatchObject({ estado: 'EN_COLA', datos: null });
+    // CP-043: la etapa 4 en curso muestra las pantallas que ya están listas.
+    const parcial = { total: 30, pantallas: [{ id: 'p01', disposicion: 'portada' }] };
+    await prisma.generacionEtapa.updateMany({ where: { generacionId: g.id, etapa: 'PANTALLAS' }, data: { estado: 'EN_CURSO', detalle: { texto: '1 de 30 pantallas listas', datos: parcial } } });
+    expect((await como('grafico').get(`/generaciones/${g.id}/etapas/PANTALLAS`)).body).toMatchObject({ estado: 'EN_CURSO', detalle: '1 de 30 pantallas listas', datos: parcial });
     expect((await como('grafico').get(`/generaciones/${g.id}/etapas/NO_EXISTE`)).status).toBe(404);
     expect((await como('ajeno').get(`/generaciones/${g.id}/etapas/RESUMEN_MATERIAL`)).status).toBe(404);
   });

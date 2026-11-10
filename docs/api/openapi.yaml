@@ -4108,11 +4108,13 @@ components:
             nullable: true
             description: >-
               Lo que guardó la etapa. En RESUMEN_MATERIAL, un ResumenMaterial; en OBJETIVOS_ESTRUCTURA, una
-              EstructuraCurso; en STORYBOARD_GUION, un GuionCurso; las demás etapas definen el suyo.
+              EstructuraCurso; en STORYBOARD_GUION, un GuionCurso; en PANTALLAS, un PantallasCurso, también
+              mientras corre (CP-043: las pantallas listas); las demás etapas definen el suyo.
             anyOf:
             - $ref: '#/components/schemas/ResumenMaterial'
             - $ref: '#/components/schemas/EstructuraCurso'
             - $ref: '#/components/schemas/GuionCurso'
+            - $ref: '#/components/schemas/PantallasCurso'
             - type: object
     EstructuraCurso:
       type: object
@@ -4166,6 +4168,109 @@ components:
               type: integer
               nullable: true
             total:
+              type: integer
+    PantallasCurso:
+      type: object
+      description: >-
+        Resultado de la etapa 4 (HU-0406, IA-15 v2): cada pantalla con su disposición del kit, fondo y campos, sin HTML.
+        Mientras la etapa corre trae solo las pantallas listas (CP-043); al terminar, también el curso guardado y
+        validado (CP-042).
+      required:
+      - total
+      - kit
+      - modelos
+      - pantallas
+      - advertencias
+      properties:
+        total:
+          type: integer
+          description: Pantallas que tendrá el curso
+        kit:
+          type: object
+          properties:
+            nombre:
+              type: string
+            paleta:
+              type: object
+              additionalProperties:
+                type: string
+            tipografias:
+              type: object
+              properties:
+                titulos:
+                  type: string
+                textos:
+                  type: string
+            personaje:
+              type: string
+              nullable: true
+        modelos:
+          type: object
+          description: Por disposición, el modelo que usa (el del cliente o el del estilo base)
+          additionalProperties:
+            type: object
+        pantallas:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - orden
+            - capsulaId
+            - titulo
+            - disposicion
+            - fondo
+            - campos
+            - pedidosImagen
+            properties:
+              id:
+                type: string
+              orden:
+                type: integer
+                description: Lugar en el curso, desde 1 (una pantalla puede quedar lista antes que la anterior)
+              capsulaId:
+                type: string
+              titulo:
+                type: string
+              disposicion:
+                type: string
+              fondo:
+                type: string
+              campos:
+                type: object
+                description: Campos de IA-15 (titulo, subtitulo, texto, dato, items, opciones…)
+              personaje:
+                type: object
+                properties:
+                  pose:
+                    type: string
+                  lado:
+                    type: string
+              pedidosImagen:
+                type: array
+                items:
+                  type: object
+              actividad:
+                type: object
+                properties:
+                  tipo:
+                    type: string
+                  consigna:
+                    type: string
+              motivo:
+                type: string
+        advertencias:
+          type: array
+          items:
+            type: string
+        curso:
+          type: object
+          description: El curso guardado al terminar la etapa
+          properties:
+            id:
+              type: string
+              format: uuid
+            version:
               type: integer
     GuionCurso:
       type: object

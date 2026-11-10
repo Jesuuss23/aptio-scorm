@@ -1,3 +1,5 @@
+import type { PantallaCompuesta } from '@aptio/schema/generacion';
+
 /** Montos en dólares como en el prototipo: US$ 58.20. */
 export const usd = (n: number) => `US$ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -27,4 +29,26 @@ export function tiempo(segundos: number): string {
   const m = Math.floor((s % 3600) / 60);
   const ss = String(s % 60).padStart(2, '0');
   return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/**
+ * Lo que muestra cada zona de una pantalla compuesta (HU-0406) en su miniatura: el campo de IA-15 que la llena, el
+ * personaje del kit o la actividad. null si la zona queda vacía (las imágenes llegan en la etapa 5).
+ */
+export function contenidoZona(p: Pick<PantallaCompuesta, 'campos' | 'actividad' | 'personaje'>, zona: string, personaje: string | null): string | null {
+  const c = p.campos;
+  const campo = (c as unknown as Record<string, unknown>)[zona];
+  const texto = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
+  switch (zona) {
+    case 'dato': return texto(c.datoGrande) ?? texto(c.dato);
+    case 'globo': return texto(c.burbuja);
+    case 'lista': case 'tarjetas': case 'ideas': return c.items?.length ? c.items.map((i) => i.titulo).join(' · ') : null;
+    case 'opciones': return c.opciones?.length ? c.opciones.join(' · ') : null;
+    case 'retroalimentacion': return texto(c.retroOk);
+    case 'personaje': return p.personaje && personaje ? personaje : null;
+    case 'juego': case 'escena': return p.actividad ? `${NOMBRE_INTERACCION[p.actividad.tipo] ?? 'Actividad'}: los datos llegan en la etapa siguiente` : null;
+    case 'boton': return 'Continuar';
+    case 'botones': return 'Mito · Realidad';
+    default: return texto(campo);
+  }
 }

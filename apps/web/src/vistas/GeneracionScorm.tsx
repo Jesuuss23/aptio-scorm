@@ -7,6 +7,7 @@ import { api, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
 import { usd } from '../formato';
 import { EstructuraVista } from './EstructuraVista';
 import { GuionVista } from './GuionVista';
+import { PantallasVista } from './PantallasVista';
 import { ResumenMaterialVista } from './ResumenMaterialVista';
 
 const ACTIVAS = new Set<Generacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -15,11 +16,17 @@ const NOMBRE_ESTADO: Record<Generacion['estado'], string> = {
 };
 const CHIP: Partial<Record<Generacion['estado'], string>> = { EN_CURSO: 'ia', COMPLETADO: 'validado', ERROR: 'error', CANCELADO: 'aviso' };
 const CONSULTA_MS = 2000;
-/** Etapas cuyo resultado se puede abrir desde la lista (cada historia agrega la suya). */
-const RESULTADOS: Partial<Record<EtapaGeneracion['etapa'], { ver: string; ocultar: string; Vista: (p: { generacionId: string }) => ReactNode }>> = {
+/**
+ * Etapas cuyo resultado se puede abrir desde la lista (cada historia agrega la suya). Las `enVivo` se muestran solas
+ * mientras corren (CP-043) y se vuelven a pedir con cada avance (`clave`).
+ */
+const RESULTADOS: Partial<Record<EtapaGeneracion['etapa'], {
+  ver: string; ocultar: string; enVivo?: boolean; Vista: (p: { generacionId: string; clave?: string }) => ReactNode;
+}>> = {
   RESUMEN_MATERIAL: { ver: 'Ver resumen', ocultar: 'Ocultar resumen', Vista: ResumenMaterialVista },
   OBJETIVOS_ESTRUCTURA: { ver: 'Ver estructura', ocultar: 'Ocultar estructura', Vista: EstructuraVista },
   STORYBOARD_GUION: { ver: 'Ver guion', ocultar: 'Ocultar guion', Vista: GuionVista },
+  PANTALLAS: { ver: 'Ver pantallas', ocultar: 'Ocultar pantallas', enVivo: true, Vista: PantallasVista },
 };
 
 function titulo(g: Generacion): string {
@@ -147,6 +154,7 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
           <ol className="etapas" aria-label="Etapas de la generación">
             {g.etapas.map((e) => {
               const resultado = e.estado === 'COMPLETADO' ? RESULTADOS[e.etapa] : undefined;
+              const enVivo = e.estado === 'EN_CURSO' && RESULTADOS[e.etapa]?.enVivo ? RESULTADOS[e.etapa] : undefined;
               return (
               <li key={e.etapa} className={`etapa ${e.estado === 'COMPLETADO' ? 'hecha' : e.estado === 'EN_CURSO' ? 'en-curso' : ''}`} aria-label={NOMBRE_ETAPA[e.etapa]}>
                 <span className="etapa-numero" aria-hidden="true">{e.estado === 'COMPLETADO' ? '✓' : e.orden}</span>
@@ -164,6 +172,7 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
                   </button>
                 ) : null}
                 {resultado && abierta === e.etapa ? <div className="etapa-resultado"><resultado.Vista generacionId={g.id} /></div> : null}
+                {enVivo ? <div className="etapa-resultado"><enVivo.Vista generacionId={g.id} clave={e.detalle ?? ''} /></div> : null}
               </li>
               );
             })}

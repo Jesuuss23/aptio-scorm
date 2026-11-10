@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
+import { DISPOSICIONES, modeloBase } from '@aptio/schema/marca';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 
 export const USUARIO = {
@@ -105,12 +106,39 @@ function guionLoto() {
   };
 }
 
+/**
+ * Resultado de la etapa 4 (HU-0406): las pantallas LOTO de IA-15 con el kit de Minera Andina y los modelos del estilo
+ * base. Con `listas` < 30, la etapa sigue en curso y trae solo esas (CP-043); p02 queda lista después de p03 para ver
+ * que cada pantalla aparece en su lugar.
+ */
+function pantallasLoto(listas: number) {
+  const leer = (f: string) => JSON.parse(readFileSync(new URL(`../../../packages/ai/casos/loto/salidas/${f}`, import.meta.url), 'utf8'));
+  const ia15 = leer('04-IA-15-pantallas.json') as { pantallaId: string; disposicion: string; fondo: string; campos: Record<string, unknown>; personaje?: object; pedidosImagen: object[] }[];
+  const guion = guionLoto().capsulas[0]!.pantallas;
+  const orden = listas >= 30 ? ia15 : ia15.slice(0, listas + 1).filter((x) => x.pantallaId !== 'p02');
+  const pantallas = orden.map((x) => {
+    const g = guion.find((p) => p.id === x.pantallaId)!;
+    return { ...x, id: x.pantallaId, orden: Number(x.pantallaId.slice(1)), capsulaId: 'cap-loto', titulo: (g as { titulo?: string }).titulo ?? x.pantallaId, ...('actividad' in g ? { actividad: g.actividad } : {}) };
+  });
+  return {
+    total: 30,
+    kit: { nombre: 'Minera Andina', paleta: KIT_MINERA.paleta, tipografias: KIT_MINERA.tipografias, personaje: 'Ana' },
+    modelos: Object.fromEntries(DISPOSICIONES.map((d) => [d, modeloBase(d)])),
+    pantallas,
+    advertencias: [],
+    ...(listas >= 30 ? { curso: { id: '00000000-0000-4000-8000-000000000990', version: 1 } } : {}),
+  };
+}
+
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
 const ETAPAS_SIMULADAS = [
   { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
   { detalle: '3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad', costoUsd: 0.1 },
   { detalle: '30 pantallas con texto en pantalla y narración · 1 pantalla supera 30 palabras en pantalla', costoUsd: 0.45 },
+  { detalle: '30 pantallas armadas con el kit · curso validado', costoUsd: 0.6 },
 ];
+/** Pantallas que la etapa 4 deja listas en cada consulta. */
+const PANTALLAS_POR_CONSULTA = 10;
 
 /** CP-033: el manual de ejemplo tiene 84 páginas y la 42 está escaneada; un archivo «inyeccion» trae una orden para la IA (CP-102). */
 function paginasDe(nombre: string) {
@@ -144,6 +172,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   type EtapaSim = { etapa: string; orden: number; estado: string; detalle: string | null; inicio: null; fin: null; costoUsd: number };
   type GeneracionSim = { id: string; proyectoId: string; estado: string; avance: number; costoUsd: number; parametros: object; etapas: EtapaSim[]; creadoEn: string; terminadoEn: string | null };
   const generaciones: GeneracionSim[] = [];
+  const pantallasListas = new Map<string, number>();
   let falla = generacion === 'falla';
   let ajena = generacion === 'ajena';
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
@@ -308,6 +337,14 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         estadoDe(g.proyectoId, 'BORRADOR');
         return;
       }
+      if (e.etapa === 'PANTALLAS') {
+        const listas = Math.min((pantallasListas.get(g.id) ?? 0) + PANTALLAS_POR_CONSULTA, 30);
+        pantallasListas.set(g.id, listas);
+        if (listas < 30) {
+          e.detalle = `${listas} de 30 pantallas listas`;
+          return;
+        }
+      }
       Object.assign(e, { estado: 'COMPLETADO', ...ETAPAS_SIMULADAS[e.orden - 1] });
       const siguiente = g.etapas.find((x) => x.estado === 'EN_COLA');
       if (siguiente && siguiente.orden <= ETAPAS_SIMULADAS.length) {
@@ -351,7 +388,9 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (etapaDe) {
       const e = generaciones.find((x) => x.id === etapaDe[1])?.etapas.find((x) => x.etapa === etapaDe[2]);
       if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Etapa no encontrada' });
-      const datos = e.estado !== 'COMPLETADO' ? null : e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : e.etapa === 'OBJETIVOS_ESTRUCTURA' ? estructuraLoto() : e.etapa === 'STORYBOARD_GUION' ? guionLoto() : null;
+      const g = generaciones.find((x) => x.id === etapaDe[1])!;
+      const datos = e.etapa === 'PANTALLAS' && ['EN_CURSO', 'COMPLETADO'].includes(e.estado) ? pantallasLoto(e.estado === 'COMPLETADO' ? 30 : (pantallasListas.get(g.id) ?? 0))
+        : e.estado !== 'COMPLETADO' ? null : e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : e.etapa === 'OBJETIVOS_ESTRUCTURA' ? estructuraLoto() : e.etapa === 'STORYBOARD_GUION' ? guionLoto() : null;
       return responder(200, { ...e, datos });
     }
     const unaGeneracion = ruta.match(/^\/generaciones\/([0-9a-f-]+)(?:\/(cancelar|continuar))?$/);
