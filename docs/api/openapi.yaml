@@ -1784,7 +1784,10 @@ paths:
       summary: Guardar cambios del editor en una pantalla
       operationId: patch_cursos_cursoId_pantallas_pantallaId
       description: Dispara regeneración en cascada solo de lo afectado. La pantalla vuelve a borrador (RN-05-2); 409 VERSION_CAMBIO
-        si otra persona guardó antes.
+        si otra persona guardó antes. HU-0503 (SUP-38) · si cambia la narración en español de una pantalla que ya tenía
+        voz, se encola un trabajo CASCADA (cola voz) que regenera su voz, boca y subtítulos 1 s después del último
+        guardado (varios guardados seguidos dejan un solo trabajo, CP-051) y espera a que termine una generación en
+        curso. `regenerando` lista lo que se regenera; el avance se sigue en `GET /cursos/{cursoId}/narraciones`.
       parameters:
       - name: cursoId
         in: path
@@ -4856,6 +4859,7 @@ components:
           type: integer
         regenerando:
           type: array
+          description: HU-0503 · Lo que se regenera en cascada tras el cambio. Hasta el S7 solo voz-es, boca y subtitulos-es.
           items:
             type: string
             enum:

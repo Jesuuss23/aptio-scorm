@@ -15,6 +15,8 @@ export interface DatosTrabajo {
   organizacionId: string;
   /** Tarea de IA (IA-01 … IA-18) o tarea de voz, media o exportación. */
   tarea: string;
+  /** HU-0503 · La pantalla de una regeneración en cascada (`trabajoId` es entonces el curso). */
+  pantallaId?: string;
 }
 
 export type EstadoTrabajo = 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';

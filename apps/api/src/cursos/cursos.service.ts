@@ -1,13 +1,16 @@
 // HU-0501 y HU-0502 · Revisión del curso: observaciones, edición de textos y aprobación de pantallas (M05).
 // RN-05-1: aprobar exige que la pantalla no tenga observaciones que bloquean la entrega.
 // RN-05-2: una pantalla aprobada que se modifica vuelve a borrador.
+// HU-0503: corregir la narración en español regenera su voz, boca y subtítulos en cascada (trabajo CASCADA, cola voz).
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashNarracion } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
+import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
 import { type CursoDoc, observacionesRegla, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { AlmacenService } from '../recursos/almacen.service.js';
+import { ColasService } from '../trabajos/colas.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { AprobacionDto, CambioResultadoDto, FiltroNarracionesDto, FiltroObservacionesDto, NarracionDto, ObservacionDto, PantallaCambioDto, TextoI18nDto } from './curso.dto.js';
@@ -33,6 +36,7 @@ export class CursosService {
   constructor(
     private readonly baseDatos: BaseDatosService,
     private readonly almacenes: AlmacenService,
+    private readonly colas: ColasService,
   ) {}
 
   private get bd() {
@@ -168,7 +172,13 @@ export class CursosService {
       return { regenerando: [] as string[], estado: p.estado };
     });
     if (narracionCambiada.length) {
-      await this.bd.narracion.updateMany({ where: { cursoId, pantallaId, idioma: { in: narracionCambiada }, estado: 'ACTUALIZADA' }, data: { estado: 'DESACTUALIZADA' } });
+      await this.bd.narracion.updateMany({ where: { cursoId, pantallaId, idioma: { in: narracionCambiada }, estado: { in: ['ACTUALIZADA', 'ERROR'] } }, data: { estado: 'DESACTUALIZADA' } });
+    }
+    // HU-0503 (SUP-38): solo el español y solo si la pantalla ya tenía voz; el inglés se regenera desde el S7.
+    if (narracionCambiada.includes('es') && (await this.bd.narracion.count({ where: { cursoId, pantallaId, idioma: 'es' } }))) {
+      const c = await this.buscar(u, cursoId);
+      await this.colas.encolarConEspera('voz', { trabajoId: cursoId, organizacionId: c.organizacionId, tarea: TAREA_CASCADA, pantallaId }, `cascada-${cursoId}-${pantallaId}`, ESPERA_CASCADA_MS);
+      return { ...r, regenerando: [...CASCADA_ES] };
     }
     return r;
   }

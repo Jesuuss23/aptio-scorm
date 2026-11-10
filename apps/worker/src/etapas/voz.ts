@@ -124,7 +124,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
           const costo = costoVoz(audio.caracteres, audio.modelo, audio.proveedor);
           await ctx.bd.trabajoIA.create({
             data: {
-              organizacionId: ctx.organizacionId, proyectoId: proyecto.id, generacionId: ctx.generacionId, tarea: 'VOZ', tipo: 'VOZ',
+              organizacionId: ctx.organizacionId, proyectoId: proyecto.id, generacionId: ctx.generacionId || null, tarea: 'VOZ', tipo: 'VOZ',
               proveedor: audio.proveedor, modelo: audio.modelo, caracteres: audio.caracteres, costoUsd: costo, estado: 'COMPLETADO',
               intentos: intento, duracionMs: Date.now() - inicio,
             },
