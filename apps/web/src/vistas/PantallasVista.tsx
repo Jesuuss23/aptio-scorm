@@ -1,4 +1,5 @@
-// HU-0406 · Resultado de la etapa 4: las pantallas armadas con la disposición y los colores del kit. CP-043: mientras la
+// HU-0406 y HU-0407 · Resultado de la etapa 4: las pantallas armadas con la disposición y los colores del kit, y cada
+// actividad con lo que trae. CP-043: mientras la
 // etapa corre, cada pantalla lista aparece en su lugar y las que faltan se ven como espacios en espera.
 import type { PantallasCurso } from '@aptio/schema/generacion';
 import { DISPOSITIVOS, NOMBRE_DISPOSICION } from '@aptio/schema/marca';
@@ -44,7 +45,7 @@ export function PantallasVista({ generacionId, clave }: { generacionId: string; 
         </div>
       </div>
       {d.advertencias.map((a) => <p key={a} className="nota aviso">{a}</p>)}
-      {terminado ? <p className="nota">Propuesta de la IA con el kit de {d.kit.nombre}. Las imágenes, la voz y los datos de cada actividad se agregan en las etapas siguientes.</p> : null}
+      {terminado ? <p className="nota">Propuesta de la IA con el kit de {d.kit.nombre}. Cada actividad trae sus datos; las imágenes y la voz se agregan en las etapas siguientes.</p> : null}
       <ol className="pantallas-rejilla" aria-label="Pantallas">
         {Array.from({ length: Math.max(d.total, d.pantallas.length) }, (_, i) => {
           const p = d.pantallas.find((x) => x.orden === i + 1);
@@ -62,7 +63,10 @@ export function PantallasVista({ generacionId, clave }: { generacionId: string; 
             <li key={p.id} className="pantalla-celda" aria-label={`Pantalla ${p.id}: ${p.titulo}`}>
               <Miniatura definicion={modelo} dispositivo={dispositivo} fondo={p.fondo} contenido={(z) => contenidoZona(p, z, d.kit.personaje)} />
               <span className="pantalla-nombre"><span className="num">{numero}</span> {p.titulo}</span>
-              <span className="chip">{NOMBRE_DISPOSICION[p.disposicion]}</span>
+              <span className="fila-chips">
+                <span className="chip">{NOMBRE_DISPOSICION[p.disposicion]}</span>
+                {p.actividad?.interaccion?.modo === 'sumativa' ? <span className="chip aviso">Calificada</span> : null}
+              </span>
             </li>
           );
         })}

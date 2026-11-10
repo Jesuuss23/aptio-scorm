@@ -193,16 +193,18 @@ export async function ejecutarTarea<T = unknown>(
 
 /**
  * Ajusta la salida grabada del caso LOTO al pedido: de una lista por tema (IA-03) toma la del tema pedido o, si no
- * existe, la primera con el id del tema; de la lista por pantalla (IA-15), la de la pantalla pedida; y usa el
+ * existe, la primera con el id del tema; de la lista por pantalla (IA-15, IA-07), la de la pantalla pedida; y usa el
  * documentoId pedido (IA-01).
  */
 function ajustarAlPedido(datos: unknown, pedido: string): unknown {
   const temaId = pedido.match(/temaId = "([^"]+)"/)?.[1];
   const pantallaId = pedido.match(/pantallaId = "([^"]+)"/)?.[1];
-  // IA-15: una salida por pantalla; si el caso no tiene esa pantalla, la primera con el id pedido.
+  // IA-15 e IA-07: una salida por pantalla; si el caso no tiene esa pantalla, la primera del mismo tipo de actividad
+  // (IA-07) o la primera, con el id pedido.
   if (Array.isArray(datos) && pantallaId) {
-    const lista = datos as { pantallaId: string }[];
-    return lista.find((d) => d.pantallaId === pantallaId) ?? { ...lista[0]!, pantallaId };
+    const tipo = pedido.match(/tipo = "(INT-\d\d)"/)?.[1];
+    const lista = datos as { pantallaId: string; tipo?: string }[];
+    return lista.find((d) => d.pantallaId === pantallaId) ?? { ...(lista.find((d) => tipo && d.tipo === tipo) ?? lista[0]!), pantallaId };
   }
   if (Array.isArray(datos)) {
     const lista = datos as { temaId?: string; fragmentos?: { id: string }[] }[];

@@ -114,11 +114,14 @@ function guionLoto() {
 function pantallasLoto(listas: number) {
   const leer = (f: string) => JSON.parse(readFileSync(new URL(`../../../packages/ai/casos/loto/salidas/${f}`, import.meta.url), 'utf8'));
   const ia15 = leer('04-IA-15-pantallas.json') as { pantallaId: string; disposicion: string; fondo: string; campos: Record<string, unknown>; personaje?: object; pedidosImagen: object[] }[];
+  const ia07 = leer('04-IA-07-interacciones.json') as { pantallaId: string; tipo: string; modo: string; instruccion: object; datos: object; peso?: number }[];
   const guion = guionLoto().capsulas[0]!.pantallas;
   const orden = listas >= 30 ? ia15 : ia15.slice(0, listas + 1).filter((x) => x.pantallaId !== 'p02');
   const pantallas = orden.map((x) => {
     const g = guion.find((p) => p.id === x.pantallaId)!;
-    return { ...x, id: x.pantallaId, orden: Number(x.pantallaId.slice(1)), capsulaId: 'cap-loto', titulo: (g as { titulo?: string }).titulo ?? x.pantallaId, ...('actividad' in g ? { actividad: g.actividad } : {}) };
+    const datos = ia07.find((a) => a.pantallaId === x.pantallaId);
+    const actividad = datos ? { tipo: datos.tipo, consigna: 'Consigna del guion', interaccion: { modo: datos.modo, instruccion: datos.instruccion, datos: datos.datos } } : undefined;
+    return { ...x, id: x.pantallaId, orden: Number(x.pantallaId.slice(1)), capsulaId: 'cap-loto', titulo: (g as { titulo?: string }).titulo ?? x.pantallaId, ...(actividad ? { actividad } : {}) };
   });
   return {
     total: 30,
@@ -135,7 +138,7 @@ const ETAPAS_SIMULADAS = [
   { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
   { detalle: '3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad', costoUsd: 0.1 },
   { detalle: '30 pantallas con texto en pantalla y narración · 1 pantalla supera 30 palabras en pantalla', costoUsd: 0.45 },
-  { detalle: '30 pantallas armadas con el kit · curso validado', costoUsd: 0.6 },
+  { detalle: '30 pantallas armadas con el kit · 9 actividades con sus datos · curso validado', costoUsd: 0.6 },
 ];
 /** Pantallas que la etapa 4 deja listas en cada consulta. */
 const PANTALLAS_POR_CONSULTA = 10;

@@ -1,6 +1,7 @@
 // HU-0406 · Etapa 4 «Pantallas con el kit» (IA-15 v2): cada pantalla del guion sale con una disposición del kit y sus
 // campos, sin HTML. Se componen hasta 4 a la vez y cada una lista se guarda como avance para verla en Producción sin
-// esperar al resto (CP-043). Al terminar se arma el documento del curso con los bloques y se valida (CP-042).
+// esperar al resto (CP-043). Cada pantalla con actividad pide además sus datos a IA-07 (HU-0407, CP-044). Al terminar
+// se arma el documento del curso con los bloques y se valida (CP-042).
 import { createHash } from 'node:crypto';
 import { textoSeguro } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
@@ -11,8 +12,10 @@ import {
 } from '@aptio/schema/generacion';
 import { type Disposicion, KIT_INICIAL, modelosParaGenerar, type Paleta, type RolColor } from '@aptio/schema/marca';
 import type { ContextoEtapa, EjecutorEtapa } from '../generar.js';
+import { FICHAS_INTERACCION, interaccionDe, modoDe, revisarActividad, type SalidaIa07 } from './actividades.js';
 
 export const VERSION_PROMPT = 'v2';
+export const VERSION_PROMPT_ACTIVIDAD = 'v2';
 /** Pantallas que se componen a la vez (cada una es una llamada corta a la IA). */
 export const EN_PARALELO = 4;
 const FONDOS_PRIMARIO: readonly Disposicion[] = ['portada', 'seccion', 'cierre'];
@@ -54,11 +57,12 @@ const lineaItem = (it: { titulo: string; texto?: string }) =>
 
 /**
  * Bloques del curso desde los campos de IA-15 (reglas de casos/loto/README.md): cada campo es un texto con su rol e id
- * `<pantalla>-<campo>`, y el personaje un bloque propio. Las imágenes y los datos de la actividad los agregan las
- * etapas siguientes; el video, solo si el proyecto tiene uno del cliente.
+ * `<pantalla>-<campo>`, el personaje un bloque propio y la actividad, con los datos de IA-07, un bloque `interaccion`
+ * (la situación, la pregunta o la afirmación de IA-15 ya van dentro de ella). Las imágenes las agrega la etapa 5; el
+ * video, solo si el proyecto tiene uno del cliente.
  */
 export function bloquesDe(
-  p: Pick<PantallaCompuesta, 'id' | 'disposicion' | 'campos' | 'personaje'>,
+  p: Pick<PantallaCompuesta, 'id' | 'disposicion' | 'campos' | 'personaje' | 'actividad'>,
   origen: Origen,
   extra: { personajeRecursoId: string | null; videoRecursoId: string | null },
 ): Bloque[] {
@@ -74,12 +78,12 @@ export function bloquesDe(
   texto('cuerpo', c.texto, 'texto');
   texto('cuerpo', c.burbuja, 'burbuja');
   texto('destacado', c.dato, 'dato');
-  texto('cuerpo', c.situacion, 'situacion');
-  texto('cuerpo', c.pregunta, 'pregunta');
-  texto('cuerpo', c.afirmacion, 'afirmacion');
   (c.items ?? []).forEach((it, i) => texto('cuerpo', lineaItem(it), `item-${i + 1}`));
   if (p.personaje && extra.personajeRecursoId) {
     bloques.push({ id: `${p.id}-personaje`, tipo: 'personaje', recursoId: extra.personajeRecursoId, pose: p.personaje.pose, lado: p.personaje.lado });
+  }
+  if (p.actividad?.interaccion) {
+    bloques.push({ id: `${p.id}-actividad`, tipo: 'interaccion', interaccion: { tipo: p.actividad.tipo, ...p.actividad.interaccion } });
   }
   if (p.disposicion === 'video' && extra.videoRecursoId) {
     bloques.push({ id: `${p.id}-video`, tipo: 'video', recursoId: extra.videoRecursoId, marcadores: [], reglas: { impedirAdelantar: true, porcentajeMinimo: 90 } });
@@ -96,9 +100,10 @@ function tipoCurso(tipo: string, disposicion: Disposicion): 'portada' | 'conteni
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-export function textoPantallas(listas: number, total: number, terminado: boolean): string {
+export function textoPantallas(listas: number, total: number, terminado: boolean, actividades = 0): string {
   if (!terminado) return `${listas} de ${total} pantallas listas`;
-  return `${plural(total, 'pantalla armada', 'pantallas armadas')} con el kit · curso validado`;
+  const conDatos = actividades ? ` · ${plural(actividades, 'actividad', 'actividades')} con sus datos` : '';
+  return `${plural(total, 'pantalla armada', 'pantallas armadas')} con el kit${conDatos} · curso validado`;
 }
 
 /** Corre `trabajo` sobre la lista con a lo más `n` a la vez, en orden de llegada. */
@@ -150,6 +155,8 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
 
   const kitNombre = proyecto.cliente.nombre;
   const objetivos = new Map(estructura.objetivos.map((o) => [o.id, o]));
+  const deEstructura = new Map(estructura.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas.map((p) => [p.id, p]))));
+  const ideas = new Map(resumen.ideas.map((x) => [x.id, x]));
   const lista = guion.capsulas.flatMap((c) => c.pantallas.map((p) => ({ capsulaId: c.id, p })));
   const listas: (PantallaCompuesta | undefined)[] = new Array(lista.length);
   const datos = (): PantallasCurso => ({
@@ -168,6 +175,28 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
       return ctx.avance(textoPantallas(d.pantallas.length, lista.length, false), d);
     });
     return cola;
+  };
+
+  /** IA-07 para una pantalla con actividad: el reto final es sumativo y lo demás formativo. */
+  const datosActividad = async (p: PantallaGuion) => {
+    const tipo = p.actividad!.tipo;
+    const e = deEstructura.get(p.id);
+    const modo = modoDe(e?.tipo ?? p.tipo, tipo);
+    const usadas = (e?.fragmentoIds ?? []).flatMap((id) => ideas.get(id) ?? []);
+    const r = await ctx.ia<SalidaIa07>('IA-07', {
+      cliente: { nombre: proyecto.cliente.nombre },
+      glosario: proyecto.cliente.glosario.map((t) => ({ termino: t.termino, traduccion: t.traduccion, noTraducir: t.noTraducir })),
+      pantalla: { id: p.id }, tipo, modo,
+      nombreInteraccion: FICHAS_INTERACCION[tipo]?.nombre ?? tipo,
+      fichaInteraccion: FICHAS_INTERACCION[tipo]?.ficha ?? null,
+      objetivos: estructura.objetivos.map((o) => `${o.id} · ${textoSeguro(o.texto.es ?? o.verbo)}`).join('\n'),
+      guion: JSON.stringify({ id: p.id, titulo: textoSeguro(p.titulo), textoPantalla: textoSeguro(p.textoPantalla), narracion: textoSeguro(p.narracion), consigna: textoSeguro(p.actividad!.consigna) }, null, 2),
+      fragmentos: usadas.map((x) => `${x.id} · documento ${x.materialId} · p. ${x.paginas.join(', ')} · ${textoSeguro(x.texto)}`).join('\n') || null,
+    }, {
+      version: VERSION_PROMPT_ACTIVIDAD,
+      ...(ctx.proveedor !== 'simulado' ? { validarExtra: revisarActividad({ pantallaId: p.id, tipo, modo, objetivoIds: [...objetivos.keys()] }) } : {}),
+    });
+    return interaccionDe(p.id, r.datos);
   };
 
   await enParalelo(lista, EN_PARALELO, async ({ capsulaId, p }, i) => {
@@ -190,11 +219,17 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
       ...(ctx.proveedor !== 'simulado' ? { validarExtra: revisarPantalla({ pantalla: p, permitidas, vecinas }) } : {}),
     });
     const { pantallaId: _id, actividad: _a, personaje: pose, ...salida } = r.datos;
-    // El personaje solo si el kit tiene uno; la actividad es la del guion (sus datos llegan con IA-07).
+    // La actividad es la del guion, con sus datos de IA-07 (HU-0407).
+    const actividad = p.actividad ? { ...p.actividad, interaccion: await datosActividad(p) } : undefined;
+    // En exploración, la escena que pidió IA-15 es la imagen de la actividad: lleva su id para la etapa de ilustraciones.
+    const pedidosImagen = actividad?.tipo === 'INT-06'
+      ? salida.pedidosImagen.map((x) => (x.uso === 'escena' ? { ...x, id: `${p.id}-escena` } : x))
+      : salida.pedidosImagen;
+    // El personaje solo si el kit tiene uno.
     listas[i] = {
-      ...salida, id: p.id, orden: i + 1, capsulaId, titulo: p.titulo,
+      ...salida, pedidosImagen, id: p.id, orden: i + 1, capsulaId, titulo: p.titulo,
       ...(personaje && pose ? { personaje: pose } : {}),
-      ...(p.actividad ? { actividad: p.actividad } : {}),
+      ...(actividad ? { actividad } : {}),
     };
     await avisar();
   });
@@ -222,6 +257,10 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
   if (personaje) {
     agregarRecurso({ id: personaje.recursoId, tipo: 'svg', origen: 'biblioteca', nombre: recursoDe(personaje.recursoId)?.nombre ?? 'personaje.svg', mime: 'image/svg+xml' });
   }
+  // La escena de cada exploración: se registra ahora y la dibuja la etapa de ilustraciones.
+  for (const x of pantallas.filter((y) => y.actividad?.tipo === 'INT-06')) {
+    agregarRecurso({ id: `${x.id}-escena`, tipo: 'imagen', origen: 'generado', nombre: `${x.id}-escena.png`, mime: 'image/png' });
+  }
   if (video) {
     const rec = recursoDe(video.recursoId)!;
     agregarRecurso({ id: rec.id, tipo: 'video', origen: 'cliente', nombre: rec.nombre, mime: rec.mime });
@@ -248,6 +287,8 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
     })),
   }));
 
+  const conDatos = pantallas.filter((x) => x.actividad?.interaccion);
+  const sumativa = conDatos.some((x) => x.actividad!.interaccion!.modo === 'sumativa');
   const ahora = new Date().toISOString();
   const documento = {
     versionEsquema: VERSION_ESQUEMA,
@@ -259,7 +300,8 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
     idiomas: ['es'], modoIdioma: 'unico', kitMarcaId: kit?.id ?? 'estilo-base',
     objetivos: estructura.objetivos.map((o) => ({ id: o.id, texto: soloEs(o.texto, o.verbo), nivelBloom: o.nivelBloom })),
     modulos,
-    seguimiento: { criterioCompletado: 'pantallas-obligatorias', notaMinima: 70, intentosMaximos: null, notaReportada: 'mejor' },
+    // Con un reto final sumativo, la nota define el completado; sin él, basta recorrer las pantallas obligatorias.
+    seguimiento: { criterioCompletado: sumativa ? 'sumativa' : 'pantallas-obligatorias', notaMinima: 70, intentosMaximos: null, notaReportada: 'mejor' },
     recursos,
   };
   const v = validarCurso(documento);
@@ -276,7 +318,7 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
   });
 
   const final: PantallasCurso = { ...datos(), pantallas, advertencias, curso: { id: curso.id, version: curso.version } };
-  return { texto: textoPantallas(pantallas.length, lista.length, true), datos: final };
+  return { texto: textoPantallas(pantallas.length, lista.length, true, conDatos.length), datos: final };
 };
 
 function soloEs(t: { es?: string; en?: string }, respaldo: string): { es: string } {

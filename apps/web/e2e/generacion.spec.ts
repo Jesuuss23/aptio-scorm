@@ -150,7 +150,7 @@ test('CP-043 · las pantallas aparecen en Producción mientras la etapa 4 corre;
   // p02 quedó lista después de p03: su lugar sigue en espera.
   await expect(vista.getByRole('listitem', { name: 'Pantalla 02 en espera' })).toBeVisible();
 
-  await expect(fila).toContainText('30 pantallas armadas con el kit · curso validado', { timeout: 15_000 });
+  await expect(fila).toContainText('30 pantallas armadas con el kit · 9 actividades con sus datos · curso validado', { timeout: 15_000 });
   await fila.getByRole('button', { name: 'Ver pantallas' }).click();
   const final = fila.getByRole('region', { name: 'Pantallas armadas con el kit' });
   await expect(final.getByRole('status')).toHaveText('30 de 30 pantallas');
@@ -158,7 +158,10 @@ test('CP-043 · las pantallas aparecen en Producción mientras la etapa 4 corre;
   await expect(final.getByRole('listitem', { name: /en espera$/ })).toHaveCount(0);
   const p06 = final.getByRole('listitem', { name: 'Pantalla p06: Seis tipos de energía' });
   await expect(p06).toContainText('Lista');
-  await expect(final.getByRole('listitem', { name: /^Pantalla p10:/ })).toContainText('Clasificar');
+  // CP-044: cada actividad muestra lo que trae; el reto final va calificado.
+  await expect(final.getByRole('listitem', { name: /^Pantalla p10:/ })).toContainText('Clasificar: 2 grupos · 7 elementos');
+  await expect(final.getByRole('listitem', { name: /^Pantalla p28:/ })).toContainText('Calificada');
+  await expect(final.getByText('Calificada')).toHaveCount(1);
   await final.getByRole('button', { name: 'Celular' }).click();
   await expect(final.locator('.miniatura.celular')).toHaveCount(30);
 });
