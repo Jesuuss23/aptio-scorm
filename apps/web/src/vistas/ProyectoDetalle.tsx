@@ -1,11 +1,12 @@
 // HU-0302 · Detalle del proyecto: resumen, datos técnicos que se completan después y perfil de entrega propuesto (CP-031).
-// HU-0304 · Material del cliente con el texto por página.
+// HU-0304 · Material del cliente con el texto por página. HU-0401 · Generación del SCORM con sus 11 etapas.
 import { Cabecera } from '@aptio/ui';
 import { FORMATOS, LMS_DESTINO, NOMBRE_ESTADO, NOMBRE_PERFIL, perfilPropuesto } from '@aptio/schema/proyecto';
-import { type FormEvent, useEffect, useState } from 'react';
-import { api, CREAN_PROYECTOS, ErrorApi, type Proyecto, type Rol } from '../api';
+import { type FormEvent, useCallback, useEffect, useState } from 'react';
+import { api, CREAN_PROYECTOS, ErrorApi, type Material, type Proyecto, type Rol } from '../api';
 import { navegar } from '../ruta';
 import { usd } from '../formato';
+import { GeneracionScorm } from './GeneracionScorm';
 import { MaterialCliente } from './MaterialCliente';
 
 const NOMBRE_FORMATO: Record<(typeof FORMATOS)[number], string> = {
@@ -17,7 +18,12 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [lms, setLms] = useState('');
+  const [materiales, setMateriales] = useState<Material[]>([]);
   const puedeEditar = CREAN_PROYECTOS.includes(rol);
+  // Tras lanzar, cancelar o terminar una generación cambian el estado y el costo del proyecto.
+  const recargar = useCallback(() => {
+    api.proyecto(id).then(setProyecto, () => undefined);
+  }, [id]);
 
   useEffect(() => {
     api.proyecto(id).then(
@@ -92,7 +98,6 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
             <div><dt>Avance</dt><dd>{proyecto.avance.total ? `${proyecto.avance.aprobadas} de ${proyecto.avance.total} pantallas aprobadas` : 'Sin generar'}</dd></div>
             <div><dt>Costo de IA</dt><dd>{usd(proyecto.costoIaUsd)}</dd></div>
           </dl>
-          <div className="nota">El proyecto ya tiene lo necesario para generar. El generador se habilita en el siguiente sprint (S2).</div>
         </section>
 
         <form className="tarjeta kit-bloque" onSubmit={guardarDatos} aria-label="Datos técnicos">
@@ -125,7 +130,13 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
           {puedeEditar ? <div className="acciones-form"><button className="boton primario" type="submit">Guardar datos técnicos</button></div> : null}
         </form>
       </div>
-      <MaterialCliente proyectoId={proyecto.id} puedeEditar={puedeEditar && proyecto.estado !== 'ARCHIVADO'} />
+      <GeneracionScorm
+        proyectoId={proyecto.id}
+        puedeGenerar={puedeEditar && proyecto.estado !== 'ARCHIVADO'}
+        materialListo={materiales.some((m) => m.estado === 'listo') && !materiales.some((m) => m.estado === 'pendiente' || m.estado === 'procesando')}
+        alCambiar={recargar}
+      />
+      <MaterialCliente proyectoId={proyecto.id} puedeEditar={puedeEditar && proyecto.estado !== 'ARCHIVADO'} alCambiar={setMateriales} />
     </>
   );
 }

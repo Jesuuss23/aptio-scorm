@@ -1,0 +1,141 @@
+// HU-0401 y HU-0408 · Orquestador de la generación (cola ia, tarea GENERAR): corre las 11 etapas en orden, salta las
+// terminadas (continuar no repite trabajo), revisa la cancelación entre etapas y publica cada cambio por SSE.
+// Un error deja la etapa y la generación en ERROR sin relanzar: BullMQ no la reintenta sola, se continúa a mano.
+import { type ProveedorTexto, type ResultadoTarea, SalidaNoValida } from '@aptio/ai';
+import { type EstadoTrabajo, publicarEvento } from '@aptio/colas';
+import type { Prisma, PrismaClient } from '@aptio/db';
+import { DETALLE_PROXIMAMENTE, ETAPAS, type Etapa, TAREA_GENERAR } from '@aptio/schema/generacion';
+import type { Redis } from 'ioredis';
+import { tareaRegistrada } from './ia.js';
+import type { TrabajoEnCola } from './procesar.js';
+
+export interface ContextoEtapa {
+  generacionId: string;
+  organizacionId: string;
+  proyectoId: string;
+  parametros: Record<string, unknown>;
+  /** Datos guardados por las etapas ya terminadas de esta generación. */
+  anteriores: Partial<Record<Etapa, unknown>>;
+  bd: PrismaClient;
+  /** Ejecuta una tarea de IA registrada en TrabajoIA y suma su costo a la etapa. */
+  ia<T = unknown>(tarea: string, variables: Record<string, unknown>, opciones?: Parameters<typeof tareaRegistrada>[5]): Promise<ResultadoTarea<T>>;
+}
+
+export interface ResultadoEtapa {
+  /** Resumen legible para la pantalla de avance. */
+  texto: string;
+  /** Lo que reciben las etapas siguientes (`anteriores`). */
+  datos?: unknown;
+}
+
+export type EjecutorEtapa = (ctx: ContextoEtapa) => Promise<ResultadoEtapa>;
+
+export interface DependenciasGenerador {
+  bd: PrismaClient;
+  redis: Redis;
+  proveedor: ProveedorTexto;
+  ejecutores: Partial<Record<Etapa, EjecutorEtapa>>;
+}
+
+const redondear = (usd: number) => Math.round(usd * 10_000) / 10_000;
+
+export function crearGenerador({ bd, redis, proveedor, ejecutores }: DependenciasGenerador) {
+  return async function generar(trabajo: TrabajoEnCola): Promise<{ estado: EstadoTrabajo }> {
+    const { trabajoId: generacionId, organizacionId } = trabajo.data;
+    // La generación se busca con la organización del trabajo: nunca se procesa la de otra.
+    const g = await bd.generacion.findFirst({ where: { id: generacionId, organizacionId }, include: { etapas: { orderBy: { orden: 'asc' } } } });
+    if (!g) throw new Error(`Generación ${generacionId} no existe en la organización`);
+
+    const avance = async () => {
+      const hechas = await bd.generacionEtapa.count({ where: { generacionId, estado: 'COMPLETADO' } });
+      return Math.round((hechas / ETAPAS.length) * 100);
+    };
+    const emitir = async (tarea: string, estado: EstadoTrabajo, mensaje?: string) =>
+      publicarEvento(redis, {
+        tipo: 'estado', trabajoId: generacionId, organizacionId, cola: 'ia', tarea, estado, progreso: await avance(),
+        ...(mensaje ? { mensaje } : {}), en: new Date().toISOString(),
+      });
+
+    // Solo arranca si sigue activa: si la cancelaron antes de empezar, no se hace nada. EN_CURSO cubre el reintento de
+    // BullMQ cuando el worker se cayó a mitad.
+    const arranque = await bd.generacion.updateMany({ where: { id: generacionId, estado: { in: ['EN_COLA', 'EN_CURSO'] } }, data: { estado: 'EN_CURSO' } });
+    if (!arranque.count) return { estado: g.estado };
+    await emitir(TAREA_GENERAR, 'EN_CURSO');
+
+    const anteriores: Partial<Record<Etapa, unknown>> = {};
+    for (const e of g.etapas) {
+      if (e.estado === 'COMPLETADO') anteriores[e.etapa as Etapa] = (e.detalle as { datos?: unknown } | null)?.datos;
+    }
+
+    for (const e of g.etapas) {
+      if (e.estado === 'COMPLETADO') continue;
+      const etapa = e.etapa as Etapa;
+      const ejecutor = ejecutores[etapa];
+      if (!ejecutor) {
+        // Las etapas sin ejecutor (sprints siguientes) quedan en cola con el aviso; la generación termina aquí.
+        const pendientes = g.etapas.filter((x) => x.orden >= e.orden && x.estado !== 'COMPLETADO').map((x) => x.id);
+        await bd.generacionEtapa.updateMany({ where: { id: { in: pendientes } }, data: { estado: 'EN_COLA', detalle: { texto: DETALLE_PROXIMAMENTE } } });
+        break;
+      }
+
+      const empezo = await bd.generacionEtapa.updateMany({ where: { id: e.id, estado: { in: ['EN_COLA', 'EN_CURSO'] } }, data: { estado: 'EN_CURSO', inicio: new Date(), fin: null } });
+      if (!empezo.count) return { estado: 'CANCELADO' };
+      await emitir(etapa, 'EN_CURSO');
+
+      let costo = 0;
+      const ctx: ContextoEtapa = {
+        generacionId, organizacionId, proyectoId: g.proyectoId, parametros: g.parametros as Record<string, unknown>, anteriores, bd,
+        async ia<T = unknown>(tarea: string, variables: Record<string, unknown>, opciones?: Parameters<typeof tareaRegistrada>[5]) {
+          try {
+            const r = await tareaRegistrada<T>(bd, { organizacionId, proyectoId: g.proyectoId, generacionId }, proveedor, tarea, variables, opciones);
+            costo = redondear(costo + r.costoUsd);
+            return r;
+          } catch (err) {
+            if (err instanceof SalidaNoValida) costo = redondear(costo + err.registro.costoUsd);
+            throw err;
+          }
+        },
+      };
+
+      let resultado: ResultadoEtapa | undefined;
+      let fallo: string | undefined;
+      try {
+        resultado = await ejecutor(ctx);
+      } catch (err) {
+        fallo = err instanceof Error ? err.message : String(err);
+      }
+      // El costo se paga aunque la etapa falle o la cancelen mientras corría.
+      if (costo > 0) await bd.generacion.update({ where: { id: generacionId }, data: { costoUsd: { increment: costo } } });
+
+      if (fallo !== undefined) {
+        const marcada = await bd.generacionEtapa.updateMany({
+          where: { id: e.id, estado: 'EN_CURSO' }, data: { estado: 'ERROR', fin: new Date(), costoUsd: costo, detalle: { texto: fallo } },
+        });
+        if (!marcada.count) return { estado: 'CANCELADO' };
+        await bd.generacion.updateMany({ where: { id: generacionId, estado: 'EN_CURSO' }, data: { estado: 'ERROR', terminadoEn: new Date() } });
+        await bd.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'BORRADOR' } });
+        await emitir(etapa, 'ERROR', fallo);
+        await emitir(TAREA_GENERAR, 'ERROR', fallo);
+        return { estado: 'ERROR' };
+      }
+
+      // CP-045: si la cancelaron mientras corría, la API ya marcó la etapa CANCELADO y su resultado no se guarda.
+      const detalle = { texto: resultado!.texto, ...(resultado!.datos !== undefined ? { datos: resultado!.datos } : {}) } as Prisma.InputJsonValue;
+      const guardada = await bd.generacionEtapa.updateMany({
+        where: { id: e.id, estado: 'EN_CURSO' }, data: { estado: 'COMPLETADO', fin: new Date(), costoUsd: costo, detalle },
+      });
+      if (!guardada.count) return { estado: 'CANCELADO' };
+      anteriores[etapa] = resultado!.datos;
+      await emitir(etapa, 'COMPLETADO');
+      await trabajo.updateProgress(await avance());
+    }
+
+    const fin = await bd.generacion.updateMany({ where: { id: generacionId, estado: 'EN_CURSO' }, data: { estado: 'COMPLETADO', terminadoEn: new Date() } });
+    if (!fin.count) return { estado: 'CANCELADO' };
+    // El proyecto pasa a revisión solo con las 11 etapas hechas; si faltan etapas por habilitar, vuelve a borrador.
+    const completas = (await avance()) === 100;
+    await bd.proyecto.update({ where: { id: g.proyectoId }, data: { estado: completas ? 'REVISION' : 'BORRADOR' } });
+    await emitir(TAREA_GENERAR, 'COMPLETADO');
+    return { estado: 'COMPLETADO' };
+  };
+}
