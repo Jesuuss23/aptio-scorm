@@ -3,12 +3,13 @@
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas } from '@aptio/colas';
-import { proveedorDesdeEntorno, proveedorSimulado, transcriptorDesdeEntorno } from '@aptio/ai';
+import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
 import { TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { EJECUTORES } from './etapas/index.js';
+import { crearEtapaVoz } from './etapas/voz.js';
 import { cerrarOcr, ocrTesseract } from './extraer/ocr.js';
 import { crearGenerador } from './generar.js';
 import { mediosFfmpeg } from './extraer/medios.js';
@@ -31,7 +32,9 @@ const extraer = crearExtractor({ bd: prisma, redis, leer: (clave) => almacen.lee
 // Video y audio del cliente (HU-0305): transcripción con marcas de tiempo.
 const transcribir = crearTranscriptor({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), medios: mediosFfmpeg, proveedor: transcriptorDesdeEntorno(process.env) });
 // Generación de un proyecto (HU-0401): las 11 etapas en orden con el proveedor de texto del entorno.
-const generar = crearGenerador({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: EJECUTORES });
+// La etapa 6 (HU-0701) necesita la voz del entorno y el almacenamiento para guardar los audios.
+const vozEs = crearEtapaVoz({ sintetizar: sintetizadorDesdeEntorno(process.env), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
+const generar = crearGenerador({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: { ...EJECUTORES, VOZ_ES: vozEs } });
 const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
   if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);

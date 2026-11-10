@@ -1,15 +1,16 @@
 // HU-0501 y HU-0502 · Revisión del curso: observaciones, edición de textos y aprobación de pantallas (M05).
 // RN-05-1: aprobar exige que la pantalla no tenga observaciones que bloquean la entrega.
 // RN-05-2: una pantalla aprobada que se modifica vuelve a borrador.
-import { createHash } from 'node:crypto';
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { hashNarracion } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { type CursoDoc, observacionesRegla, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { AlmacenService } from '../recursos/almacen.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
-import type { AprobacionDto, CambioResultadoDto, FiltroObservacionesDto, ObservacionDto, PantallaCambioDto, TextoI18nDto } from './curso.dto.js';
+import type { AprobacionDto, CambioResultadoDto, FiltroNarracionesDto, FiltroObservacionesDto, NarracionDto, ObservacionDto, PantallaCambioDto, TextoI18nDto } from './curso.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 type Texto = { es?: string; en?: string };
@@ -29,7 +30,10 @@ function limpio(t: TextoI18nDto | undefined): Texto | null {
 
 @Injectable()
 export class CursosService {
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(
+    private readonly baseDatos: BaseDatosService,
+    private readonly almacenes: AlmacenService,
+  ) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -53,6 +57,30 @@ export class CursosService {
     });
     return lista.map((o) => ({
       id: o.id, pantallaId: o.pantallaId, tipo: o.tipo, severidad: o.severidad, mensaje: o.mensaje, origen: o.origen, resuelta: o.resuelta, creadoEn: o.creadoEn.toISOString(),
+    }));
+  }
+
+  /** HU-0701 · Narraciones del curso en el orden de las pantallas, con su audio firmado por 15 minutos. */
+  async narraciones(u: UsuarioSesion, cursoId: string, f: FiltroNarracionesDto): Promise<NarracionDto[]> {
+    const c = await this.buscar(u, cursoId);
+    const filas = await this.bd.narracion.findMany({ where: { cursoId, ...(f.idioma ? { idioma: f.idioma } : {}) } });
+    const recursos = await this.bd.recurso.findMany({
+      where: { id: { in: filas.flatMap((n) => (n.audioRecursoId ? [n.audioRecursoId] : [])) }, organizacionId: c.organizacionId },
+      select: { id: true, claveS3: true, duracionMs: true, nombre: true },
+    });
+    const orden = pantallasDe(c.documento as unknown as CursoDoc);
+    const posicion = new Map(orden.map((p, i) => [p.id, i]));
+    const textos = new Map(orden.map((p) => [p.id, p.narracion?.texto as Texto | undefined]));
+    filas.sort((a, b) => (posicion.get(a.pantallaId) ?? 1e9) - (posicion.get(b.pantallaId) ?? 1e9) || a.idioma.localeCompare(b.idioma));
+    return Promise.all(filas.map(async (n) => {
+      const r = recursos.find((x) => x.id === n.audioRecursoId);
+      const texto = textos.get(n.pantallaId)?.[n.idioma as 'es' | 'en'];
+      return {
+        pantallaId: n.pantallaId, idioma: n.idioma, origen: n.origen, estado: n.estado,
+        ...(texto ? { texto } : {}), ...(n.voz ? { voz: n.voz } : {}),
+        ...(r?.duracionMs ? { duracionS: Math.round(r.duracionMs / 100) / 10 } : {}),
+        ...(r ? { audioUrl: await this.almacenes.almacen.urlDescarga(r.claveS3, r.nombre) } : {}),
+      };
     }));
   }
 
@@ -124,7 +152,7 @@ export class CursosService {
           const texto = t[idioma as 'es' | 'en'];
           if (!texto) continue;
           // El hash liga el audio al texto: si cambia, el audio queda desactualizado (la voz se regenera en el S4).
-          audio.hashTexto = createHash('sha256').update(`${texto}|${audio.voz.voz}|${audio.voz.velocidad ?? 1}`).digest('hex');
+          audio.hashTexto = hashNarracion(texto, audio.voz.voz, audio.voz.velocidad ?? 1);
           if (audio.estado === 'generado') audio.estado = 'desactualizado';
         }
         cambios++;

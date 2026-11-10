@@ -29,6 +29,13 @@ export interface ContextoEtapa {
    * esperar al resto). Si la etapa ya no está en curso no guarda nada.
    */
   avance(texto: string, datos: unknown): Promise<void>;
+  /**
+   * Para las llamadas que no son de texto (voz, imagen): revisa si cancelaron la generación antes de gastar y suma su
+   * costo a la etapa (lanza GeneracionCancelada si ya no está en curso).
+   */
+  gastar(usd: number): Promise<void>;
+  /** Lanza GeneracionCancelada si la etapa ya no está en curso. */
+  comprobar(): Promise<void>;
 }
 
 export interface ResultadoEtapa {
@@ -94,9 +101,12 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
       const etapa = e.etapa as Etapa;
       const ejecutor = ejecutores[etapa];
       if (!ejecutor) {
-        // Las etapas sin ejecutor (sprints siguientes) quedan en cola con el aviso; la generación termina aquí.
-        const pendientes = g.etapas.filter((x) => x.orden >= e.orden && x.estado !== 'COMPLETADO').map((x) => x.id);
+        // Una etapa sin ejecutor (sprint siguiente) queda en cola con el aviso. Si alguna posterior ya existe, la
+        // generación sigue con ella (SUP-24: Ilustraciones, del S9, no frena la voz del S4); si no, termina aquí.
+        const siguen = g.etapas.some((x) => x.orden > e.orden && x.estado !== 'COMPLETADO' && ejecutores[x.etapa as Etapa]);
+        const pendientes = siguen ? [e.id] : g.etapas.filter((x) => x.orden >= e.orden && x.estado !== 'COMPLETADO').map((x) => x.id);
         await bd.generacionEtapa.updateMany({ where: { id: { in: pendientes } }, data: { estado: 'EN_COLA', detalle: { texto: DETALLE_PROXIMAMENTE } } });
+        if (siguen) continue;
         break;
       }
 
@@ -105,12 +115,20 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
       await emitir(etapa, 'EN_CURSO');
 
       let costo = 0;
+      const comprobar = async () => {
+        const actual = await bd.generacionEtapa.findUnique({ where: { id: e.id }, select: { estado: true } });
+        if (actual?.estado !== 'EN_CURSO') throw new GeneracionCancelada();
+      };
       const ctx: ContextoEtapa = {
         generacionId, organizacionId, proyectoId: g.proyectoId, parametros: g.parametros as Record<string, unknown>, anteriores, bd,
         proveedor: proveedor.nombre,
+        comprobar,
+        async gastar(usd: number) {
+          costo = redondear(costo + usd);
+          await comprobar();
+        },
         async ia<T = unknown>(tarea: string, variables: Record<string, unknown>, opciones?: Parameters<typeof tareaRegistrada>[5]) {
-          const actual = await bd.generacionEtapa.findUnique({ where: { id: e.id }, select: { estado: true } });
-          if (actual?.estado !== 'EN_CURSO') throw new GeneracionCancelada();
+          await comprobar();
           try {
             const r = await tareaRegistrada<T>(bd, { organizacionId, proyectoId: g.proyectoId, generacionId }, proveedor, tarea, variables, opciones);
             costo = redondear(costo + r.costoUsd);

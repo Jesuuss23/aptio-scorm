@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { ArrayUnique, IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 
 const recortar = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -47,4 +47,20 @@ export class ObservacionDto {
   @ApiProperty({ enum: ['regla', 'ia', 'usuario'] }) origen: string;
   @ApiProperty() resuelta: boolean;
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
+}
+
+export class FiltroNarracionesDto {
+  @ApiPropertyOptional({ enum: ['es', 'en'] }) @IsOptional() @IsIn(['es', 'en']) idioma?: 'es' | 'en';
+}
+
+/** HU-0701 · Una narración del curso: estado, duración, voz y el audio (URL firmada de 15 minutos). */
+export class NarracionDto {
+  @ApiProperty() pantallaId: string;
+  @ApiProperty({ enum: ['es', 'en'] }) idioma: string;
+  @ApiPropertyOptional() texto?: string;
+  @ApiPropertyOptional({ description: 'Duración del audio en segundos' }) duracionS?: number;
+  @ApiProperty({ enum: ['tts', 'grabacion'] }) origen: string;
+  @ApiPropertyOptional() voz?: string;
+  @ApiProperty({ enum: ['ACTUALIZADA', 'DESACTUALIZADA', 'GENERANDO', 'ERROR'] }) estado: string;
+  @ApiPropertyOptional({ format: 'uri' }) audioUrl?: string;
 }
