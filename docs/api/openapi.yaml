@@ -1268,7 +1268,12 @@ paths:
       - Proyectos
       summary: Agregar material o tema
       operationId: post_proyectos_proyectoId_materiales
-      description: Inicia extracción de texto o transcripción
+      description: >-
+        HU-0304. Con recursoId (un archivo ya subido y verificado por su tipo real, CP-034) encola la extracción de
+        texto por página en la cola media; las páginas escaneadas pasan por OCR (CP-033). Con tema, el material queda
+        listo sin archivo. Agregar dos veces el mismo archivo devuelve el material existente. Roles: administración,
+        diseño instruccional y producción. Errores 422: MATERIAL_INCOMPLETO (ni archivo ni tema, o ambos),
+        TIPO_NO_PERMITIDO (no es PDF, .docx ni .pptx), TRANSCRIPCION_PENDIENTE (video y audio llegan con HU-0305, S2).
       parameters:
       - name: proyectoId
         in: path
@@ -1302,6 +1307,7 @@ paths:
       - Proyectos
       summary: Listar material
       operationId: get_proyectos_proyectoId_materiales
+      description: Todos los roles del proyecto; el revisor del cliente solo los proyectos de su cliente.
       parameters:
       - name: proyectoId
         in: path
@@ -3647,6 +3653,10 @@ components:
           type: string
           format: uuid
           nullable: true
+        nombre:
+          type: string
+          nullable: true
+          description: Nombre del archivo subido; null para un tema.
         tema:
           type: string
           nullable: true
@@ -3657,10 +3667,19 @@ components:
           - procesando
           - listo
           - error
+        error:
+          type: string
+          nullable: true
+          description: Motivo legible cuando estado = error.
         paginas:
           type: array
+          description: Texto por página (o diapositiva). Vacío hasta que el worker termina la extracción.
           items:
             type: object
+            required:
+            - n
+            - texto
+            - escaneada
             properties:
               n:
                 type: integer
@@ -3668,6 +3687,15 @@ components:
                 type: string
               escaneada:
                 type: boolean
+                description: La página no tenía capa de texto y se leyó con OCR (español e inglés).
+              posibleInstruccion:
+                type: boolean
+                description: >-
+                  El texto parece una orden dirigida a la IA (HU-1402). Se trata como dato del cliente, delimitado en
+                  el prompt, y se avisa en la interfaz (CP-102).
+        creadoEn:
+          type: string
+          format: date-time
         mapaTemas:
           type: array
           items:
@@ -3689,25 +3717,16 @@ components:
                 type: string
     MaterialEntrada:
       type: object
-      required:
-      - tipo
       properties:
-        tipo:
-          type: string
-          enum:
-          - PDF
-          - WORD
-          - POWERPOINT
-          - VIDEO
-          - AUDIO
-          - IMAGEN
-          - TEMA
         recursoId:
           type: string
           format: uuid
+          description: Archivo del proyecto ya subido; el tipo (PDF, WORD, POWERPOINT) se deduce de su tipo real.
         tema:
           type: string
-      description: recursoId para archivos; tema cuando el cliente solo da el tema.
+          minLength: 3
+          maxLength: 500
+      description: Exactamente uno de recursoId (archivos) o tema (cuando el cliente solo da el tema).
     SubidaSolicitud:
       type: object
       required:

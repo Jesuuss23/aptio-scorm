@@ -6,7 +6,9 @@ import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas } fro
 import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
 import { Queue, Worker } from 'bullmq';
-import { crearProcesador } from './procesar.js';
+import { cerrarOcr, ocrTesseract } from './extraer/ocr.js';
+import { crearExtractor, TAREA_EXTRAER } from './material.js';
+import { crearProcesador, type TrabajoEnCola } from './procesar.js';
 import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
 
 const redis = crearRedis();
@@ -17,9 +19,14 @@ const procesar = crearProcesador({
   modo: process.env.PROVEEDORES_MODO ?? 'simulado',
 });
 
+// Material del cliente (HU-0304): texto por página con OCR para las escaneadas.
+const almacen = new Almacen();
+const extraer = crearExtractor({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), ocr: ocrTesseract });
+const despachar = (trabajo: TrabajoEnCola) => (trabajo.data.tarea === TAREA_EXTRAER ? extraer(trabajo) : procesar(trabajo));
+
 const trabajadores = COLAS.map(
   (cola) =>
-    new Worker<DatosTrabajo>(cola, procesar, {
+    new Worker<DatosTrabajo>(cola, despachar, {
       connection: opcionesRedis(),
       prefix: prefijoColas(),
       concurrency: Number(process.env.WORKER_CONCURRENCIA ?? 2),
@@ -27,7 +34,6 @@ const trabajadores = COLAS.map(
 );
 
 // Mantenimiento: borrado diario de documentos del cliente vencidos (HU-1404). Fuera de COLAS: no es un trabajo de IA.
-const almacen = new Almacen();
 const mantenimiento = new Queue(COLA_MANTENIMIENTO, { connection: opcionesRedis(), prefix: prefijoColas() });
 await mantenimiento.upsertJobScheduler(TAREA_BORRADO, { pattern: PATRON_BORRADO, tz: 'America/Lima' }, { name: TAREA_BORRADO });
 const mantenedor = new Worker(
@@ -48,6 +54,7 @@ console.log(`Worker escuchando las colas ${COLAS.join(', ')} en ${opcionesRedis(
 
 async function cerrar() {
   await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close()]);
+  await cerrarOcr();
   redis.disconnect();
   await prisma.$disconnect();
   process.exit(0);

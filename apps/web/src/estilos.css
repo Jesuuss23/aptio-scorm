@@ -524,3 +524,60 @@
 .datos-tecnicos[open] > summary {
   margin-bottom: 12px;
 }
+
+/* HU-0304 · Material del cliente y texto por página. */
+.material-tema {
+  flex: 3 1 280px;
+}
+.lista-material {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fila-material {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  border-bottom: 1px solid var(--color-borde);
+  padding-bottom: 8px;
+}
+.material-nombre {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.texto-error {
+  color: var(--color-error);
+}
+.paginas-material {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.pagina-material {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 12px;
+}
+.texto-pagina {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--texto-sm);
+}
+.material-agregar {
+  flex: 0 0 auto;
+  align-self: flex-end;
+}

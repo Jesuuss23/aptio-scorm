@@ -105,6 +105,25 @@ export interface Recurso {
   url?: string;
 }
 
+/** Página extraída del material (HU-0304). `posibleInstruccion`: el texto parece dirigido a la IA (CP-102). */
+export interface PaginaMaterial {
+  n: number;
+  texto: string;
+  escaneada: boolean;
+  posibleInstruccion?: boolean;
+}
+export interface Material {
+  id: string;
+  tipo: 'PDF' | 'WORD' | 'POWERPOINT' | 'VIDEO' | 'AUDIO' | 'TEMA';
+  recursoId: string | null;
+  nombre: string | null;
+  tema: string | null;
+  estado: 'pendiente' | 'procesando' | 'listo' | 'error';
+  error: string | null;
+  paginas: PaginaMaterial[];
+  creadoEn: string;
+}
+
 export interface TerminoGlosario {
   termino: string;
   traduccion: string | null;
@@ -217,6 +236,9 @@ export const api = {
   crearProyecto: (datos: ProyectoEntrada) => pedir<Proyecto>('/proyectos', json(datos)),
   editarProyecto: (id: string, datos: Partial<ProyectoEntrada>) => pedir<Proyecto>(`/proyectos/${id}`, json(datos, 'PATCH')),
   archivarProyecto: (id: string) => pedir<void>(`/proyectos/${id}`, { method: 'DELETE' }),
+  materiales: (proyectoId: string) => pedir<Material[]>(`/proyectos/${proyectoId}/materiales`),
+  agregarMaterial: (proyectoId: string, datos: { recursoId: string } | { tema: string }) =>
+    pedir<Material>(`/proyectos/${proyectoId}/materiales`, json(datos)),
   glosario: (clienteId: string) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`),
   guardarGlosario: (clienteId: string, terminos: TerminoGlosario[]) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`, json(terminos, 'PUT')),
   pronunciacion: (clienteId: string) => pedir<TerminoPronunciacion[]>(`/clientes/${clienteId}/pronunciacion`),

@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "MaterialFuente" ADD COLUMN     "actualizadoEn" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "error" TEXT;

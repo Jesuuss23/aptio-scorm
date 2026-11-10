@@ -1,5 +1,5 @@
 // HU-0302 y HU-0303 · Nuevo SCORM: solo cliente y nombre son obligatorios (RN-03-1, CP-030); los datos técnicos y la
-// estimación van plegados y son opcionales (RN-03-2, CP-032). El material del cliente se suma con HU-0304.
+// estimación van plegados y son opcionales (RN-03-2, CP-032). El material del cliente se sube en el detalle del proyecto (HU-0304, SUP-21).
 import { Cabecera } from '@aptio/ui';
 import { estimar, LMS_DESTINO, NOMBRE_PERFIL, perfilPropuesto, SUPUESTOS_ESTIMACION, TONOS } from '@aptio/schema/proyecto';
 import { type FormEvent, useEffect, useState } from 'react';

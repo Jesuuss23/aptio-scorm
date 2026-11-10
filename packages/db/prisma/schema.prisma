@@ -237,10 +237,12 @@ model MaterialFuente {
   recursoId     String?      @db.Uuid // null cuando tipo = TEMA
   tema          String?
   estado        String       @default("pendiente") // pendiente | procesando | listo | error
-  paginas       Json? // [{ n, texto, escaneada }]
+  paginas       Json? // [{ n, texto, escaneada, posibleInstruccion }]
   transcripcion Json? // [{ desde, hasta, texto }]
   mapaTemas     Json? // [{ tema, paginas, decision: conservar|complementario|omitir, motivo }]
+  error         String? // motivo legible si estado = error
   creadoEn      DateTime     @default(now())
+  actualizadoEn DateTime     @default(now()) @updatedAt
 
   proyecto Proyecto @relation(fields: [proyectoId], references: [id], onDelete: Cascade)
 }
