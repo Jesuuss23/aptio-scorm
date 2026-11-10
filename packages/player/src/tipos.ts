@@ -37,6 +37,23 @@ export interface Pantalla {
   fondo?: RolColor;
   fondoRecursoId?: string;
   narracion?: { texto: TextoI18n; personajeBloqueId?: string; porIdioma?: Partial<Record<Idioma, AudioNarracion>> };
+  /** HU-0602 · Retoques del editor por id de bloque (RN-06-1). */
+  ajustes?: Record<string, AjusteElemento>;
+}
+
+/** Retoque de un elemento (curso-v0 `ajusteElemento`). Lo que el reproductor aún no usa (desplazamiento, tiempos) se ignora. */
+export interface AjusteElemento {
+  tamanoCqw?: number;
+  escala?: number;
+  color?: RolColor;
+  relleno?: RolColor;
+  alineacion?: 'izquierda' | 'centro' | 'derecha';
+  animacion?: 'auto' | 'ninguna' | 'aparecer' | 'deslizar' | 'zoom' | 'rebotar';
+  retardoS?: number;
+  finS?: number;
+  anclaPalabra?: number;
+  oculto?: boolean;
+  desplazamiento?: { x: number; y: number; dispositivo?: 'todos' | 'escritorio' | 'celular' };
 }
 
 /** Audio de la narración en un idioma (etapas 6 a 8): el recurso, su duración, las marcas [ms, boca] y el WebVTT. */

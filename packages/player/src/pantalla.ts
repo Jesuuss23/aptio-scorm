@@ -1,5 +1,6 @@
 // Dibujo de una pantalla desde sus bloques (capa de contenido) con la disposición elegida por el generador (capa de
 // presentación). Modo guiado: la disposición acomoda los bloques sola y se adapta al ancho, sin lienzo fijo.
+import { aplicarAjuste } from './ajustes.ts';
 import { mostrarBoca, mostrarPose, svgEnLinea } from './boca.ts';
 import { h } from './dom.ts';
 import { t, type Textos } from './textos.ts';
@@ -55,34 +56,36 @@ export function dibujarPantalla(p: Pantalla, ctx: ContextoPantalla): HTMLElement
   let conTitulo = false;
 
   for (const b of p.bloques) {
+    // HU-0602 · Retoques del editor sobre el elemento (tamaño, color del kit, alineación y animación).
+    const aj = <E extends HTMLElement>(el: E): E => aplicarAjuste(el, p.ajustes?.[b.id], b.tipo) as E;
     if (b.tipo !== 'texto' || !sufijo(b).startsWith('item-')) items = null;
     if (b.tipo === 'texto') {
       const contenido = t(b.contenido, ctx.idioma);
       const s = sufijo(b);
       if (b.rol === 'titulo' && !conTitulo) {
         conTitulo = true;
-        texto.push(h('h2', { class: 'ap-titulo-pantalla', id: idTitulo, tabindex: '-1', 'data-bloque': b.id }, contenido));
+        texto.push(aj(h('h2', { class: 'ap-titulo-pantalla', id: idTitulo, tabindex: '-1', 'data-bloque': b.id }, contenido)));
       } else if (s.startsWith('item-')) {
         if (!items) {
           items = h('ul', { class: 'ap-items' });
           texto.push(items);
         }
         const [cabeza, ...resto] = contenido.split(/:\s(.+)/s);
-        items.append(h('li', { 'data-bloque': b.id }, resto.length ? [h('b', {}, `${cabeza}:`), ` ${resto[0]}`] : contenido));
+        items.append(aj(h('li', { 'data-bloque': b.id }, resto.length ? [h('b', {}, `${cabeza}:`), ` ${resto[0]}`] : contenido)));
       } else if (s === 'burbuja') {
-        texto.push(h('p', { class: 'ap-burbuja', 'data-bloque': b.id }, contenido));
+        texto.push(aj(h('p', { class: 'ap-burbuja', 'data-bloque': b.id }, contenido)));
       } else if (s === 'dato-grande') {
-        texto.push(h('p', { class: 'ap-dato-grande', 'data-bloque': b.id }, contenido));
+        texto.push(aj(h('p', { class: 'ap-dato-grande', 'data-bloque': b.id }, contenido)));
       } else if (b.rol === 'destacado') {
-        texto.push(h('p', { class: 'ap-dato', 'data-bloque': b.id }, contenido));
+        texto.push(aj(h('p', { class: 'ap-dato', 'data-bloque': b.id }, contenido)));
       } else if (b.rol === 'subtitulo' || b.rol === 'titulo') {
-        texto.push(h('p', { class: s === 'numero' ? 'ap-numero-seccion' : 'ap-subtitulo', 'data-bloque': b.id }, contenido));
+        texto.push(aj(h('p', { class: s === 'numero' ? 'ap-numero-seccion' : 'ap-subtitulo', 'data-bloque': b.id }, contenido)));
       } else {
-        texto.push(h('p', { class: 'ap-parrafo', 'data-bloque': b.id }, contenido));
+        texto.push(aj(h('p', { class: 'ap-parrafo', 'data-bloque': b.id }, contenido)));
       }
     } else if (b.tipo === 'personaje') {
       // El SVG va en línea para animar la boca; mientras llega (o si no se puede leer) se ve la silueta.
-      const figura = h('figure', { class: `ap-personaje ap-pose-${b.pose ?? 'neutral'} ap-lado-${b.lado ?? 'izquierda'}`, 'aria-hidden': 'true', 'data-bloque': b.id }, silueta());
+      const figura = aj(h('figure', { class: `ap-personaje ap-pose-${b.pose ?? 'neutral'} ap-lado-${b.lado ?? 'izquierda'}`, 'aria-hidden': 'true', 'data-bloque': b.id }, silueta()));
       if (ctx.cargarSvg) {
         void ctx.cargarSvg(b.recursoId).then((marcado) => {
           const svg = marcado ? svgEnLinea(marcado, document, { primario: ctx.paleta.primario, secundario: ctx.paleta.secundario, acento: ctx.paleta.acento }) : null;
@@ -97,8 +100,8 @@ export function dibujarPantalla(p: Pantalla, ctx: ContextoPantalla): HTMLElement
     } else if (b.tipo === 'imagen') {
       const url = ctx.urlRecurso(b.recursoId);
       const alt = b.decorativa ? '' : t(b.alt, ctx.idioma);
-      medios.push(h('figure', { class: 'ap-imagen', 'data-bloque': b.id },
-        url ? h('img', { src: url, alt }) : h('span', { class: 'ap-sin-imagen', role: b.decorativa ? null : 'img', 'aria-label': b.decorativa ? null : alt }, alt || ctx.tx.imagenPendiente)));
+      medios.push(aj(h('figure', { class: 'ap-imagen', 'data-bloque': b.id },
+        url ? h('img', { src: url, alt }) : h('span', { class: 'ap-sin-imagen', role: b.decorativa ? null : 'img', 'aria-label': b.decorativa ? null : alt }, alt || ctx.tx.imagenPendiente))));
     } else if (b.tipo === 'video') {
       const url = ctx.urlRecurso(b.recursoId);
       medios.push(h('figure', { class: 'ap-video', 'data-bloque': b.id },

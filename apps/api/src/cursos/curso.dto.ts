@@ -10,13 +10,18 @@ export class TextoI18nDto {
   @ApiPropertyOptional() @IsOptional() @Transform(recortar) @IsString() @MaxLength(2000) en?: string;
 }
 
-/** HU-0501 · Cambios de la revisión sobre una pantalla (título, textos por id de bloque y narración). */
+/** HU-0501 · Cambios de la revisión sobre una pantalla (título, textos por id de bloque y narración). HU-0602 · Y sus retoques. */
 export class PantallaCambioDto {
   @ApiProperty({ description: 'Versión del curso leída (bloqueo optimista)' }) @IsInt() @Min(1) version: number;
   @ApiPropertyOptional({ type: TextoI18nDto }) @IsOptional() @ValidateNested() @Type(() => TextoI18nDto) titulo?: TextoI18nDto;
   @ApiPropertyOptional({ type: TextoI18nDto }) @IsOptional() @ValidateNested() @Type(() => TextoI18nDto) narracion?: TextoI18nDto;
   @ApiPropertyOptional({ type: 'object', additionalProperties: { $ref: '#/components/schemas/TextoI18nDto' }, description: 'Clave = id del bloque de texto' })
   @IsOptional() @IsObject() textos?: Record<string, TextoI18nDto>;
+  @ApiPropertyOptional({
+    type: 'object', additionalProperties: { nullable: true, $ref: '#/components/schemas/AjusteElemento' },
+    description: 'HU-0602 · Retoques por id de bloque (RN-06-1). Cada clave reemplaza el ajuste de ese elemento; null lo restablece. Colores solo por rol del kit (RN-06-4).',
+  })
+  @IsOptional() @IsObject() ajustes?: Record<string, Record<string, unknown> | null>;
 }
 
 /** HU-0502 · Aprobar varias: las indicadas o, con soloSinObservaciones, todas las que no tienen observaciones abiertas. */
