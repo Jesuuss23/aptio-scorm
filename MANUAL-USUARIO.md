@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.5 · actualizado con la segunda entrega del Sprint 3 (10 de noviembre de 2026)**
+**Versión 0.6 · actualizado con la tercera entrega del Sprint 3 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -228,6 +228,22 @@ Si una etapa falla (por ejemplo, porque el servicio de IA no respondió), verás
 
 Cada etapa muestra lo que costó, y el proyecto suma el total. Ese costo también aparece en la lista de proyectos. Si una generación se cancela, lo que ya se gastó se cuenta igual.
 
+### 8.6 Vista previa: recorrer la cápsula como el participante
+
+Cuando la generación ya armó las pantallas, el proyecto muestra el botón **Vista previa**. Ahí recorres la cápsula tal como la verá cada participante en la plataforma del cliente. Lo que ves es exactamente lo que irá en el paquete.
+
+- **Celular, Tableta o Escritorio:** cambia el marco para ver cómo se acomoda la cápsula en cada pantalla.
+- **Participante:** recorres la cápsula desde el inicio, con las mismas reglas que tendrá el alumno. Si una pantalla tiene una actividad obligatoria, el botón **Siguiente** se apaga y dice «Completa la actividad para continuar». Tampoco puedes saltarla desde el **Temario**.
+- **Revisión:** puedes ir directo a cualquier pantalla con «Ir a la pantalla» y ver su código (p. ej. p10), para revisar sin hacer todo el recorrido.
+- **Reiniciar:** vuelve a empezar como si fueras un participante nuevo.
+- **Seguimiento simulado:** a la derecha ves lo que la plataforma del cliente recibiría: avance, nota del reto final, puntos y estado (Incompleto, Completado, Aprobado o No aprobado). Es solo una simulación y no se guarda.
+
+Todas las actividades se juegan de verdad: memoria, clasificar, ordenar pasos, tarjetas, preguntas con tiempo y vidas, exploración de una imagen, verdadero o falso y decisiones con consecuencias. Todo se hace con botones, así que funciona con el dedo, el ratón o el teclado.
+
+Por ahora:
+- La vista previa usa el recorrido «Clásico» (barra arriba y botones Anterior y Siguiente abajo). Si el curso pide otro recorrido, verás un aviso.
+- Las imágenes, el personaje y el video aparecen como un recuadro con su descripción, hasta que lleguen las ilustraciones y la voz.
+
 ---
 
 ## 9. Preguntas frecuentes
@@ -244,6 +260,12 @@ No. Todo lo que hace la IA es una propuesta que el equipo revisa y aprueba.
 **¿Se guardan para siempre los documentos del cliente?**
 No. Se borran solos después de la entrega, según los días de retención del cliente.
 
+**¿Lo que veo en la vista previa es lo que recibirá el cliente?**
+Sí. La vista previa y el paquete usan el mismo reproductor, así que las pantallas se ven iguales.
+
+**¿Por qué no puedo pasar a la siguiente pantalla en la vista previa?**
+Porque la pantalla tiene una actividad obligatoria. Complétala y el botón **Siguiente** se activa. Si solo quieres revisar, cambia a **Revisión**.
+
 **¿Por qué un proyecto con solo un video empieza desde el tema?**
 Por ahora la etapa 1 resume documentos. La lectura de transcripciones en la generación llega en una próxima entrega.
 
@@ -254,7 +276,7 @@ Por ahora la etapa 1 resume documentos. La lectura de transcripciones en la gene
 Estas funciones se agregarán en las próximas entregas y este manual se actualizará cuando estén disponibles:
 
 - Ilustraciones.
-- Vista previa para recorrer la cápsula como la verá el participante.
+- Otros recorridos de la cápsula (historias, mapa de misiones, menú de temas y más).
 - Voz del narrador, boca animada del personaje y subtítulos.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
@@ -266,6 +288,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.6 | 2026-11-10 | Vista previa: recorrer la cápsula en celular, tableta o escritorio, con las actividades jugables y el seguimiento simulado. |
 | 0.5 | 2026-11-10 | Las actividades salen con su contenido y el reto final con la marca «Calificada». |
 | 0.4 | 2026-11-10 | Etapa 4: pantallas armadas con el kit, que aparecen en vivo. |
 | 0.3 | 2026-11-10 | Primera versión: ingreso, clientes y kits, proyectos, material (documentos, video y audio) y etapas 1 a 3 de la generación. |
