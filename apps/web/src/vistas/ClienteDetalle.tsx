@@ -1,9 +1,10 @@
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useState } from 'react';
 import { api, type Cliente, EDITAN_CLIENTES, ErrorApi, OPCIONES_LMS, type Rol, VEN_KIT } from '../api';
+import { Glosario } from './Glosario';
 import { KitMarca } from './KitMarca';
 
-/** Datos del cliente y su kit de marca (HU-0202). El glosario y las pantallas modelo se suman con sus historias. */
+/** Datos del cliente, su kit de marca con las pantallas modelo (HU-0202, HU-0204) y su glosario y pronunciación (HU-0205). */
 export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; alCargar: (nombre: string) => void }) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [error, setError] = useState('');
@@ -91,6 +92,7 @@ export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; al
       {VEN_KIT.includes(rol) ? (
         <KitMarca clienteId={cliente.id} rol={rol} conIngles={cliente.idiomas.includes('en')} alGuardar={() => setCliente({ ...cliente, tieneKit: true })} />
       ) : null}
+      {VEN_KIT.includes(rol) ? <Glosario clienteId={cliente.id} rol={rol} conIngles={cliente.idiomas.includes('en')} /> : null}
     </>
   );
 }

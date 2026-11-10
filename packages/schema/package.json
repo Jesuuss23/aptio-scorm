@@ -24,6 +24,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./marca": "./src/marca.ts"
+    "./marca": "./src/marca.ts",
+    "./voz": "./src/voz.ts"
   }
 }

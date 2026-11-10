@@ -10,6 +10,7 @@ import { RecursosModule } from './recursos/recursos.module.js';
 import { SaludModule } from './salud/salud.module.js';
 import { TrabajosModule } from './trabajos/trabajos.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
+import { VozModule } from './voz/voz.module.js';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     ClientesModule,
     RecursosModule,
     SaludModule,
+    VozModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

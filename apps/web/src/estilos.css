@@ -413,3 +413,39 @@
 .tabla-zonas select {
   width: auto;
 }
+
+/* HU-0205 · Glosario y pronunciación. */
+.glosario-bloque {
+  flex: 1 1 380px;
+  min-width: 0;
+}
+.tabla-terminos {
+  overflow-x: auto;
+}
+.tabla-terminos table {
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+  width: 100%;
+}
+.tabla-terminos th,
+.tabla-terminos td {
+  padding: 4px;
+  text-align: left;
+  vertical-align: middle;
+}
+.tabla-terminos input:not([type='checkbox']),
+.tabla-terminos select {
+  width: 100%;
+  min-width: 96px;
+  font-size: var(--texto-sm);
+  padding: 4px 6px;
+  border: 1px solid var(--color-borde);
+  border-radius: 6px;
+}
+.muestra-voz > .campo:first-child {
+  flex: 3 1 240px;
+}
+.glosario-bloque audio {
+  width: 100%;
+  max-width: 360px;
+}
