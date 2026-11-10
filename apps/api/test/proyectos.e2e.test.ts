@@ -1,0 +1,121 @@
+// HU-0301 a HU-0303 · Proyectos y Nuevo SCORM (CP-029 a CP-031) contra PostgreSQL real. Se salta sin DATABASE_URL, salvo en CI.
+import 'reflect-metadata';
+import type { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { hashearClave, prisma, Rol } from '@aptio/db';
+import request from 'supertest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { configurarApp } from '../src/app.js';
+import { AppModule } from '../src/app.module.js';
+
+const hayBase = Boolean(process.env.DATABASE_URL);
+const CLAVE = 'clave-de-prueba-123';
+const sufijo = Math.random().toString(36).slice(2, 8);
+const correo = (n: string) => `${n}-${sufijo}@prueba.test`;
+
+describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', () => {
+  let app: INestApplication;
+  let servidor: ReturnType<INestApplication['getHttpServer']>;
+  let orgId: string;
+  let otraOrgId: string;
+  const clientes: string[] = [];
+  let productorId: string;
+  const cookies: Record<string, string> = {};
+
+  beforeAll(async () => {
+    orgId = (await prisma.organizacion.create({ data: { nombre: 'Org proyectos', slug: `proyectos-${sufijo}` } })).id;
+    otraOrgId = (await prisma.organizacion.create({ data: { nombre: 'Otra', slug: `proyectos-otra-${sufijo}` } })).id;
+    for (const [nombre, idiomas] of [['Minera Andina', ['es', 'en']], ['Banco Sur', ['es']], ['Colegio Norte', ['es']]] as const) {
+      clientes.push((await prisma.cliente.create({ data: { organizacionId: orgId, nombre, idiomas: [...idiomas] } })).id);
+    }
+    const hashClave = await hashearClave(CLAVE);
+    const crear = (nombre: string, rol: Rol, organizacionId = orgId, extra: object = {}) =>
+      prisma.usuario.create({ data: { nombre, email: correo(nombre), rol, organizacionId, hashClave, emailVerificado: true, ...extra } });
+    productorId = (await crear('productor', Rol.PRODUCTOR)).id;
+    await crear('grafico', Rol.DISENADOR_GRAFICO);
+    await crear('revisor', Rol.REVISOR_CLIENTE, orgId, { clienteId: clientes[1] });
+    await crear('ajeno', Rol.ADMINISTRADOR, otraOrgId);
+    // CP-029: 20 proyectos de 3 clientes (8, 7 y 5).
+    await prisma.proyecto.createMany({
+      data: Array.from({ length: 20 }, (_, i) => ({
+        organizacionId: orgId, clienteId: clientes[i < 8 ? 0 : i < 15 ? 1 : 2]!, nombre: `Cápsula ${i + 1}`, creadoPorId: productorId,
+      })),
+    });
+    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = configurarApp(modulo.createNestApplication());
+    await app.init();
+    servidor = app.getHttpServer();
+    for (const n of ['productor', 'grafico', 'revisor', 'ajeno']) {
+      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correo(n), clave: CLAVE });
+      cookies[n] = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    }
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    await prisma.auditoria.deleteMany({ where: { organizacionId: { in: [orgId, otraOrgId] } } });
+    await prisma.trabajoIA.deleteMany({ where: { organizacionId: orgId } });
+    await prisma.proyecto.deleteMany({ where: { organizacionId: orgId } });
+    await prisma.usuario.deleteMany({ where: { email: { endsWith: `-${sufijo}@prueba.test` } } });
+    await prisma.cliente.deleteMany({ where: { organizacionId: orgId } });
+    await prisma.organizacion.deleteMany({ where: { id: { in: [orgId, otraOrgId] } } });
+  });
+
+  const como = (quien: string) => ({
+    get: (ruta: string) => request(servidor).get(`/api/v1${ruta}`).set('Cookie', cookies[quien]!),
+    post: (ruta: string, datos: object) => request(servidor).post(`/api/v1${ruta}`).set('Cookie', cookies[quien]!).send(datos),
+    patch: (ruta: string, datos: object) => request(servidor).patch(`/api/v1${ruta}`).set('Cookie', cookies[quien]!).send(datos),
+    delete: (ruta: string) => request(servidor).delete(`/api/v1${ruta}`).set('Cookie', cookies[quien]!),
+  });
+
+  it('CP-029 · con 20 proyectos de 3 clientes, filtrar por un cliente muestra solo los suyos', async () => {
+    expect((await como('productor').get('/proyectos')).body).toHaveLength(20);
+    const r = await como('productor').get(`/proyectos?clienteId=${clientes[1]}`);
+    expect(r.status).toBe(200);
+    expect(r.body).toHaveLength(7);
+    expect(r.body.every((p: { clienteId: string; clienteNombre: string }) => p.clienteId === clientes[1] && p.clienteNombre === 'Banco Sur')).toBe(true);
+    expect((await como('productor').get('/proyectos?buscar=cápsula 1')).body.map((p: { nombre: string }) => p.nombre).sort()).toEqual(
+      ['Cápsula 1', 'Cápsula 10', 'Cápsula 11', 'Cápsula 12', 'Cápsula 13', 'Cápsula 14', 'Cápsula 15', 'Cápsula 16', 'Cápsula 17', 'Cápsula 18', 'Cápsula 19'],
+    );
+  });
+
+  it('CP-030 y CP-031 · solo con cliente y nombre se crea; sin LMS el perfil propuesto es Genérico', async () => {
+    const r = await como('productor').post('/proyectos', { clienteId: clientes[0], nombre: 'Bloqueo y etiquetado' });
+    expect(r.status).toBe(201);
+    expect(r.body).toMatchObject({
+      nombre: 'Bloqueo y etiquetado', clienteNombre: 'Minera Andina', estado: 'BORRADOR', idiomas: ['es', 'en'], modoIdioma: 'mismo-paquete',
+      datosTecnicos: {}, perfilPropuesto: 'GENERICO', avance: { aprobadas: 0, total: 0 }, costoIaUsd: 0, publico: null, tono: null,
+    });
+    // Los datos técnicos se completan después y cambian el perfil propuesto.
+    const editado = await como('productor').patch(`/proyectos/${r.body.id}`, { datosTecnicos: { lms: 'Moodle 4.5 o superior', horasCapacitacion: 48, porcentajeScorm: 50, fechaEntrega: '2026-12-15' } });
+    expect(editado.status).toBe(200);
+    expect(editado.body).toMatchObject({ perfilPropuesto: 'MOODLE', datosTecnicos: { lms: 'Moodle 4.5 o superior', horasCapacitacion: 48 } });
+    const vuelve = await como('productor').patch(`/proyectos/${r.body.id}`, { datosTecnicos: { lms: '' } });
+    expect(vuelve.body).toMatchObject({ perfilPropuesto: 'GENERICO', datosTecnicos: {} });
+    // El costo de IA del proyecto suma sus trabajos.
+    await prisma.trabajoIA.create({ data: { organizacionId: orgId, proyectoId: r.body.id, tarea: 'IA-01', tipo: 'TEXTO', proveedor: 'anthropic', modelo: 'x', costoUsd: 0.25 } });
+    expect((await como('productor').get(`/proyectos/${r.body.id}`)).body.costoIaUsd).toBe(0.25);
+  });
+
+  it('valida los datos y archivar saca el proyecto de la lista sin borrarlo', async () => {
+    expect((await como('productor').post('/proyectos', { clienteId: clientes[0] })).status).toBe(422);
+    expect((await como('productor').post('/proyectos', { clienteId: clientes[0], nombre: 'X', pantallasObjetivo: 500 })).status).toBe(422);
+    expect((await como('productor').post('/proyectos', { clienteId: clientes[0], nombre: 'Tono raro', tono: 'Sarcástico' })).status).toBe(422);
+    const p = await como('productor').post('/proyectos', { clienteId: clientes[2], nombre: 'Para archivar', tono: 'Cercano', pantallasObjetivo: 20 });
+    expect((await como('productor').delete(`/proyectos/${p.body.id}`)).status).toBe(204);
+    expect((await como('productor').get(`/proyectos?clienteId=${clientes[2]}`)).body.some((x: { id: string }) => x.id === p.body.id)).toBe(false);
+    expect((await como('productor').get('/proyectos?estado=ARCHIVADO')).body.map((x: { id: string }) => x.id)).toEqual([p.body.id]);
+  });
+
+  it('permisos: el gráfico ve y no crea; el revisor ve solo su cliente; otra organización no ve nada', async () => {
+    expect((await como('grafico').get('/proyectos')).status).toBe(200);
+    expect((await como('grafico').post('/proyectos', { clienteId: clientes[0], nombre: 'No' })).status).toBe(403);
+    const delRevisor = await como('revisor').get('/proyectos');
+    expect(delRevisor.body).toHaveLength(7);
+    expect((await como('revisor').get(`/proyectos?clienteId=${clientes[0]}`)).body).toEqual([]);
+    expect((await como('revisor').post('/proyectos', { clienteId: clientes[1], nombre: 'No' })).status).toBe(403);
+    const ajeno = (await como('productor').get(`/proyectos?clienteId=${clientes[0]}`)).body[0].id as string;
+    expect((await como('ajeno').get(`/proyectos/${ajeno}`)).status).toBe(404);
+    expect((await como('ajeno').post('/proyectos', { clienteId: clientes[0], nombre: 'Intruso' })).status).toBe(404);
+  });
+});

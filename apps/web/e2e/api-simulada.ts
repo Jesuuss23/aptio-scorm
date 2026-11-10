@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { perfilPropuesto } from '@aptio/schema/proyecto';
 
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -37,10 +38,12 @@ export interface OpcionesSimulacion {
   rol?: string;
   /** El próximo PUT del kit responde 409, como si otra persona hubiera guardado antes (CP-022). */
   kitEnConflicto?: boolean;
+  /** Proyectos de ejemplo: 3 de Minera Andina y 2 de la Municipalidad (CP-029). */
+  conProyectos?: boolean;
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos }: OpcionesSimulacion) {
   let conflicto = Boolean(kitEnConflicto);
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
   const subidas = new Map<string, { nombre: string; mime: string }>();
@@ -55,6 +58,25 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
     clienteBase(CLIENTE_ID, 'Minera Andina', { lmsHabitual: 'Moodle 4.5 o superior', idiomas: ['es', 'en'], tieneKit: true }),
     clienteBase('00000000-0000-4000-8000-0000000000c2', 'Municipalidad de Lima'),
   ];
+  const proyecto = (n: number, clienteId: string, nombre: string, extra: Record<string, unknown> = {}) => {
+    const cliente = clientes.find((c) => c.id === clienteId)!;
+    const datosTecnicos = (extra.datosTecnicos as Record<string, unknown> | undefined) ?? {};
+    return {
+      id: `00000000-0000-4000-8000-${String(700 + n).padStart(12, '0')}`, clienteId, clienteNombre: cliente.nombre, nombre, estado: 'BORRADOR',
+      idiomas: cliente.idiomas, modoIdioma: cliente.idiomas.length > 1 ? 'mismo-paquete' : 'unico', publico: null, tono: null, pantallasObjetivo: null,
+      porcentajeActividades: null, avance: { aprobadas: 0, total: 0 }, costoIaUsd: 0,
+      creadoEn: '2026-11-10T10:00:00.000Z', actualizadoEn: '2026-11-10T10:00:00.000Z', ...extra, datosTecnicos, perfilPropuesto: perfilPropuesto(datosTecnicos),
+    };
+  };
+  const proyectos: Record<string, unknown>[] = conProyectos
+    ? [
+      proyecto(1, CLIENTE_ID, 'Bloqueo y etiquetado', { estado: 'REVISION', pantallasObjetivo: 30, avance: { aprobadas: 12, total: 30 }, costoIaUsd: 4.2, datosTecnicos: { lms: 'Moodle 4.5 o superior' } }),
+      proyecto(2, CLIENTE_ID, 'Trabajo en altura', { pantallasObjetivo: 20 }),
+      proyecto(3, CLIENTE_ID, 'Espacios confinados', { estado: 'ENTREGADO', avance: { aprobadas: 25, total: 25 } }),
+      proyecto(4, '00000000-0000-4000-8000-0000000000c2', 'Atención al ciudadano'),
+      proyecto(5, '00000000-0000-4000-8000-0000000000c2', 'Ética pública', { estado: 'GENERANDO' }),
+    ]
+    : [];
   await page.route('**/api/v1/**', async (route) => {
     const req = route.request();
     const ruta = new URL(req.url()).pathname.replace('/api/v1', '');
@@ -111,6 +133,33 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
         ...(svg ? { eliminadosAlSanear: s.nombre.includes('peligrosa') ? ['script', 'atributos on*'] : [] } : {}),
         url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><rect width="30" height="40" fill="#12355B"/></svg>')}`,
       });
+    }
+    if (ruta === '/proyectos' && req.method() === 'GET') {
+      const q = new URL(req.url()).searchParams;
+      return responder(200, proyectos.filter((p) =>
+        (!q.get('clienteId') || p.clienteId === q.get('clienteId'))
+        && (q.get('estado') ? p.estado === q.get('estado') : p.estado !== 'ARCHIVADO')
+        && String(p.nombre).toLowerCase().includes((q.get('buscar') ?? '').toLowerCase())));
+    }
+    if (ruta === '/proyectos' && req.method() === 'POST') {
+      const datos = req.postDataJSON() as Record<string, unknown>;
+      const nuevo = proyecto(proyectos.length + 1, String(datos.clienteId), String(datos.nombre), datos);
+      proyectos.unshift(nuevo);
+      return responder(201, nuevo);
+    }
+    const unProyecto = ruta.match(/^\/proyectos\/([0-9a-f-]+)$/);
+    if (unProyecto) {
+      const i = proyectos.findIndex((p) => p.id === unProyecto[1]);
+      if (i < 0) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Proyecto no encontrado' });
+      if (req.method() === 'DELETE') {
+        proyectos[i]!.estado = 'ARCHIVADO';
+        return responder(204);
+      }
+      if (req.method() === 'PATCH') {
+        const actual = proyectos[i]!;
+        proyectos[i] = proyecto(Number(String(actual.id).slice(-3)) - 700, String(actual.clienteId), String(actual.nombre), { ...actual, ...(req.postDataJSON() as object) });
+      }
+      return responder(200, proyectos[i]);
     }
     if (/^\/clientes\/[0-9a-f-]+\/glosario$/.test(ruta)) {
       if (req.method() === 'PUT') {

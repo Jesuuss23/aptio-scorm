@@ -969,7 +969,7 @@ paths:
       - Proyectos
       summary: Listar proyectos
       operationId: get_proyectos
-      description: El revisor del cliente solo ve los de su cliente
+      description: Todos los roles de la organización; el revisor del cliente solo ve los de su cliente. Sin estado se listan todos menos los archivados (CP-029).
       parameters:
       - name: clienteId
         in: query
@@ -981,7 +981,7 @@ paths:
         in: query
         required: false
         schema:
-          type: string
+          $ref: '#/components/schemas/EstadoProyecto'
       - name: buscar
         in: query
         required: false
@@ -1005,7 +1005,7 @@ paths:
       - Proyectos
       summary: Crear proyecto (Nuevo SCORM)
       operationId: post_proyectos
-      description: Datos técnicos opcionales
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y PRODUCTOR. Solo cliente y nombre son obligatorios (RN-03-1, CP-030); sin idiomas se usan los del cliente.
       requestBody:
         required: true
         content:
@@ -1056,6 +1056,7 @@ paths:
       - Proyectos
       summary: Editar proyecto o datos técnicos
       operationId: patch_proyectos_proyectoId
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y PRODUCTOR. datosTecnicos se reemplaza completo. 409 PROYECTO_CON_CURSO si se cambia el cliente de un proyecto que ya tiene curso.
       parameters:
       - name: proyectoId
         in: path
@@ -1089,7 +1090,7 @@ paths:
       - Proyectos
       summary: Archivar proyecto
       operationId: delete_proyectos_proyectoId
-      description: Pasa a ARCHIVADO; no borra
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y PRODUCTOR. Pasa a ARCHIVADO; no borra
       parameters:
       - name: proyectoId
         in: path
@@ -3530,10 +3531,16 @@ components:
         clienteId:
           type: string
           format: uuid
+        clienteNombre:
+          type: string
         nombre:
           type: string
         estado:
           $ref: '#/components/schemas/EstadoProyecto'
+        perfilPropuesto:
+          type: string
+          enum: [GENERICO, MOODLE, BLACKBOARD, CHAMILO, CANVAS]
+          description: Perfil de entrega propuesto según datosTecnicos.lms; Genérico sin LMS (CP-031)
         idiomas:
           type: array
           items:

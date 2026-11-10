@@ -1,11 +1,13 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, ErrorApi, NOMBRE_ROL, type Usuario } from './api';
+import { api, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario } from './api';
 import { MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
 import { ClienteDetalle } from './vistas/ClienteDetalle';
 import { Clientes } from './vistas/Clientes';
+import { NuevoScorm } from './vistas/NuevoScorm';
+import { ProyectoDetalle } from './vistas/ProyectoDetalle';
 import { Proyectos } from './vistas/Proyectos';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
@@ -45,19 +47,26 @@ export function App() {
   const ruta = !vista
     ? ['Inicio', 'Página no encontrada']
     : vista.id
-      ? [vista.grupo, 'Clientes y kits', titulo || vista.nombre]
+      ? [vista.grupo, vista.activo === '/' ? 'Proyectos' : 'Clientes y kits', titulo || vista.nombre]
       : [vista.grupo, vista.nombre];
+  const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
+  // Nuevo SCORM solo aparece a quien puede crear proyectos (RN-01-2: la API también lo valida).
+  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => i.ruta !== '/nuevo' || puedeCrear) }));
   return (
     <Estructura
-      menu={MENU}
+      menu={menu}
       rutaActual={vista?.activo ?? camino}
       ruta={ruta}
       usuario={{ nombre: usuario.nombre, rol: NOMBRE_ROL[usuario.rol] }}
       alNavegar={navegar}
       alSalir={salir}
     >
-      {vista?.activo === '/' ? (
-        <Proyectos />
+      {vista?.activo === '/' && vista.id ? (
+        <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
+      ) : vista?.activo === '/' ? (
+        <Proyectos rol={usuario.rol} />
+      ) : vista?.activo === '/nuevo' && puedeCrear ? (
+        <NuevoScorm />
       ) : vista?.id ? (
         <ClienteDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/clientes' ? (

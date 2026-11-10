@@ -1,5 +1,6 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
+import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 
 export interface Usuario {
   id: string;
@@ -44,6 +45,8 @@ export const EDITAN_KIT: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'D
 export const VEN_KIT: Rol[] = [...EDITAN_KIT, 'PRODUCTOR'];
 /** Las pantallas modelo las diseñan diseño gráfico y administración (docs/14-modulos.md). */
 export const DISENAN_MODELOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_GRAFICO'];
+/** docs/14-modulos.md: crean proyectos y generan administración, diseño instruccional y producción. */
+export const CREAN_PROYECTOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
 /** HU-0205: el glosario y la pronunciación los edita todo el equipo, también producción. */
 export const EDITAN_GLOSARIO: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 
@@ -124,6 +127,37 @@ export interface MuestraVoz {
   simulada: boolean;
 }
 
+export interface Proyecto {
+  id: string;
+  clienteId: string;
+  clienteNombre: string;
+  nombre: string;
+  estado: EstadoProyecto;
+  idiomas: ('es' | 'en')[];
+  modoIdioma: string;
+  publico: string | null;
+  tono: string | null;
+  pantallasObjetivo: number | null;
+  porcentajeActividades: number | null;
+  datosTecnicos: DatosTecnicos;
+  perfilPropuesto: PerfilLms;
+  avance: { aprobadas: number; total: number };
+  costoIaUsd: number;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export interface ProyectoEntrada {
+  clienteId: string;
+  nombre: string;
+  idiomas?: ('es' | 'en')[];
+  publico?: string;
+  tono?: string;
+  pantallasObjetivo?: number;
+  porcentajeActividades?: number;
+  datosTecnicos?: DatosTecnicos;
+}
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -175,6 +209,14 @@ export const api = {
       : pedir<PantallaModelo>(`/clientes/${clienteId}/kit/pantallas-modelo`, json(datos)),
   desactivarPantallaModelo: (clienteId: string, id: string) =>
     pedir<void>(`/clientes/${clienteId}/kit/pantallas-modelo/${id}`, { method: 'DELETE' }),
+  proyectos: (filtro: { clienteId?: string; estado?: string; buscar?: string } = {}) => {
+    const q = new URLSearchParams(Object.entries(filtro).filter(([, v]) => v) as [string, string][]).toString();
+    return pedir<Proyecto[]>(`/proyectos${q ? `?${q}` : ''}`);
+  },
+  proyecto: (id: string) => pedir<Proyecto>(`/proyectos/${id}`),
+  crearProyecto: (datos: ProyectoEntrada) => pedir<Proyecto>('/proyectos', json(datos)),
+  editarProyecto: (id: string, datos: Partial<ProyectoEntrada>) => pedir<Proyecto>(`/proyectos/${id}`, json(datos, 'PATCH')),
+  archivarProyecto: (id: string) => pedir<void>(`/proyectos/${id}`, { method: 'DELETE' }),
   glosario: (clienteId: string) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`),
   guardarGlosario: (clienteId: string, terminos: TerminoGlosario[]) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`, json(terminos, 'PUT')),
   pronunciacion: (clienteId: string) => pedir<TerminoPronunciacion[]>(`/clientes/${clienteId}/pronunciacion`),
