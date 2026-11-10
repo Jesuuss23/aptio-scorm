@@ -3,6 +3,7 @@
 // RN-05-1: no se aprueba con una observación que bloquea la entrega. RN-05-2: lo que se edita vuelve a borrador.
 // HU-0503 · Corregir la narración regenera su voz, boca y subtítulos en español; los chips muestran el avance.
 // HU-0504 · «Ajustar con IA» pide una propuesta (IA-16) que se aplica, se descarta o se deshace (RN-05-3, RN-05-4).
+// HU-0601 · «✎ Editar pantalla» abre el editor en esa pantalla.
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, montar } from '@aptio/player';
 import { cursoConPropuesta } from '@aptio/schema/propuesta';
@@ -316,6 +317,10 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
               <ChipEstado estado={actual.estado} />
             </div>
             <div className="acciones-form">
+              {/* HU-0601 · El editor es del equipo; el revisor del cliente sigue en Revisión. */}
+              {editan ? (
+                <a className="boton" href={`/proyectos/${proyectoId}/editor?pantalla=${actual.id}`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/editor?pantalla=${actual.id}`); }}>✎ Editar pantalla</a>
+              ) : null}
               <button type="button" className="boton" disabled={indice === 0} onClick={() => setSeleccion(pantallas[indice - 1]!.id)}>Anterior</button>
               <button type="button" className="boton" disabled={indice === pantallas.length - 1} onClick={() => setSeleccion(pantallas[indice + 1]!.id)}>Siguiente</button>
             </div>

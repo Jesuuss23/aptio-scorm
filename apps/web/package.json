@@ -9,7 +9,8 @@
     "lint": "oxlint --deny-warnings .",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "test": "vitest run --dir src"
   },
   "dependencies": {
     "@aptio/player": "workspace:*",
@@ -35,6 +36,7 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "typescript": "~7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "vitest": "^3.2.7"
   }
 }
