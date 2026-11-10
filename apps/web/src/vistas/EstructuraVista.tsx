@@ -1,21 +1,12 @@
 // HU-0403 · Resultado de la etapa 2: objetivos con verbo y nivel de Bloom y la lista de pantallas con su tipo, objetivo,
 // actividad sugerida y páginas de origen (CP-039). Es propuesta de la IA: el diseñador instruccional decide.
-import { conActividad, type EstructuraCurso, type NivelBloom, type TipoPantalla } from '@aptio/schema/generacion';
+import { conActividad, type EstructuraCurso, type NivelBloom } from '@aptio/schema/generacion';
 import { useEffect, useState } from 'react';
 import { api, ErrorApi } from '../api';
-import { paginas } from '../formato';
+import { NOMBRE_INTERACCION, NOMBRE_TIPO_PANTALLA, paginas } from '../formato';
 
-const NOMBRE_TIPO: Record<TipoPantalla, string> = {
-  portada: 'Portada', objetivos: 'Objetivos', contenido: 'Contenido', actividad: 'Actividad', evaluacion: 'Reto final',
-  seccion: 'Sección', resumen: 'Resumen', resultados: 'Resultados', cierre: 'Cierre',
-};
 const NOMBRE_BLOOM: Record<NivelBloom, string> = {
   recordar: 'Recordar', comprender: 'Comprender', aplicar: 'Aplicar', analizar: 'Analizar', evaluar: 'Evaluar', crear: 'Crear',
-};
-/** Catálogo cerrado de interacciones (docs/05-interacciones.md). */
-const NOMBRE_INTERACCION: Record<string, string> = {
-  'INT-01': 'Memoria', 'INT-02': 'Clasificar', 'INT-03': 'Ordenar pasos', 'INT-04': 'Tarjetas', 'INT-05': 'Quiz',
-  'INT-06': 'Exploración', 'INT-07': 'Deslizar', 'INT-08': 'Decisión',
 };
 
 export function EstructuraVista({ generacionId }: { generacionId: string }) {
@@ -58,7 +49,7 @@ export function EstructuraVista({ generacionId }: { generacionId: string }) {
                 <b>{p.proposito}</b>
               </div>
               <div className="fila-chips">
-                <span className={`chip ${conActividad(p) ? 'validado' : ''}`}>{NOMBRE_TIPO[p.tipo]}</span>
+                <span className={`chip ${conActividad(p) ? 'validado' : ''}`}>{NOMBRE_TIPO_PANTALLA[p.tipo]}</span>
                 {p.actividadSugerida ? <span className="chip">{p.actividadSugerida} · {NOMBRE_INTERACCION[p.actividadSugerida] ?? 'Interacción'}</span> : null}
                 {p.objetivoIds.map((o) => <span key={o} className="chip">Objetivo {numero.get(o) ?? o}</span>)}
                 {p.paginas.length ? <span className="chip">{paginas(p.paginas)}</span> : null}

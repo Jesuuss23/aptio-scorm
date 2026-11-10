@@ -4082,10 +4082,11 @@ components:
             nullable: true
             description: >-
               Lo que guardó la etapa. En RESUMEN_MATERIAL, un ResumenMaterial; en OBJETIVOS_ESTRUCTURA, una
-              EstructuraCurso; las demás etapas definen el suyo.
+              EstructuraCurso; en STORYBOARD_GUION, un GuionCurso; las demás etapas definen el suyo.
             anyOf:
             - $ref: '#/components/schemas/ResumenMaterial'
             - $ref: '#/components/schemas/EstructuraCurso'
+            - $ref: '#/components/schemas/GuionCurso'
             - type: object
     EstructuraCurso:
       type: object
@@ -4140,6 +4141,117 @@ components:
               nullable: true
             total:
               type: integer
+    GuionCurso:
+      type: object
+      description: >-
+        Resultado de la etapa 3 (HU-0404, IA-05 v2): por cápsula, cada pantalla de la estructura con título, texto en
+        pantalla, narración, visual, actividad y origen. Pasar de 30 palabras en pantalla o 45 de narración no rechaza
+        el guion: queda en advertencias (CP-040).
+      required:
+      - capsulas
+      - advertencias
+      properties:
+        capsulas:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              moduloId:
+                type: string
+              titulo:
+                type: object
+                properties:
+                  es:
+                    type: string
+                  en:
+                    type: string
+              pantallas:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - id
+                  - tipo
+                  - titulo
+                  - textoPantalla
+                  - narracion
+                  - visual
+                  - objetivoIds
+                  - origen
+                  - palabras
+                  properties:
+                    id:
+                      type: string
+                    tipo:
+                      type: string
+                    titulo:
+                      type: string
+                    textoPantalla:
+                      type: string
+                    narracion:
+                      type: string
+                    visual:
+                      type: string
+                    actividad:
+                      type: object
+                      properties:
+                        tipo:
+                          type: string
+                          description: INT-01 a INT-08
+                        consigna:
+                          type: string
+                    objetivoIds:
+                      type: array
+                      items:
+                        type: string
+                    origen:
+                      type: object
+                      description: documento (con documentoId del material, archivo y páginas), ia o manual
+                      properties:
+                        tipo:
+                          type: string
+                          enum:
+                          - documento
+                          - ia
+                          - manual
+                        documentoId:
+                          type: string
+                        archivo:
+                          type: string
+                        paginas:
+                          type: array
+                          items:
+                            type: integer
+                        revisado:
+                          type: boolean
+                    notas:
+                      type: string
+                    palabras:
+                      type: object
+                      properties:
+                        textoPantalla:
+                          type: integer
+                        narracion:
+                          type: integer
+        advertencias:
+          type: array
+          description: Cada campo de cada pantalla que pasa su límite de palabras (textoPantalla 30, narracion 45)
+          items:
+            type: object
+            properties:
+              pantallaId:
+                type: string
+              campo:
+                type: string
+                enum:
+                - textoPantalla
+                - narracion
+              palabras:
+                type: integer
+              limite:
+                type: integer
     ResumenMaterial:
       type: object
       description: Resultado de la etapa 1 (HU-0402). Todo es propuesta de la IA para que el diseñador decida.

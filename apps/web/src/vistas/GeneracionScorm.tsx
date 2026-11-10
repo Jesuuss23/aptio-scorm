@@ -6,6 +6,7 @@ import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { api, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
 import { usd } from '../formato';
 import { EstructuraVista } from './EstructuraVista';
+import { GuionVista } from './GuionVista';
 import { ResumenMaterialVista } from './ResumenMaterialVista';
 
 const ACTIVAS = new Set<Generacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -18,6 +19,7 @@ const CONSULTA_MS = 2000;
 const RESULTADOS: Partial<Record<EtapaGeneracion['etapa'], { ver: string; ocultar: string; Vista: (p: { generacionId: string }) => ReactNode }>> = {
   RESUMEN_MATERIAL: { ver: 'Ver resumen', ocultar: 'Ocultar resumen', Vista: ResumenMaterialVista },
   OBJETIVOS_ESTRUCTURA: { ver: 'Ver estructura', ocultar: 'Ocultar estructura', Vista: EstructuraVista },
+  STORYBOARD_GUION: { ver: 'Ver guion', ocultar: 'Ocultar guion', Vista: GuionVista },
 };
 
 function titulo(g: Generacion): string {

@@ -3,9 +3,11 @@
 import type { Etapa } from '@aptio/schema/generacion';
 import type { EjecutorEtapa } from '../generar.js';
 import { estructurarCurso } from './estructura.js';
+import { escribirGuion } from './guion.js';
 import { resumirMaterial } from './resumen.js';
 
 export const EJECUTORES: Partial<Record<Etapa, EjecutorEtapa>> = {
   RESUMEN_MATERIAL: resumirMaterial,
   OBJETIVOS_ESTRUCTURA: estructurarCurso,
+  STORYBOARD_GUION: escribirGuion,
 };
