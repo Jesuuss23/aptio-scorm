@@ -36,7 +36,14 @@ export interface Pantalla {
   disposicion?: string;
   fondo?: RolColor;
   fondoRecursoId?: string;
-  narracion?: { texto: TextoI18n };
+  narracion?: { texto: TextoI18n; personajeBloqueId?: string; porIdioma?: Partial<Record<Idioma, AudioNarracion>> };
+}
+
+/** Audio de la narración en un idioma (etapas 6 y 7): el recurso, su duración y las marcas [ms, boca]. */
+export interface AudioNarracion {
+  recursoAudioId?: string;
+  duracionMs?: number;
+  bocas?: [number, string][];
 }
 
 export interface Capsula {

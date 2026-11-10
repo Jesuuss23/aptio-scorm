@@ -31,9 +31,11 @@ export interface Avance {
   /** La pantalla más lejana a la que llegó el participante. */
   maxima: number;
   resultados: ReadonlyMap<string, ResultadoActividad>;
+  /** HU-0702 · La pantalla actual pide terminar su narración antes de seguir y todavía no se ha escuchado entera. */
+  narracionPendiente?: boolean;
 }
 
-export type Motivo = 'actividad' | 'orden';
+export type Motivo = 'actividad' | 'orden' | 'narracion';
 
 const pendiente = (x: PantallaPlana | undefined, r: Avance['resultados']) => Boolean(x?.conActividad && !r.get(x.pantalla.id)?.completada);
 
@@ -42,10 +44,13 @@ const pendiente = (x: PantallaPlana | undefined, r: Avance['resultados']) => Boo
  * - libre: a cualquier pantalla.
  * - condiciones: a cualquiera mientras no quede atrás una actividad sin hacer.
  * - secuencial: a las ya vistas y a la siguiente de la más lejana, si esa está completa.
+ * Con «Siguiente se habilita al terminar la narración» (SUP-32, HU-0702), tampoco se avanza más allá de la pantalla
+ * actual mientras su narración no termine; volver atrás siempre se puede.
  */
 export function motivoBloqueo(pantallas: readonly PantallaPlana[], avance: Avance, modo: ModoNavegacion, destino: number): Motivo | null {
   if (destino < 0 || destino >= pantallas.length) return 'orden';
   if (modo === 'libre' || destino <= avance.actual) return null;
+  if (avance.narracionPendiente) return 'narracion';
   if (modo === 'condiciones') {
     for (let j = 0; j < destino; j++) if (pendiente(pantallas[j], avance.resultados)) return 'actividad';
     return null;

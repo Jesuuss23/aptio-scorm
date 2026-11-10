@@ -3,13 +3,21 @@ import 'reflect-metadata';
 import { readFileSync } from 'node:fs';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { randomUUID } from 'node:crypto';
+import { Almacen, configDesdeEnv, prepararAlmacen } from '@aptio/almacen';
 import { hashearClave, prisma, Rol } from '@aptio/db';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
 
+process.env.AWS_ENDPOINT ??= 'http://localhost:9000';
+process.env.AWS_ACCESS_KEY_ID ??= 'test';
+process.env.AWS_SECRET_ACCESS_KEY ??= 'test';
+process.env.S3_BUCKET_NAME ??= 'aptio-pruebas-api';
+
 const hayBase = Boolean(process.env.DATABASE_URL);
+const hayS3 = await fetch(`${process.env.AWS_ENDPOINT}/_localstack/health`).then((r) => r.ok).catch(() => false);
 const CLAVE = 'clave-de-prueba-123';
 const sufijo = Math.random().toString(36).slice(2, 8);
 const correo = (n: string) => `${n}-${sufijo}@prueba.test`;
@@ -133,5 +141,31 @@ describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', ()
     // El revisor de otro cliente y otra organización no lo ven.
     expect((await como('revisor').get(`/proyectos/${id}/curso`)).status).toBe(404);
     expect((await como('ajeno').get(`/proyectos/${id}/curso`)).status).toBe(404);
+  });
+  it.skipIf(!hayS3 && !process.env.CI)('HU-0702: la vista previa recibe la URL firmada de cada audio y el SVG del personaje en línea', async () => {
+    const proyecto = (await como('productor').post('/proyectos', { clienteId: clientes[0], nombre: `Con voz ${sufijo}` })).body as { id: string };
+    const almacen = new Almacen(configDesdeEnv());
+    await prepararAlmacen(almacen, ['http://localhost:5173']);
+    const svg = readFileSync(new URL('../../../docs/diseno/personaje/plantilla-ana.svg', import.meta.url), 'utf8');
+    const ids = { audio: randomUUID(), ana: randomUUID(), otraOrg: randomUUID() };
+    const clave = (x: string) => `org/${orgId}/${clientes[0]}/${x}`;
+    await almacen.subir(clave(ids.ana), svg, 'image/svg+xml');
+    const base = { organizacionId: orgId, clienteId: clientes[0]!, origen: 'GENERADO' as const, bytes: 10n, hash: 'x' };
+    await prisma.recurso.createMany({ data: [
+      { ...base, id: ids.audio, tipo: 'AUDIO', claveS3: clave(ids.audio), mime: 'audio/wav', nombre: 'p01-es.wav' },
+      { ...base, id: ids.ana, tipo: 'SVG', origen: 'CLIENTE', claveS3: clave(ids.ana), mime: 'image/svg+xml', nombre: 'ana.svg' },
+    ] });
+    const documento = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
+    documento.recursos.push({ id: ids.audio, tipo: 'audio', origen: 'generado', nombre: 'p01-es.wav', mime: 'audio/wav', idioma: 'es' }, { id: ids.otraOrg, tipo: 'audio', origen: 'generado', nombre: 'x.wav', mime: 'audio/wav' });
+    const p03 = documento.modulos[0].capsulas[0].pantallas[2];
+    p03.bloques.find((b: { tipo: string }) => b.tipo === 'personaje').recursoId = ids.ana;
+    await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: proyecto.id, versionEsquema: '0.2.0', documento } });
+
+    const r = await como('grafico').get(`/proyectos/${proyecto.id}/curso`);
+    expect(r.status).toBe(200);
+    expect(Object.keys(r.body.urlsRecursos)).toEqual([ids.audio]);
+    expect(r.body.urlsRecursos[ids.audio]).toMatch(/X-Amz-Signature=/);
+    expect(Object.keys(r.body.svgPersonajes)).toEqual([ids.ana]);
+    expect(r.body.svgPersonajes[ids.ana]).toContain('id="boca_A"');
   });
 });

@@ -221,6 +221,10 @@ export interface Curso {
   version: number;
   documento: Record<string, unknown>;
   actualizadoEn: string;
+  /** HU-0702 · URL firmada de cada audio de narración, por id de recurso. */
+  urlsRecursos?: Record<string, string>;
+  /** HU-0702 · SVG del personaje (saneado), por id de recurso. */
+  svgPersonajes?: Record<string, string>;
 }
 
 export type TextoI18n = { es?: string; en?: string };

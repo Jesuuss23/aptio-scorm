@@ -2,6 +2,9 @@
 // Se monta en un Shadow DOM propio para que los estilos de la página que lo contiene (el editor o el LMS) no lo cambien.
 // HU-1102 · Patrón Clásico: barra con temario y avance, la pantalla y un pie con Anterior, contador y Siguiente. Con
 // «actividades obligatorias», Siguiente se deshabilita y dice por qué (RN-11-4, CP-086).
+// HU-0702 · Narración con boca sincronizada: «Escuchar narración» reproduce el audio de la pantalla y el personaje mueve
+// la boca según sus marcas (CP-072). Con «Siguiente se habilita al terminar la narración», se avanza al terminarla.
+import { animarBoca, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
 import { aplanar, type Motivo, modoDe, motivoBloqueo } from './navegacion.ts';
@@ -9,7 +12,7 @@ import { dibujarPantalla } from './pantalla.ts';
 import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
 import { ESTILOS } from './estilos.ts';
 import { t, textos } from './textos.ts';
-import type { BloqueInteraccion, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
+import type { AudioNarracion, BloqueInteraccion, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
 
 /** Estilo base (el mismo de KIT_INICIAL en @aptio/schema/marca) más blanco y alerta. */
 export const PALETA_BASE: Record<RolColor, string> = {
@@ -24,6 +27,8 @@ export interface OpcionesReproductor {
   kit?: KitReproductor;
   /** URL de un recurso del curso (imagen, personaje, video). Sin URL se dibuja un marco con su texto alternativo. */
   urlRecurso?: (id: string) => string | undefined;
+  /** El SVG del personaje como texto; por defecto se descarga de `urlRecurso`. */
+  cargarSvg?: (id: string) => Promise<string | undefined>;
   /** Modo revisión: se puede ir a cualquier pantalla y se ven los identificadores. */
   revision?: boolean;
   /** Id de la pantalla con la que empieza. */
@@ -78,9 +83,63 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const vistas = new Set<string>();
   const resultados = new Map<string, ResultadoActividad>();
   const dibujadas = new Map<string, HTMLElement>();
+  /** Pantallas cuya narración se escuchó hasta el final. */
+  const escuchadas = new Set<string>();
 
-  const avance = () => ({ actual, maxima, resultados });
-  const textoMotivo = (m: Motivo | null) => (m === 'actividad' ? tx.motivoActividad : m === 'orden' ? tx.motivoOrden : null);
+  // ---------- Narración y personaje (HU-0702) ----------
+  const svgs = new Map<string, Promise<string | undefined>>();
+  const cargarSvg = opciones.cargarSvg ?? ((id: string) => {
+    if (!svgs.has(id)) {
+      const url = urlRecurso(id);
+      svgs.set(id, url ? fetch(url).then((r) => (r.ok ? r.text() : undefined), () => undefined) : Promise.resolve(undefined));
+    }
+    return svgs.get(id)!;
+  });
+  const audioDe = (i: number): AudioNarracion | undefined => pantallas[i]?.pantalla.narracion?.porIdioma?.[idioma];
+  const urlAudio = (i: number) => {
+    const id = audioDe(i)?.recursoAudioId;
+    return id ? urlRecurso(id) : undefined;
+  };
+  const pideNarracion = !revision && curso.navegacion?.siguienteSeHabilita === 'narracion';
+  const audio = h('audio', { preload: 'auto' }) as HTMLAudioElement;
+  const personaje = () => escena.querySelector('.ap-personaje svg:not(.ap-silueta)');
+  const botonNarracion = h('button', { type: 'button', class: 'ap-boton', 'aria-pressed': 'false', onclick: () => (audio.paused ? void audio.play().catch(() => undefined) : audio.pause()) }, tx.escuchar);
+  const barraNarracion = h('div', { class: 'ap-narracion', hidden: true }, botonNarracion);
+  let detenerBoca: (() => void) | null = null;
+  const callar = () => {
+    detenerBoca?.();
+    detenerBoca = null;
+    const svg = personaje();
+    if (svg) mostrarBoca(svg, 'X');
+  };
+  audio.addEventListener('play', () => {
+    callar();
+    detenerBoca = animarBoca(personaje, { ms: () => audio.currentTime * 1000, sonando: () => !audio.paused && !audio.ended }, () => audioDe(actual)?.bocas);
+    refrescar();
+  });
+  audio.addEventListener('pause', () => { callar(); refrescar(); });
+  audio.addEventListener('ended', () => {
+    const p = pantallas[actual]?.pantalla;
+    if (p) escuchadas.add(p.id);
+    callar();
+    refrescar();
+  });
+  const cargarNarracion = () => {
+    callar();
+    audio.pause();
+    const url = urlAudio(actual);
+    if (url) {
+      if (audio.getAttribute('src') !== url) audio.src = url;
+      audio.currentTime = 0;
+    } else audio.removeAttribute('src');
+    barraNarracion.hidden = !url;
+  };
+
+  const avance = () => {
+    const p = pantallas[actual]?.pantalla;
+    return { actual, maxima, resultados, narracionPendiente: pideNarracion && Boolean(p && urlAudio(actual)) && !escuchadas.has(p!.id) };
+  };
+  const textoMotivo = (m: Motivo | null) => (m === 'actividad' ? tx.motivoActividad : m === 'orden' ? tx.motivoOrden : m === 'narracion' ? tx.motivoNarracion : null);
 
   // ---------- Estructura del patrón Clásico ----------
   const variables = [
@@ -108,6 +167,8 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       mostrar.has('progreso') ? [barraAvance, porcentaje] : h('span', { class: 'ap-espacio' }),
       botonSubtitulos),
     h('div', { class: 'ap-cuerpo' }, temario, escena),
+    barraNarracion,
+    audio,
     subtitulos,
     h('footer', { class: 'ap-pie' }, anterior, h('span', { class: 'ap-centro' }, mostrar.has('contador') ? contador : null, motivo), siguiente));
 
@@ -120,6 +181,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     });
   }
   vaciar(sombra, h('style', {}, ESTILOS), raiz);
+  const dejarDeParpadear = parpadear(personaje);
 
   // ---------- Actividades ----------
   const crearActividad = (b: BloqueInteraccion, p: Pantalla): HTMLElement => {
@@ -145,7 +207,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     const p = pantallas[i]!.pantalla;
     let el = dibujadas.get(p.id);
     if (!el) {
-      el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad });
+      el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad, cargarSvg });
       dibujadas.set(p.id, el);
     }
     return el;
@@ -176,6 +238,9 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     anterior.disabled = actual === 0;
     siguiente.disabled = !e.puedeSiguiente;
     siguiente.title = e.motivo ?? '';
+    const sonando = !audio.paused && !audio.ended;
+    botonNarracion.setAttribute('aria-pressed', String(sonando));
+    botonNarracion.textContent = sonando ? tx.pausar : tx.escuchar;
     botonSubtitulos.setAttribute('aria-pressed', String(conSubtitulos));
     subtitulos.hidden = !conSubtitulos;
     subtitulos.textContent = p?.narracion ? t(p.narracion.texto, idioma) : '';
@@ -211,6 +276,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     maxima = Math.max(maxima, destino);
     vistas.add(pantallas[destino]!.pantalla.id);
     vaciar(escena, pantallaDe(destino));
+    cargarNarracion();
     refrescar();
     if (enfocar) escena.querySelector<HTMLElement>('.ap-titulo-pantalla')?.focus();
     return true;
@@ -222,11 +288,13 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     vistas.clear();
     resultados.clear();
     dibujadas.clear();
+    escuchadas.clear();
     temarioAbierto = false;
     if (pantallas[inicio]) {
       vistas.add(pantallas[inicio].pantalla.id);
       vaciar(escena, pantallaDe(inicio));
     }
+    cargarNarracion();
     refrescar();
   };
   const indiceDe = (d: string | number) => (typeof d === 'number' ? d : pantallas.findIndex((x) => x.pantalla.id === d));
@@ -242,6 +310,9 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     estado,
     destruir: () => {
       vivo = false;
+      callar();
+      audio.pause();
+      dejarDeParpadear();
       sombra.replaceChildren();
     },
   };
