@@ -26,12 +26,12 @@ test('CP-036 · lanza la generación y muestra las 11 etapas avanzando con su co
   await expect(gen.getByRole('list', { name: 'Etapas de la generación' }).getByRole('listitem')).toHaveCount(11);
   await expect(page.getByText('Minera Andina · Producción')).toBeVisible();
   await expect(gen.getByRole('button', { name: 'Cancelar' })).toBeVisible();
-  await expect(etapa(gen, 'Storyboard y guion')).toContainText('Lista', { timeout: 15_000 });
+  await expect(etapa(gen, 'Pantallas con el kit')).toContainText('Lista', { timeout: 20_000 });
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('30 páginas → 29 ideas clave');
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('US$ 0.35');
   await expect(etapa(gen, 'Paquete de prueba')).toContainText('Se habilita en un sprint siguiente');
-  await expect(gen.getByText('27 %')).toBeVisible();
-  await expect(gen.getByText('US$ 0.90')).toBeVisible();
+  await expect(gen.getByText('36 %')).toBeVisible();
+  await expect(gen.getByText('US$ 1.50')).toBeVisible();
   await expect(gen.getByRole('button', { name: 'Generar de nuevo' })).toBeVisible();
 });
 
@@ -135,4 +135,30 @@ test('CP-040 · el guion muestra texto y narración por pantalla y advierte la q
   await expect(p02).toContainText('Agregado por la IA');
   await expect(vista.getByRole('listitem', { name: 'Pantalla p06' })).toContainText('p. 13 · PETS-SEG-014 Bloqueo y etiquetado.pdf');
   await expect(vista.getByText(/^Supera el límite:/)).toHaveCount(1);
+});
+
+test('CP-043 · las pantallas aparecen en Producción mientras la etapa 4 corre; CP-042 · todas con su disposición', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const gen = await conTema(page);
+  await gen.getByRole('button', { name: 'Generar SCORM' }).click();
+  const fila = etapa(gen, 'Pantallas con el kit');
+  // En curso: la rejilla se muestra sola con las listas y el resto en espera.
+  await expect(fila).toContainText('de 30 pantallas listas', { timeout: 15_000 });
+  const vista = fila.getByRole('region', { name: 'Pantallas armadas con el kit' });
+  await expect(vista.getByRole('status')).toContainText(/^(10|20) de 30 pantallas · se agregan a medida que quedan listas/);
+  await expect(vista.getByRole('listitem', { name: /en espera$/ }).first()).toBeVisible();
+  // p02 quedó lista después de p03: su lugar sigue en espera.
+  await expect(vista.getByRole('listitem', { name: 'Pantalla 02 en espera' })).toBeVisible();
+
+  await expect(fila).toContainText('30 pantallas armadas con el kit · curso validado', { timeout: 15_000 });
+  await fila.getByRole('button', { name: 'Ver pantallas' }).click();
+  const final = fila.getByRole('region', { name: 'Pantallas armadas con el kit' });
+  await expect(final.getByRole('status')).toHaveText('30 de 30 pantallas');
+  await expect(final.getByRole('listitem', { name: /^Pantalla p\d\d:/ })).toHaveCount(30);
+  await expect(final.getByRole('listitem', { name: /en espera$/ })).toHaveCount(0);
+  const p06 = final.getByRole('listitem', { name: 'Pantalla p06: Seis tipos de energía' });
+  await expect(p06).toContainText('Lista');
+  await expect(final.getByRole('listitem', { name: /^Pantalla p10:/ })).toContainText('Clasificar');
+  await final.getByRole('button', { name: 'Celular' }).click();
+  await expect(final.locator('.miniatura.celular')).toHaveCount(30);
 });

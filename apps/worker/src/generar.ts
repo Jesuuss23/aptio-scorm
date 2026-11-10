@@ -24,6 +24,11 @@ export interface ContextoEtapa {
    * cancelaron la generación: así una etapa larga no sigue gastando (lanza GeneracionCancelada).
    */
   ia<T = unknown>(tarea: string, variables: Record<string, unknown>, opciones?: Parameters<typeof tareaRegistrada>[5]): Promise<ResultadoTarea<T>>;
+  /**
+   * Guarda un resultado parcial mientras la etapa corre y lo avisa por SSE (CP-043: las pantallas listas se ven sin
+   * esperar al resto). Si la etapa ya no está en curso no guarda nada.
+   */
+  avance(texto: string, datos: unknown): Promise<void>;
 }
 
 export interface ResultadoEtapa {
@@ -114,6 +119,12 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
             if (err instanceof SalidaNoValida) costo = redondear(costo + err.registro.costoUsd);
             throw err;
           }
+        },
+        async avance(texto: string, datos: unknown) {
+          const r = await bd.generacionEtapa.updateMany({
+            where: { id: e.id, estado: 'EN_CURSO' }, data: { costoUsd: costo, detalle: { texto, datos } as Prisma.InputJsonValue },
+          });
+          if (r.count) await emitir(etapa, 'EN_CURSO', texto);
         },
       };
 

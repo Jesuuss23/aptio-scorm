@@ -321,7 +321,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 12px;
 }
 .modelo {
@@ -789,4 +789,54 @@
 }
 .segmento-texto .chip {
   white-space: normal;
+}
+
+/* HU-0406 · Resultado de la etapa 4: las pantallas con el kit, en vivo (prototipo: Producción, rejilla de pantallas). */
+.pantallas-vista {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+.pantallas-vista > .kit-fila {
+  justify-content: space-between;
+  align-items: center;
+}
+.pantallas-rejilla {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+.pantalla-celda {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+.pantalla-nombre {
+  font-size: var(--texto-xs);
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pantalla-espera {
+  width: 100%;
+  border: 2px dashed var(--color-borde);
+  border-radius: 10px;
+  background: repeating-linear-gradient(45deg, var(--color-suave) 0 8px, var(--color-superficie) 8px 16px);
+}
+.pantalla-espera.celular {
+  aspect-ratio: 9 / 16;
+}
+.pantalla-espera.escritorio {
+  aspect-ratio: 16 / 9;
+}
+.zona.llena {
+  border-color: transparent;
 }

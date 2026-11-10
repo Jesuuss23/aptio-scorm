@@ -1,4 +1,6 @@
 // HU-0401 · Las 11 etapas del generador (docs/14-modulos.md, M04), en orden, con su nombre para la pantalla.
+import type { DefinicionModelo, Disposicion, Paleta, RolColor } from './marca.js';
+
 export const ETAPAS = [
   'RESUMEN_MATERIAL', 'OBJETIVOS_ESTRUCTURA', 'STORYBOARD_GUION', 'PANTALLAS', 'ILUSTRACIONES', 'VOZ_ES', 'BOCA', 'SUBTITULOS',
   'VERSION_EN', 'CONTROL_CALIDAD', 'PAQUETE',
@@ -167,4 +169,86 @@ export function advertenciasDeLongitud(pantallas: Pick<PantallaGuion, 'id' | 'te
   return pantallas.flatMap((p) => (Object.keys(LIMITE_PALABRAS) as CampoGuion[])
     .map((campo) => ({ pantallaId: p.id, campo, palabras: contarPalabras(p[campo]), limite: LIMITE_PALABRAS[campo] }))
     .filter((a) => a.palabras > a.limite));
+}
+
+// ---------- Etapa 4 · Pantallas con el kit (HU-0406) ----------
+
+/** Disposición que corresponde a cada actividad del catálogo (IA-15 v2). Las tarjetas (INT-04) van en una lista. */
+export const DISPOSICION_DE_ACTIVIDAD: Record<string, Disposicion> = {
+  'INT-01': 'memoria', 'INT-02': 'clasificar', 'INT-03': 'ordenar', 'INT-04': 'lista', 'INT-05': 'quiz',
+  'INT-06': 'hotspot', 'INT-07': 'vf', 'INT-08': 'decision',
+};
+/** Disposiciones que solo tienen sentido con los datos de una actividad (los da IA-07). */
+export const DISPOSICIONES_DE_JUEGO: readonly Disposicion[] = ['memoria', 'clasificar', 'ordenar', 'hotspot'];
+
+/** Campos que llena IA-15 (IA-15.salida.schema.json). */
+export interface CamposPantalla {
+  titulo: string;
+  subtitulo?: string;
+  texto?: string;
+  dato?: string;
+  datoGrande?: string;
+  numero?: string;
+  items?: { icono?: string; titulo: string; texto?: string }[];
+  burbuja?: string;
+  situacion?: string;
+  pregunta?: string;
+  afirmacion?: string;
+  opciones?: string[];
+  correcta?: number;
+  retroOk?: string;
+  retroNo?: string;
+}
+
+export interface PedidoImagen {
+  id: string;
+  uso: 'principal' | 'icono' | 'fondo' | 'escena';
+  descripcion: string;
+}
+
+/** Una pantalla compuesta: lo que pidió el guion más la disposición y los campos de IA-15. */
+export interface PantallaCompuesta {
+  id: string;
+  /** Lugar en el curso, desde 1: con varias a la vez, una pantalla puede quedar lista antes que la anterior. */
+  orden: number;
+  capsulaId: string;
+  titulo: string;
+  disposicion: Disposicion;
+  fondo: RolColor;
+  campos: CamposPantalla;
+  personaje?: { pose: string; lado: 'izquierda' | 'derecha' };
+  /** Los dibuja la etapa 5 (Ilustraciones). */
+  pedidosImagen: PedidoImagen[];
+  /** Los datos de la actividad los agrega HU-0407 (IA-07). */
+  actividad?: { tipo: string; consigna: string };
+  motivo?: string;
+}
+
+/**
+ * Lo que guarda la etapa PANTALLAS. Mientras corre guarda las pantallas listas (CP-043: se ven en Producción sin
+ * esperar al resto); al terminar, además, el curso validado (CP-042).
+ */
+export interface PantallasCurso {
+  total: number;
+  kit: { nombre: string; paleta: Paleta; tipografias: { titulos: string; textos: string }; personaje: string | null };
+  /** El modelo que usa cada disposición: el del cliente o el del estilo base. */
+  modelos: Partial<Record<Disposicion, DefinicionModelo>>;
+  pantallas: PantallaCompuesta[];
+  advertencias: string[];
+  curso?: { id: string; version: number };
+}
+
+/** Tramos de 3 o más pantallas seguidas con la misma disposición (la regla de IA-15 es no repetir 3 veces). */
+export function repeticionesSeguidas(pantallas: Pick<PantallaCompuesta, 'id' | 'disposicion'>[]): { ids: string[]; disposicion: Disposicion }[] {
+  const tramos: { ids: string[]; disposicion: Disposicion }[] = [];
+  let actual: { ids: string[]; disposicion: Disposicion } | null = null;
+  for (const p of pantallas) {
+    if (actual && actual.disposicion === p.disposicion) actual.ids.push(p.id);
+    else {
+      if (actual && actual.ids.length >= 3) tramos.push(actual);
+      actual = { ids: [p.id], disposicion: p.disposicion };
+    }
+  }
+  if (actual && actual.ids.length >= 3) tramos.push(actual);
+  return tramos;
 }
