@@ -1783,7 +1783,8 @@ paths:
       - Curso
       summary: Guardar cambios del editor en una pantalla
       operationId: patch_cursos_cursoId_pantallas_pantallaId
-      description: Dispara regeneración en cascada solo de lo afectado
+      description: Dispara regeneración en cascada solo de lo afectado. La pantalla vuelve a borrador (RN-05-2); 409 VERSION_CAMBIO
+        si otra persona guardó antes.
       parameters:
       - name: cursoId
         in: path
@@ -1815,6 +1816,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
   /cursos/{cursoId}/pantallas/{pantallaId}/aprobar:
@@ -1823,7 +1826,8 @@ paths:
       - Curso
       summary: Aprobar una pantalla
       operationId: post_cursos_cursoId_pantallas_pantallaId_aprobar
-      description: Una pantalla aprobada no cambia por IA sin nueva aprobación
+      description: Una pantalla aprobada no cambia por IA sin nueva aprobación. 409 OBSERVACIONES_BLOQUEAN si tiene observaciones
+        abiertas que bloquean la entrega (RN-05-1).
       parameters:
       - name: cursoId
         in: path
@@ -1849,6 +1853,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
   /cursos/{cursoId}/pantallas/aprobar:
     post:
       tags:
@@ -4792,7 +4798,7 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/TextoI18n'
-          description: Clave = ruta del texto en la pantalla
+          description: Clave = id del bloque de texto de la pantalla
         disposicion:
           $ref: '#/components/schemas/Disposicion'
         fondo:
@@ -4828,6 +4834,23 @@ components:
             - traduccion-en
             - voz-en
             - subtitulos-en
+        aprobadas:
+          type: array
+          items:
+            type: string
+          description: Pantallas que quedaron aprobadas con esta llamada
+        pendientes:
+          type: array
+          items:
+            type: string
+          description: Pantallas pedidas que no se aprobaron por tener observaciones abiertas
+        estado:
+          type: string
+          enum:
+          - borrador
+          - propuesta-ia
+          - aprobado
+          description: Estado de la pantalla tras editar o aprobar una sola
     Aprobacion:
       type: object
       properties:
@@ -4951,6 +4974,9 @@ components:
           - usuario
         resuelta:
           type: boolean
+        creadoEn:
+          type: string
+          format: date-time
     Comentario:
       type: object
       required:

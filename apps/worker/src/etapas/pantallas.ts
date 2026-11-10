@@ -2,6 +2,7 @@
 // campos, sin HTML. Se componen hasta 4 a la vez y cada una lista se guarda como avance para verla en Producción sin
 // esperar al resto (CP-043). Cada pantalla con actividad pide además sus datos a IA-07 (HU-0407, CP-044). Al terminar
 // se arma el documento del curso con los bloques y se valida (CP-042).
+import { type CursoDoc, observacionesRegla } from '@aptio/schema/revision';
 import { createHash } from 'node:crypto';
 import { textoSeguro } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
@@ -314,6 +315,10 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
       ? await tx.curso.update({ where: { id: previo.id }, data: { documento: documento as Prisma.InputJsonValue, versionEsquema: VERSION_ESQUEMA, version: { increment: 1 } } })
       : await tx.curso.create({ data: { organizacionId: ctx.organizacionId, proyectoId: proyecto.id, versionEsquema: VERSION_ESQUEMA, documento: documento as Prisma.InputJsonValue } });
     await tx.cursoVersion.create({ data: { cursoId: c.id, version: c.version, documento: documento as Prisma.InputJsonValue, motivo: 'generación' } });
+    // HU-0501: las observaciones por reglas se calculan de nuevo con el curso nuevo; las demás se conservan.
+    await tx.observacion.deleteMany({ where: { cursoId: c.id, origen: 'regla' } });
+    const observaciones = observacionesRegla(documento as unknown as CursoDoc);
+    if (observaciones.length) await tx.observacion.createMany({ data: observaciones.map((o) => ({ cursoId: c.id, ...o, origen: 'regla' })) });
     return c;
   });
 

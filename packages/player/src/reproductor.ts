@@ -28,6 +28,8 @@ export interface OpcionesReproductor {
   revision?: boolean;
   /** Id de la pantalla con la que empieza. */
   inicio?: string;
+  /** false: solo la pantalla, sin barra ni botones (la usa la revisión para mostrar una pantalla a la vez). */
+  marco?: boolean;
   alCambiar?: (estado: EstadoReproductor) => void;
 }
 
@@ -64,7 +66,8 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const pantallas = aplanar(curso);
   const modo: ModoNavegacion = revision ? 'libre' : modoDe(curso);
   const mostrar = new Set(curso.navegacion?.mostrar?.length ? [...curso.navegacion.mostrar, 'botones'] : MOSTRAR_BASE);
-  const atajos = curso.navegacion?.atajosTeclado !== false;
+  const conMarco = opciones.marco !== false;
+  const atajos = conMarco && curso.navegacion?.atajosTeclado !== false;
   const mejor = curso.seguimiento.notaReportada !== 'ultima';
 
   let actual = 0;
@@ -98,7 +101,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const contador = h('span', { class: 'ap-contador' });
   const motivo = h('span', { class: 'ap-motivo', id: 'ap-motivo', role: 'status' });
 
-  const raiz = h('div', { class: 'ap-r', lang: idioma, style: variables, 'data-patron': 'clasico', 'data-modo': modo },
+  const raiz = h('div', { class: conMarco ? 'ap-r' : 'ap-r ap-sin-marco', lang: idioma, style: variables, 'data-patron': 'clasico', 'data-modo': modo },
     h('header', { class: 'ap-barra' },
       mostrar.has('temario') ? botonTemario : null,
       h('span', { class: 'ap-titulo-curso' }, titulo),
