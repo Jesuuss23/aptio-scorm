@@ -17,3 +17,4 @@ export {
   BocaNoDisponible, bocaDeLetra, bocasDeRhubarb, bocasSimuladas, type CalculadorBocas, calculadorSimulado, type FormaBoca, type MarcaBoca, normalizarBocas,
   type PedidoBoca, type ResultadoBoca,
 } from './boca.js';
+export { aVtt, MAX_CARACTERES_SUBTITULO, type Subtitulo, subtitulosDeNarracion, tiempoVtt } from './subtitulos.js';

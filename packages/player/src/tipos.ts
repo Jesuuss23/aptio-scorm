@@ -39,11 +39,12 @@ export interface Pantalla {
   narracion?: { texto: TextoI18n; personajeBloqueId?: string; porIdioma?: Partial<Record<Idioma, AudioNarracion>> };
 }
 
-/** Audio de la narración en un idioma (etapas 6 y 7): el recurso, su duración y las marcas [ms, boca]. */
+/** Audio de la narración en un idioma (etapas 6 a 8): el recurso, su duración, las marcas [ms, boca] y el WebVTT. */
 export interface AudioNarracion {
   recursoAudioId?: string;
   duracionMs?: number;
   bocas?: [number, string][];
+  subtitulosId?: string;
 }
 
 export interface Capsula {

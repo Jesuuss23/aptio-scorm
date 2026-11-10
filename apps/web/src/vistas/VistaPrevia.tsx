@@ -58,6 +58,7 @@ export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCa
       revision,
       urlRecurso: (id) => curso.urlsRecursos?.[id],
       cargarSvg: async (id) => curso.svgPersonajes?.[id],
+      cargarSubtitulos: async (id) => curso.subtitulos?.[id],
       ...(revision && ultima.current ? { inicio: ultima.current } : {}),
       alCambiar: (e) => {
         ultima.current = e.pantallaId;

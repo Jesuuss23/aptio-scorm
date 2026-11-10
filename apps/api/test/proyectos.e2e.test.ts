@@ -142,21 +142,25 @@ describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', ()
     expect((await como('revisor').get(`/proyectos/${id}/curso`)).status).toBe(404);
     expect((await como('ajeno').get(`/proyectos/${id}/curso`)).status).toBe(404);
   });
-  it.skipIf(!hayS3 && !process.env.CI)('HU-0702: la vista previa recibe la URL firmada de cada audio y el SVG del personaje en línea', async () => {
+  it.skipIf(!hayS3 && !process.env.CI)('HU-0702 y HU-0801: la vista previa recibe la URL firmada de cada audio, el SVG del personaje y los WebVTT en línea', async () => {
     const proyecto = (await como('productor').post('/proyectos', { clienteId: clientes[0], nombre: `Con voz ${sufijo}` })).body as { id: string };
     const almacen = new Almacen(configDesdeEnv());
     await prepararAlmacen(almacen, ['http://localhost:5173']);
     const svg = readFileSync(new URL('../../../docs/diseno/personaje/plantilla-ana.svg', import.meta.url), 'utf8');
-    const ids = { audio: randomUUID(), ana: randomUUID(), otraOrg: randomUUID() };
+    const ids = { audio: randomUUID(), ana: randomUUID(), otraOrg: randomUUID(), vtt: randomUUID() };
+    const vtt = 'WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.000\nHola.\n\n';
     const clave = (x: string) => `org/${orgId}/${clientes[0]}/${x}`;
     await almacen.subir(clave(ids.ana), svg, 'image/svg+xml');
+    await almacen.subir(clave(ids.vtt), vtt, 'text/vtt');
     const base = { organizacionId: orgId, clienteId: clientes[0]!, origen: 'GENERADO' as const, bytes: 10n, hash: 'x' };
     await prisma.recurso.createMany({ data: [
       { ...base, id: ids.audio, tipo: 'AUDIO', claveS3: clave(ids.audio), mime: 'audio/wav', nombre: 'p01-es.wav' },
       { ...base, id: ids.ana, tipo: 'SVG', origen: 'CLIENTE', claveS3: clave(ids.ana), mime: 'image/svg+xml', nombre: 'ana.svg' },
+      { ...base, id: ids.vtt, tipo: 'SUBTITULO', claveS3: clave(ids.vtt), mime: 'text/vtt', nombre: 'p01-es.vtt' },
     ] });
     const documento = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
-    documento.recursos.push({ id: ids.audio, tipo: 'audio', origen: 'generado', nombre: 'p01-es.wav', mime: 'audio/wav', idioma: 'es' }, { id: ids.otraOrg, tipo: 'audio', origen: 'generado', nombre: 'x.wav', mime: 'audio/wav' });
+    documento.recursos.push({ id: ids.audio, tipo: 'audio', origen: 'generado', nombre: 'p01-es.wav', mime: 'audio/wav', idioma: 'es' }, { id: ids.otraOrg, tipo: 'audio', origen: 'generado', nombre: 'x.wav', mime: 'audio/wav' },
+      { id: ids.vtt, tipo: 'subtitulos', origen: 'generado', nombre: 'p01-es.vtt', mime: 'text/vtt', idioma: 'es' });
     const p03 = documento.modulos[0].capsulas[0].pantallas[2];
     p03.bloques.find((b: { tipo: string }) => b.tipo === 'personaje').recursoId = ids.ana;
     await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: proyecto.id, versionEsquema: '0.2.0', documento } });
@@ -167,5 +171,6 @@ describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', ()
     expect(r.body.urlsRecursos[ids.audio]).toMatch(/X-Amz-Signature=/);
     expect(Object.keys(r.body.svgPersonajes)).toEqual([ids.ana]);
     expect(r.body.svgPersonajes[ids.ana]).toContain('id="boca_A"');
+    expect(r.body.subtitulos).toEqual({ [ids.vtt]: vtt });
   });
 });

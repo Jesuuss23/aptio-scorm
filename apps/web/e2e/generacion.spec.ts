@@ -31,9 +31,11 @@ test('CP-036 · lanza la generación y muestra las 11 etapas avanzando con su co
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('US$ 0.35');
   await expect(etapa(gen, 'Voz en español')).toContainText('Lista', { timeout: 20_000 });
   await expect(etapa(gen, 'Boca del personaje')).toContainText('30 narraciones con boca sincronizada · simulada por letras', { timeout: 20_000 });
+  await expect(etapa(gen, 'Subtítulos')).toContainText('30 narraciones con subtítulos sincronizados · WebVTT en español', { timeout: 20_000 });
   await expect(etapa(gen, 'Ilustraciones')).toContainText('Se habilita en un sprint siguiente');
   await expect(etapa(gen, 'Paquete de prueba')).toContainText('Se habilita en un sprint siguiente');
-  await expect(gen.getByText('55 %')).toBeVisible();
+  // 7 de 11 etapas listas (la 5 todavía no tiene ejecutor).
+  await expect(gen.getByText('64 %')).toBeVisible();
   await expect(gen.getByText('US$ 1.53')).toBeVisible();
   await expect(gen.getByRole('button', { name: 'Generar de nuevo' })).toBeVisible();
 });
@@ -211,7 +213,7 @@ test('CP-073 · tras cambiar la pronunciación de «pasos», solo esas 4 quedan 
   await aviso.getByRole('button', { name: 'Regenerar las desactualizadas (4)' }).click();
   // Se reabren las etapas 6 y 7 de la misma generación y vuelven a terminar.
   await expect(gen.getByText('Armando tu SCORM…')).toBeVisible();
-  await expect(etapa(gen, 'Boca del personaje')).toContainText('Lista', { timeout: 20_000 });
+  await expect(etapa(gen, 'Subtítulos')).toContainText('Lista', { timeout: 20_000 });
   await voz.getByRole('button', { name: 'Escuchar narraciones' }).click();
   await expect(lista.filter({ hasText: 'Lista' })).toHaveCount(30);
   await expect(voz.getByRole('status', { name: 'Narraciones por regenerar' })).toHaveCount(0);
