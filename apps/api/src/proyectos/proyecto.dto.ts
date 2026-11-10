@@ -65,3 +65,13 @@ export class ProyectoDto {
   @ApiProperty() creadoEn: string;
   @ApiProperty() actualizadoEn: string;
 }
+
+/** HU-1101 · El documento del curso del proyecto: lo lee la vista previa con el reproductor único. */
+export class CursoDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ format: 'uuid' }) proyectoId: string;
+  @ApiProperty({ example: '0.2.0' }) versionEsquema: string;
+  @ApiProperty({ description: 'Versión del documento; va también en el encabezado ETag' }) version: number;
+  @ApiProperty({ type: 'object', additionalProperties: true, description: 'Valida contra packages/schema/esquemas/curso-v0.schema.json' }) documento: Record<string, unknown>;
+  @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
+}

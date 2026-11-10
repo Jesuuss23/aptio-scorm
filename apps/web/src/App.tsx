@@ -9,6 +9,7 @@ import { Clientes } from './vistas/Clientes';
 import { NuevoScorm } from './vistas/NuevoScorm';
 import { ProyectoDetalle } from './vistas/ProyectoDetalle';
 import { Proyectos } from './vistas/Proyectos';
+import { VistaPrevia } from './vistas/VistaPrevia';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -47,7 +48,9 @@ export function App() {
   const ruta = !vista
     ? ['Inicio', 'Página no encontrada']
     : vista.id
-      ? [vista.grupo, vista.activo === '/' ? 'Proyectos' : 'Clientes y kits', titulo || vista.nombre]
+      ? vista.sub
+        ? [vista.grupo, 'Proyectos', titulo || 'Proyecto', vista.nombre]
+        : [vista.grupo, vista.activo === '/' ? 'Proyectos' : 'Clientes y kits', titulo || vista.nombre]
       : [vista.grupo, vista.nombre];
   const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
   // Nuevo SCORM solo aparece a quien puede crear proyectos (RN-01-2: la API también lo valida).
@@ -61,7 +64,9 @@ export function App() {
       alNavegar={navegar}
       alSalir={salir}
     >
-      {vista?.activo === '/' && vista.id ? (
+      {vista?.sub === 'vista-previa' ? (
+        <VistaPrevia key={vista.id} proyectoId={vista.id!} alCargar={alCargar} />
+      ) : vista?.activo === '/' && vista.id ? (
         <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' ? (
         <Proyectos rol={usuario.rol} />
