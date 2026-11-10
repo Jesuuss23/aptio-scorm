@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.13 · actualizado con la segunda entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.14 · actualizado con la tercera entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -312,6 +312,19 @@ Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Produc
 
 Puedes guardar varias veces seguidas sin preocuparte: solo se hace una regeneración, un segundo después del último guardado, y solo se paga esa. Si solo cambias el título, no se regenera nada. Por ahora solo se regenera el español; el inglés llegará con su etapa.
 
+### 8.8 Editor: escribir directamente sobre la pantalla
+
+En Revisión, el botón **✎ Editar pantalla** abre el editor en la pantalla que estás mirando. Arriba ves **← Revisión** para volver, el número, el título y el estado de la pantalla. Al centro está la pantalla tal como la verá el participante, y abajo, la tira con todas las pantallas para saltar a otra.
+
+Para corregir un texto (el título, el subtítulo, un párrafo, un dato o un punto de una lista):
+1. Haz **doble clic** sobre él. Con teclado, llega con **Tab** y pulsa **Enter** o **F2**.
+2. Escribe. Arriba de la pantalla verás «Escribiendo… Enter para terminar · Esc para cancelar».
+3. Pulsa **Enter** para guardar, o haz clic fuera del texto. Pulsa **Esc** si quieres dejarlo como estaba.
+
+Cada texto guardado vuelve la pantalla a **Borrador**; si estaba aprobada, apruébala de nuevo en Revisión. Un texto no puede quedar vacío: si lo borras todo, vuelve el que tenía. Si otra persona guardó un cambio mientras escribías, el editor carga lo último y te pide escribir tu cambio de nuevo.
+
+Por ahora el editor solo cambia textos. Las actividades, las imágenes y la narración se cambian desde Revisión. El tamaño, el color, mover elementos, agregar elementos, deshacer y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
+
 ---
 
 ## 9. Preguntas frecuentes
@@ -355,7 +368,8 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
-- Otra ilustración desde la revisión, comentarios del cliente y retoques en un editor visual.
+- Otra ilustración desde la revisión y comentarios del cliente.
+- En el editor: tamaño, color, alineación y animación; mover y agregar elementos; deshacer y guardado automático; línea de tiempo.
 
 ---
 
@@ -363,6 +377,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
 | 0.12 | 2026-11-10 | Regeneración automática: al corregir la narración en Revisión se rehacen solos su voz, su boca y sus subtítulos, con las marcas de avance. |
 | 0.11 | 2026-11-10 | Subtítulos: la etapa 8 del generador y el botón CC de la vista previa, que muestra la frase que se está diciendo. |

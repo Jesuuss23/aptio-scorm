@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.13 · actualizado con la segunda entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.14 · actualizado con la tercera entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -208,6 +208,12 @@ Las propuestas de la IA (HU-0504) son la tarea IA-16 v2 en la cola `ia`.
 - Aplicar usa `CursosService.guardar` y compara la huella dentro del guardado. Restaurar (`/versiones/{v}/restaurar`) copia la versión vieja pero conserva la narración de cada pantalla y `recursos`.
 - En modo simulado, `ajustarAlPedido` elige la salida por `tipoPedido = "…"` de `X-IA-16-propuestas-p05.json`.
 
+El editor (HU-0601, PNT-21) es `apps/web/src/vistas/EditorVista.tsx`, en la ruta `editor` de `menu.ts`.
+- Después de `montar()`, recorre la sombra del reproductor: a cada `[data-bloque]` que `esEditable` acepta le pone `data-editable` y `tabindex=0`, e inyecta un `<style>` propio dentro de la sombra.
+- Doble clic, o Enter/F2 con foco, activa `contentEditable = 'plaintext-only'`. Enter o `focusout` guardan; Esc restaura los nodos clonados.
+- `edicion-texto.ts` (lógica pura, con Vitest) decide el cuerpo con `edicionDe(pantalla, bloqueId, escrito)`: `titulo`, `textos[bloque]`, `vacio` o `sin-cambios`.
+- El lienzo se vuelve a montar con cada versión del curso; `guardarRef` evita montarlo de nuevo en cada render.
+
 En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg` y `cargarSubtitulos`; la vista previa usa `urlsRecursos`, `svgPersonajes` y `subtitulos` de `GET /proyectos/{id}/curso`. `packages/player/src/subtitulos.ts` tiene `leerVtt` (texto plano, sin HTML) y `cueEn(cues, ms)`; mientras suena el audio, un `requestAnimationFrame` actualiza la línea de «CC». La preferencia vive en `localStorage['aptio-subtitulos']`, dentro de un try/catch.
 
 ### 7.2 Agregar un proveedor
@@ -226,6 +232,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 
 - **Vitest** usa PostgreSQL y Redis reales. Sin ellos, las pruebas que los necesitan se saltan en local, pero **en CI fallan** para no dar un falso verde.
 - **Playwright** usa la API simulada. Corre con `npx playwright test --trace off` desde `apps/web`.
+- La lógica pura de la web va en archivos `*.ts` con su `*.test.ts` en `apps/web/src`; `pnpm --filter web test` corre `vitest run --dir src` (los `e2e/*.spec.ts` quedan fuera).
 - La transcripción se prueba con ffmpeg real sobre un video generado en la misma prueba (`apps/worker/test/transcribir.test.ts`).
 - **Prohibido** saltarse, desactivar o poner en cuarentena una prueba para obtener verde.
 
@@ -282,6 +289,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
 | 0.12 | 2026-11-10 | Regeneración en cascada: trabajo `CASCADA` (`crearCascada`), `encolarConEspera` en la API y chips en Revisión. |
 | 0.11 | 2026-11-10 | Etapa 8 de subtítulos (`crearEtapaSubtitulos`, `subtitulosDeNarracion`, `aVtt`) y `cargarSubtitulos` en el reproductor. |
