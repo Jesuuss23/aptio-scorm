@@ -635,6 +635,7 @@ paths:
       - Clientes y kits
       summary: Listar pantallas modelo
       operationId: get_clientes_clienteId_kit_pantallas_modelo
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR. Lista vacía si el cliente aún no tiene kit (se usa el estilo base, RN-02-5).
       parameters:
       - name: clienteId
         in: path
@@ -642,6 +643,12 @@ paths:
         schema:
           type: string
           format: uuid
+      - name: activas
+        in: query
+        required: false
+        description: true devuelve solo las activas
+        schema:
+          type: boolean
       responses:
         '200':
           description: OK
@@ -662,7 +669,7 @@ paths:
       - Clientes y kits
       summary: Agregar pantalla modelo
       operationId: post_clientes_clienteId_kit_pantallas_modelo
-      description: Rol DISENADOR_GRAFICO o ADMINISTRADOR
+      description: Rol DISENADOR_GRAFICO o ADMINISTRADOR. 404 con código SIN_KIT si el cliente no tiene kit guardado; 422 con código DEFINICION_NO_VALIDA y un detalle por error de la definición.
       parameters:
       - name: clienteId
         in: path
@@ -697,6 +704,7 @@ paths:
       - Clientes y kits
       summary: Editar pantalla modelo
       operationId: put_clientes_clienteId_kit_pantallas_modelo_modeloId
+      description: Rol DISENADOR_GRAFICO o ADMINISTRADOR. La disposición no cambia.
       parameters:
       - name: clienteId
         in: path
@@ -736,7 +744,7 @@ paths:
       - Clientes y kits
       summary: Desactivar pantalla modelo
       operationId: delete_clientes_clienteId_kit_pantallas_modelo_modeloId
-      description: Borrado lógico (activa = false)
+      description: Rol DISENADOR_GRAFICO o ADMINISTRADOR. Borrado lógico (activa = false); la disposición vuelve al estilo base si no queda otro modelo activo.
       parameters:
       - name: clienteId
         in: path
@@ -3324,8 +3332,7 @@ components:
         nombre:
           type: string
         definicion:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/DefinicionModelo'
         miniaturaRecursoId:
           type: string
           format: uuid
@@ -3346,12 +3353,69 @@ components:
         nombre:
           type: string
         definicion:
-          type: object
-          additionalProperties: true
+          $ref: '#/components/schemas/DefinicionModelo'
         orden:
           type: integer
+          minimum: 0
         activa:
           type: boolean
+    DefinicionModelo:
+      type: object
+      description: Zonas de la pantalla en porcentaje del lienzo por dispositivo (HU-0204). Cada zona pertenece a la disposición y usa colores del kit.
+      required:
+      - fondo
+      - celular
+      - escritorio
+      properties:
+        fondo:
+          $ref: '#/components/schemas/RolColor'
+        celular:
+          type: array
+          items:
+            $ref: '#/components/schemas/ZonaModelo'
+        escritorio:
+          type: array
+          items:
+            $ref: '#/components/schemas/ZonaModelo'
+    ZonaModelo:
+      type: object
+      required:
+      - zona
+      - x
+      - y
+      - ancho
+      - alto
+      properties:
+        zona:
+          type: string
+          description: Zona de la disposición (titulo, personaje, opciones…)
+        x:
+          type: number
+          minimum: 0
+          maximum: 100
+        y:
+          type: number
+          minimum: 0
+          maximum: 100
+        ancho:
+          type: number
+          minimum: 0
+          maximum: 100
+        alto:
+          type: number
+          minimum: 0
+          maximum: 100
+        color:
+          $ref: '#/components/schemas/RolColor'
+        tamano:
+          type: string
+          enum: [sm, md, lg, xl]
+        alineacion:
+          type: string
+          enum: [inicio, centro, fin]
+    RolColor:
+      type: string
+      enum: [primario, secundario, acento, fondo, texto]
     GlosarioTermino:
       type: object
       required:

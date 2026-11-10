@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { contraste, FAMILIAS_KIT, FUENTES_KIT, KIT_INICIAL, revisarPaleta, revisarPersonaje } from '../src/marca.js';
+import {
+  contraste, DISPOSICIONES, erroresDefinicion, FAMILIAS_KIT, FUENTES_KIT, KIT_INICIAL, modeloBase, modelosParaGenerar, revisarPaleta, revisarPersonaje,
+} from '../src/marca.js';
 
 describe('marca del kit', () => {
   it('calcula el contraste WCAG', () => {
@@ -44,5 +46,42 @@ describe('personaje', () => {
     const sinA = revisarPersonaje({ ids: completo.filter((i) => i !== 'boca_A'), viewBox: '0 0 300 400', bytes: 300 * 1024 });
     expect(sinA.errores).toEqual(['Falta la capa obligatoria «boca_A»', 'Pesa 300 KB; el máximo es 200 KB']);
     expect(revisarPersonaje({ ids: completo, viewBox: '0 0 400 400', bytes: 150 * 1024 }).avisos).toHaveLength(2);
+  });
+});
+
+describe('pantallas modelo', () => {
+  it('cada disposición tiene un modelo base válido en celular y escritorio', () => {
+    for (const d of DISPOSICIONES) expect({ d, errores: erroresDefinicion(d, modeloBase(d)) }).toEqual({ d, errores: [] });
+  });
+
+  it('rechaza zonas ajenas, repetidas, fuera del lienzo o con colores fuera del kit', () => {
+    const base = modeloBase('idea');
+    const malo = {
+      ...base,
+      celular: [...base.celular, { zona: 'video', x: 0, y: 0, ancho: 10, alto: 10 }, { zona: 'titulo', x: 90, y: 0, ancho: 20, alto: 10, color: 'rosado' }],
+    };
+    const errores = erroresDefinicion('idea', malo);
+    expect(errores).toContain('celular: la zona «video» no es de la disposición idea');
+    expect(errores).toContain('celular: la zona «titulo» está repetida');
+    expect(errores).toContain('celular: la zona «titulo» debe caber en el lienzo (porcentajes de 0 a 100)');
+    expect(errores).toContain('celular: la zona «titulo» usa un color fuera del kit');
+    expect(erroresDefinicion('otra', base)).toEqual(['Disposición desconocida: otra']);
+    expect(erroresDefinicion('idea', { fondo: 'fondo', celular: base.celular })).toEqual(['Faltan las zonas de escritorio']);
+  });
+
+  it('CP-025 · el generador usa la pantalla modelo activa del cliente', () => {
+    const modelos = modelosParaGenerar([
+      { id: 'm1', disposicion: 'idea', nombre: 'Idea + ilustración', definicion: modeloBase('idea'), activa: true, orden: 0 },
+      { id: 'm2', disposicion: 'quiz', nombre: 'Quiz apagado', definicion: modeloBase('quiz'), activa: false, orden: 0 },
+    ]);
+    expect(modelos).toHaveLength(DISPOSICIONES.length);
+    expect(modelos.find((m) => m.disposicion === 'idea')).toMatchObject({ origen: 'cliente', nombre: 'Idea + ilustración', modeloId: 'm1' });
+    expect(modelos.find((m) => m.disposicion === 'quiz')).toMatchObject({ origen: 'base' });
+  });
+
+  it('CP-026 · sin pantallas modelo se usan las del estilo base', () => {
+    const modelos = modelosParaGenerar([]);
+    expect(modelos.map((m) => m.disposicion)).toEqual([...DISPOSICIONES]);
+    expect(modelos.every((m) => m.origen === 'base')).toBe(true);
   });
 });

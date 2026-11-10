@@ -303,3 +303,113 @@
   margin: 0;
   padding: 0;
 }
+
+/* HU-0204 · Pantallas modelo: zonas en porcentaje del lienzo, como en el reproductor. */
+.modelos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--color-borde);
+  padding-top: 14px;
+}
+.modelos-rejilla {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+.modelo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.modelo.inactivo .miniatura {
+  opacity: 0.45;
+}
+.modelo-nombre {
+  font-weight: 600;
+  font-size: var(--texto-sm);
+}
+.miniatura {
+  position: relative;
+  width: 100%;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  overflow: hidden;
+  font-family: var(--k-textos);
+}
+.miniatura.celular {
+  aspect-ratio: 9 / 16;
+}
+.miniatura.escritorio {
+  aspect-ratio: 16 / 9;
+}
+.zona {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  padding: 2px 4px;
+  border: 1px dashed currentColor;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: var(--texto-xs);
+  line-height: 1.2;
+}
+.zona-lg,
+.zona-xl {
+  font-family: var(--k-titulos);
+  font-weight: 700;
+  font-size: var(--texto-sm);
+}
+.zona-centro {
+  justify-content: center;
+  text-align: center;
+}
+.zona-fin {
+  justify-content: flex-end;
+  text-align: right;
+}
+.modelo-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.modelo-editor-cuerpo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.modelo-editor-cuerpo > .miniatura {
+  flex: 0 0 160px;
+  width: 160px;
+}
+.tabla-zonas {
+  flex: 1 1 320px;
+  overflow-x: auto;
+}
+.tabla-zonas table {
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+  width: 100%;
+}
+.tabla-zonas th,
+.tabla-zonas td {
+  padding: 4px;
+  text-align: left;
+}
+.tabla-zonas input,
+.tabla-zonas select {
+  width: 64px;
+  font-size: var(--texto-sm);
+  padding: 4px;
+  border: 1px solid var(--color-borde);
+  border-radius: 6px;
+}
+.tabla-zonas select {
+  width: auto;
+}

@@ -2,6 +2,7 @@
 import './fuentes-kit';
 import { type CSSProperties, useEffect, useState } from 'react';
 import { BOCAS, ESTILOS_KIT, FUENTES_KIT, KIT_INICIAL, type Paleta, revisarPaleta, type RolColor } from '@aptio/schema/marca';
+import { PantallasModelo } from './PantallasModelo';
 import { api, EDITAN_KIT, ErrorApi, type Kit, type KitEntrada, type Rol, type Voz } from '../api';
 
 const NOMBRE_COLOR: Record<RolColor, string> = {
@@ -222,6 +223,7 @@ export function KitMarca({ clienteId, rol, conIngles, alGuardar }: { clienteId: 
 
         <VistaPrevia paleta={datos.paleta} titulos={datos.tipografias.titulos} textos={datos.tipografias.textos} logoUrl={logoUrl} />
       </div>
+      <PantallasModelo clienteId={clienteId} rol={rol} paleta={datos.paleta} titulos={datos.tipografias.titulos} textos={datos.tipografias.textos} hayKit={Boolean(kit)} />
     </section>
   );
 }
@@ -324,7 +326,7 @@ function VistaPrevia({ paleta, titulos, textos, logoUrl }: { paleta: Paleta; tit
           <figcaption>Pregunta</figcaption>
         </figure>
       </div>
-      <p className="sec">Las pantallas modelo propias del cliente se suman en la siguiente entrega; mientras tanto se usan las del estilo base.</p>
+      <p className="sec">Más abajo, las pantallas modelo del cliente con estos mismos colores.</p>
     </div>
   );
 }

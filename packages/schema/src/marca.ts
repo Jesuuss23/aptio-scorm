@@ -142,3 +142,146 @@ export function revisarPersonaje({ ids, viewBox, bytes }: { ids: readonly string
   if (bytes > BYTES_IDEALES_PERSONAJE && bytes <= MAX_BYTES_PERSONAJE) avisos.push(`Pesa ${Math.round(bytes / 1024)} KB; lo ideal es menos de 120 KB`);
   return { bocasDisponibles, bocasFaltantes, reemplazos, poses: ids.filter((i) => i.startsWith('pose_')).map((i) => i.slice(5)), errores, avisos };
 }
+
+// ---------- Pantallas modelo (HU-0204, docs/20-guia-diseno.md §4) ----------
+
+/** Disposiciones del curso (curso-v0.schema.json, $defs.pantalla.disposicion). */
+export const DISPOSICIONES = [
+  'portada', 'objetivos', 'personaje', 'dato', 'idea', 'lista', 'memoria', 'clasificar', 'ordenar',
+  'decision', 'video', 'hotspot', 'quiz', 'vf', 'resumen', 'seccion', 'resultados', 'cierre',
+] as const;
+export type Disposicion = (typeof DISPOSICIONES)[number];
+
+export const NOMBRE_DISPOSICION: Record<Disposicion, string> = {
+  portada: 'Portada', objetivos: 'Objetivos', personaje: 'Personaje', dato: 'Dato', idea: 'Idea clave', lista: 'Lista',
+  memoria: 'Memoria', clasificar: 'Clasificar', ordenar: 'Ordenar', decision: 'Decisión', video: 'Video',
+  hotspot: 'Puntos en escena', quiz: 'Pregunta', vf: 'Mito o realidad', resumen: 'Resumen', seccion: 'Sección',
+  resultados: 'Resultados', cierre: 'Cierre',
+};
+
+/** Zonas que el generador llena en cada disposición (tabla de la guía de diseño). */
+export const ZONAS: Record<Disposicion, readonly string[]> = {
+  portada: ['titulo', 'subtitulo', 'personaje', 'fondo'],
+  objetivos: ['titulo', 'lista'],
+  personaje: ['personaje', 'globo', 'titulo'],
+  dato: ['dato', 'texto', 'icono'],
+  idea: ['titulo', 'texto', 'dato', 'imagen'],
+  lista: ['titulo', 'tarjetas'],
+  memoria: ['titulo', 'juego'],
+  clasificar: ['titulo', 'juego'],
+  ordenar: ['titulo', 'juego'],
+  decision: ['situacion', 'opciones', 'retroalimentacion'],
+  video: ['video', 'marcadores'],
+  hotspot: ['escena', 'puntos', 'detalle'],
+  quiz: ['pregunta', 'opciones', 'marcador'],
+  vf: ['afirmacion', 'botones'],
+  resumen: ['titulo', 'ideas'],
+  seccion: ['numero', 'titulo'],
+  resultados: ['puntaje', 'estrellas', 'insignia'],
+  cierre: ['titulo', 'personaje', 'boton'],
+};
+
+export const TAMANOS_ZONA = ['sm', 'md', 'lg', 'xl'] as const;
+export const ALINEACIONES = ['inicio', 'centro', 'fin'] as const;
+
+/** Zona en porcentaje del lienzo (0–100): el reproductor no usa píxeles fijos (decisión 4). */
+export interface ZonaModelo {
+  zona: string;
+  x: number;
+  y: number;
+  ancho: number;
+  alto: number;
+  color?: RolColor;
+  tamano?: (typeof TAMANOS_ZONA)[number];
+  alineacion?: (typeof ALINEACIONES)[number];
+}
+
+/** Definición de una pantalla modelo: fondo con un rol del kit y zonas por dispositivo. */
+export interface DefinicionModelo {
+  fondo: RolColor;
+  celular: ZonaModelo[];
+  escritorio: ZonaModelo[];
+}
+
+export const DISPOSITIVOS = ['celular', 'escritorio'] as const;
+
+/** Errores de una definición; vacío si es válida. Las zonas deben ser de la disposición y caber en el lienzo. */
+export function erroresDefinicion(disposicion: string, d: unknown): string[] {
+  if (!(DISPOSICIONES as readonly string[]).includes(disposicion)) return [`Disposición desconocida: ${disposicion}`];
+  const zonas = ZONAS[disposicion as Disposicion];
+  const def = d as Partial<DefinicionModelo> | null;
+  if (!def || typeof def !== 'object') return ['La definición debe ser un objeto'];
+  const errores: string[] = [];
+  if (!def.fondo || !ROLES_COLOR.includes(def.fondo)) errores.push('El fondo debe ser un color del kit (primario, secundario, acento, fondo o texto)');
+  for (const disp of DISPOSITIVOS) {
+    const lista = def[disp];
+    if (!Array.isArray(lista) || lista.length === 0) {
+      errores.push(`Faltan las zonas de ${disp}`);
+      continue;
+    }
+    const vistas = new Set<string>();
+    for (const z of lista as Partial<ZonaModelo>[]) {
+      const nombre = String(z?.zona ?? '');
+      if (!zonas.includes(nombre)) errores.push(`${disp}: la zona «${nombre}» no es de la disposición ${disposicion}`);
+      if (vistas.has(nombre)) errores.push(`${disp}: la zona «${nombre}» está repetida`);
+      vistas.add(nombre);
+      const [x, y, ancho, alto] = [z?.x, z?.y, z?.ancho, z?.alto].map(Number) as [number, number, number, number];
+      const enRango = [x, y, ancho, alto].every((n) => Number.isFinite(n) && n >= 0 && n <= 100);
+      if (!enRango || ancho === 0 || alto === 0 || x + ancho > 100.01 || y + alto > 100.01) {
+        errores.push(`${disp}: la zona «${nombre}» debe caber en el lienzo (porcentajes de 0 a 100)`);
+      }
+      if (z?.color !== undefined && !ROLES_COLOR.includes(z.color)) errores.push(`${disp}: la zona «${nombre}» usa un color fuera del kit`);
+      if (z?.tamano !== undefined && !(TAMANOS_ZONA as readonly string[]).includes(z.tamano)) errores.push(`${disp}: tamaño no válido en «${nombre}»`);
+      if (z?.alineacion !== undefined && !(ALINEACIONES as readonly string[]).includes(z.alineacion)) errores.push(`${disp}: alineación no válida en «${nombre}»`);
+    }
+  }
+  return errores;
+}
+
+/**
+ * Modelo del estilo base de una disposición (RN-02-5). Apila las zonas: en celular una debajo de otra y en
+ * escritorio en dos columnas cuando hay imagen o personaje. El equipo gráfico reemplaza estos modelos con el
+ * diseño del estilo base en S3; mientras tanto el generador tiene siempre un modelo por disposición.
+ */
+export function modeloBase(disposicion: Disposicion): DefinicionModelo {
+  const zonas = ZONAS[disposicion].filter((z) => z !== 'fondo');
+  const visual = new Set(['personaje', 'imagen', 'escena', 'video', 'icono', 'insignia']);
+  const apilar = (lista: readonly string[], x: number, ancho: number): ZonaModelo[] => {
+    const alto = Math.floor(84 / Math.max(lista.length, 1));
+    return lista.map((zona, i) => ({ zona, x, y: 8 + i * alto, ancho, alto: alto - 2, ...estiloBase(zona) }));
+  };
+  const visuales = zonas.filter((z) => visual.has(z));
+  const textos = zonas.filter((z) => !visual.has(z));
+  const escritorio = visuales.length && textos.length ? [...apilar(textos, 6, 50), ...apilar(visuales, 60, 34)] : apilar(zonas, 10, 80);
+  return { fondo: disposicion === 'portada' || disposicion === 'seccion' ? 'primario' : 'fondo', celular: apilar(zonas, 6, 88), escritorio };
+}
+
+function estiloBase(zona: string): Partial<ZonaModelo> {
+  if (['titulo', 'pregunta', 'afirmacion', 'situacion', 'numero', 'puntaje', 'dato'].includes(zona)) return { color: 'primario', tamano: zona === 'numero' || zona === 'dato' ? 'xl' : 'lg' };
+  if (['boton', 'botones', 'opciones', 'marcador'].includes(zona)) return { color: 'acento', tamano: 'md' };
+  return { color: 'texto', tamano: 'sm' };
+}
+
+export interface ModeloParaGenerar {
+  disposicion: Disposicion;
+  nombre: string;
+  definicion: DefinicionModelo;
+  origen: 'cliente' | 'base';
+  modeloId?: string;
+}
+
+/**
+ * Modelos que usa el generador (CP-025, CP-026): por cada disposición, los modelos activos del cliente y, si no
+ * tiene ninguno de esa disposición, el del estilo base.
+ */
+export function modelosParaGenerar(
+  delCliente: readonly { id: string; disposicion: string; nombre: string; definicion: unknown; activa: boolean; orden: number }[],
+): ModeloParaGenerar[] {
+  return DISPOSICIONES.flatMap((disposicion) => {
+    const propios = delCliente
+      .filter((m) => m.activa && m.disposicion === disposicion)
+      .sort((a, b) => a.orden - b.orden)
+      .map((m): ModeloParaGenerar => ({ disposicion, nombre: m.nombre, definicion: m.definicion as DefinicionModelo, origen: 'cliente', modeloId: m.id }));
+    return propios.length ? propios : [{ disposicion, nombre: `${NOMBRE_DISPOSICION[disposicion]} (estilo base)`, definicion: modeloBase(disposicion), origen: 'base' as const }];
+  });
+}

@@ -44,6 +44,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
   let conflicto = Boolean(kitEnConflicto);
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
   const subidas = new Map<string, { nombre: string; mime: string }>();
+  const modelos: Record<string, unknown>[] = [];
   // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
   await page.route('**/s3-simulado/**', (route) => route.fulfill({ status: 200, body: '' }));
   let sesion = conSesion;
@@ -108,6 +109,24 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
         ...(svg ? { eliminadosAlSanear: s.nombre.includes('peligrosa') ? ['script', 'atributos on*'] : [] } : {}),
         url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><rect width="30" height="40" fill="#12355B"/></svg>')}`,
       });
+    }
+    const listaModelos = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/pantallas-modelo$/);
+    if (listaModelos) {
+      if (req.method() === 'GET') return responder(200, modelos);
+      const datos = req.postDataJSON() as Record<string, unknown>;
+      const nuevo = { id: `00000000-0000-4000-8000-${String(900 + modelos.length).padStart(12, '0')}`, miniaturaRecursoId: null, orden: 0, activa: true, ...datos };
+      modelos.push(nuevo);
+      return responder(201, nuevo);
+    }
+    const unModelo = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/pantallas-modelo\/([0-9a-f-]+)$/);
+    if (unModelo) {
+      const m = modelos.find((x) => x.id === unModelo[2])!;
+      if (req.method() === 'DELETE') {
+        m.activa = false;
+        return responder(204);
+      }
+      Object.assign(m, req.postDataJSON());
+      return responder(200, m);
     }
     const personaje = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/personaje$/);
     if (personaje) {
