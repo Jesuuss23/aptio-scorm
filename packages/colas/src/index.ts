@@ -17,6 +17,8 @@ export interface DatosTrabajo {
   tarea: string;
   /** HU-0503 · La pantalla de una regeneración en cascada (`trabajoId` es entonces el curso). */
   pantallaId?: string;
+  /** HU-0504 · El pedido de una propuesta de la IA (IA-16); `trabajoId` es entonces el TrabajoIA. */
+  propuesta?: { cursoId: string; tipo: string; texto?: string };
 }
 
 export type EstadoTrabajo = 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';

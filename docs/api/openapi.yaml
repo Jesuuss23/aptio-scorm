@@ -1751,7 +1751,9 @@ paths:
       - Curso
       summary: Restaurar una versión
       operationId: post_cursos_cursoId_versiones_version_restaurar
-      description: Crea una versión nueva con motivo «restauración»
+      description: Crea una versión nueva con motivo «restauración». HU-0504 (Deshacer de una propuesta) · la narración
+        de cada pantalla y los recursos se conservan como están ahora, para no desligar audios, bocas y subtítulos
+        (SUP-39). 422 VERSION_NO_ANTERIOR si la versión no es anterior a la actual.
       parameters:
       - name: cursoId
         in: path
@@ -1777,6 +1779,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /cursos/{cursoId}/pantallas/{pantallaId}:
     patch:
       tags:
@@ -1899,7 +1903,11 @@ paths:
       - Asistente IA
       summary: Pedir una propuesta a la IA
       operationId: post_cursos_cursoId_propuestas
-      description: Más visual, menos texto, actividad, variantes, ilustración, pedido libre, alineación, patrón, pausas de video
+      description: Más visual, menos texto, actividad, variantes, ilustración, pedido libre, alineación, patrón, pausas de video.
+        HU-0504 (SUP-39) · En el S5 se calculan mas-visual, menos-texto, actividad, variantes y libre sobre una pantalla
+        (`pantallaId` obligatorio; `pedido` obligatorio en libre); los demás tipos responden 422 TIPO_NO_DISPONIBLE.
+        Encola IA-16 en la cola ia; el `id` es el TrabajoIA (`GET /trabajos/{id}`) y la propuesta aparece en
+        `GET /cursos/{cursoId}/propuestas` cuando termina. Los editores de pantallas piden; el revisor del cliente, no (403).
       parameters:
       - name: cursoId
         in: path
@@ -1933,6 +1941,8 @@ paths:
       - Asistente IA
       summary: Listar propuestas
       operationId: get_cursos_cursoId_propuestas
+      description: HU-0504 · De la más nueva a la más antigua. Al listar, una PENDIENTE cuya pantalla cambió desde la
+        versión base pasa a VENCIDA (RN-05-4).
       parameters:
       - name: cursoId
         in: path
@@ -1971,7 +1981,10 @@ paths:
       - Asistente IA
       summary: Aplicar propuesta
       operationId: post_propuestas_propuestaId_aplicar
-      description: 409 si quedó VENCIDA; se puede deshacer restaurando la versión anterior
+      description: 'HU-0504 · Aplica el patch (o la variante `varianteIndice`) a la pantalla, crea una versión del curso
+        con motivo «propuesta» y la pantalla vuelve a borrador. 409 PROPUESTA_VENCIDA («Recalcular propuesta») si la
+        pantalla cambió desde `versionBase` (solo cuenta esa pantalla, SUP-39), 409 PROPUESTA_RESUELTA si ya se aplicó o se
+        descartó, 422 VARIANTE_REQUERIDA o PROPUESTA_NO_APLICA. Se deshace restaurando la versión anterior.'
       parameters:
       - name: propuestaId
         in: path
@@ -2008,6 +2021,7 @@ paths:
       - Asistente IA
       summary: Descartar propuesta
       operationId: post_propuestas_propuestaId_descartar
+      description: 409 PROPUESTA_RESUELTA si ya se aplicó.
       parameters:
       - name: propuestaId
         in: path
@@ -2024,6 +2038,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
   /cursos/{cursoId}/observaciones:
     get:
       tags:
@@ -4947,8 +4963,18 @@ components:
           type: array
           items:
             type: object
-            additionalProperties: true
-          description: Variantes renderizables (para «ver 3 variantes»)
+            required:
+            - nombre
+            - disposicion
+            - patch
+            properties:
+              nombre:
+                type: string
+              disposicion:
+                type: string
+              patch:
+                $ref: '#/components/schemas/JsonPatch'
+          description: Las 3 variantes de «Ver 3 variantes», cada una con su patch relativo a la pantalla (HU-0504)
         versionBase:
           type: integer
         estado:

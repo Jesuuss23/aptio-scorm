@@ -4,6 +4,8 @@ import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos
 import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
 import { DISPOSICIONES, modeloBase } from '@aptio/schema/marca';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
+import { cursoConPropuesta, huellaPantalla, patchDe } from '@aptio/schema/propuesta';
+import type { CursoDoc } from '@aptio/schema/revision';
 
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -54,6 +56,8 @@ export interface OpcionesSimulacion {
   porRegenerar?: string[];
   /** HU-0503 · Cómo termina la cascada tras corregir una narración: avanza una etapa por consulta, o la voz falla. */
   cascada?: 'normal' | 'falla';
+  /** HU-0504 · El próximo pedido a la IA termina en error. */
+  propuestaFalla?: boolean;
 }
 
 /** HU-0801 · El WebVTT de cada narración del curso, por id de recurso, como lo escribe la etapa 8 (SUP-37). */
@@ -230,10 +234,18 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal' }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
+  // HU-0504 · Pedidos a la IA (terminan a la 2.ª consulta), propuestas con la salida grabada de p05 e historial de versiones.
+  const salidasIA16 = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/salidas/X-IA-16-propuestas-p05.json', import.meta.url), 'utf8')) as
+    { tipo: string; titulo: string; resumen: string; patch?: unknown[]; variantes?: { nombre: string; disposicion: string; patch: unknown[] }[] }[];
+  type PropuestaSim = { id: string; tipo: string; pantallaId: string; titulo: string; descripcion: string; cambios: unknown[]; vistaPrevia?: unknown[]; versionBase: number; estado: string; costoUsd: number; creadoEn: string; huella: string | null };
+  const pedidosIA = new Map<string, { tipo: string; pantallaId: string; consultas: number; falla: boolean }>();
+  let fallaIA = Boolean(propuestaFalla);
+  const propuestasSim: PropuestaSim[] = [];
+  const historial = new Map<number, Record<string, unknown>>();
   let conflicto = Boolean(kitEnConflicto);
   type EtapaSim = { etapa: string; orden: number; estado: string; detalle: string | null; inicio: null; fin: null; costoUsd: number };
   type GeneracionSim = { id: string; proyectoId: string; estado: string; avance: number; costoUsd: number; parametros: object; etapas: EtapaSim[]; creadoEn: string; terminadoEn: string | null };
@@ -539,9 +551,65 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         };
       }));
     }
+    // HU-0504 · Propuestas de la IA, como la API: vencen si la pantalla cambió desde la versión base.
+    const docSim = () => revision.documento as unknown as CursoDoc;
+    if (ruta === `/cursos/${CURSO_ID}/propuestas` && req.method() === 'POST') {
+      const datos = req.postDataJSON() as { tipo: string; pantallaId: string };
+      const id = `00000000-0000-4000-8000-${String(800 + pedidosIA.size).padStart(12, '0')}`;
+      pedidosIA.set(id, { ...datos, consultas: 0, falla: fallaIA });
+      fallaIA = false;
+      return responder(202, { id, estado: 'EN_COLA', eventos: '/api/v1/eventos' });
+    }
+    const trabajoIA = ruta.match(/^\/trabajos\/([0-9a-f-]+)$/);
+    if (trabajoIA && pedidosIA.has(trabajoIA[1]!)) {
+      const t = pedidosIA.get(trabajoIA[1]!)!;
+      if (++t.consultas < 2) return responder(200, { id: trabajoIA[1], estado: 'EN_CURSO', error: null });
+      if (t.falla) return responder(200, { id: trabajoIA[1], estado: 'ERROR', error: 'La salida de IA-16 no validó tras 3 intentos' });
+      if (t.consultas === 2) {
+        const sal = salidasIA16.find((x) => x.tipo === t.tipo)!;
+        propuestasSim.unshift({
+          id: trabajoIA[1]!.replace(/-8000-/, '-9000-'), tipo: t.tipo, pantallaId: t.pantallaId, titulo: sal.titulo, descripcion: sal.resumen,
+          cambios: sal.patch ?? [], ...(sal.variantes ? { vistaPrevia: sal.variantes } : {}), versionBase: revision.version, estado: 'PENDIENTE', costoUsd: 0.06,
+          creadoEn: new Date().toISOString(), huella: huellaPantalla(docSim(), t.pantallaId),
+        });
+      }
+      return responder(200, { id: trabajoIA[1], estado: 'COMPLETADO', error: null });
+    }
+    if (ruta === `/cursos/${CURSO_ID}/propuestas`) {
+      for (const p of propuestasSim) if (p.estado === 'PENDIENTE' && huellaPantalla(docSim(), p.pantallaId) !== p.huella) p.estado = 'VENCIDA';
+      return responder(200, propuestasSim.map(({ huella: _h, ...p }) => p));
+    }
+    const dePropuesta = ruta.match(/^\/propuestas\/([0-9a-f-]+)\/(aplicar|descartar)$/);
+    if (dePropuesta) {
+      const p = propuestasSim.find((x) => x.id === dePropuesta[1]);
+      if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Propuesta no encontrada' });
+      if (dePropuesta[2] === 'descartar') {
+        p.estado = 'DESCARTADA';
+        return responder(204);
+      }
+      if (huellaPantalla(docSim(), p.pantallaId) !== p.huella) {
+        p.estado = 'VENCIDA';
+        return responder(409, { codigo: 'PROPUESTA_VENCIDA', mensaje: 'La pantalla cambió desde que se calculó esta propuesta. Recalcular propuesta.' });
+      }
+      const { varianteIndice } = req.postDataJSON() as { varianteIndice?: number };
+      historial.set(revision.version, structuredClone(revision.documento));
+      const nuevo = cursoConPropuesta(docSim(), p.pantallaId, patchDe((p.vistaPrevia ? { variantes: p.vistaPrevia } : { patch: p.cambios }) as never, varianteIndice));
+      revision.documento = nuevo as unknown as Record<string, unknown>;
+      pantallasSim().find((x) => x.id === p.pantallaId)!.estado = 'borrador';
+      p.estado = 'APLICADA';
+      return responder(200, { version: ++revision.version, regenerando: [], estado: 'borrador' });
+    }
+    const restaurar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/versiones/(\\d+)/restaurar$`));
+    if (restaurar) {
+      const doc = historial.get(Number(restaurar[1]));
+      if (!doc) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Versión no encontrada' });
+      revision.documento = structuredClone(doc);
+      return responder(200, { id: CURSO_ID, version: ++revision.version, documento: revision.documento });
+    }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
       const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; narracion?: { es: string } };
+      historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
       if (datos.titulo) p.titulo = { es: datos.titulo.es.trim() };

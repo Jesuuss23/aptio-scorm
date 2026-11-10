@@ -21,7 +21,7 @@ Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confia
 | [IA-13](IA-13.v1.md) | Acta de omitidos | 1 · RESUMEN_MATERIAL (al aprobar el alcance) | `ANTHROPIC_MODEL_RAPIDO` | 0.2 |
 | [IA-14](IA-14.v1.md) | Patrón de navegación | Navegación (bajo pedido) | `ANTHROPIC_MODEL_RAPIDO` | 0.4 |
 | [IA-15](IA-15.v1.md) | Componer pantalla con componentes del kit | 4 · PANTALLAS | `ANTHROPIC_MODEL_PANTALLAS` | 0.4 |
-| [IA-16](IA-16.v1.md) | Propuesta de retoque | Revisión / Editor (bajo pedido) | `ANTHROPIC_MODEL_PANTALLAS` | 0.6 |
+| [IA-16](IA-16.v2.md) | Propuesta de retoque (v2 sobre bloques, HU-0504) | Revisión / Editor (bajo pedido) | `ANTHROPIC_MODEL_PANTALLAS` | 0.6 |
 | [IA-17](IA-17.v1.md) | Corrección de alineación | Alineación pedagógica (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
 | [IA-18](IA-18.v1.md) | Extracción de kit | Clientes y kits (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.2 |
 
