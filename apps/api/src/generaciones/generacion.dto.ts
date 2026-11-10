@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ETAPAS, ESTADOS_TRABAJO } from '@aptio/schema/generacion';
-import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from 'class-validator';
 
 /** Todo es opcional: lo que no se envía se toma del proyecto (HU-0401). */
 export class GeneracionEntradaDto {
@@ -37,4 +37,22 @@ export class GeneracionDto {
 export class EtapaResultadoDto extends EtapaDto {
   @ApiProperty({ nullable: true, description: 'Lo que guardó la etapa (p. ej. ResumenMaterial en RESUMEN_MATERIAL); en curso, su avance si lo guarda (PANTALLAS); si no, null' })
   datos: unknown;
+}
+
+/** HU-0703 · Qué narraciones regenerar. Por defecto, solo las desactualizadas (RN-07-1). */
+export class NarracionSolicitudDto {
+  @ApiPropertyOptional({ type: [String], example: ['p02', 'p12'], description: 'Limita a estas pantallas; sin lista, todas las del curso' })
+  @IsOptional() @IsArray() @ArrayMaxSize(500) @IsString({ each: true }) @Matches(/^[A-Za-z0-9_-]{1,64}$/, { each: true }) pantallaIds?: string[];
+  @ApiPropertyOptional({ type: [String], enum: ['es', 'en'], example: ['es'], description: 'Por ahora solo es; en llega con M08 (S5) y responde 422' })
+  @IsOptional() @IsArray() @IsIn(['es', 'en'], { each: true }) idiomas?: ('es' | 'en')[];
+  @ApiPropertyOptional({ default: true, description: 'false (con pantallaIds) pide una toma nueva aunque nada haya cambiado' })
+  @IsOptional() @IsBoolean() soloDesactualizadas?: boolean;
+}
+
+/** HU-0703 · La regeneración continúa la última generación: su id, su estado y su flujo de eventos. */
+export class RegeneracionDto {
+  @ApiProperty({ format: 'uuid', description: 'Id de la generación que se continúa' }) id: string;
+  @ApiProperty({ enum: ESTADOS_TRABAJO }) estado: string;
+  @ApiProperty({ format: 'uri', description: 'URL de eventos (SSE) de la generación' }) eventos: string;
+  @ApiProperty({ description: 'Narraciones marcadas «Por regenerar» o con error al pedirlo' }) pendientes: number;
 }

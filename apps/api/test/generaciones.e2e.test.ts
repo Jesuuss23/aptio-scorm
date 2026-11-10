@@ -96,7 +96,7 @@ describe.skipIf(!hayBase && !process.env.CI)('generación del SCORM (HU-0401, HU
     });
     expect(res.body.etapas.map((e: { etapa: string }) => e.etapa)).toEqual([...ETAPAS]);
     expect(res.body.etapas.every((e: { estado: string; orden: number }, i: number) => e.estado === 'EN_COLA' && e.orden === i + 1)).toBe(true);
-    expect(encolados).toEqual([{ cola: 'ia', datos: { trabajoId: res.body.id, organizacionId: orgId, tarea: 'GENERAR' }, jobId: `${res.body.id}:1` }]);
+    expect(encolados).toEqual([{ cola: 'ia', datos: { trabajoId: res.body.id, organizacionId: orgId, tarea: 'GENERAR' }, jobId: `${res.body.id}-1` }]);
     expect(await estadoProyecto(id)).toBe('GENERANDO');
     expect(await prisma.auditoria.count({ where: { accion: 'GENERACION_LANZADA', entidadId: res.body.id } })).toBe(1);
 
@@ -162,7 +162,7 @@ describe.skipIf(!hayBase && !process.env.CI)('generación del SCORM (HU-0401, HU
     expect(res.body.etapas[0]).toMatchObject({ estado: 'COMPLETADO', detalle: 'resumen' });
     expect(res.body.etapas[1]).toMatchObject({ estado: 'EN_COLA', detalle: null });
     // Otro jobId: BullMQ descarta un trabajo repetido con el mismo id.
-    expect(encolados).toEqual([{ cola: 'ia', datos: { trabajoId: g.id, organizacionId: orgId, tarea: 'GENERAR' }, jobId: `${g.id}:2` }]);
+    expect(encolados).toEqual([{ cola: 'ia', datos: { trabajoId: g.id, organizacionId: orgId, tarea: 'GENERAR' }, jobId: `${g.id}-2` }]);
     expect(await estadoProyecto(id)).toBe('GENERANDO');
   });
 

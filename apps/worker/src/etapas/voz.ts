@@ -2,6 +2,8 @@
 // pronunciación del cliente. El audio se guarda cifrado en el almacenamiento con su duración real y la narración
 // queda «Lista» (CP-071). Hasta 4 a la vez y cada una lista se ve en Producción sin esperar al resto.
 // Continuar no paga otra vez: una narración ya lista con el mismo hash (texto, voz, velocidad y diccionario) se reusa.
+// HU-0703 · Regenerar (`parametros.regenerarVoz`) decide por el hash (RN-07-1): una marcada «Por regenerar» que en
+// realidad no cambió vuelve a «Lista» sin costo; `pantallaIds` limita a esas pantallas y `forzar` pide una toma nueva.
 import { createHash, randomUUID } from 'node:crypto';
 import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, type Sintetizador, VozNoDisponible } from '@aptio/ai';
 import { Prisma } from '@aptio/db';
@@ -22,6 +24,12 @@ type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId
 type PantallaDoc = { id: string; titulo: { es?: string }; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } } };
 type RecursoDoc = { id: string; tipo: string; idioma?: string };
 type CursoDoc = { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[]; recursos: RecursoDoc[] };
+
+/** Lo que pide `POST /cursos/{id}/narraciones/regenerar` (se guarda en los parámetros de la generación). */
+export interface RegenerarVoz {
+  pantallaIds?: string[];
+  forzar?: boolean;
+}
 
 export interface DependenciasVoz {
   sintetizar: Sintetizador;
@@ -58,8 +66,10 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
 
     const conNarracion = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto.es?.trim() && p.narracion.porIdioma.es);
     const previas = new Map(
-      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma: 'es', estado: 'ACTUALIZADA', audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
+      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma: 'es', estado: { in: ['ACTUALIZADA', 'DESACTUALIZADA'] }, audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
     );
+    const pedido = (ctx.parametros.regenerarVoz ?? {}) as RegenerarVoz;
+    const solo = pedido.pantallaIds?.length ? new Set(pedido.pantallaIds) : null;
 
     const listas = new Map<string, NarracionLista & { recursoId: string; hash: string; mime: string }>();
     let simulada = false;
@@ -84,17 +94,22 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       const hash = hashNarracion(texto, voz.voz, velocidad, usados);
       const base = { pantallaId: p.id, titulo: p.titulo.es ?? p.id, texto, voz: voz.voz, pronunciados: aplicados, hash };
 
-      // Continuar: lo que ya se dijo igual no se paga otra vez.
+      // Continuar: lo que ya se dijo igual no se paga otra vez. Fuera de las pantallas pedidas, el audio queda como está.
       const previa = previas.get(p.id);
-      if (previa?.textoHash === hash && previa.audioRecursoId) {
+      const fuera = solo !== null && !solo.has(p.id);
+      const forzada = !fuera && solo !== null && pedido.forzar === true;
+      if (previa?.audioRecursoId && (fuera || (previa.textoHash === hash && !forzada))) {
         const r = await ctx.bd.recurso.findUnique({ where: { id: previa.audioRecursoId }, select: { duracionMs: true, proveedor: true, mime: true } });
         if (r?.duracionMs) {
           if (r.proveedor === 'simulado') simulada = true;
-          listas.set(p.id, { ...base, duracionMs: r.duracionMs, recursoId: previa.audioRecursoId, mime: r.mime });
+          // Marcada «Por regenerar» sin que cambiara nada de lo que se dice: vuelve a «Lista» sin pagar (RN-07-1).
+          if (!fuera && previa.estado === 'DESACTUALIZADA') await ctx.bd.narracion.update({ where: { id: previa.id }, data: { estado: 'ACTUALIZADA' } });
+          listas.set(p.id, { ...base, ...(fuera ? { hash: previa.textoHash } : {}), duracionMs: r.duracionMs, recursoId: previa.audioRecursoId, mime: r.mime });
           await avisar();
           return;
         }
       }
+      if (fuera) return;
       if (!PROVEEDORES.includes(voz.proveedor)) {
         throw new Error(`La voz de ${voz.proveedor} todavía no está disponible: elige una voz de Google en el kit`);
       }

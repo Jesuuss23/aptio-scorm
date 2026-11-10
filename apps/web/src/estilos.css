@@ -1039,6 +1039,11 @@
   flex-direction: column;
   gap: 10px;
 }
+/* HU-0703 · El aviso y su botón, alineados al centro; en el celular el botón baja a otra línea. */
+.voz-por-regenerar {
+  align-items: center;
+  flex-wrap: wrap;
+}
 .voz-lista {
   list-style: none;
   margin: 0;

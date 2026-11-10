@@ -53,6 +53,8 @@ export const CREAN_PROYECTOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL
 export const EDITAN_PANTALLAS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 export const APRUEBAN_PANTALLAS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
 export const EDITAN_GLOSARIO: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
+/** HU-0703: regenera narraciones todo el equipo; el revisor del cliente no. */
+export const REGENERAN_VOZ: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 
 export interface PantallaModeloEntrada {
   disposicion: string;
@@ -242,6 +244,14 @@ export interface Observacion {
 }
 
 /** HU-0701 · Narración de una pantalla: ACTUALIZADA se muestra como «Lista». */
+/** HU-0703 · Respuesta de `POST /cursos/{id}/narraciones/regenerar`: la generación que se continúa. */
+export interface Regeneracion {
+  id: string;
+  estado: Generacion['estado'];
+  eventos: string;
+  pendientes: number;
+}
+
 export interface Narracion {
   pantallaId: string;
   idioma: 'es' | 'en';
@@ -306,6 +316,8 @@ export const api = {
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
   narraciones: (cursoId: string, idioma: 'es' | 'en' = 'es') => pedir<Narracion[]>(`/cursos/${cursoId}/narraciones?idioma=${idioma}`),
+  regenerarNarraciones: (cursoId: string, datos: { pantallaIds?: string[]; soloDesactualizadas?: boolean } = {}) =>
+    pedir<Regeneracion>(`/cursos/${cursoId}/narraciones/regenerar`, json(datos)),
   observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
   editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; narracion?: TextoI18n }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),

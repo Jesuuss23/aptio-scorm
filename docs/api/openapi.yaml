@@ -2261,7 +2261,14 @@ paths:
       - Personaje y voz
       summary: Regenerar narraciones
       operationId: post_cursos_cursoId_narraciones_regenerar
-      description: Por defecto solo las DESACTUALIZADA
+      description: >-
+        HU-0703. Continúa las etapas 6 (Voz en español) y 7 (Boca del personaje) de la última generación del proyecto;
+        el avance se sigue con `eventos`. Por defecto mira solo las DESACTUALIZADA. El worker decide por el hash RN-07-1:
+        una narración cuyo texto, voz, velocidad y pronunciación no cambiaron vuelve a «Lista» sin pedir otra voz.
+        Con `pantallaIds` y `soloDesactualizadas: false` pide una toma nueva de esas pantallas aunque nada haya
+        cambiado. Lo usa el equipo; el revisor del cliente recibe 403. 409 `GENERACION_ACTIVA` si ya hay una generación
+        en curso; 422 `SIN_VOZ` si el curso aún no tiene voz, `IDIOMA_NO_DISPONIBLE` si se pide `en` (HU-0901) y
+        `PANTALLAS_REQUERIDAS` si `soloDesactualizadas` es false sin `pantallaIds`.
       parameters:
       - name: cursoId
         in: path
@@ -2277,17 +2284,19 @@ paths:
               $ref: '#/components/schemas/NarracionSolicitud'
       responses:
         '202':
-          description: OK
+          description: Generación continuada con las etapas 6 y 7 en cola
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Trabajo202'
+                $ref: '#/components/schemas/Regeneracion'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
   /cursos/{cursoId}/narraciones/{pantallaId}/{idioma}/audio-cliente:
@@ -5075,8 +5084,11 @@ components:
       properties:
         pantallaIds:
           type: array
+          maxItems: 500
+          description: Limita la regeneración a estas pantallas; las demás «Por regenerar» siguen así.
           items:
             type: string
+            pattern: ^p\d{2,3}$
         idiomas:
           type: array
           items:
@@ -5087,6 +5099,30 @@ components:
         soloDesactualizadas:
           type: boolean
           default: true
+          description: false pide una toma nueva de `pantallaIds` aunque nada haya cambiado.
+    Regeneracion:
+      type: object
+      required:
+      - id
+      - estado
+      - eventos
+      - pendientes
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: La generación que se continúa.
+        estado:
+          type: string
+          enum:
+          - EN_COLA
+        eventos:
+          type: string
+          description: Ruta SSE con el avance de las etapas.
+        pendientes:
+          type: integer
+          minimum: 0
+          description: Narraciones DESACTUALIZADA o con error que entran en el pedido.
     AudioClienteEntrada:
       type: object
       required:
