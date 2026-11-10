@@ -1146,3 +1146,66 @@ ul.fila-chips {
   justify-content: space-between;
   gap: 8px;
 }
+
+/* HU-0601 · Editor (PNT-21), esqueleto: barra superior, lienzo y tira de pantallas. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.editor-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.editor-barra h1 {
+  flex: 1 1 200px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--titulo-pagina);
+}
+.editor-lienzo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.editor-ctx {
+  margin: 0;
+  color: var(--color-texto-sec);
+  font-size: var(--texto-sm);
+}
+.editor-tira ol {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0 0 8px;
+  overflow-x: auto;
+  list-style: none;
+}
+.editor-miniatura {
+  width: 132px;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  font: inherit;
+  font-size: var(--texto-sm);
+  cursor: pointer;
+}
+.editor-miniatura[aria-current='true'] {
+  border-color: var(--color-cobalto);
+  background: var(--color-cobalto-suave);
+}
+.editor-miniatura:focus-visible {
+  outline: 2px solid var(--color-cobalto);
+  outline-offset: 2px;
+}
