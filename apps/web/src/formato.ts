@@ -46,9 +46,31 @@ export function contenidoZona(p: Pick<PantallaCompuesta, 'campos' | 'actividad' 
     case 'opciones': return c.opciones?.length ? c.opciones.join(' · ') : null;
     case 'retroalimentacion': return texto(c.retroOk);
     case 'personaje': return p.personaje && personaje ? personaje : null;
-    case 'juego': case 'escena': return p.actividad ? `${NOMBRE_INTERACCION[p.actividad.tipo] ?? 'Actividad'}: los datos llegan en la etapa siguiente` : null;
+    case 'juego': case 'escena': case 'marcador': case 'puntos': {
+      if (!p.actividad) return null;
+      const nombre = NOMBRE_INTERACCION[p.actividad.tipo] ?? 'Actividad';
+      if (!p.actividad.interaccion) return zona === 'juego' || zona === 'escena' ? `${nombre}: sin datos todavía` : null;
+      return `${nombre}: ${resumenActividad(p.actividad.tipo, p.actividad.interaccion.datos)}`;
+    }
     case 'boton': return 'Continuar';
     case 'botones': return 'Mito · Realidad';
     default: return texto(campo);
+  }
+}
+
+/** Qué trae una actividad generada (HU-0407): «2 grupos · 8 elementos», «8 preguntas»… */
+export function resumenActividad(tipo: string, datos: Record<string, unknown>): string {
+  const n = (clave: string) => (Array.isArray(datos[clave]) ? (datos[clave] as unknown[]).length : 0);
+  const cuenta = (clave: string, uno: string, varios: string) => `${n(clave)} ${n(clave) === 1 ? uno : varios}`;
+  switch (tipo) {
+    case 'INT-01': return cuenta('pares', 'par', 'pares');
+    case 'INT-02': return `${cuenta('grupos', 'grupo', 'grupos')} · ${cuenta('elementos', 'elemento', 'elementos')}`;
+    case 'INT-03': return cuenta('pasos', 'paso', 'pasos');
+    case 'INT-04': return cuenta('tarjetas', 'tarjeta', 'tarjetas');
+    case 'INT-05': return cuenta('preguntas', 'pregunta', 'preguntas');
+    case 'INT-06': return cuenta('puntos', 'punto', 'puntos');
+    case 'INT-07': return cuenta('afirmaciones', 'afirmación', 'afirmaciones');
+    case 'INT-08': return cuenta('nodos', 'situación', 'situaciones');
+    default: return 'con datos';
   }
 }

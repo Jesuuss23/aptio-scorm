@@ -20,7 +20,7 @@ const TODAS = [...DISPOSICIONES];
 describe('reglas de la etapa 4', () => {
   it('convierte los campos de IA-15 en los mismos bloques de texto que el curso de referencia LOTO', () => {
     const origen = { tipo: 'ia' as const, revisado: false };
-    for (const id of ['p01', 'p02', 'p04', 'p05', 'p06', 'p12', 'p30']) {
+    for (const id of SALIDAS.map((x) => x.pantallaId)) {
       const s = salida(id);
       const textos = (b: Record<string, unknown>[]) => b.filter((x) => x.tipo === 'texto').map((x) => ({ ...x, origen }));
       expect(textos(bloquesDe({ ...s, id }, origen, { personajeRecursoId: null, videoRecursoId: null }))).toEqual(textos(referencia(id).bloques));
@@ -63,6 +63,7 @@ describe('reglas de la etapa 4', () => {
     expect(repeticionesSeguidas(SALIDAS.map((s) => ({ id: s.pantallaId, disposicion: s.disposicion })))).toEqual([]);
     expect(textoPantallas(12, 30, false)).toBe('12 de 30 pantallas listas');
     expect(textoPantallas(30, 30, true)).toBe('30 pantallas armadas con el kit · curso validado');
+    expect(textoPantallas(30, 30, true, 1)).toBe('30 pantallas armadas con el kit · 1 actividad con sus datos · curso validado');
   });
 });
 
@@ -86,7 +87,7 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 4 en el generador', () => 
     expect(await e.correr(generacionId, proveedorSimulado(), hasta4)).toEqual({ estado: 'COMPLETADO' });
     const etapa = await etapaDe(generacionId, 'PANTALLAS');
     const { texto, datos } = etapa.detalle as unknown as { texto: string; datos: PantallasCurso };
-    expect(texto).toBe('30 pantallas armadas con el kit · curso validado');
+    expect(texto).toBe('30 pantallas armadas con el kit · 9 actividades con sus datos · curso validado');
     expect(datos.pantallas.map((p) => p.id)).toEqual(SALIDAS.map((s) => s.pantallaId));
     expect(datos.pantallas.every((p) => (DISPOSICIONES as readonly string[]).includes(p.disposicion))).toBe(true);
     expect(Object.keys(datos.modelos)).toHaveLength(18);
@@ -166,7 +167,7 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 4 en el generador', () => 
     const trabajos = await prisma.trabajoIA.findMany({ where: { generacionId, tarea: 'IA-15' } });
     expect(trabajos).toHaveLength(30);
     expect(trabajos.every((t) => t.versionPrompt === 'IA-15.v2' && t.estado === 'COMPLETADO')).toBe(true);
-    expect(await conteo(generacionId)).toMatchObject({ 'IA-15': 30 });
+    expect(await conteo(generacionId)).toMatchObject({ 'IA-15': 30, 'IA-07': 9 });
     await prisma.kitMarca.delete({ where: { clienteId: e.ids.clienteId } });
   });
 

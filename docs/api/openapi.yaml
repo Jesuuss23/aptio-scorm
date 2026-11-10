@@ -4172,7 +4172,8 @@ components:
     PantallasCurso:
       type: object
       description: >-
-        Resultado de la etapa 4 (HU-0406, IA-15 v2): cada pantalla con su disposición del kit, fondo y campos, sin HTML.
+        Resultado de la etapa 4 (HU-0406, IA-15 v2): cada pantalla con su disposición del kit, fondo y campos, sin HTML,
+        y cada actividad con sus datos (HU-0407, IA-07 v2).
         Mientras la etapa corre trae solo las pantallas listas (CP-043); al terminar, también el curso guardado y
         validado (CP-042).
       required:
@@ -4257,6 +4258,21 @@ components:
                     type: string
                   consigna:
                     type: string
+                  interaccion:
+                    type: object
+                    description: Datos de la actividad de IA-07 (HU-0407), tal como van en el bloque interaccion del curso
+                    properties:
+                      modo:
+                        type: string
+                        enum:
+                        - formativa
+                        - sumativa
+                      peso:
+                        type: number
+                      instruccion:
+                        type: object
+                      datos:
+                        type: object
               motivo:
                 type: string
         advertencias:

@@ -206,6 +206,14 @@ export interface PedidoImagen {
   descripcion: string;
 }
 
+/** Datos de una actividad (salida de IA-07 sin `pantallaId`): van tal cual en `bloque.interaccion` del curso. */
+export interface InteraccionGenerada {
+  modo: 'formativa' | 'sumativa';
+  peso?: number;
+  instruccion: { es?: string; en?: string };
+  datos: Record<string, unknown>;
+}
+
 /** Una pantalla compuesta: lo que pidió el guion más la disposición y los campos de IA-15. */
 export interface PantallaCompuesta {
   id: string;
@@ -219,8 +227,8 @@ export interface PantallaCompuesta {
   personaje?: { pose: string; lado: 'izquierda' | 'derecha' };
   /** Los dibuja la etapa 5 (Ilustraciones). */
   pedidosImagen: PedidoImagen[];
-  /** Los datos de la actividad los agrega HU-0407 (IA-07). */
-  actividad?: { tipo: string; consigna: string };
+  /** La actividad del guion con sus datos (IA-07, HU-0407), listos para el bloque `interaccion` del curso. */
+  actividad?: { tipo: string; consigna: string; interaccion?: InteraccionGenerada };
   motivo?: string;
 }
 
