@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.14 · actualizado con la tercera entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.15 · actualizado con la cuarta entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -323,7 +323,16 @@ Para corregir un texto (el título, el subtítulo, un párrafo, un dato o un pun
 
 Cada texto guardado vuelve la pantalla a **Borrador**; si estaba aprobada, apruébala de nuevo en Revisión. Un texto no puede quedar vacío: si lo borras todo, vuelve el que tenía. Si otra persona guardó un cambio mientras escribías, el editor carga lo último y te pide escribir tu cambio de nuevo.
 
-Por ahora el editor solo cambia textos. Las actividades, las imágenes y la narración se cambian desde Revisión. El tamaño, el color, mover elementos, agregar elementos, deshacer y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
+**Cambiar tamaño, color, alineación y animación.** Haz un clic en un elemento para elegirlo (con teclado, llega con **Tab** y pulsa **Espacio**). Queda marcado en naranja, y arriba aparece una barra con sus opciones:
+- **A−** y **A+**: lo achican o agrandan un 10 % cada vez.
+- **Colores**: solo los del kit del cliente (Primario, Secundario, Acento, Texto, Blanco y Alerta), para cuidar la marca.
+- **Izq.**, **Centro** y **Der.**: alinean el texto.
+- **Animación**: cambia cómo entra el elemento (Auto, Ninguna, Aparecer, Deslizar, Zoom o Rebotar).
+- **Restablecer**: lo deja como lo armó la aplicación.
+
+A la derecha, el panel **Propiedades** tiene las mismas opciones, un deslizador de tamaño y **▶ Ver animación** para ver la entrada de nuevo. Pulsa **Esc** para soltar el elemento. Los textos cambian todo; las imágenes y el personaje, el tamaño y la animación. Cada cambio se guarda al momento y vuelve la pantalla a **Borrador**. Se ve igual en la vista previa y en el paquete. «Auto» entra sin movimiento por ahora; el orden y los tiempos de entrada llegarán con la línea de tiempo.
+
+Las actividades y la narración se cambian desde Revisión. Mover y agregar elementos, deshacer y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
 
 ---
 
@@ -369,7 +378,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
 - Otra ilustración desde la revisión y comentarios del cliente.
-- En el editor: tamaño, color, alineación y animación; mover y agregar elementos; deshacer y guardado automático; línea de tiempo.
+- En el editor: mover y agregar elementos; deshacer y guardado automático; línea de tiempo.
 
 ---
 
@@ -377,6 +386,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
 | 0.12 | 2026-11-10 | Regeneración automática: al corregir la narración en Revisión se rehacen solos su voz, su boca y sus subtítulos, con las marcas de avance. |
