@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.11 · actualizado con la cuarta entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.12 · actualizado con la primera entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -195,6 +195,12 @@ La etapa 8 (`apps/worker/src/etapas/subtitulos.ts`, HU-0801) recibe solo `subir`
 - Guarda un `Recurso` SUBTITULO (`text/vtt`) y `Narracion.subtituloRecursoId`, y en el curso `porIdioma.es.subtitulosId`, el recurso `tipo: 'subtitulos'` y `estado: 'generado'` si ya hay `duracionMs` y `bocas`. Versión del curso con motivo `subtitulos`.
 - Una narración con `subtituloRecursoId` se reutiliza. La etapa 6 lo pone en `null`, borra `subtitulosId` y deja la narración `pendiente` al crear otro audio. Regenerar (HU-0703) reabre VOZ_ES, BOCA y SUBTITULOS.
 
+La regeneración en cascada (HU-0503) es un trabajo aparte, `CASCADA` en la cola `voz`, para una sola pantalla.
+- `apps/worker/src/cascada.ts`: `crearCascada({ bd, voz, boca, subtitulos, esperaMs, esperaMaximaMs })` reutiliza las mismas etapas 6, 7 y 8 con un contexto sin generación (`generacionId: ''`, `parametros.regenerarVoz = { pantallaIds: [pantallaId] }`). La voz guarda `TrabajoIA.generacionId = null`. Mientras el proyecto tenga una generación EN_COLA o EN_CURSO, espera (5 s por vuelta, máximo 30 min). Si falla, la narración queda ERROR y el trabajo falla.
+- En `DatosTrabajo`, `trabajoId` es el curso y `pantallaId` la pantalla. Las constantes `TAREA_CASCADA`, `ESPERA_CASCADA_MS` y `CASCADA_ES` están en `@aptio/schema/generacion`.
+- La API (`CursosService.editar`) encola con `ColasService.encolarConEspera(cola, datos, jobId, esperaMs)`: un trabajo diferido de id `cascada-{curso}-{pantalla}`. Si hay uno pendiente con ese id, lo borra y lo vuelve a crear (CP-051). Si ya está activo, usa `{id}-tras`.
+- La web (`RevisionVista.tsx`, `ChipsCascada`) consulta `GET /cursos/{id}/narraciones` y `GET /proyectos/{id}/generaciones` cada 2 s durante 2 min. Voz lista = ACTUALIZADA; boca = hay `bocas`; subtítulos = hay `subtitulosUrl`.
+
 En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg` y `cargarSubtitulos`; la vista previa usa `urlsRecursos`, `svgPersonajes` y `subtitulos` de `GET /proyectos/{id}/curso`. `packages/player/src/subtitulos.ts` tiene `leerVtt` (texto plano, sin HTML) y `cueEn(cues, ms)`; mientras suena el audio, un `requestAnimationFrame` actualiza la línea de «CC». La preferencia vive en `localStorage['aptio-subtitulos']`, dentro de un try/catch.
 
 ### 7.2 Agregar un proveedor
@@ -269,6 +275,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.12 | 2026-11-10 | Regeneración en cascada: trabajo `CASCADA` (`crearCascada`), `encolarConEspera` en la API y chips en Revisión. |
 | 0.11 | 2026-11-10 | Etapa 8 de subtítulos (`crearEtapaSubtitulos`, `subtitulosDeNarracion`, `aVtt`) y `cargarSubtitulos` en el reproductor. |
 | 0.10 | 2026-11-10 | Regenerar narraciones (`regenerarVoz`, `intento()`, id de trabajo con «-») y marcas «Por regenerar» desde Revisión. |
 | 0.9 | 2026-11-10 | Etapa 7 de boca (`crearEtapaBoca`, Rhubarb), módulo `boca.ts` del reproductor, «Siguiente» tras la narración y `urlsRecursos`/`svgPersonajes`. |

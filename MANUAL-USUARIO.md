@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.11 · actualizado con la cuarta entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.12 · actualizado con la primera entrega del Sprint 5 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -289,7 +289,13 @@ Si la pantalla ya estaba aprobada, al guardar vuelve a «Borrador» para que alg
 
 Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Producción pueden corregir textos. Revisión del cliente puede mirar las pantallas, pero no cambiarlas.
 
-Por ahora, al cambiar la narración, la voz, la boca del personaje y la versión en inglés no se rehacen solas. Eso llegará con la voz.
+**Regeneración automática al corregir la narración.** Si corriges la narración de una pantalla que ya tiene voz, al guardar se rehacen solas su voz, la boca del personaje y sus subtítulos en español. Las demás pantallas no se tocan. Debajo de **Textos** aparece la tarjeta **Regeneración** con tres marcas: **Voz ES**, **Boca** y **Subtítulos ES**.
+- **Regenerando…:** se está haciendo. Suele tardar unos segundos.
+- **Lista** (verde): ya está. La pantalla muestra la versión nueva.
+- **En espera** (amarillo): hay una generación en curso en el proyecto. La regeneración empieza sola cuando termine.
+- **Error** (rojo): no se pudo hacer la voz. Corrige el texto y guarda de nuevo, o regenérala desde **Producción**.
+
+Puedes guardar varias veces seguidas sin preocuparte: solo se hace una regeneración, un segundo después del último guardado, y solo se paga esa. Si solo cambias el título, no se regenera nada. Por ahora solo se regenera el español; el inglés llegará con su etapa.
 
 ---
 
@@ -342,6 +348,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.12 | 2026-11-10 | Regeneración automática: al corregir la narración en Revisión se rehacen solos su voz, su boca y sus subtítulos, con las marcas de avance. |
 | 0.11 | 2026-11-10 | Subtítulos: la etapa 8 del generador y el botón CC de la vista previa, que muestra la frase que se está diciendo. |
 | 0.10 | 2026-11-10 | Narraciones «Por regenerar»: cuándo aparecen, el aviso en Producción y el botón para regenerar solo las que cambiaron. |
 | 0.9 | 2026-11-10 | Boca del personaje: Ana habla con la boca sincronizada al escuchar las narraciones y en la vista previa. |
