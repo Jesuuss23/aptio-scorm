@@ -191,3 +191,28 @@ test('CP-071 · la etapa 6 deja cada narración Lista con su duración, y se pue
   await expect(voz.getByRole('listitem', { name: 'Narración p16' })).toContainText('Pronunciación del diccionario: candado');
   await expect(lista.filter({ hasText: 'Lista' })).toHaveCount(30);
 });
+
+test('CP-073 · tras cambiar la pronunciación de «pasos», solo esas 4 quedan «Por regenerar» y el equipo las regenera', async ({ page }) => {
+  // SUP-36: «pasos» aparece en la narración de p02, p12, p15 y p27 del caso LOTO.
+  await simularApi(page, { conSesion: true, conProyectos: true, porRegenerar: ['p02', 'p12', 'p15', 'p27'] });
+  const gen = await conTema(page);
+  await gen.getByRole('button', { name: 'Generar SCORM' }).click();
+  const voz = etapa(gen, 'Voz en español');
+  await expect(etapa(gen, 'Boca del personaje')).toContainText('Lista', { timeout: 45_000 });
+
+  await voz.getByRole('button', { name: 'Escuchar narraciones' }).click();
+  const lista = voz.getByRole('list', { name: 'Narraciones' }).getByRole('listitem');
+  await expect(lista.filter({ hasText: 'Por regenerar' })).toHaveCount(4);
+  for (const id of ['p02', 'p12', 'p15', 'p27']) await expect(voz.getByRole('listitem', { name: `Narración ${id}` }).getByText('Por regenerar')).toBeVisible();
+  await expect(lista.filter({ hasText: 'Lista' })).toHaveCount(26);
+  const aviso = voz.getByRole('status', { name: 'Narraciones por regenerar' });
+  await expect(aviso).toContainText('4 narraciones quedaron «Por regenerar»');
+
+  await aviso.getByRole('button', { name: 'Regenerar las desactualizadas (4)' }).click();
+  // Se reabren las etapas 6 y 7 de la misma generación y vuelven a terminar.
+  await expect(gen.getByText('Armando tu SCORM…')).toBeVisible();
+  await expect(etapa(gen, 'Boca del personaje')).toContainText('Lista', { timeout: 20_000 });
+  await voz.getByRole('button', { name: 'Escuchar narraciones' }).click();
+  await expect(lista.filter({ hasText: 'Lista' })).toHaveCount(30);
+  await expect(voz.getByRole('status', { name: 'Narraciones por regenerar' })).toHaveCount(0);
+});

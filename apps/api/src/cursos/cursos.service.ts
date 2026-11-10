@@ -118,7 +118,9 @@ export class CursosService {
 
   /** CP-049: editar el título, un texto o la narración deja la pantalla en borrador, aunque estuviera aprobada. */
   async editar(u: UsuarioSesion, cursoId: string, pantallaId: string, dto: PantallaCambioDto): Promise<CambioResultadoDto> {
-    return this.guardar(u, cursoId, dto.version, 'edición', (doc) => {
+    /** Idiomas cuya narración cambió de verdad: su audio queda «Por regenerar» (HU-0703, RN-07-1). */
+    const narracionCambiada: string[] = [];
+    const r = await this.guardar(u, cursoId, dto.version, 'edición', (doc) => {
       const p = this.pantalla(doc, pantallaId);
       const bloques = p.bloques as Bloque[];
       const editado = (b: Bloque, contenido: Texto) => {
@@ -147,11 +149,13 @@ export class CursosService {
         const n = (p as unknown as { narracion?: Narracion }).narracion;
         const t = limpio(dto.narracion);
         if (!n || !t) throw new UnprocessableEntityException({ codigo: 'NARRACION_NO_VALIDA', mensaje: n ? 'La narración no puede quedar vacía' : 'Esta pantalla no tiene narración' });
+        const antes = n.texto;
         n.texto = t;
         for (const [idioma, audio] of Object.entries(n.porIdioma)) {
           const texto = t[idioma as 'es' | 'en'];
           if (!texto) continue;
-          // El hash liga el audio al texto: si cambia, el audio queda desactualizado (la voz se regenera en el S4).
+          if (texto !== antes[idioma as 'es' | 'en']) narracionCambiada.push(idioma);
+          // El hash liga el audio al texto: si cambia, el audio queda desactualizado hasta regenerarlo (HU-0703).
           audio.hashTexto = hashNarracion(texto, audio.voz.voz, audio.voz.velocidad ?? 1);
           if (audio.estado === 'generado') audio.estado = 'desactualizado';
         }
@@ -161,6 +165,10 @@ export class CursosService {
       p.estado = 'borrador';
       return { regenerando: [] as string[], estado: p.estado };
     });
+    if (narracionCambiada.length) {
+      await this.bd.narracion.updateMany({ where: { cursoId, pantallaId, idioma: { in: narracionCambiada }, estado: 'ACTUALIZADA' }, data: { estado: 'DESACTUALIZADA' } });
+    }
+    return r;
   }
 
   /** Abiertas que bloquean la entrega, por pantalla. */
