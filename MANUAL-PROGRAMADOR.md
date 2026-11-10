@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.4 · actualizado con la primera entrega del Sprint 3 (10 de noviembre de 2026)**
+**Versión 0.5 · actualizado con la segunda entrega del Sprint 3 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -142,7 +142,7 @@ Las 11 etapas están en `ETAPAS` (`packages/schema/src/generacion.ts`). Una etap
    - Playwright del CP.
 7. Documenta: esquema en OpenAPI (`EtapaResultado`), entrada en ESTADO y supuesto si aplica.
 
-La etapa 4 (`apps/worker/src/etapas/pantallas.ts`) es el ejemplo más completo: corre IA-15 en paralelo (`EN_PARALELO = 4`), convierte los campos en bloques con `bloquesDe` y guarda el documento del curso validado con `validarCurso` en `Curso` y `CursoVersion`.
+La etapa 4 (`apps/worker/src/etapas/pantallas.ts`) es el ejemplo más completo. Encadena dos tareas por pantalla: IA-15 la compone y, si tiene actividad, IA-07 escribe sus datos (`apps/worker/src/etapas/actividades.ts`, con las fichas del catálogo y `interaccionDe`, que antepone el id de la pantalla a los ids para que no choquen). Además corre IA-15 en paralelo (`EN_PARALELO = 4`), convierte los campos en bloques con `bloquesDe` y guarda el documento del curso validado con `validarCurso` en `Curso` y `CursoVersion`.
 
 `ctx.ia` comprueba antes de cada llamada que la etapa siga en curso: si cancelan, lanza `GeneracionCancelada` y el costo gastado se conserva.
 
@@ -213,5 +213,6 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.5 | 2026-11-10 | IA-07 dentro de la etapa 4 (datos de las actividades). |
 | 0.4 | 2026-11-10 | `ctx.avance` y vistas en vivo; la etapa 4 como ejemplo de etapa en paralelo que guarda el curso. |
 | 0.3 | 2026-11-10 | Primera versión, al cierre del S2: entorno, estructura, patrones, cómo agregar etapas, proveedores y materiales, pruebas y CI. |
