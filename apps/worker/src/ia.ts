@@ -7,6 +7,8 @@ export interface ContextoTrabajo {
   organizacionId: string;
   proyectoId?: string;
   generacionId?: string;
+  /** HU-0504 · El TrabajoIA que ya creó la API al encolar; si falta, se crea uno. */
+  trabajoId?: string;
 }
 
 export async function tareaRegistrada<T = unknown>(
@@ -17,14 +19,16 @@ export async function tareaRegistrada<T = unknown>(
   variables: Record<string, unknown>,
   opciones: Parameters<typeof ejecutarTarea>[3] = {},
 ): Promise<ResultadoTarea<T> & { trabajoId: string }> {
-  const trabajo = await bd.trabajoIA.create({
-    data: {
-      organizacionId: contexto.organizacionId,
-      ...(contexto.proyectoId ? { proyectoId: contexto.proyectoId } : {}),
-      ...(contexto.generacionId ? { generacionId: contexto.generacionId } : {}),
-      tarea, tipo: 'TEXTO', proveedor: proveedor.nombre, modelo: '-', estado: 'EN_CURSO',
-    },
-  });
+  const trabajo = contexto.trabajoId
+    ? await bd.trabajoIA.update({ where: { id: contexto.trabajoId, organizacionId: contexto.organizacionId }, data: { proveedor: proveedor.nombre, estado: 'EN_CURSO' } })
+    : await bd.trabajoIA.create({
+      data: {
+        organizacionId: contexto.organizacionId,
+        ...(contexto.proyectoId ? { proyectoId: contexto.proyectoId } : {}),
+        ...(contexto.generacionId ? { generacionId: contexto.generacionId } : {}),
+        tarea, tipo: 'TEXTO', proveedor: proveedor.nombre, modelo: '-', estado: 'EN_CURSO',
+      },
+    });
   const guardar = (r: Omit<ResultadoTarea, 'datos'>, estado: 'COMPLETADO' | 'ERROR', error: string | null) =>
     bd.trabajoIA.update({
       where: { id: trabajo.id },

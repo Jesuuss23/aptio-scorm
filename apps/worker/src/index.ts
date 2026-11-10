@@ -9,6 +9,8 @@ import { prisma } from '@aptio/db';
 import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { crearCascada } from './cascada.js';
+import { crearPropuestas } from './propuesta.js';
+import { TAREA_PROPUESTA } from '@aptio/schema/propuesta';
 import { EJECUTORES } from './etapas/index.js';
 import { crearEtapaVoz } from './etapas/voz.js';
 import { crearEtapaSubtitulos } from './etapas/subtitulos.js';
@@ -47,11 +49,14 @@ const generar = crearGenerador({
 });
 // La regeneración en cascada (HU-0503) corre las etapas 6, 7 y 8 de una sola pantalla, fuera de la generación.
 const cascada = crearCascada({ bd: prisma, voz: vozEs, boca, subtitulos });
+// Las propuestas de la IA (HU-0504) usan el mismo proveedor de texto que la generación.
+const proponer = crearPropuestas({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
   if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);
   if (trabajo.data.tarea === TAREA_GENERAR) return generar(trabajo);
   if (trabajo.data.tarea === TAREA_CASCADA) return cascada(trabajo);
+  if (trabajo.data.tarea === TAREA_PROPUESTA) return proponer(trabajo);
   return procesar(trabajo);
 };
 

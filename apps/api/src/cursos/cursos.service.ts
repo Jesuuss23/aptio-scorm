@@ -43,8 +43,8 @@ export class CursosService {
     return this.baseDatos.cliente;
   }
 
-  /** El curso, si es de la organización (y del cliente del revisor). */
-  private async buscar(u: UsuarioSesion, cursoId: string) {
+  /** El curso, si es de la organización (y del cliente del revisor). También lo usan las propuestas (HU-0504). */
+  async buscar(u: UsuarioSesion, cursoId: string) {
     const organizacionId = organizacionDe(u);
     const c = await this.bd.curso.findFirst({
       where: { id: cursoId, organizacionId, ...(u.rol === 'REVISOR_CLIENTE' ? { proyecto: { clienteId: u.clienteId ?? NINGUNO } } : {}) },
@@ -94,7 +94,7 @@ export class CursosService {
    * Guarda el documento con bloqueo optimista y una versión en el historial. `cambiar` modifica una copia del documento
    * y devuelve lo que responde la API; si el documento no valida, nada se guarda.
    */
-  private async guardar<T>(u: UsuarioSesion, cursoId: string, versionLeida: number | null, motivo: string, cambiar: (doc: CursoDoc) => T): Promise<T & { version: number }> {
+  async guardar<T>(u: UsuarioSesion, cursoId: string, versionLeida: number | null, motivo: string, cambiar: (doc: CursoDoc) => T): Promise<T & { version: number }> {
     const c = await this.buscar(u, cursoId);
     if (versionLeida !== null && versionLeida !== c.version) {
       throw new ConflictException({ codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
