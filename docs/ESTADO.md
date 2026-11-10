@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-10 · Fase actual: **Sprint S4 en curso** (voz, boca y subtítulos): HU-0701, HU-0702, HU-0703 y HU-0801 hechas en código; el S4 queda completo en código. S0 a S3 están cerrados (la demo del S3 se aprobó); siguen pendientes la prueba en Edge, Safari y un celular real, y el despliegue en el entorno de pruebas; `main` está protegida con CI. Los manuales de usuario, programador y sistema viven en la rama `docs/manuales` (PR #24, no se fusiona) y se actualizan tras cada entrega.
+Última actualización: 2026-11-10 · Fase actual: **Sprint S4 cerrado en código** (voz, boca y subtítulos): HU-0701, HU-0702, HU-0703 y HU-0801 hechas en código; falta la demo del S4. S0 a S3 están cerrados (la demo del S3 se aprobó); siguen pendientes la prueba en Edge, Safari y un celular real, y el despliegue en el entorno de pruebas; `main` está protegida con CI. Los manuales de usuario, programador y sistema viven en la rama `docs/manuales` (PR #24, no se fusiona) y se actualizan tras cada entrega.
 
 ## Decisiones aprobadas
 
@@ -50,6 +50,7 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Cambios recientes
 
+- **Cierre del S4 (2026-11-10):** HU-0701, HU-0702, HU-0703 y HU-0801 están hechas en código (PR #30 a #33). Cumplen CP-071, CP-072, CP-073 y CP-075 con pruebas automáticas, respetan el contrato y no dejan errores de lint ni de tipos. Sobre `main`, el CI completo pasa 319 pruebas, incluidas 107 de la API contra PostgreSQL y 78 del worker, y Playwright pasa 93 de 93. Faltan dos condiciones de la Definición de Terminado: probar en Edge, Safari y un celular real (Playwright corre solo Chromium) y desplegar en el entorno de pruebas (HU-1405). Todo se probó en modo simulado; la voz real de Google y PT-01 siguen pendientes. El guion de la demo con el caso LOTO está en el documento de cierre del S4. Supuestos nuevos del sprint: SUP-34 a SUP-37.
 - **HU-0801 · Subtítulos (2026-11-10):** la etapa 8 del generador (SUBTITULOS) escribe un WebVTT por narración, sincronizado con su audio, lo guarda como recurso y lo enlaza a la narración y al curso; la narración queda «generado» con audio, boca y subtítulos, y el aviso «narración pendiente» desaparece al exportar. Continuar no repite los VTT que ya están; un audio nuevo los rehace. La vista previa muestra con «CC» la frase que se está diciendo (CP-075: la segunda frase de p03 aparece a los 2,3 s) y recuerda la preferencia. `GET /cursos/{id}/narraciones` devuelve `subtitulosUrl` y `GET /proyectos/{id}/curso`, `subtitulos`. Supuesto en SUP-37.
 - **HU-0703 · Narraciones desactualizadas (2026-11-10):** `POST /cursos/{id}/narraciones/regenerar` continúa las etapas 6 y 7 de la misma generación y el worker solo vuelve a narrar, y a calcular la boca, lo que cambió según el hash RN-07-1 (CP-073: al cambiar la pronunciación de «pasos» se regeneran exactamente sus 4 narraciones, sin costo nuevo en las demás). Admite `pantallaIds` y una toma nueva forzada; 409 si hay una generación en curso, 422 sin voz o en inglés. Corregir la narración en Revisión la deja «Por regenerar». En Producción, «Escuchar narraciones» avisa cuántas están «Por regenerar» y el equipo las regenera con un botón. Se corrigió además el id del trabajo en la cola (`{generación}-{intento}`): BullMQ no acepta «:» y «Continuar» (HU-0408) habría fallado contra una cola real; su prueba simulaba la cola y no lo detectaba. Supuesto en SUP-36.
 - **HU-0702 · Boca sincronizada (2026-11-10):** la etapa 7 del generador (BOCA) calcula las marcas `[ms, boca]` de cada narración desde su audio (Rhubarb en modo real, por letras en simulado), las guarda en la narración y en el curso con una versión `boca`, y al continuar no repite las que ya tienen marcas para su audio. En el reproductor, «Escuchar narración» reproduce el audio de la pantalla y Ana mueve la boca según las marcas (CP-072: desfase máximo medido de 13 a 16 ms en Chromium con una narración de 10 s), con parpadeo y la pose de la pantalla; «Siguiente se habilita al terminar la narración» ya funciona. En Producción, «Escuchar narraciones» muestra a Ana diciendo la que suena. `GET /proyectos/{id}/curso` devuelve `urlsRecursos` y `svgPersonajes`. Probado además con Rhubarb 1.13 real sobre un MP3 (ffmpeg → WAV → marcas). Supuesto en SUP-35.
@@ -180,8 +181,8 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Siguiente paso
 
-1. Revisar y fusionar la HU-0801 (subtítulos).
-2. Cerrar el S4 (skill `cierre-sprint`): estado real, guion de demo y pruebas en Edge, Safari y un celular real.
+1. Demo del S4 con el guion del documento de cierre: escuchar la cápsula con Ana, cambiar una pronunciación y regenerar solo lo afectado, y ver los subtítulos. El responsable completa la tabla de la demo en `docs/18-plan-sprints.md`.
+2. Empezar el S5 (editor y regeneración en cascada) con el plan de su primera historia.
 3. Probar las vistas del S3 y del S4 en Edge, Safari y un celular real, la voz con una clave real de Google y PT-01 con el personaje definitivo.
 4. En paralelo, el responsable del producto mide 2 proyectos con la tabla de `docs/11-medicion-y-piloto.md`.
 5. Al cerrar cada sprint, demo en el entorno de pruebas y observaciones en Jira. Piloto al cerrar S6.
