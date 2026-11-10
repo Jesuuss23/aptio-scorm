@@ -1,9 +1,9 @@
 // HU-0110 · Auditoría visual de docs/22-auditoria-prototipo.md repetida sobre apps/web.
 import { expect, type Page, test } from '@playwright/test';
 import { ANCHO_BARRA_LATERAL, ESCALA_TIPOGRAFICA, MARGEN_ESCRITORIO, TAMANO_TITULO_PAGINA } from '../../../packages/ui/src/tokens';
-import { simularApi } from './api-simulada';
+import { CLIENTE_ID, simularApi } from './api-simulada';
 
-const CON_ESTRUCTURA = ['/', '/no-existe'];
+const CON_ESTRUCTURA = ['/', '/clientes', `/clientes/${CLIENTE_ID}`, '/no-existe'];
 const SIN_ESTRUCTURA = ['/ingresar', '/olvido', '/clave?token=vigente'];
 
 async function abrir(page: Page, ruta: string) {

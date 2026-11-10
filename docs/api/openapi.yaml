@@ -367,6 +367,7 @@ paths:
       - Clientes y kits
       summary: Listar clientes
       operationId: get_clientes
+      description: Clientes activos de la organización, por nombre. El revisor del cliente solo ve el suyo. `buscar` filtra por nombre sin distinguir mayúsculas.
       parameters:
       - name: buscar
         in: query
@@ -391,6 +392,7 @@ paths:
       - Clientes y kits
       summary: Crear cliente
       operationId: post_clientes
+      description: ADMINISTRADOR, DISENADOR_INSTRUCCIONAL o PRODUCTOR. Solo el nombre es obligatorio; idiomas por defecto ['es']. 409 CLIENTE_EXISTE si ya hay uno con el mismo nombre en la organización.
       requestBody:
         required: true
         content:
@@ -441,6 +443,7 @@ paths:
       - Clientes y kits
       summary: Editar cliente
       operationId: patch_clientes_clienteId
+      description: ADMINISTRADOR, DISENADOR_INSTRUCCIONAL o PRODUCTOR.
       parameters:
       - name: clienteId
         in: path
@@ -453,7 +456,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ClienteEntrada'
+              $ref: '#/components/schemas/ClienteCambio'
       responses:
         '200':
           description: OK
@@ -2940,8 +2943,14 @@ components:
         notas:
           type: string
           nullable: true
+        retencionDocumentosDias:
+          type: integer
+          description: Días tras la entrega para borrar los documentos fuente (ADR-009)
         tieneKit:
           type: boolean
+        creadoEn:
+          type: string
+          format: date-time
     ClienteEntrada:
       type: object
       required:
@@ -2961,6 +2970,33 @@ components:
             - en
         notas:
           type: string
+        retencionDocumentosDias:
+          type: integer
+          minimum: 1
+          maximum: 3650
+          default: 180
+    ClienteCambio:
+      type: object
+      description: Igual que ClienteEntrada, con todos los campos opcionales.
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+        lmsHabitual:
+          type: string
+        idiomas:
+          type: array
+          items:
+            type: string
+            enum:
+            - es
+            - en
+        notas:
+          type: string
+        retencionDocumentosDias:
+          type: integer
+          minimum: 1
+          maximum: 3650
     Paleta:
       type: object
       required:

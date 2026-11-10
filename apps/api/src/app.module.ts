@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
 import { BaseDatosModule } from './base-datos/base-datos.module.js';
 import { GuardaRoles } from './comun/guarda-roles.js';
+import { ClientesModule } from './clientes/clientes.module.js';
 import { CorreoModule } from './correo/correo.module.js';
 import { SaludModule } from './salud/salud.module.js';
 import { TrabajosModule } from './trabajos/trabajos.module.js';
@@ -18,6 +19,7 @@ import { UsuariosModule } from './usuarios/usuarios.module.js';
     AuthModule,
     UsuariosModule,
     TrabajosModule,
+    ClientesModule,
     SaludModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
