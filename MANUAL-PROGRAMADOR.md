@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.8 · actualizado con la primera entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.9 · actualizado con la segunda entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -176,6 +176,13 @@ La etapa 6 (`apps/worker/src/etapas/voz.ts`) es el modelo para etapas de medios.
 
 Al final actualiza el curso con bloqueo optimista y una `CursoVersion` con motivo `voz`. En el worker se registra en `index.ts` con `sintetizadorDesdeEntorno(process.env)`.
 
+La etapa 7 (`apps/worker/src/etapas/boca.ts`) sigue el mismo molde: `crearEtapaBoca({ calcular, leer })` recibe un `CalculadorBocas` y la lectura del almacenamiento.
+- `calculadorBocasDesdeEntorno(env)` (`src/extraer/rhubarb.ts`) devuelve `calculadorSimulado` en modo simulado o `calculadorRhubarb(RHUBARB_PATH)`, que pasa el audio por ffmpeg a WAV y corre `rhubarb -r phonetic -f json --extendedShapes GHX`.
+- Las funciones puras están en `@aptio/ai`: `bocasSimuladas`, `bocasDeRhubarb` y `normalizarBocas`. Toda lista de marcas cierra con `[duraciónMs, 'X']`.
+- Una narración con `bocas` no nulas se reutiliza; la etapa 6 las pone en `null` al crear otro audio.
+
+En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg`; la vista previa usa `urlsRecursos` y `svgPersonajes` de `GET /proyectos/{id}/curso`.
+
 ### 7.2 Agregar un proveedor
 
 - **Texto:** implementa `ProveedorTexto` (`nombre`, `modeloPara`, `completar`) y elígelo en `proveedorDesdeEntorno`.
@@ -221,6 +228,7 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL_*`, `ANTHROPIC_ESFUERZO` | worker | IA de texto |
 | `GOOGLE_STT_API_KEY`, `GOOGLE_STT_MODELO` | worker | Transcripción |
+| `RHUBARB_PATH` | worker | Ejecutable de Rhubarb Lip Sync para la boca en modo real (vacío = `rhubarb` del PATH) |
 | `GOOGLE_TTS_API_KEY` | api, worker | Muestra de voz (api) y narración de la etapa 6 en modo real (worker) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | api | Ingreso con Google |
 
@@ -235,6 +243,8 @@ Ninguna clave real va al repositorio.
 | El material de video queda en error «No se pudo extraer el audio» | El archivo no tiene pista de sonido, o falta ffmpeg | Instala ffmpeg o revisa el archivo |
 | En modo real, la transcripción falla con `GOOGLE_STT_API_KEY` | Falta la clave | Agrégala al `.env` del worker |
 | La etapa 6 falla con «La voz de azure todavía no está disponible» | El kit usa una voz que no es de Google | Elige una voz de Google en el kit (SUP-34) |
+| La etapa 7 falla con «Rhubarb Lip Sync no está instalado» | Modo real sin Rhubarb en el worker | Instala Rhubarb 1.13 y define `RHUBARB_PATH` |
+| En la vista previa se ven todas las bocas encimadas | El SVG se insertó sin `mostrarBoca(svg, 'X')` | Inserta siempre con `svgEnLinea` y deja la boca en reposo |
 | `openapi:lint` con más de 7 avisos | Un componente sin usar o `nullable` sin `type` | Usa el componente o agrega `type` |
 | oxlint «solo exportar componentes» | Una función auxiliar en un `.tsx` | Muévela a `formato.ts` |
 
@@ -244,6 +254,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.9 | 2026-11-10 | Etapa 7 de boca (`crearEtapaBoca`, Rhubarb), módulo `boca.ts` del reproductor, «Siguiente» tras la narración y `urlsRecursos`/`svgPersonajes`. |
 | 0.8 | 2026-11-10 | Etapa 6 de voz (`crearEtapaVoz`), `ctx.gastar` y `ctx.comprobar`, `hashNarracion`, `duracionAudio`, `costoVoz` y `GET /cursos/{id}/narraciones`. |
 | 0.7 | 2026-11-10 | Módulo `cursos` (observaciones, editar y aprobar con bloqueo optimista), `@aptio/schema/revision` y la opción `marco` del reproductor. |
 | 0.6 | 2026-11-10 | Paquete `@aptio/player` (reproductor único), `GET /proyectos/{id}/curso` y la vista previa. |

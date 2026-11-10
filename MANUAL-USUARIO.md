@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.8 · actualizado con la primera entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.9 · actualizado con la segunda entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -206,7 +206,9 @@ Solo puede haber una generación en curso por proyecto. Si otra persona ya la la
 
 | 6 | **Voz en español** | La narración de cada pantalla leída con la voz del kit del cliente, respetando su lista de pronunciación. Mientras trabaja verás «12 de 30 narraciones listas»; al terminar, el total y cuánto dura todo el audio. | **Escuchar narraciones** |
 
-La etapa 5 (ilustraciones) y las etapas 7 a 11 (boca del personaje, subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
+| 7 | **Boca del personaje** | El movimiento de la boca de Ana para cada narración, sincronizado con el audio. No necesitas revisarla aparte: la ves al escuchar las narraciones o en la vista previa. | — |
+
+La etapa 5 (ilustraciones) y las etapas 8 a 11 (subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
 
 ### 8.3 Cómo revisar cada resultado
 
@@ -218,7 +220,7 @@ La etapa 5 (ilustraciones) y las etapas 7 a 11 (boca del personaje, subtítulos,
 
 Las pantallas que la IA agregó por su cuenta (una transición o un ejemplo) llevan la marca **«Agregado por la IA»**. Las que salen del material muestran su página y archivo.
 
-- **Voz:** pulsa **Escuchar narraciones**. Cada pantalla aparece con su número, su título, cuánto dura y la marca **«Lista»**. Debajo está el texto que lee el narrador y, si aplicó alguna regla de tu lista de pronunciación, verás «Pronunciación del diccionario: …». Pulsa el botón de reproducir para escucharla. Si una palabra suena mal, agrégala en **Glosario y pronunciación** del cliente y continúa la generación. Si una narración falla tres veces, la etapa se detiene con el motivo; al pulsar **Continuar**, solo se rehacen las que faltan.
+- **Voz:** pulsa **Escuchar narraciones**. Cada pantalla aparece con su número, su título, cuánto dura y la marca **«Lista»**. Debajo está el texto que lee el narrador y, si aplicó alguna regla de tu lista de pronunciación, verás «Pronunciación del diccionario: …». Pulsa el botón de reproducir para escucharla: si el kit del cliente tiene personaje, Ana aparece al lado y dice la narración moviendo la boca. Si una palabra suena mal, agrégala en **Glosario y pronunciación** del cliente y continúa la generación. Si una narración falla tres veces, la etapa se detiene con el motivo; al pulsar **Continuar**, solo se rehacen las que faltan.
 
 ### 8.4 Cancelar, continuar o generar de nuevo
 
@@ -246,7 +248,9 @@ Todas las actividades se juegan de verdad: memoria, clasificar, ordenar pasos, t
 
 Por ahora:
 - La vista previa usa el recorrido «Clásico» (barra arriba y botones Anterior y Siguiente abajo). Si el curso pide otro recorrido, verás un aviso.
-- Las imágenes, el personaje y el video aparecen como un recuadro con su descripción, hasta que lleguen las ilustraciones y el personaje animado.
+- Las imágenes y el video aparecen como un recuadro con su descripción hasta que lleguen las ilustraciones. El personaje del kit sí aparece, con los colores del cliente.
+- En las pantallas con narración verás **Escuchar narración**: al pulsarlo, Ana habla con la boca sincronizada y parpadea. **Pausar narración** la detiene.
+- Si la cápsula está configurada para que **Siguiente** se habilite al terminar la narración, el botón espera a que termine el audio y explica «Escucha la narración para continuar».
 
 ### 8.7 Revisar y aprobar las pantallas
 
@@ -313,7 +317,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 - Ilustraciones.
 - Otros recorridos de la cápsula (historias, mapa de misiones, menú de temas y más).
-- Boca animada del personaje y subtítulos.
+- Subtítulos.
 - Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
@@ -325,6 +329,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.9 | 2026-11-10 | Boca del personaje: Ana habla con la boca sincronizada al escuchar las narraciones y en la vista previa. |
 | 0.8 | 2026-11-10 | Voz en español: la generación narra cada pantalla con la voz del kit y se escuchan en «Escuchar narraciones». |
 | 0.7 | 2026-11-10 | Revisión: filtros, corregir título y narración, control de calidad, origen y aprobación de pantallas una por una o todas las que no tienen observaciones. |
 | 0.6 | 2026-11-10 | Vista previa: recorrer la cápsula en celular, tableta o escritorio, con las actividades jugables y el seguimiento simulado. |
