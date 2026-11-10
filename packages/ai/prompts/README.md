@@ -27,7 +27,7 @@ Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confia
 
 ## Cómo se usan
 
-- Enviar el esquema de salida a la API como herramienta (tool use) con `input_schema` = esquema **empaquetado** (resolver los `$ref` al esquema del curso antes de enviarlo) y forzar esa herramienta; luego validar igual con Ajv.
+- `ejecutarTarea` (`packages/ai/src/texto.ts`) arma el prompt, pide la respuesta como JSON en texto y la valida con Ajv contra el esquema de la tarea. No se fuerza una herramienta: los modelos actuales no aceptan `tool_choice` forzado y los esquemas usan `$ref` al esquema del curso. La columna Temperatura queda como referencia: la API actual no acepta `temperature`; la profundidad se ajusta con el esfuerzo (`ANTHROPIC_ESFUERZO`).
 - Si no valida: reintentar hasta 2 veces agregando al mensaje los errores de Ajv (ruta y mensaje). Si sigue fallando, la etapa queda en ERROR (RN-04-2).
 - Registrar en `TrabajoIA`: tarea, versión de este archivo, modelo, tokens de entrada y salida, costo, duración y resultado.
 - Variables con `{{ }}`: las llena `packages/ai`. Los textos del cliente siempre dentro de `<material_cliente>`.
