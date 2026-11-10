@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.10 · actualizado con la tercera entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.11 · actualizado con la cuarta entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -210,7 +210,9 @@ Solo puede haber una generación en curso por proyecto. Si otra persona ya la la
 
 | 7 | **Boca del personaje** | El movimiento de la boca de Ana para cada narración, sincronizado con el audio. No necesitas revisarla aparte: la ves al escuchar las narraciones o en la vista previa. | — |
 
-La etapa 5 (ilustraciones) y las etapas 8 a 11 (subtítulos, versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
+| 8 | **Subtítulos** | Los subtítulos de cada narración, frase por frase y sincronizados con el audio. Muestran el texto tal como está escrito, aunque la voz lo pronuncie distinto (por ejemplo, «LOTO» y no «lo-to»). Los ves con el botón **CC** de la vista previa. | — |
+
+La etapa 5 (ilustraciones) y las etapas 9 a 11 (versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
 
 ### 8.3 Cómo revisar cada resultado
 
@@ -234,9 +236,9 @@ Si una etapa falla (por ejemplo, porque el servicio de IA no respondió), verás
 
 **Narraciones «Por regenerar».** Una narración queda «Por regenerar» cuando cambia algo que afecta cómo suena: corriges su texto en Revisión o cambias la pronunciación de una palabra que usa. Si solo corriges el título, sigue «Lista». Al pulsar **Escuchar narraciones** verás un aviso amarillo con cuántas están así, y cada una lleva la marca «Por regenerar» en lugar de «Lista». Mientras tanto se sigue escuchando el audio anterior.
 
-Para actualizarlas, pulsa **Regenerar las desactualizadas (N)** en ese aviso. El botón lo ve el equipo (administración, diseño instruccional, diseño gráfico y producción), no el revisor del cliente. La generación retoma solo las etapas de voz y boca:
+Para actualizarlas, pulsa **Regenerar las desactualizadas (N)** en ese aviso. El botón lo ve el equipo (administración, diseño instruccional, diseño gráfico y producción), no el revisor del cliente. La generación retoma solo las etapas de voz, boca y subtítulos:
 
-- Se vuelven a narrar únicamente las que de verdad cambiaron, con su boca. Las demás no se tocan ni se vuelven a pagar.
+- Se vuelven a narrar únicamente las que de verdad cambiaron, con su boca y sus subtítulos. Las demás no se tocan ni se vuelven a pagar.
 - Si una estaba marcada pero lo que dice la voz no cambió, vuelve a «Lista» sin costo.
 - Si ya hay una generación en curso, espera a que termine. Por ahora solo se regenera el español; el inglés llega con su etapa.
 
@@ -260,6 +262,7 @@ Por ahora:
 - La vista previa usa el recorrido «Clásico» (barra arriba y botones Anterior y Siguiente abajo). Si el curso pide otro recorrido, verás un aviso.
 - Las imágenes y el video aparecen como un recuadro con su descripción hasta que lleguen las ilustraciones. El personaje del kit sí aparece, con los colores del cliente.
 - En las pantallas con narración verás **Escuchar narración**: al pulsarlo, Ana habla con la boca sincronizada y parpadea. **Pausar narración** la detiene.
+- El botón **CC** de la barra superior activa los subtítulos. Mientras suena la narración ves la frase que Ana está diciendo; en pausa, el texto completo. Si lo dejas activado, la próxima vez que abras la vista previa en ese navegador seguirá activado.
 - Si la cápsula está configurada para que **Siguiente** se habilite al terminar la narración, el botón espera a que termine el audio y explica «Escucha la narración para continuar».
 
 ### 8.7 Revisar y aprobar las pantallas
@@ -327,7 +330,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 - Ilustraciones.
 - Otros recorridos de la cápsula (historias, mapa de misiones, menú de temas y más).
-- Subtítulos.
+- Subtítulos en inglés y elegir el idioma de los subtítulos.
 - Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
@@ -339,6 +342,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.11 | 2026-11-10 | Subtítulos: la etapa 8 del generador y el botón CC de la vista previa, que muestra la frase que se está diciendo. |
 | 0.10 | 2026-11-10 | Narraciones «Por regenerar»: cuándo aparecen, el aviso en Producción y el botón para regenerar solo las que cambiaron. |
 | 0.9 | 2026-11-10 | Boca del personaje: Ana habla con la boca sincronizada al escuchar las narraciones y en la vista previa. |
 | 0.8 | 2026-11-10 | Voz en español: la generación narra cada pantalla con la voz del kit y se escuchan en «Escuchar narraciones». |

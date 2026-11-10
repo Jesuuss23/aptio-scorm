@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.10 · actualizado con la tercera entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.11 · actualizado con la cuarta entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -190,7 +190,12 @@ La etapa 7 (`apps/worker/src/etapas/boca.ts`) sigue el mismo molde: `crearEtapaB
 - Las funciones puras están en `@aptio/ai`: `bocasSimuladas`, `bocasDeRhubarb` y `normalizarBocas`. Toda lista de marcas cierra con `[duraciónMs, 'X']`.
 - Una narración con `bocas` no nulas se reutiliza; la etapa 6 las pone en `null` al crear otro audio.
 
-En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg`; la vista previa usa `urlsRecursos` y `svgPersonajes` de `GET /proyectos/{id}/curso`.
+La etapa 8 (`apps/worker/src/etapas/subtitulos.ts`, HU-0801) recibe solo `subir`: `crearEtapaSubtitulos({ subir })`.
+- Las funciones puras están en `@aptio/ai` (`src/subtitulos.ts`): `subtitulosDeNarracion(texto, duracionMs)` (una frase por subtítulo, partida si pasa de `MAX_CARACTERES_SUBTITULO = 84`, tiempos por letras), `aVtt` (escapa `& < >`) y `tiempoVtt`.
+- Guarda un `Recurso` SUBTITULO (`text/vtt`) y `Narracion.subtituloRecursoId`, y en el curso `porIdioma.es.subtitulosId`, el recurso `tipo: 'subtitulos'` y `estado: 'generado'` si ya hay `duracionMs` y `bocas`. Versión del curso con motivo `subtitulos`.
+- Una narración con `subtituloRecursoId` se reutiliza. La etapa 6 lo pone en `null`, borra `subtitulosId` y deja la narración `pendiente` al crear otro audio. Regenerar (HU-0703) reabre VOZ_ES, BOCA y SUBTITULOS.
+
+En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg` y `cargarSubtitulos`; la vista previa usa `urlsRecursos`, `svgPersonajes` y `subtitulos` de `GET /proyectos/{id}/curso`. `packages/player/src/subtitulos.ts` tiene `leerVtt` (texto plano, sin HTML) y `cueEn(cues, ms)`; mientras suena el audio, un `requestAnimationFrame` actualiza la línea de «CC». La preferencia vive en `localStorage['aptio-subtitulos']`, dentro de un try/catch.
 
 ### 7.2 Agregar un proveedor
 
@@ -264,6 +269,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.11 | 2026-11-10 | Etapa 8 de subtítulos (`crearEtapaSubtitulos`, `subtitulosDeNarracion`, `aVtt`) y `cargarSubtitulos` en el reproductor. |
 | 0.10 | 2026-11-10 | Regenerar narraciones (`regenerarVoz`, `intento()`, id de trabajo con «-») y marcas «Por regenerar» desde Revisión. |
 | 0.9 | 2026-11-10 | Etapa 7 de boca (`crearEtapaBoca`, Rhubarb), módulo `boca.ts` del reproductor, «Siguiente» tras la narración y `urlsRecursos`/`svgPersonajes`. |
 | 0.8 | 2026-11-10 | Etapa 6 de voz (`crearEtapaVoz`), `ctx.gastar` y `ctx.comprobar`, `hashNarracion`, `duracionAudio`, `costoVoz` y `GET /cursos/{id}/narraciones`. |
