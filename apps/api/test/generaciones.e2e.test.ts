@@ -166,6 +166,19 @@ describe.skipIf(!hayBase && !process.env.CI)('generación del SCORM (HU-0401, HU
     expect(await estadoProyecto(id)).toBe('GENERANDO');
   });
 
+  it('CP-038 · el resultado de una etapa terminada trae sus datos; una sin terminar, null', async () => {
+    const id = await proyecto();
+    const g = (await como('productor').post(`/proyectos/${id}/generaciones`)).body;
+    const datos = { ideas: [{ id: 't04-f01', texto: 'Bloqueo: colocar un candado personal.', paginas: [7] }], acta: { titulo: 'Acta', temas: [], textoActa: 'Sin omitidos' } };
+    await prisma.generacionEtapa.updateMany({ where: { generacionId: g.id, orden: 1 }, data: { estado: 'COMPLETADO', detalle: { texto: '30 páginas → 1 idea clave', datos } } });
+    const res = await como('revisor').get(`/generaciones/${g.id}/etapas/RESUMEN_MATERIAL`);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ etapa: 'RESUMEN_MATERIAL', estado: 'COMPLETADO', detalle: '30 páginas → 1 idea clave', datos });
+    expect((await como('grafico').get(`/generaciones/${g.id}/etapas/OBJETIVOS_ESTRUCTURA`)).body).toMatchObject({ estado: 'EN_COLA', datos: null });
+    expect((await como('grafico').get(`/generaciones/${g.id}/etapas/NO_EXISTE`)).status).toBe(404);
+    expect((await como('ajeno').get(`/generaciones/${g.id}/etapas/RESUMEN_MATERIAL`)).status).toBe(404);
+  });
+
   it('si la cola no responde, la generación queda en error y el proyecto en borrador', async () => {
     const id = await proyecto();
     colaCaida = true;

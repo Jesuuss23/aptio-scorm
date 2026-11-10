@@ -17,7 +17,12 @@ export interface ContextoEtapa {
   /** Datos guardados por las etapas ya terminadas de esta generación. */
   anteriores: Partial<Record<Etapa, unknown>>;
   bd: PrismaClient;
-  /** Ejecuta una tarea de IA registrada en TrabajoIA y suma su costo a la etapa. */
+  /** Nombre del proveedor de texto (`simulado` responde siempre el caso LOTO). */
+  proveedor: string;
+  /**
+   * Ejecuta una tarea de IA registrada en TrabajoIA y suma su costo a la etapa. Antes de cada llamada revisa si
+   * cancelaron la generación: así una etapa larga no sigue gastando (lanza GeneracionCancelada).
+   */
   ia<T = unknown>(tarea: string, variables: Record<string, unknown>, opciones?: Parameters<typeof tareaRegistrada>[5]): Promise<ResultadoTarea<T>>;
 }
 
@@ -26,6 +31,12 @@ export interface ResultadoEtapa {
   texto: string;
   /** Lo que reciben las etapas siguientes (`anteriores`). */
   datos?: unknown;
+}
+
+export class GeneracionCancelada extends Error {
+  constructor() {
+    super('La generación se canceló');
+  }
 }
 
 export type EjecutorEtapa = (ctx: ContextoEtapa) => Promise<ResultadoEtapa>;
@@ -62,6 +73,12 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
     if (!arranque.count) return { estado: g.estado };
     await emitir(TAREA_GENERAR, 'EN_CURSO');
 
+    /** La etapa cancelada a mitad no guarda su resultado, pero sí lo que ya costó. */
+    const cancelada = async (etapaId: string, costo: number) => {
+      await bd.generacionEtapa.update({ where: { id: etapaId }, data: { fin: new Date(), costoUsd: costo } });
+      return { estado: 'CANCELADO' as const };
+    };
+
     const anteriores: Partial<Record<Etapa, unknown>> = {};
     for (const e of g.etapas) {
       if (e.estado === 'COMPLETADO') anteriores[e.etapa as Etapa] = (e.detalle as { datos?: unknown } | null)?.datos;
@@ -85,7 +102,10 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
       let costo = 0;
       const ctx: ContextoEtapa = {
         generacionId, organizacionId, proyectoId: g.proyectoId, parametros: g.parametros as Record<string, unknown>, anteriores, bd,
+        proveedor: proveedor.nombre,
         async ia<T = unknown>(tarea: string, variables: Record<string, unknown>, opciones?: Parameters<typeof tareaRegistrada>[5]) {
+          const actual = await bd.generacionEtapa.findUnique({ where: { id: e.id }, select: { estado: true } });
+          if (actual?.estado !== 'EN_CURSO') throw new GeneracionCancelada();
           try {
             const r = await tareaRegistrada<T>(bd, { organizacionId, proyectoId: g.proyectoId, generacionId }, proveedor, tarea, variables, opciones);
             costo = redondear(costo + r.costoUsd);
@@ -111,7 +131,7 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
         const marcada = await bd.generacionEtapa.updateMany({
           where: { id: e.id, estado: 'EN_CURSO' }, data: { estado: 'ERROR', fin: new Date(), costoUsd: costo, detalle: { texto: fallo } },
         });
-        if (!marcada.count) return { estado: 'CANCELADO' };
+        if (!marcada.count) return cancelada(e.id, costo);
         await bd.generacion.updateMany({ where: { id: generacionId, estado: 'EN_CURSO' }, data: { estado: 'ERROR', terminadoEn: new Date() } });
         await bd.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'BORRADOR' } });
         await emitir(etapa, 'ERROR', fallo);
@@ -124,7 +144,7 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
       const guardada = await bd.generacionEtapa.updateMany({
         where: { id: e.id, estado: 'EN_CURSO' }, data: { estado: 'COMPLETADO', fin: new Date(), costoUsd: costo, detalle },
       });
-      if (!guardada.count) return { estado: 'CANCELADO' };
+      if (!guardada.count) return cancelada(e.id, costo);
       anteriores[etapa] = resultado!.datos;
       await emitir(etapa, 'COMPLETADO');
       await trabajo.updateProgress(await avance());

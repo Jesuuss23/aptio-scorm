@@ -5,6 +5,7 @@ import { DETALLE_PROXIMAMENTE, NOMBRE_ETAPA } from '@aptio/schema/generacion';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
 import { usd } from '../formato';
+import { ResumenMaterialVista } from './ResumenMaterialVista';
 
 const ACTIVAS = new Set<Generacion['estado']>(['EN_COLA', 'EN_CURSO']);
 const NOMBRE_ESTADO: Record<Generacion['estado'], string> = {
@@ -39,6 +40,7 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [verResumen, setVerResumen] = useState(false);
   const activa = Boolean(g && ACTIVAS.has(g.estado));
 
   useEffect(() => {
@@ -146,6 +148,12 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
                   <span className={`chip ${CHIP[e.estado] ?? ''}`}>{NOMBRE_ESTADO[e.estado]}</span>
                   {e.costoUsd > 0 ? <span className="sec num">{usd(e.costoUsd)}</span> : null}
                 </span>
+                {e.etapa === 'RESUMEN_MATERIAL' && e.estado === 'COMPLETADO' ? (
+                  <button className="boton etapa-ver" type="button" aria-expanded={verResumen} onClick={() => setVerResumen(!verResumen)}>
+                    {verResumen ? 'Ocultar resumen' : 'Ver resumen'}
+                  </button>
+                ) : null}
+                {e.etapa === 'RESUMEN_MATERIAL' && e.estado === 'COMPLETADO' && verResumen ? <div className="etapa-resultado"><ResumenMaterialVista generacionId={g.id} /></div> : null}
               </li>
             ))}
           </ol>

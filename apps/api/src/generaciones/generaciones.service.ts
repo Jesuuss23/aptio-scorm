@@ -7,7 +7,7 @@ import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { ColasService } from '../trabajos/colas.service.js';
-import type { GeneracionDto, GeneracionEntradaDto } from './generacion.dto.js';
+import type { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto } from './generacion.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 const conEtapas = { etapas: { orderBy: { orden: 'asc' } } } as const;
@@ -50,6 +50,15 @@ export class GeneracionesService {
 
   async ver(u: UsuarioSesion, id: string): Promise<GeneracionDto> {
     return aDto(await this.generacion(u, id));
+  }
+
+  /** Resultado completo de una etapa terminada (CP-038: ideas clave con página y acta de omitidos). */
+  async etapa(u: UsuarioSesion, id: string, etapa: string): Promise<EtapaResultadoDto> {
+    const g = await this.generacion(u, id);
+    const e = g.etapas.find((x) => x.etapa === etapa);
+    if (!e) throw new NotFoundException('Etapa no encontrada');
+    const dto = aDto({ ...g, etapas: [e] }).etapas[0]!;
+    return { ...dto, datos: e.estado === 'COMPLETADO' ? ((e.detalle as { datos?: unknown } | null)?.datos ?? null) : null };
   }
 
   /** Comprueba el acceso; lo usa el flujo de eventos antes de suscribirse. */
