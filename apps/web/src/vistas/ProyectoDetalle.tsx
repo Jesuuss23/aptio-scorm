@@ -82,7 +82,10 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
         accion={
           <div className="acciones-form">
             {proyecto.avance.total ? (
-              <a className="boton primario" href={`/proyectos/${proyecto.id}/vista-previa`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/vista-previa`); }}>Vista previa</a>
+              <>
+                <a className="boton primario" href={`/proyectos/${proyecto.id}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/revision`); }}>Revisión</a>
+                <a className="boton" href={`/proyectos/${proyecto.id}/vista-previa`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/vista-previa`); }}>Vista previa</a>
+              </>
             ) : null}
             {puedeEditar && proyecto.estado !== 'ARCHIVADO' ? <button className="boton" type="button" onClick={() => void archivar()}>Archivar</button> : null}
           </div>

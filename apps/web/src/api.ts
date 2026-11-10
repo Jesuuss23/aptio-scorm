@@ -49,6 +49,9 @@ export const DISENAN_MODELOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_GRAFICO'];
 /** docs/14-modulos.md: crean proyectos y generan administración, diseño instruccional y producción. */
 export const CREAN_PROYECTOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
 /** HU-0205: el glosario y la pronunciación los edita todo el equipo, también producción. */
+/** docs/14-modulos.md: editan pantallas todos los del equipo; aprueban administración y diseño instruccional. */
+export const EDITAN_PANTALLAS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
+export const APRUEBAN_PANTALLAS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
 export const EDITAN_GLOSARIO: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 
 export interface PantallaModeloEntrada {
@@ -220,6 +223,29 @@ export interface Curso {
   actualizadoEn: string;
 }
 
+export type TextoI18n = { es?: string; en?: string };
+
+/** HU-0501 · Observación de una pantalla (reglas, IA o personas). */
+export interface Observacion {
+  id: string;
+  pantallaId: string | null;
+  tipo: string;
+  severidad: 'info' | 'aviso' | 'bloquea-entrega';
+  mensaje: string;
+  origen: string;
+  resuelta: boolean;
+  creadoEn: string;
+}
+
+/** HU-0502 · Resultado de editar o aprobar. */
+export interface CambioResultado {
+  version: number;
+  regenerando: string[];
+  aprobadas?: string[];
+  pendientes?: string[];
+  estado?: string;
+}
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -263,6 +289,11 @@ export const api = {
   cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
+  observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
+  editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; narracion?: TextoI18n }) =>
+    pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
+  aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),
+  aprobarSinObservaciones: (cursoId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/aprobar`, json({ soloSinObservaciones: true })),
   curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
   guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
