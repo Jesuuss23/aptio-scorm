@@ -52,13 +52,16 @@ export class GeneracionesService {
     return aDto(await this.generacion(u, id));
   }
 
-  /** Resultado completo de una etapa terminada (CP-038: ideas clave con página y acta de omitidos). */
+  /**
+   * Resultado completo de una etapa terminada (CP-038: ideas clave con página y acta de omitidos). Una etapa en curso
+   * devuelve su avance si lo guarda (CP-043: las pantallas listas de la etapa 4).
+   */
   async etapa(u: UsuarioSesion, id: string, etapa: string): Promise<EtapaResultadoDto> {
     const g = await this.generacion(u, id);
     const e = g.etapas.find((x) => x.etapa === etapa);
     if (!e) throw new NotFoundException('Etapa no encontrada');
     const dto = aDto({ ...g, etapas: [e] }).etapas[0]!;
-    return { ...dto, datos: e.estado === 'COMPLETADO' ? ((e.detalle as { datos?: unknown } | null)?.datos ?? null) : null };
+    return { ...dto, datos: e.estado === 'COMPLETADO' || e.estado === 'EN_CURSO' ? ((e.detalle as { datos?: unknown } | null)?.datos ?? null) : null };
   }
 
   /** Comprueba el acceso; lo usa el flujo de eventos antes de suscribirse. */

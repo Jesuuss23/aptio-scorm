@@ -115,19 +115,31 @@ const TEXTO_ZONA: Record<string, string> = {
   botones: 'Mito · Realidad', ideas: 'Ideas', numero: '01', puntaje: '90 %', estrellas: '★★★', insignia: 'Insignia', boton: 'Continuar',
 };
 
-/** Pinta las zonas en porcentaje del lienzo con los colores del kit; mismo cálculo que hará el reproductor. */
-export function Miniatura({ definicion, dispositivo }: { definicion: DefinicionModelo; dispositivo: Dispositivo }) {
+/** Un texto del mismo color que el fondo no se lee: pasa al color de fondo (o al de texto si el fondo es el claro). */
+const legible = (color: RolColor, fondo: RolColor): RolColor => (color !== fondo ? color : fondo === 'fondo' ? 'texto' : 'fondo');
+
+/**
+ * Pinta las zonas en porcentaje del lienzo con los colores del kit; mismo cálculo que hará el reproductor. Con
+ * `contenido`, cada zona muestra lo que la IA puso en ella (HU-0406) en lugar del nombre de la zona.
+ */
+export function Miniatura({ definicion, dispositivo, fondo, contenido }: {
+  definicion: DefinicionModelo; dispositivo: Dispositivo; fondo?: RolColor; contenido?: (zona: string) => string | null;
+}) {
+  const color = fondo ?? definicion.fondo;
   return (
-    <div className={`miniatura ${dispositivo}`} style={{ background: `var(--k-${definicion.fondo})` }} aria-hidden="true">
-      {definicion[dispositivo].map((z) => (
-        <span
-          key={z.zona}
-          className={`zona zona-${z.tamano ?? 'sm'} zona-${z.alineacion ?? 'inicio'}`}
-          style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.ancho}%`, height: `${z.alto}%`, color: `var(--k-${z.color ?? 'texto'})` }}
-        >
-          {TEXTO_ZONA[z.zona] ?? z.zona}
-        </span>
-      ))}
+    <div className={`miniatura ${dispositivo}`} style={{ background: `var(--k-${color})` }} aria-hidden="true">
+      {definicion[dispositivo].map((z) => {
+        const texto = contenido ? contenido(z.zona) : null;
+        return (
+          <span
+            key={z.zona}
+            className={`zona zona-${z.tamano ?? 'sm'} zona-${z.alineacion ?? 'inicio'}${texto ? ' llena' : ''}`}
+            style={{ left: `${z.x}%`, top: `${z.y}%`, width: `${z.ancho}%`, height: `${z.alto}%`, color: `var(--k-${legible(z.color ?? 'texto', color)})` }}
+          >
+            {texto ?? TEXTO_ZONA[z.zona] ?? z.zona}
+          </span>
+        );
+      })}
     </div>
   );
 }
