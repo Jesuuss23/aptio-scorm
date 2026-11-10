@@ -82,11 +82,34 @@ function estructuraLoto() {
   return { ...e, actividades: { minimas: 12, total: 12 } };
 }
 
+/**
+ * Resultado de la etapa 3: el storyboard LOTO con la actividad de p05 y p08 (las que agrega estructuraLoto) y un texto
+ * largo en p05 para ver la advertencia de CP-040 (34 palabras en pantalla).
+ */
+function guionLoto() {
+  const leer = (f: string) => JSON.parse(readFileSync(new URL(`../../../packages/ai/casos/loto/salidas/${f}`, import.meta.url), 'utf8'));
+  const s = leer('03-IA-05-storyboard.json') as { capsulaId: string; pantallas: { id: string; textoPantalla: string; narracion: string; origen: Record<string, unknown> }[] };
+  const e = estructuraLoto().modulos[0]!.capsulas[0]!.pantallas;
+  const largo = 'Antes de abrir el tablero mira cada fuente: luz, agua, aire, gas, peso y calor. Pon tu candado y tu tarjeta, y prueba que el equipo no arranque. Si dudas, llama a tu jefe.';
+  const contar = (t: string) => t.split(/\s+/).filter((x) => /[\p{L}\p{N}]/u.test(x)).length;
+  const pantallas = s.pantallas.map((p, i) => {
+    const textoPantalla = p.id === 'p05' ? largo : p.textoPantalla;
+    const actividad = p.id === 'p05' ? { actividad: { tipo: 'INT-04', consigna: 'Voltea cada tarjeta y descubre la fuente de energía.' } }
+      : p.id === 'p08' ? { actividad: { tipo: 'INT-02', consigna: 'Clasifica cada práctica como segura o riesgosa.' } } : {};
+    const origen = p.origen.tipo === 'documento' ? { ...p.origen, documentoId: '00000000-0000-4000-8000-000000000900', archivo: 'PETS-SEG-014 Bloqueo y etiquetado.pdf' } : p.origen;
+    return { ...p, ...actividad, textoPantalla, origen, tipo: e[i]!.tipo, palabras: { textoPantalla: contar(textoPantalla), narracion: contar(p.narracion) } };
+  });
+  return {
+    capsulas: [{ id: s.capsulaId, moduloId: 'mod-1', titulo: { es: 'Bloqueo y etiquetado' }, pantallas }],
+    advertencias: [{ pantallaId: 'p05', campo: 'textoPantalla', palabras: contar(largo), limite: 30 }],
+  };
+}
+
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
 const ETAPAS_SIMULADAS = [
   { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
   { detalle: '3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad', costoUsd: 0.1 },
-  { detalle: '30 pantallas con texto corto en pantalla y narración', costoUsd: 0.45 },
+  { detalle: '30 pantallas con texto en pantalla y narración · 1 pantalla supera 30 palabras en pantalla', costoUsd: 0.45 },
 ];
 
 /** CP-033: el manual de ejemplo tiene 84 páginas y la 42 está escaneada; un archivo «inyeccion» trae una orden para la IA (CP-102). */
@@ -308,7 +331,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (etapaDe) {
       const e = generaciones.find((x) => x.id === etapaDe[1])?.etapas.find((x) => x.etapa === etapaDe[2]);
       if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Etapa no encontrada' });
-      const datos = e.estado !== 'COMPLETADO' ? null : e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : e.etapa === 'OBJETIVOS_ESTRUCTURA' ? estructuraLoto() : null;
+      const datos = e.estado !== 'COMPLETADO' ? null : e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : e.etapa === 'OBJETIVOS_ESTRUCTURA' ? estructuraLoto() : e.etapa === 'STORYBOARD_GUION' ? guionLoto() : null;
       return responder(200, { ...e, datos });
     }
     const unaGeneracion = ruta.match(/^\/generaciones\/([0-9a-f-]+)(?:\/(cancelar|continuar))?$/);
