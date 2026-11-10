@@ -6,6 +6,7 @@ import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
 import { ClienteDetalle } from './vistas/ClienteDetalle';
 import { Clientes } from './vistas/Clientes';
+import { EditorVista } from './vistas/EditorVista';
 import { NuevoScorm } from './vistas/NuevoScorm';
 import { ProyectoDetalle } from './vistas/ProyectoDetalle';
 import { Proyectos } from './vistas/Proyectos';
@@ -69,6 +70,8 @@ export function App() {
         <VistaPrevia key={vista.id} proyectoId={vista.id!} alCargar={alCargar} />
       ) : vista?.sub === 'revision' ? (
         <RevisionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
+      ) : vista?.sub === 'editor' ? (
+        <EditorVista key={vista.id} proyectoId={vista.id!} pantallaId={new URLSearchParams(busqueda).get('pantalla')} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' && vista.id ? (
         <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' ? (

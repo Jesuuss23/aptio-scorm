@@ -608,11 +608,23 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
-      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; narracion?: { es: string } };
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string } };
       historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
-      if (datos.titulo) p.titulo = { es: datos.titulo.es.trim() };
+      // Como la API: el título también cambia su bloque, y cada texto cambia el suyo (HU-0601).
+      type BloqueSim = { id: string; tipo: string; rol?: string; contenido?: { es: string } };
+      const bloques = (p as unknown as { bloques: BloqueSim[] }).bloques;
+      if (datos.titulo) {
+        p.titulo = { es: datos.titulo.es.trim() };
+        const b = bloques.find((x) => x.tipo === 'texto' && x.rol === 'titulo');
+        if (b) b.contenido = { es: datos.titulo.es.trim() };
+      }
+      for (const [id, valor] of Object.entries(datos.textos ?? {})) {
+        const b = bloques.find((x) => x.id === id && x.tipo === 'texto');
+        if (!b) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el texto «${id}»` });
+        b.contenido = { es: valor.es.trim() };
+      }
       const cambiaVoz = Boolean(datos.narracion && p.narracion && datos.narracion.es.trim() !== p.narracion.texto.es);
       if (datos.narracion && p.narracion) p.narracion.texto = { es: datos.narracion.es.trim() };
       p.estado = 'borrador';

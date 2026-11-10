@@ -10,7 +10,7 @@ export const MENU: GrupoMenu[] = [
 ];
 
 /** Vista a partir de la ruta: grupo de la ruta, nombre, ítem activo del menú y parámetro. */
-export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' } | null {
+export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' } | null {
   if (camino === '/') return { grupo: 'Inicio', nombre: 'Proyectos', activo: '/' };
   if (camino === '/nuevo') return { grupo: 'Inicio', nombre: 'Nuevo SCORM', activo: '/nuevo' };
   const proyecto = camino.match(/^\/proyectos\/([0-9a-f-]{36})$/i);
@@ -19,6 +19,8 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (vistaPrevia) return { grupo: 'Inicio', nombre: 'Vista previa', activo: '/', id: vistaPrevia[1]!, sub: 'vista-previa' };
   const revision = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/revision$/i);
   if (revision) return { grupo: 'Inicio', nombre: 'Revisión', activo: '/', id: revision[1]!, sub: 'revision' };
+  const editor = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/editor$/i);
+  if (editor) return { grupo: 'Inicio', nombre: 'Editor', activo: '/', id: editor[1]!, sub: 'editor' };
   if (camino === '/clientes') return { grupo: 'Empresa', nombre: 'Clientes y kits', activo: '/clientes' };
   const cliente = camino.match(/^\/clientes\/([0-9a-f-]{36})$/i);
   if (cliente) return { grupo: 'Empresa', nombre: 'Cliente', activo: '/clientes', id: cliente[1]! };
