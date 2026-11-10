@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { tareaRegistrada } from '../src/ia.js';
 
 const baseLista = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
-const variables = { cliente: { nombre: 'Minera Andina' }, documento: { id: 'd', nombre: 'm.pdf', rango: '1-2', texto_por_pagina: 'x' } };
+const variables = { cliente: { nombre: 'Minera Andina' }, documento: { id: 'doc-1', nombre: 'm.pdf', rango: '1-2', texto_por_pagina: 'x' } };
 
 describe.skipIf(!baseLista && !process.env.CI)('registro de trabajos de IA', () => {
   const sufijo = Math.random().toString(36).slice(2, 8);
@@ -27,7 +27,7 @@ describe.skipIf(!baseLista && !process.env.CI)('registro de trabajos de IA', () 
       completar: async (p) => ({ ...(await base.completar(p)), modelo: 'claude-opus-5-5', consumo: { tokensEntrada: 12_000, tokensSalida: 2_500, tokensCacheLeidos: 0, tokensCacheEscritos: 0 } }),
     };
     const r = await tareaRegistrada(prisma, { organizacionId: orgId }, proveedor, 'IA-01', variables);
-    expect(r.datos).toEqual(leerSalidaSimulada('IA-01').datos);
+    expect(r.datos).toEqual({ ...(leerSalidaSimulada('IA-01').datos as object), documentoId: 'doc-1' });
     const t = await prisma.trabajoIA.findUniqueOrThrow({ where: { id: r.trabajoId } });
     expect(t).toMatchObject({
       tarea: 'IA-01', tipo: 'TEXTO', proveedor: 'anthropic', modelo: 'claude-opus-5-5', versionPrompt: 'IA-01.v1', estado: 'COMPLETADO',

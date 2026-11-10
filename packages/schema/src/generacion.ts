@@ -27,3 +27,52 @@ export const ACTIVOS: readonly EstadoTrabajo[] = ['EN_COLA', 'EN_CURSO'];
 export const TAREA_GENERAR = 'GENERAR';
 /** Detalle de una etapa cuyo ejecutor aún no existe (se habilita en sprints siguientes). */
 export const DETALLE_PROXIMAMENTE = 'Se habilita en un sprint siguiente';
+
+// ---------- Etapa 1 · Leer y resumir (HU-0402) ----------
+
+export type DecisionTema = 'conservar' | 'complementario' | 'omitir';
+
+/** Tema del mapa (IA-01) con la decisión propuesta (IA-02) y el material de donde sale. */
+export interface TemaMaterial {
+  id: string;
+  materialId: string;
+  titulo: string;
+  resumen: string;
+  paginas: number[];
+  peso: number;
+  tipoContenido: string;
+  decision: DecisionTema;
+  motivo: string;
+}
+
+/** Idea clave (fragmento de IA-03) con su origen: archivo y páginas (CP-038). */
+export interface IdeaClave {
+  id: string;
+  temaId: string;
+  materialId: string;
+  archivo: string;
+  texto: string;
+  paginas: number[];
+  tipo: 'idea' | 'dato' | 'paso' | 'ejemplo' | 'advertencia' | 'definicion';
+  literal: boolean;
+}
+
+export interface ActaOmitidos {
+  titulo: string;
+  temas: { temaId: string; titulo: string; paginas: number[]; motivo: string }[];
+  /** Markdown para el cliente. Es una propuesta: el diseñador la revisa antes de enviarla. */
+  textoActa: string;
+}
+
+/** Lo que guarda la etapa RESUMEN_MATERIAL y recibe la etapa 2. */
+export interface ResumenMaterial {
+  /** Tema escrito por el equipo cuando no hay documento (o además de él). */
+  tema: string | null;
+  documentos: { materialId: string; nombre: string; totalPaginas: number }[];
+  temas: TemaMaterial[];
+  metaMinutos: number | null;
+  minutosEstimados: number | null;
+  ideas: IdeaClave[];
+  acta: ActaOmitidos | null;
+  observaciones: string[];
+}

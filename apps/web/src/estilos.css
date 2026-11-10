@@ -680,3 +680,62 @@
     align-items: center;
   }
 }
+
+/* HU-0402 · Resultado de la etapa 1: temas, ideas clave con página y acta. */
+.etapa-ver {
+  grid-column: 2 / -1;
+  justify-self: start;
+}
+.etapa-resultado {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.resumen-material {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 8px;
+}
+.resumen-material h3 {
+  margin: 0 0 8px;
+  font-size: var(--titulo-panel);
+}
+.lista-temas,
+.ideas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tema-material {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid var(--color-borde);
+  padding-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.ideas {
+  gap: 6px;
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-borde);
+}
+.ideas > li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.acta {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--fuente-ui);
+  font-size: var(--texto-base);
+  background: var(--color-suave);
+  border-radius: var(--radio-control);
+  padding: 12px;
+}

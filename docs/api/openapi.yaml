@@ -1467,6 +1467,52 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /generaciones/{generacionId}/etapas/{etapa}:
+    get:
+      tags:
+      - Generación
+      summary: Ver el resultado de una etapa
+      operationId: get_generaciones_generacionId_etapas_etapa
+      description: >-
+        La etapa con lo que guardó al terminar (`datos`; null si no terminó). En RESUMEN_MATERIAL, `datos` es un
+        ResumenMaterial: temas con decisión y motivo, ideas clave con archivo y página, y el acta de omitidos (CP-038).
+      parameters:
+      - name: generacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: etapa
+        in: path
+        required: true
+        schema:
+          type: string
+          enum:
+          - RESUMEN_MATERIAL
+          - OBJETIVOS_ESTRUCTURA
+          - STORYBOARD_GUION
+          - PANTALLAS
+          - ILUSTRACIONES
+          - VOZ_ES
+          - BOCA
+          - SUBTITULOS
+          - VERSION_EN
+          - CONTROL_CALIDAD
+          - PAQUETE
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EtapaResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /generaciones/{generacionId}/cancelar:
     post:
       tags:
@@ -4026,6 +4072,141 @@ components:
           nullable: true
         costoUsd:
           type: number
+    EtapaResultado:
+      allOf:
+      - $ref: '#/components/schemas/Etapa'
+      - type: object
+        properties:
+          datos:
+            type: object
+            nullable: true
+            description: Lo que guardó la etapa. En RESUMEN_MATERIAL, un ResumenMaterial; las demás etapas definen el suyo.
+            anyOf:
+            - $ref: '#/components/schemas/ResumenMaterial'
+            - type: object
+    ResumenMaterial:
+      type: object
+      description: Resultado de la etapa 1 (HU-0402). Todo es propuesta de la IA para que el diseñador decida.
+      required:
+      - documentos
+      - temas
+      - ideas
+      properties:
+        tema:
+          type: string
+          nullable: true
+          description: Tema escrito por el equipo cuando no hay documento
+        documentos:
+          type: array
+          items:
+            type: object
+            properties:
+              materialId:
+                type: string
+                format: uuid
+              nombre:
+                type: string
+              totalPaginas:
+                type: integer
+        temas:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              materialId:
+                type: string
+                format: uuid
+              titulo:
+                type: string
+              resumen:
+                type: string
+              paginas:
+                type: array
+                items:
+                  type: integer
+              peso:
+                type: integer
+                minimum: 1
+                maximum: 5
+              tipoContenido:
+                type: string
+              decision:
+                type: string
+                enum:
+                - conservar
+                - complementario
+                - omitir
+              motivo:
+                type: string
+        metaMinutos:
+          type: number
+          nullable: true
+        minutosEstimados:
+          type: number
+          nullable: true
+        ideas:
+          type: array
+          description: Ideas clave (fragmentos de IA-03), cada una con archivo y páginas de origen
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              temaId:
+                type: string
+              materialId:
+                type: string
+                format: uuid
+              archivo:
+                type: string
+              texto:
+                type: string
+              paginas:
+                type: array
+                items:
+                  type: integer
+              tipo:
+                type: string
+                enum:
+                - idea
+                - dato
+                - paso
+                - ejemplo
+                - advertencia
+                - definicion
+              literal:
+                type: boolean
+        acta:
+          type: object
+          nullable: true
+          description: Acta de temas omitidos (IA-13), propuesta para revisar antes de enviarla al cliente
+          properties:
+            titulo:
+              type: string
+            temas:
+              type: array
+              items:
+                type: object
+                properties:
+                  temaId:
+                    type: string
+                  titulo:
+                    type: string
+                  paginas:
+                    type: array
+                    items:
+                      type: integer
+                  motivo:
+                    type: string
+            textoActa:
+              type: string
+              description: Markdown
+        observaciones:
+          type: array
+          items:
+            type: string
     Generacion:
       type: object
       required:
