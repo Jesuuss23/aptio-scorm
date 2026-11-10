@@ -10,7 +10,7 @@ import type { Redis } from 'ioredis';
 import { crearGenerador, type EjecutorEtapa } from '../src/generar.js';
 
 export const baseLista = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
-const AI = dirname(createRequire(import.meta.url).resolve('@aptio/ai/package.json'));
+export const AI = dirname(createRequire(import.meta.url).resolve('@aptio/ai/package.json'));
 export const leerCaso = (archivo: string): unknown => JSON.parse(readFileSync(join(AI, 'casos/loto/salidas', archivo), 'utf8'));
 
 /** El manual LOTO del caso de referencia: 30 páginas marcadas como [p. N]. */

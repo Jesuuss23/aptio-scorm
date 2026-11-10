@@ -60,12 +60,12 @@ export class CursosService {
     }));
   }
 
-  /** HU-0701 · Narraciones del curso en el orden de las pantallas, con su audio firmado por 15 minutos. */
+  /** HU-0701 · Narraciones del curso en el orden de las pantallas, con su audio (y sus subtítulos, HU-0801) firmados por 15 minutos. */
   async narraciones(u: UsuarioSesion, cursoId: string, f: FiltroNarracionesDto): Promise<NarracionDto[]> {
     const c = await this.buscar(u, cursoId);
     const filas = await this.bd.narracion.findMany({ where: { cursoId, ...(f.idioma ? { idioma: f.idioma } : {}) } });
     const recursos = await this.bd.recurso.findMany({
-      where: { id: { in: filas.flatMap((n) => (n.audioRecursoId ? [n.audioRecursoId] : [])) }, organizacionId: c.organizacionId },
+      where: { id: { in: filas.flatMap((n) => [n.audioRecursoId, n.subtituloRecursoId].filter((x): x is string => Boolean(x))) }, organizacionId: c.organizacionId },
       select: { id: true, claveS3: true, duracionMs: true, nombre: true },
     });
     const orden = pantallasDe(c.documento as unknown as CursoDoc);
@@ -74,12 +74,14 @@ export class CursosService {
     filas.sort((a, b) => (posicion.get(a.pantallaId) ?? 1e9) - (posicion.get(b.pantallaId) ?? 1e9) || a.idioma.localeCompare(b.idioma));
     return Promise.all(filas.map(async (n) => {
       const r = recursos.find((x) => x.id === n.audioRecursoId);
+      const vtt = n.subtituloRecursoId ? recursos.find((x) => x.id === n.subtituloRecursoId) : undefined;
       const texto = textos.get(n.pantallaId)?.[n.idioma as 'es' | 'en'];
       return {
         pantallaId: n.pantallaId, idioma: n.idioma, origen: n.origen, estado: n.estado,
         ...(texto ? { texto } : {}), ...(n.voz ? { voz: n.voz } : {}),
         ...(r?.duracionMs ? { duracionS: Math.round(r.duracionMs / 100) / 10 } : {}),
         ...(r ? { audioUrl: await this.almacenes.almacen.urlDescarga(r.claveS3, r.nombre) } : {}),
+        ...(vtt ? { subtitulosUrl: await this.almacenes.almacen.urlDescarga(vtt.claveS3, vtt.nombre) } : {}),
       };
     }));
   }

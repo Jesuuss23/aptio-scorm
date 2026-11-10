@@ -38,7 +38,7 @@ export class GeneracionesController {
   @Roles(...EQUIPO)
   @ApiTags('Personaje y voz')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiAcceptedResponse({ type: RegeneracionDto, description: 'HU-0703: continúa las etapas 6 y 7 de la última generación. 409 GENERACION_ACTIVA, 422 SIN_VOZ o IDIOMA_NO_DISPONIBLE' })
+  @ApiAcceptedResponse({ type: RegeneracionDto, description: 'HU-0703: continúa las etapas 6 a 8 (voz, boca y subtítulos) de la última generación. 409 GENERACION_ACTIVA, 422 SIN_VOZ o IDIOMA_NO_DISPONIBLE' })
   regenerar(@UsuarioActual() u: UsuarioSesion, @Param('cursoId', ParseUUIDPipe) id: string, @Body() dto: NarracionSolicitudDto): Promise<RegeneracionDto> {
     return this.generaciones.regenerarNarraciones(u, id, dto);
   }

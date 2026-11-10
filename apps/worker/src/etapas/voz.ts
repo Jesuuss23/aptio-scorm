@@ -20,7 +20,7 @@ export const INTENTOS_VOZ = 3;
 const PROVEEDORES = ['google'];
 
 type VozDoc = { proveedor: string; voz: string; velocidad?: number };
-type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown };
+type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown; subtitulosId?: string };
 type PantallaDoc = { id: string; titulo: { es?: string }; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } } };
 type RecursoDoc = { id: string; tipo: string; idioma?: string };
 type CursoDoc = { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[]; recursos: RecursoDoc[] };
@@ -164,8 +164,8 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         ctx.bd.narracion.upsert({
           where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma: 'es' } },
           create: { cursoId: curso.id, pantallaId: p.id, idioma: 'es', textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, estado: 'ACTUALIZADA' },
-          // Un audio nuevo deja sin boca a la narración: la etapa 7 la calcula de nuevo (HU-0702).
-          update: { textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, bocas: Prisma.DbNull, estado: 'ACTUALIZADA' },
+          // Un audio nuevo deja sin boca ni subtítulos a la narración: las etapas 7 y 8 los rehacen (HU-0702, HU-0801).
+          update: { textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, bocas: Prisma.DbNull, subtituloRecursoId: null, estado: 'ACTUALIZADA' },
         }),
       ]);
       listas.set(p.id, { ...base, duracionMs, recursoId, mime: audio.mime });
@@ -183,12 +183,16 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         const n = listas.get(p.id);
         const es = p.narracion?.porIdioma.es;
         if (!n || !es || p.narracion!.texto.es?.trim() !== n.texto) continue;
-        // Con otro audio, las marcas de boca anteriores ya no sirven (las recalcula la etapa 7).
-        if (es.recursoAudioId !== n.recursoId) delete es.bocas;
+        // Con otro audio, la boca y los subtítulos anteriores ya no sirven (los rehacen las etapas 7 y 8) y la narración
+        // vuelve a «pendiente»: el esquema exige audio, boca y subtítulos para «generado».
+        if (es.recursoAudioId !== n.recursoId) {
+          delete es.bocas;
+          delete es.subtitulosId;
+          es.estado = 'pendiente';
+        }
         es.recursoAudioId = n.recursoId;
         es.duracionMs = n.duracionMs;
         es.hashTexto = n.hash;
-        // Queda «pendiente» hasta tener boca (HU-0702) y subtítulos (HU-0801): el esquema exige los tres para «generado».
         usados.add(n.recursoId);
       }
       const otros = doc.recursos.filter((r) => !(r.tipo === 'audio' && r.idioma === 'es'));

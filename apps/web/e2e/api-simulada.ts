@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
+import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
 import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
 import { DISPOSICIONES, modeloBase } from '@aptio/schema/marca';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
@@ -51,6 +52,16 @@ export interface OpcionesSimulacion {
   generacion?: 'normal' | 'lenta' | 'falla' | 'ajena';
   /** HU-0703 · Narraciones «Por regenerar» (p. ej. las 4 con «pasos», SUP-36) hasta que se regeneran. */
   porRegenerar?: string[];
+}
+
+/** HU-0801 · El WebVTT de cada narración del curso, por id de recurso, como lo escribe la etapa 8 (SUP-37). */
+export function subtitulosDe(documento: Record<string, unknown>): Record<string, string> {
+  type P = { narracion?: { texto: { es: string }; porIdioma?: { es?: { duracionMs?: number; subtitulosId?: string } } } };
+  const pantallas = (documento.modulos as { capsulas: { pantallas: P[] }[] }[]).flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
+  return Object.fromEntries(pantallas.flatMap((p) => {
+    const es = p.narracion?.porIdioma?.es;
+    return es?.subtitulosId && es.duracionMs ? [[es.subtitulosId, aVtt(subtitulosDeNarracion(p.narracion!.texto.es, es.duracionMs))]] : [];
+  }));
 }
 
 /** Resultado de la etapa 1 armado con las salidas grabadas del caso LOTO (como lo guarda el worker). */
@@ -172,6 +183,7 @@ const ETAPAS_SIMULADAS: Record<string, { detalle: string; costoUsd: number }> = 
   VOZ_ES: { detalle: '30 narraciones listas · 2 min 10 s de audio · voz es-US-Neural2-A', costoUsd: 0.03 },
   // HU-0702: la boca se calcula en el worker, sin costo (SUP-35).
   BOCA: { detalle: '30 narraciones con boca sincronizada · simulada por letras', costoUsd: 0 },
+  SUBTITULOS: { detalle: '30 narraciones con subtítulos sincronizados · WebVTT en español', costoUsd: 0 },
 };
 /** Pantallas que la etapa 4 deja listas en cada consulta (y narraciones, la etapa 6). */
 const PANTALLAS_POR_CONSULTA = 10;
@@ -487,8 +499,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (['EN_COLA', 'EN_CURSO'].includes(g.estado)) return responder(409, { codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
       const pendientes = porRegenerar.size;
       porRegenerar.clear();
-      // Como el worker: arranca por la 6 (la 5 sigue en espera, sin ejecutor) y después la 7.
-      for (const e of g.etapas.filter((x) => x.etapa === 'VOZ_ES' || x.etapa === 'BOCA')) Object.assign(e, { estado: e.etapa === 'VOZ_ES' ? 'EN_CURSO' : 'EN_COLA', detalle: null });
+      // Como el worker: arranca por la 6 (la 5 sigue en espera, sin ejecutor) y después la 7 y la 8 (HU-0801).
+      for (const e of g.etapas.filter((x) => ['VOZ_ES', 'BOCA', 'SUBTITULOS'].includes(x.etapa))) Object.assign(e, { estado: e.etapa === 'VOZ_ES' ? 'EN_CURSO' : 'EN_COLA', detalle: null });
       g.estado = 'EN_CURSO';
       estadoDe(g.proyectoId, 'GENERANDO');
       return responder(202, { id: g.id, estado: g.estado, eventos: `/api/v1/generaciones/${g.id}/eventos`, pendientes });
@@ -503,7 +515,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         .filter((r) => r.tipo === 'audio').map((r) => [r.id, `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
       return responder(200, {
         id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version, documento: revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z',
-        urlsRecursos, svgPersonajes: { 'svg-ana': ANA_SVG },
+        urlsRecursos, svgPersonajes: { 'svg-ana': ANA_SVG }, subtitulos: subtitulosDe(revision.documento),
       });
     }
     // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).

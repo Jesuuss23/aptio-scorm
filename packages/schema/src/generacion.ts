@@ -291,6 +291,14 @@ export interface BocaCurso {
   metodo: 'rhubarb' | 'simulado';
 }
 
+/** HU-0801 · Resultado de la etapa 8: subtítulos WebVTT por narración (SUP-37). */
+export interface SubtitulosCurso {
+  total: number;
+  listas: number;
+  cursoId: string;
+  idioma: 'es' | 'en';
+}
+
 /** «4 min 12 s» a partir de milisegundos. */
 export function duracionLegible(ms: number): string {
   const s = Math.round(ms / 1000);

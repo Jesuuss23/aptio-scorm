@@ -63,4 +63,5 @@ export class NarracionDto {
   @ApiPropertyOptional() voz?: string;
   @ApiProperty({ enum: ['ACTUALIZADA', 'DESACTUALIZADA', 'GENERANDO', 'ERROR'] }) estado: string;
   @ApiPropertyOptional({ format: 'uri' }) audioUrl?: string;
+  @ApiPropertyOptional({ format: 'uri', description: 'HU-0801 · WebVTT de la narración (URL firmada de 15 minutos)' }) subtitulosUrl?: string;
 }

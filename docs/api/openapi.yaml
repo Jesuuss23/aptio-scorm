@@ -1612,7 +1612,7 @@ paths:
       - Curso
       summary: Ver documento del curso
       operationId: get_proyectos_proyectoId_curso
-      description: ETag = versión. Lo lee la vista previa con el reproductor único (HU-1101); 404 si aún no se generaron las pantallas. Incluye `urlsRecursos` (audios firmados) y `svgPersonajes` para escuchar la narración con la boca sincronizada (HU-0702).
+      description: ETag = versión. Lo lee la vista previa con el reproductor único (HU-1101); 404 si aún no se generaron las pantallas. Incluye `urlsRecursos` (audios firmados) y `svgPersonajes` para escuchar la narración con la boca sincronizada (HU-0702), y `subtitulos` con el WebVTT de cada narración (HU-0801).
       parameters:
       - name: proyectoId
         in: path
@@ -2262,7 +2262,7 @@ paths:
       summary: Regenerar narraciones
       operationId: post_cursos_cursoId_narraciones_regenerar
       description: >-
-        HU-0703. Continúa las etapas 6 (Voz en español) y 7 (Boca del personaje) de la última generación del proyecto;
+        HU-0703. Continúa las etapas 6 (Voz en español), 7 (Boca del personaje) y 8 (Subtítulos, HU-0801) de la última generación del proyecto;
         el avance se sigue con `eventos`. Por defecto mira solo las DESACTUALIZADA. El worker decide por el hash RN-07-1:
         una narración cuyo texto, voz, velocidad y pronunciación no cambiaron vuelve a «Lista» sin pedir otra voz.
         Con `pantallaIds` y `soloDesactualizadas: false` pide una toma nueva de esas pantallas aunque nada haya
@@ -2284,7 +2284,7 @@ paths:
               $ref: '#/components/schemas/NarracionSolicitud'
       responses:
         '202':
-          description: Generación continuada con las etapas 6 y 7 en cola
+          description: Generación continuada con las etapas 6 a 8 en cola
           content:
             application/json:
               schema:
@@ -4716,6 +4716,11 @@ components:
           description: HU-0702 · SVG saneado de cada personaje que usa el curso, por id de recurso, para dibujarlo en línea y animar su boca sin depender del CORS del almacenamiento. Solo en GET /proyectos/{proyectoId}/curso.
           additionalProperties:
             type: string
+        subtitulos:
+          type: object
+          description: HU-0801 · Texto WebVTT de cada narración del curso, por id de recurso de subtítulos (SUP-37), para que la vista previa lo lea sin depender del CORS del almacenamiento. Solo en GET /proyectos/{proyectoId}/curso.
+          additionalProperties:
+            type: string
     CursoEntrada:
       type: object
       required:
@@ -5079,6 +5084,7 @@ components:
         subtitulosUrl:
           type: string
           format: uri
+          description: HU-0801 · WebVTT de la narración (etapa 8), URL firmada de 15 minutos.
     NarracionSolicitud:
       type: object
       properties:

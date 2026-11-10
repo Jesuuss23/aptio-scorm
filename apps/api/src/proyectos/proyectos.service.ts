@@ -130,23 +130,28 @@ export class ProyectosService {
     // el SVG (ya saneado al subirlo) en la respuesta, para no depender del CORS del almacenamiento.
     const doc = c.documento as { recursos?: { id: string; tipo: string }[]; modulos?: { capsulas: { pantallas: { bloques: { tipo: string; recursoId?: string }[] }[] }[] }[] };
     const audios = (doc.recursos ?? []).filter((r) => r.tipo === 'audio').map((r) => r.id);
+    // HU-0801 · Los WebVTT van como texto, igual que el SVG: son pocos KB y el reproductor los lee sin CORS (SUP-37).
+    const vtts = (doc.recursos ?? []).filter((r) => r.tipo === 'subtitulos').map((r) => r.id);
     const personajes = [...new Set((doc.modulos ?? []).flatMap((m) => m.capsulas.flatMap((x) => x.pantallas.flatMap((p) => p.bloques.filter((b) => b.tipo === 'personaje' && b.recursoId).map((b) => b.recursoId!)))))];
     const recursos = await this.bd.recurso.findMany({
-      where: { id: { in: [...audios, ...personajes].filter((x) => /^[0-9a-f-]{36}$/i.test(x)) }, organizacionId: c.organizacionId },
+      where: { id: { in: [...audios, ...personajes, ...vtts].filter((x) => /^[0-9a-f-]{36}$/i.test(x)) }, organizacionId: c.organizacionId },
       select: { id: true, claveS3: true, nombre: true, mime: true },
     });
     const urlsRecursos: Record<string, string> = {};
     const svgPersonajes: Record<string, string> = {};
+    const subtitulos: Record<string, string> = {};
     await Promise.all(recursos.map(async (r) => {
       if (personajes.includes(r.id) && r.mime === 'image/svg+xml') {
         svgPersonajes[r.id] = new TextDecoder().decode(await this.almacenes.almacen.leer(r.claveS3));
       } else if (audios.includes(r.id)) {
         urlsRecursos[r.id] = await this.almacenes.almacen.urlDescarga(r.claveS3, r.nombre);
+      } else if (vtts.includes(r.id) && r.mime === 'text/vtt') {
+        subtitulos[r.id] = new TextDecoder().decode(await this.almacenes.almacen.leer(r.claveS3));
       }
     }));
     return {
       id: c.id, proyectoId: c.proyectoId, versionEsquema: c.versionEsquema, version: c.version,
-      documento: c.documento as Record<string, unknown>, actualizadoEn: c.actualizadoEn.toISOString(), urlsRecursos, svgPersonajes,
+      documento: c.documento as Record<string, unknown>, actualizadoEn: c.actualizadoEn.toISOString(), urlsRecursos, svgPersonajes, subtitulos,
     };
   }
 

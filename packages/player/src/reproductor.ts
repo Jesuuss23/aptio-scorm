@@ -4,11 +4,14 @@
 // «actividades obligatorias», Siguiente se deshabilita y dice por qué (RN-11-4, CP-086).
 // HU-0702 · Narración con boca sincronizada: «Escuchar narración» reproduce el audio de la pantalla y el personaje mueve
 // la boca según sus marcas (CP-072). Con «Siguiente se habilita al terminar la narración», se avanza al terminarla.
+// HU-0801 · Subtítulos: con «CC», mientras suena el audio se ve la frase del WebVTT que se está diciendo; en pausa o
+// sin audio, el texto completo de la narración. La preferencia se recuerda en el navegador (SUP-37).
 import { animarBoca, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
 import { aplanar, type Motivo, modoDe, motivoBloqueo } from './navegacion.ts';
 import { dibujarPantalla } from './pantalla.ts';
+import { type Cue, cueEn, leerVtt } from './subtitulos.ts';
 import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
 import { ESTILOS } from './estilos.ts';
 import { t, textos } from './textos.ts';
@@ -29,6 +32,8 @@ export interface OpcionesReproductor {
   urlRecurso?: (id: string) => string | undefined;
   /** El SVG del personaje como texto; por defecto se descarga de `urlRecurso`. */
   cargarSvg?: (id: string) => Promise<string | undefined>;
+  /** El WebVTT de una narración como texto (HU-0801); por defecto se descarga de `urlRecurso`. */
+  cargarSubtitulos?: (id: string) => Promise<string | undefined>;
   /** Modo revisión: se puede ir a cualquier pantalla y se ven los identificadores. */
   revision?: boolean;
   /** Id de la pantalla con la que empieza. */
@@ -79,7 +84,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   let maxima = 0;
   let vivo = true;
   let temarioAbierto = false;
-  let conSubtitulos = false;
+  let conSubtitulos = preferenciaSubtitulos();
   const vistas = new Set<string>();
   const resultados = new Map<string, ResultadoActividad>();
   const dibujadas = new Map<string, HTMLElement>();
@@ -95,6 +100,38 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     }
     return svgs.get(id)!;
   });
+  // ---------- Subtítulos (HU-0801) ----------
+  const vtts = new Map<string, Promise<Cue[]>>();
+  const cargarVtt = (id: string) => {
+    if (!vtts.has(id)) {
+      const texto = opciones.cargarSubtitulos
+        ? opciones.cargarSubtitulos(id)
+        : (() => { const url = urlRecurso(id); return url ? fetch(url).then((r) => (r.ok ? r.text() : undefined), () => undefined) : Promise.resolve(undefined); })();
+      vtts.set(id, texto.then((x) => (x ? leerVtt(x) : []), () => []));
+    }
+    return vtts.get(id)!;
+  };
+  let cues: Cue[] = [];
+  let siguiendo = 0;
+  /** Lo que dice «CC»: la frase del momento mientras suena; si no, el texto completo de la narración. */
+  const textoSubtitulos = () => {
+    const p = pantallas[actual]?.pantalla;
+    if (!p?.narracion) return '';
+    if (!audio.paused && !audio.ended && cues.length) return cueEn(cues, audio.currentTime * 1000)?.texto ?? '';
+    return t(p.narracion.texto, idioma);
+  };
+  const seguirSubtitulos = () => {
+    cancelAnimationFrame(siguiendo);
+    const paso = () => {
+      if (!vivo) return;
+      if (conSubtitulos) {
+        const x = textoSubtitulos();
+        if (subtitulos.textContent !== x) subtitulos.textContent = x;
+      }
+      if (!audio.paused && !audio.ended) siguiendo = requestAnimationFrame(paso);
+    };
+    paso();
+  };
   const audioDe = (i: number): AudioNarracion | undefined => pantallas[i]?.pantalla.narracion?.porIdioma?.[idioma];
   const urlAudio = (i: number) => {
     const id = audioDe(i)?.recursoAudioId;
@@ -116,6 +153,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     callar();
     detenerBoca = animarBoca(personaje, { ms: () => audio.currentTime * 1000, sonando: () => !audio.paused && !audio.ended }, () => audioDe(actual)?.bocas);
     refrescar();
+    seguirSubtitulos();
   });
   audio.addEventListener('pause', () => { callar(); refrescar(); });
   audio.addEventListener('ended', () => {
@@ -133,6 +171,10 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       audio.currentTime = 0;
     } else audio.removeAttribute('src');
     barraNarracion.hidden = !url;
+    cues = [];
+    const vttId = audioDe(actual)?.subtitulosId;
+    const indice = actual;
+    if (vttId) void cargarVtt(vttId).then((c) => { if (indice === actual) cues = c; });
   };
 
   const avance = () => {
@@ -151,7 +193,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const barraAvance = h('div', { class: 'ap-avance', role: 'progressbar', 'aria-label': tx.progreso, 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('i'));
   const porcentaje = h('span', { class: 'ap-porcentaje' });
   const botonTemario = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-expanded': 'false', onclick: () => { temarioAbierto = !temarioAbierto; refrescar(); } }, h('span', { 'aria-hidden': 'true' }, '☰ '), tx.temario);
-  const botonSubtitulos = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-pressed': 'false', onclick: () => { conSubtitulos = !conSubtitulos; refrescar(); } }, 'CC', h('span', { class: 'ap-oculto' }, ` ${tx.subtitulos}`));
+  const botonSubtitulos = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-pressed': 'false', onclick: () => { conSubtitulos = !conSubtitulos; recordarSubtitulos(conSubtitulos); refrescar(); } }, 'CC', h('span', { class: 'ap-oculto' }, ` ${tx.subtitulos}`));
   const temario = h('nav', { class: 'ap-temario', 'aria-label': tx.temario, hidden: true });
   const escena = h('div', { class: 'ap-escena' });
   const subtitulos = h('p', { class: 'ap-subtitulos', hidden: true });
@@ -229,7 +271,6 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   function refrescar() {
     if (!vivo) return;
     const e = estado();
-    const p = pantallas[actual]?.pantalla;
     barraAvance.setAttribute('aria-valuenow', String(e.progreso));
     (barraAvance.firstChild as HTMLElement).style.width = `${e.progreso}%`;
     porcentaje.textContent = `${e.progreso} %`;
@@ -243,7 +284,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     botonNarracion.textContent = sonando ? tx.pausar : tx.escuchar;
     botonSubtitulos.setAttribute('aria-pressed', String(conSubtitulos));
     subtitulos.hidden = !conSubtitulos;
-    subtitulos.textContent = p?.narracion ? t(p.narracion.texto, idioma) : '';
+    subtitulos.textContent = textoSubtitulos();
     botonTemario.setAttribute('aria-expanded', String(temarioAbierto));
     temario.hidden = !temarioAbierto;
     if (temarioAbierto) dibujarTemario();
@@ -310,10 +351,29 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     estado,
     destruir: () => {
       vivo = false;
+      cancelAnimationFrame(siguiendo);
       callar();
       audio.pause();
       dejarDeParpadear();
       sombra.replaceChildren();
     },
   };
+}
+
+// HU-0801 · La preferencia de subtítulos vive en el navegador del participante. Dentro de un LMS el almacenamiento puede
+// estar bloqueado: entonces empieza sin subtítulos y no se recuerda.
+const CLAVE_SUBTITULOS = 'aptio-subtitulos';
+function preferenciaSubtitulos(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(CLAVE_SUBTITULOS) === '1';
+  } catch {
+    return false;
+  }
+}
+function recordarSubtitulos(si: boolean) {
+  try {
+    globalThis.localStorage?.setItem(CLAVE_SUBTITULOS, si ? '1' : '0');
+  } catch {
+    // Sin almacenamiento, la preferencia dura lo que dure la página.
+  }
 }
