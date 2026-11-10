@@ -199,6 +199,9 @@ export async function ejecutarTarea<T = unknown>(
 function ajustarAlPedido(datos: unknown, pedido: string): unknown {
   const temaId = pedido.match(/temaId = "([^"]+)"/)?.[1];
   const pantallaId = pedido.match(/pantallaId = "([^"]+)"/)?.[1];
+  // IA-16 (HU-0504): una propuesta grabada por tipo de pedido.
+  const tipoPedido = pedido.match(/tipoPedido = "([^"]+)"/)?.[1];
+  if (Array.isArray(datos) && tipoPedido) return (datos as { tipo: string }[]).find((d) => d.tipo === tipoPedido) ?? datos[0];
   // IA-15 e IA-07: una salida por pantalla; si el caso no tiene esa pantalla, la primera del mismo tipo de actividad
   // (IA-07) o la primera, con el id pedido.
   if (Array.isArray(datos) && pantallaId) {

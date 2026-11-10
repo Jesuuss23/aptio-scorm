@@ -1,6 +1,7 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
+import type { OperacionPatch } from '@aptio/schema/patch';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 
 export interface Usuario {
@@ -279,6 +280,28 @@ export interface CambioResultado {
   estado?: string;
 }
 
+/** HU-0504 · Propuesta de la IA sobre una pantalla. `cambios` es el JSON Patch; las variantes van en `vistaPrevia`. */
+export interface Propuesta {
+  id: string;
+  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre';
+  pantallaId: string | null;
+  titulo: string;
+  descripcion: string;
+  cambios: OperacionPatch[];
+  vistaPrevia?: { nombre: string; disposicion: string; patch: OperacionPatch[] }[];
+  versionBase: number;
+  estado: 'PENDIENTE' | 'APLICADA' | 'DESCARTADA' | 'VENCIDA';
+  costoUsd: number;
+  creadoEn: string;
+}
+
+/** Un trabajo de la cola (GET /trabajos/{id}). */
+export interface TrabajoEstado {
+  id: string;
+  estado: EstadoTrabajo;
+  error: string | null;
+}
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -329,6 +352,14 @@ export const api = {
   editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; narracion?: TextoI18n }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
   aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),
+  // HU-0504 · Propuestas de la IA y Deshacer.
+  pedirPropuesta: (cursoId: string, datos: { tipo: Propuesta['tipo']; pantallaId: string; pedido?: string }) =>
+    pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json(datos)),
+  propuestas: (cursoId: string) => pedir<Propuesta[]>(`/cursos/${cursoId}/propuestas`),
+  aplicarPropuesta: (id: string, varianteIndice?: number) => pedir<CambioResultado>(`/propuestas/${id}/aplicar`, json(varianteIndice === undefined ? {} : { varianteIndice })),
+  descartarPropuesta: (id: string) => pedir<void>(`/propuestas/${id}/descartar`, { method: 'POST' }),
+  restaurarVersion: (cursoId: string, version: number) => pedir<{ version: number }>(`/cursos/${cursoId}/versiones/${version}/restaurar`, { method: 'POST' }),
+  trabajo: (id: string) => pedir<TrabajoEstado>(`/trabajos/${id}`),
   aprobarSinObservaciones: (cursoId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/aprobar`, json({ soloSinObservaciones: true })),
   curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),

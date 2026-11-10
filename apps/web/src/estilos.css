@@ -1114,3 +1114,35 @@ ul.fila-chips {
     top: 12px;
   }
 }
+
+/* HU-0504 · Propuestas de la IA (prototipo: franja .prop de Revisión). */
+.franja-ia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 12px;
+  border: 2px solid var(--color-naranja);
+  border-radius: 12px;
+  background: var(--color-naranja-suave);
+}
+.franja-ia-texto {
+  display: flex;
+  flex: 1 1 280px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: var(--texto-sm);
+}
+.franja-ia-texto b {
+  color: var(--color-naranja-texto);
+  font-size: var(--texto-base);
+}
+.fila-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

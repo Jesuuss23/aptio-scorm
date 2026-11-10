@@ -1,0 +1,315 @@
+[
+  {
+    "tipo": "mas-visual",
+    "titulo": "Más visual",
+    "resumen": "Cambia el párrafo por un dato grande y deja la imagen del tablero como protagonista: de 33 a 15 palabras en pantalla.",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/disposicion",
+        "value": "dato"
+      },
+      {
+        "op": "replace",
+        "path": "/plantilla",
+        "value": "kit-minera-andina-dato"
+      },
+      {
+        "op": "replace",
+        "path": "/bloques/1",
+        "value": {
+          "id": "p05-dato-grande",
+          "tipo": "texto",
+          "rol": "destacado",
+          "contenido": {
+            "es": "Mueve, calienta o descarga"
+          }
+        }
+      },
+      {
+        "op": "replace",
+        "path": "/bloques/2/contenido",
+        "value": {
+          "es": "Si puede hacerlo sin aviso, se bloquea."
+        }
+      }
+    ]
+  },
+  {
+    "tipo": "menos-texto",
+    "titulo": "Menos texto",
+    "resumen": "Acorta el párrafo y el dato clave sin perder la idea: de 33 a 18 palabras en pantalla.",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/bloques/1/contenido",
+        "value": {
+          "es": "Energía que puede mover, calentar o liberar algo sin aviso."
+        }
+      },
+      {
+        "op": "replace",
+        "path": "/bloques/2/contenido",
+        "value": {
+          "es": "¿Puede moverse o calentarse? Se bloquea."
+        }
+      }
+    ]
+  },
+  {
+    "tipo": "actividad",
+    "titulo": "Convertir en actividad",
+    "resumen": "Convierte la explicación en un «¿Mito o realidad?» de 4 afirmaciones sobre la energía peligrosa (INT-07, formativa).",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/tipo",
+        "value": "interactiva"
+      },
+      {
+        "op": "replace",
+        "path": "/disposicion",
+        "value": "vf"
+      },
+      {
+        "op": "replace",
+        "path": "/plantilla",
+        "value": "kit-minera-andina-vf"
+      },
+      {
+        "op": "remove",
+        "path": "/bloques/3"
+      },
+      {
+        "op": "remove",
+        "path": "/bloques/2"
+      },
+      {
+        "op": "replace",
+        "path": "/bloques/1",
+        "value": {
+          "id": "p05-actividad",
+          "tipo": "interaccion",
+          "interaccion": {
+            "tipo": "INT-07",
+            "modo": "formativa",
+            "instruccion": {
+              "es": "Decide si cada frase es mito o realidad."
+            },
+            "datos": {
+              "afirmaciones": [
+                {
+                  "id": "p05-af-1",
+                  "texto": {
+                    "es": "Solo la electricidad es energía peligrosa."
+                  },
+                  "verdadera": false,
+                  "retroalimentacion": {
+                    "es": "Mito: también lo son la presión, el calor y los resortes."
+                  }
+                },
+                {
+                  "id": "p05-af-2",
+                  "texto": {
+                    "es": "Un resorte tenso puede mover una pieza sin aviso."
+                  },
+                  "verdadera": true,
+                  "retroalimentacion": {
+                    "es": "Realidad: guarda energía mecánica."
+                  }
+                },
+                {
+                  "id": "p05-af-3",
+                  "texto": {
+                    "es": "Si la máquina no se mueve, no tiene energía."
+                  },
+                  "verdadera": false,
+                  "retroalimentacion": {
+                    "es": "Mito: puede quedar energía guardada."
+                  }
+                },
+                {
+                  "id": "p05-af-4",
+                  "texto": {
+                    "es": "El vapor de una tubería apagada puede quemarte."
+                  },
+                  "verdadera": true,
+                  "retroalimentacion": {
+                    "es": "Realidad: la energía térmica sigue ahí hasta que se enfría."
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "tipo": "variantes",
+    "titulo": "Ver 3 variantes",
+    "resumen": "La misma idea en tres composiciones: como lista, como dato grande y con Ana explicándola.",
+    "variantes": [
+      {
+        "nombre": "Lista con íconos",
+        "disposicion": "lista",
+        "campos": {
+          "titulo": "¿Qué es la energía peligrosa?"
+        },
+        "patch": [
+          {
+            "op": "replace",
+            "path": "/disposicion",
+            "value": "lista"
+          },
+          {
+            "op": "replace",
+            "path": "/plantilla",
+            "value": "kit-minera-andina-lista"
+          },
+          {
+            "op": "remove",
+            "path": "/bloques/3"
+          },
+          {
+            "op": "remove",
+            "path": "/bloques/2"
+          },
+          {
+            "op": "replace",
+            "path": "/bloques/1",
+            "value": {
+              "id": "p05-item-1",
+              "tipo": "texto",
+              "rol": "cuerpo",
+              "contenido": {
+                "es": "Mueve: Ejes, poleas y resortes"
+              }
+            }
+          },
+          {
+            "op": "add",
+            "path": "/bloques/2",
+            "value": {
+              "id": "p05-item-2",
+              "tipo": "texto",
+              "rol": "cuerpo",
+              "contenido": {
+                "es": "Calienta: Vapor y superficies"
+              }
+            }
+          },
+          {
+            "op": "add",
+            "path": "/bloques/3",
+            "value": {
+              "id": "p05-item-3",
+              "tipo": "texto",
+              "rol": "cuerpo",
+              "contenido": {
+                "es": "Libera: Presión y descargas"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "nombre": "Dato grande",
+        "disposicion": "dato",
+        "campos": {
+          "titulo": "¿Qué es la energía peligrosa?",
+          "datoGrande": "Sin aviso"
+        },
+        "patch": [
+          {
+            "op": "replace",
+            "path": "/disposicion",
+            "value": "dato"
+          },
+          {
+            "op": "replace",
+            "path": "/plantilla",
+            "value": "kit-minera-andina-dato"
+          },
+          {
+            "op": "add",
+            "path": "/bloques/1",
+            "value": {
+              "id": "p05-dato-grande",
+              "tipo": "texto",
+              "rol": "destacado",
+              "contenido": {
+                "es": "Sin aviso"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "nombre": "Ana lo explica",
+        "disposicion": "personaje",
+        "campos": {
+          "titulo": "¿Qué es la energía peligrosa?",
+          "burbuja": "Es la que puede moverse, calentarse o descargarse cuando no lo esperas."
+        },
+        "patch": [
+          {
+            "op": "replace",
+            "path": "/disposicion",
+            "value": "personaje"
+          },
+          {
+            "op": "replace",
+            "path": "/plantilla",
+            "value": "kit-minera-andina-personaje"
+          },
+          {
+            "op": "remove",
+            "path": "/bloques/3"
+          },
+          {
+            "op": "remove",
+            "path": "/bloques/2"
+          },
+          {
+            "op": "replace",
+            "path": "/bloques/1",
+            "value": {
+              "id": "p05-burbuja",
+              "tipo": "texto",
+              "rol": "cuerpo",
+              "contenido": {
+                "es": "Es la que puede moverse, calentarse o descargarse cuando no lo esperas."
+              }
+            }
+          },
+          {
+            "op": "add",
+            "path": "/bloques/-",
+            "value": {
+              "id": "p05-ana",
+              "tipo": "personaje",
+              "recursoId": "svg-ana",
+              "pose": "explicando",
+              "lado": "izquierda"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "tipo": "libre",
+    "titulo": "Con un ejemplo de la planta",
+    "resumen": "Cambia la definición por un ejemplo de la planta: la faja que se mueve sola por la tensión que quedó.",
+    "patch": [
+      {
+        "op": "replace",
+        "path": "/bloques/1/contenido",
+        "value": {
+          "es": "Ejemplo: apagas la faja, pero el contrapeso sigue tenso y la mueve de golpe."
+        }
+      }
+    ]
+  }
+]

@@ -2,13 +2,16 @@
 // corregir el título o la narración y aprobar una pantalla o todas las que no tienen observaciones.
 // RN-05-1: no se aprueba con una observación que bloquea la entrega. RN-05-2: lo que se edita vuelve a borrador.
 // HU-0503 · Corregir la narración regenera su voz, boca y subtítulos en español; los chips muestran el avance.
+// HU-0504 · «Ajustar con IA» pide una propuesta (IA-16) que se aplica, se descarta o se deshace (RN-05-3, RN-05-4).
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, montar } from '@aptio/player';
+import { cursoConPropuesta } from '@aptio/schema/propuesta';
 import { type CursoDoc, origenDe, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Proyecto, type Rol, type TextoI18n } from '../api';
+import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Propuesta, type Proyecto, type Rol, type TextoI18n } from '../api';
 import { navegar } from '../ruta';
 import './fuentes-kit';
+import { AjustarConIA, FranjaPropuesta, type TipoPedido } from './propuestas';
 
 type Filtro = 'todas' | 'revisar' | 'actividades';
 const NOMBRE_SEVERIDAD = { info: 'Información', aviso: 'Aviso', 'bloquea-entrega': 'Bloquea la entrega' } as const;
@@ -50,6 +53,12 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
   const [seleccion, setSeleccion] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [cascada, setCascada] = useState<Cascada | null>(null);
+  // HU-0504 · Propuestas del curso, el pedido en curso, la variante en vista y lo que se puede deshacer.
+  const [propuestas, setPropuestas] = useState<Propuesta[]>([]);
+  const [pedido, setPedido] = useState<{ trabajoId: string; desde: number } | null>(null);
+  const [elegida, setElegida] = useState<{ pantallaId: string; indice: number } | null>(null);
+  const [deshacer, setDeshacer] = useState<number | null>(null);
+  const textoLibre = useRef('');
   const escenario = useRef<HTMLDivElement>(null);
   const editan = EDITAN_PANTALLAS.includes(rol);
   const aprueban = APRUEBAN_PANTALLAS.includes(rol);
@@ -98,22 +107,67 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
     return () => clearTimeout(t);
   }, [cascada, enMarcha, cursoId, proyectoId, recargar]);
 
+  // HU-0504 · Las propuestas se leen con cada versión del curso (al listar, una cuya pantalla cambió pasa a VENCIDA).
+  const version = curso?.version;
+  const cargarPropuestas = useCallback(async () => {
+    if (cursoId && editan) setPropuestas(await api.propuestas(cursoId).catch(() => [] as Propuesta[]));
+  }, [cursoId, editan]);
+  useEffect(() => {
+    if (version === undefined || !cursoId || !editan) return;
+    let vigente = true;
+    api.propuestas(cursoId).then((l) => vigente && setPropuestas(l), () => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [version, cursoId, editan]);
+
+  // Sondeo del pedido a la IA: al terminar se leen las propuestas; si falla, se muestra el motivo.
+  useEffect(() => {
+    if (!pedido) return;
+    const t = setTimeout(async () => {
+      try {
+        const trabajo = await api.trabajo(pedido.trabajoId);
+        if (trabajo.estado === 'COMPLETADO') {
+          setPedido(null);
+          await cargarPropuestas();
+        } else if (trabajo.estado === 'ERROR' || trabajo.estado === 'CANCELADO' || Date.now() - pedido.desde > LIMITE_MS) {
+          setPedido(null);
+          setError(trabajo.estado === 'ERROR' ? 'La IA no pudo preparar la propuesta. Intenta de nuevo o cambia el pedido.' : 'La propuesta tarda más de lo normal; vuelve a pedirla más tarde.');
+        } else {
+          setPedido((x) => (x ? { ...x } : x));
+        }
+      } catch {
+        setPedido((x) => (x ? { ...x } : x));
+      }
+    }, CADA_MS);
+    return () => clearTimeout(t);
+  }, [pedido, cargarPropuestas]);
+
   const documento = curso ? (curso.documento as unknown as CursoDoc) : null;
   const pantallas = documento ? pantallasDe(documento) : [];
   const actual = pantallas.find((p) => p.id === seleccion) ?? pantallas[0];
   const actualId = actual?.id;
+  // La variante elegida es de una pantalla: al cambiar de pantalla deja de verse.
+  const variante = elegida && elegida.pantallaId === actualId ? elegida.indice : null;
+  const setVariante = (indice: number | null) => setElegida(indice === null || !actualId ? null : { pantallaId: actualId, indice });
+  // La franja muestra la última propuesta de la pantalla mientras esté pendiente o vencida (con «Recalcular»).
+  const ultima = propuestas.find((x) => x.pantallaId === actualId);
+  const franja = ultima && (ultima.estado === 'PENDIENTE' || ultima.estado === 'VENCIDA') ? ultima : undefined;
+  // La variante elegida se ve en la pantalla antes de aplicarla.
+  const parche = franja && variante !== null ? franja.vistaPrevia?.[variante]?.patch : undefined;
+  const enEscena = curso && actualId && parche ? cursoConPropuesta(curso.documento as unknown as CursoDoc, actualId, parche) : curso?.documento;
 
   // Una sola pantalla, sin barra ni botones del reproductor: la misma que verá el participante.
   useEffect(() => {
-    if (!curso || !actualId || !escenario.current) return;
-    const r = montar(escenario.current, curso.documento as unknown as CursoReproductor, {
+    if (!enEscena || !actualId || !escenario.current) return;
+    const r = montar(escenario.current, enEscena as unknown as CursoReproductor, {
       kit: kit ? { paleta: kit.paleta, tipografias: kit.tipografias, personaje: kit.personaje?.nombre ?? null } : {},
       revision: true,
       marco: false,
       inicio: actualId,
     });
     return () => r.destruir();
-  }, [curso, kit, actualId]);
+  }, [enEscena, kit, actualId]);
 
   const volver = (
     <a className="boton" href={`/proyectos/${proyectoId}`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}`); }}>Volver al proyecto</a>
@@ -142,6 +196,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
     setOcupado(true);
     setError('');
     setAviso('');
+    setDeshacer(null);
     try {
       setAviso(await accion());
     } catch (e) {
@@ -160,6 +215,41 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
     await recargar();
     const texto = estaba === 'aprobado' ? 'Cambios guardados. La pantalla volvió a borrador: apruébala de nuevo cuando esté lista.' : 'Cambios guardados.';
     return r.regenerando.length ? `${texto} Se regeneran su voz, su boca y sus subtítulos en español.` : texto;
+  });
+  const pedirIA = (tipo: TipoPedido, texto?: string) => hacer(async () => {
+    if (texto) textoLibre.current = texto;
+    const t = await api.pedirPropuesta(curso.id, { tipo, pantallaId: actual.id, ...(texto ? { pedido: texto } : {}) });
+    setVariante(null);
+    setPedido({ trabajoId: t.id, desde: Date.now() });
+    return '';
+  });
+  const aplicarPropuesta = (p: Propuesta) => hacer(async () => {
+    try {
+      const r = await api.aplicarPropuesta(p.id, variante ?? undefined);
+      setVariante(null);
+      await recargar();
+      setDeshacer(r.version - 1);
+      return `Propuesta aplicada: «${p.titulo}». La pantalla volvió a borrador.`;
+    } catch (e) {
+      // CP-053: la pantalla cambió desde la versión base; se ofrece recalcular.
+      if (e instanceof ErrorApi && e.codigo === 'PROPUESTA_VENCIDA') {
+        setVariante(null);
+        await cargarPropuestas();
+        return '';
+      }
+      throw e;
+    }
+  });
+  const descartarPropuesta = (p: Propuesta) => hacer(async () => {
+    await api.descartarPropuesta(p.id);
+    setVariante(null);
+    await cargarPropuestas();
+    return 'Propuesta descartada.';
+  });
+  const deshacerPropuesta = (version: number) => hacer(async () => {
+    await api.restaurarVersion(curso.id, version);
+    await recargar();
+    return 'Se deshizo la propuesta.';
   });
   const aprobar = () => hacer(async () => {
     await api.aprobarPantalla(curso.id, actual.id);
@@ -186,7 +276,12 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
         <div><dt>Con observaciones</dt><dd className="num aviso">{conObservaciones.size}</dd></div>
       </dl>
       {error ? <div className="nota error" role="alert">{error}</div> : null}
-      {aviso ? <p className="nota" role="status">{aviso}</p> : null}
+      {aviso ? (
+        <div className="nota fila-aviso" role="status">
+          <span>{aviso}</span>
+          {deshacer !== null ? <button type="button" className="boton" disabled={ocupado} onClick={() => void deshacerPropuesta(deshacer)}>Deshacer</button> : null}
+        </div>
+      ) : null}
       <div className="revision">
         <aside className="tarjeta revision-lista" aria-label="Pantallas">
           <div className="opciones" role="group" aria-label="Filtro">
@@ -225,6 +320,18 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
               <button type="button" className="boton" disabled={indice === pantallas.length - 1} onClick={() => setSeleccion(pantallas[indice + 1]!.id)}>Siguiente</button>
             </div>
           </div>
+          {franja && editan ? (
+            <FranjaPropuesta
+              propuesta={franja}
+              vencida={franja.estado === 'VENCIDA'}
+              variante={variante}
+              ocupado={ocupado}
+              alVerVariante={setVariante}
+              alAplicar={() => void aplicarPropuesta(franja)}
+              alDescartar={() => void descartarPropuesta(franja)}
+              alRecalcular={() => void pedirIA(franja.tipo, franja.tipo === 'libre' ? textoLibre.current || franja.titulo : undefined)}
+            />
+          ) : null}
           <div className="revision-escenario">
             <div ref={escenario} className="revision-reproductor" />
           </div>
@@ -234,6 +341,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
         </section>
 
         <aside className="revision-lateral">
+          {editan ? <AjustarConIA ocupado={ocupado} calculando={pedido !== null} alPedir={(tipo, texto) => void pedirIA(tipo, texto)} /> : null}
           <section className="tarjeta kit-bloque" aria-label="Control de calidad">
             <h2>Control de calidad</h2>
             {obsActual.length ? (

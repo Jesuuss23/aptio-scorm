@@ -28,6 +28,8 @@
     "./voz": "./src/voz.ts",
     "./proyecto": "./src/proyecto.ts",
     "./generacion": "./src/generacion.ts",
-    "./revision": "./src/revision.ts"
+    "./revision": "./src/revision.ts",
+    "./patch": "./src/patch.ts",
+    "./propuesta": "./src/propuesta.ts"
   }
 }

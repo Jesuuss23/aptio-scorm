@@ -1,5 +1,6 @@
 // HU-0501 y HU-0502 · Revisión (PNT-20): filtro (CP-046), origen (CP-047), aprobar por lote (CP-048) y una aprobada que
 // cambia vuelve a borrador (CP-049). HU-0503 · corregir la narración regenera voz, boca y subtítulos (CP-050).
+// HU-0504 · propuestas de la IA: aplicar y deshacer (CP-052) y propuesta vencida (CP-053).
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
 
@@ -106,6 +107,68 @@ test.describe('con el diseñador instruccional', () => {
     await expect(page.getByRole('region', { name: 'Regeneración' })).toHaveCount(0);
   });
 
+  test('CP-052 · «Más visual» se aplica, cambia la pantalla y Deshacer la revierte', async ({ page }) => {
+    await page.goto(URL_REVISION);
+    await elegir(page, '¿Qué es la energía peligrosa?');
+    const ia = page.getByRole('region', { name: 'Ajustar con IA' });
+    await expect(ia.getByRole('button', { name: '✦ Otra ilustración' })).toBeDisabled();
+    await ia.getByRole('button', { name: '✦ Más visual' }).click();
+    await expect(ia.getByText('La IA está preparando la propuesta…')).toBeVisible();
+    const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+    await expect(franja.getByText('✦ Más visual')).toBeVisible({ timeout: 10_000 });
+    await expect(franja.getByText(/Cambia el párrafo por un dato grande/)).toBeVisible();
+    const escena = page.locator('.revision-reproductor');
+    await expect(escena.getByText('Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.')).toBeVisible();
+
+    await franja.getByRole('button', { name: 'Aplicar' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Propuesta aplicada: «Más visual». La pantalla volvió a borrador.' })).toBeVisible();
+    await expect(franja).toHaveCount(0);
+    await expect(escena.getByText('Mueve, calienta o descarga')).toBeVisible();
+    await expect(escena.getByText('Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Se deshizo la propuesta.' })).toBeVisible();
+    await expect(escena.getByText('Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.')).toBeVisible();
+    await expect(escena.getByText('Mueve, calienta o descarga')).toHaveCount(0);
+  });
+
+  test('«Ver 3 variantes» muestra la elegida en la pantalla antes de aplicarla', async ({ page }) => {
+    await page.goto(URL_REVISION);
+    await elegir(page, '¿Qué es la energía peligrosa?');
+    await page.getByRole('region', { name: 'Ajustar con IA' }).getByRole('button', { name: '✦ Ver 3 variantes' }).click();
+    const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+    await expect(franja.getByRole('group', { name: 'Variantes' }).getByRole('button')).toHaveText(['Variante 1 · Lista con íconos', 'Variante 2 · Dato grande', 'Variante 3 · Ana lo explica'], { timeout: 10_000 });
+    await expect(franja.getByRole('button', { name: 'Aplicar esta variante' })).toBeDisabled();
+    await franja.getByRole('button', { name: 'Variante 1 · Lista con íconos' }).click();
+    const escena = page.locator('.revision-reproductor');
+    await expect(escena.getByText('Calienta:')).toBeVisible();
+    await franja.getByRole('button', { name: 'Variante 3 · Ana lo explica' }).click();
+    await expect(escena.getByText('Es la que puede moverse, calentarse o descargarse cuando no lo esperas.')).toBeVisible();
+    await expect(escena.getByText('Calienta:')).toHaveCount(0);
+    await franja.getByRole('button', { name: 'Aplicar esta variante' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Propuesta aplicada: «Ver 3 variantes».' })).toBeVisible();
+    await expect(escena.getByText('Es la que puede moverse, calentarse o descargarse cuando no lo esperas.')).toBeVisible();
+  });
+
+  test('CP-053 · si la pantalla cambió, la propuesta ofrece «Recalcular propuesta»; descartar la quita', async ({ page }) => {
+    await page.goto(URL_REVISION);
+    await elegir(page, '¿Qué es la energía peligrosa?');
+    await page.getByRole('region', { name: 'Ajustar con IA' }).getByRole('button', { name: '✦ Menos texto' }).click();
+    const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+    await expect(franja.getByText('✦ Menos texto')).toBeVisible({ timeout: 10_000 });
+    const textos = page.getByRole('region', { name: 'Textos' });
+    await textos.getByLabel('Título en pantalla').fill('La energía peligrosa');
+    await textos.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(franja.getByText('La pantalla cambió desde que se calculó esta propuesta.')).toBeVisible();
+    await expect(franja.getByRole('button', { name: 'Aplicar' })).toHaveCount(0);
+    await franja.getByRole('button', { name: 'Recalcular propuesta' }).click();
+    await expect(franja.getByRole('button', { name: 'Aplicar' })).toBeVisible({ timeout: 10_000 });
+    await expect(franja.getByText(/Acorta el párrafo/)).toBeVisible();
+    await franja.getByRole('button', { name: 'Descartar' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Propuesta descartada.' })).toBeVisible();
+    await expect(franja).toHaveCount(0);
+  });
+
   test('sin cambios no se guarda; sin pantallas se explica qué hacer', async ({ page }) => {
     await page.goto(URL_REVISION);
     await expect(page.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
@@ -127,6 +190,17 @@ test('el revisor del cliente solo mira', async ({ page }) => {
   await page.goto(URL_REVISION);
   await expect(page.getByLabel('Título en pantalla')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Guardar cambios' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Ajustar con IA' })).toHaveCount(0);
+});
+
+test('HU-0504 · si la IA no puede preparar la propuesta, se explica y no aparece la franja', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'PRODUCTOR', propuestaFalla: true });
+  await page.goto(URL_REVISION);
+  const ia = page.getByRole('region', { name: 'Ajustar con IA' });
+  await ia.getByLabel('Pedido libre').fill('que lo diga con un ejemplo de la planta');
+  await ia.getByRole('button', { name: 'Enviar' }).click();
+  await expect(page.getByRole('alert')).toHaveText('La IA no pudo preparar la propuesta. Intenta de nuevo o cambia el pedido.', { timeout: 10_000 });
+  await expect(page.getByRole('region', { name: 'Propuesta de la IA' })).toHaveCount(0);
 });
 
 test('en celular (390 px) la revisión no desborda y usa solo la escala de letra', async ({ page }) => {
