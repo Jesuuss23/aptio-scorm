@@ -4,6 +4,16 @@
 
 El equipo, los plazos y la estimación los define el ingeniero a cargo; este paquete no fija fechas ni tamaño de equipo.
 
+## Manuales
+
+| Manual | Para quién |
+| --- | --- |
+| [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md) | El equipo y el cliente: cómo usar cada pantalla, sin términos técnicos. |
+| [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md) | Desarrollo: entorno, estructura, patrones y cómo extender. |
+| [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md) | Ingeniería e infraestructura: arquitectura, flujos, seguridad, proveedores y operación. |
+
+Se actualizan al cerrar cada entrega.
+
 ## Orden de lectura
 
 | # | Archivo | Para qué sirve |
