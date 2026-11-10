@@ -3,7 +3,7 @@
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas } from '@aptio/colas';
-import { proveedorDesdeEntorno, proveedorSimulado } from '@aptio/ai';
+import { proveedorDesdeEntorno, proveedorSimulado, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
 import { TAREA_GENERAR } from '@aptio/schema/generacion';
@@ -11,8 +11,10 @@ import { Queue, Worker } from 'bullmq';
 import { EJECUTORES } from './etapas/index.js';
 import { cerrarOcr, ocrTesseract } from './extraer/ocr.js';
 import { crearGenerador } from './generar.js';
+import { mediosFfmpeg } from './extraer/medios.js';
 import { crearExtractor, TAREA_EXTRAER } from './material.js';
 import { crearProcesador, type TrabajoEnCola } from './procesar.js';
+import { crearTranscriptor, TAREA_TRANSCRIBIR } from './transcribir.js';
 import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
 
 const redis = crearRedis();
@@ -26,10 +28,13 @@ const procesar = crearProcesador({
 // Material del cliente (HU-0304): texto por página con OCR para las escaneadas.
 const almacen = new Almacen();
 const extraer = crearExtractor({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), ocr: ocrTesseract });
+// Video y audio del cliente (HU-0305): transcripción con marcas de tiempo.
+const transcribir = crearTranscriptor({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), medios: mediosFfmpeg, proveedor: transcriptorDesdeEntorno(process.env) });
 // Generación de un proyecto (HU-0401): las 11 etapas en orden con el proveedor de texto del entorno.
 const generar = crearGenerador({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: EJECUTORES });
 const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
+  if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);
   if (trabajo.data.tarea === TAREA_GENERAR) return generar(trabajo);
   return procesar(trabajo);
 };

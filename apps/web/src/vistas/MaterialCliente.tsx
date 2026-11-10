@@ -1,15 +1,24 @@
-// HU-0304 y HU-1402 · Material del cliente: subir PDF, Word o PowerPoint, ver el texto por página (las escaneadas pasan
-// por OCR, CP-033) y avisar del texto que parece una instrucción para la IA, que se trata como dato (CP-102). El tipo
-// real del archivo lo verifica la API al confirmar la subida (CP-034).
+// HU-0304, HU-0305 y HU-1402 · Material del cliente: subir PDF, Word o PowerPoint y ver el texto por página (las
+// escaneadas pasan por OCR, CP-033), o video y audio y ver su transcripción con marcas de tiempo (CP-035). Se avisa del
+// texto que parece una instrucción para la IA, que se trata como dato (CP-102). El tipo real del archivo lo verifica la
+// API al confirmar la subida (CP-034).
 import { useEffect, useState } from 'react';
 import { api, ErrorApi, type Material } from '../api';
+import { tiempo } from '../formato';
 
 const EXTENSIONES: Record<string, string> = {
   pdf: 'application/pdf',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/mp4',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  m4a: 'audio/mp4',
 };
-const ACEPTA = ['.pdf', '.docx', '.pptx', ...Object.values(EXTENSIONES)].join(',');
+const ACEPTA = [...Object.keys(EXTENSIONES).map((e) => `.${e}`), ...new Set(Object.values(EXTENSIONES))].join(',');
+const MEDIO = new Set<Material['tipo']>(['VIDEO', 'AUDIO']);
 const NOMBRE_TIPO: Record<Material['tipo'], string> = {
   PDF: 'PDF', WORD: 'Word', POWERPOINT: 'PowerPoint', VIDEO: 'Video', AUDIO: 'Audio', TEMA: 'Tema',
 };
@@ -24,9 +33,14 @@ function conTipo(archivo: File): File {
 
 function resumen(m: Material): string {
   if (m.tipo === 'TEMA') return 'Sin archivo: la IA parte del tema';
-  if (m.estado === 'pendiente') return 'En cola para extraer el texto';
-  if (m.estado === 'procesando') return 'Extrayendo el texto…';
+  const medio = MEDIO.has(m.tipo);
+  if (m.estado === 'pendiente') return medio ? 'En cola para transcribir' : 'En cola para extraer el texto';
+  if (m.estado === 'procesando') return medio ? 'Transcribiendo…' : 'Extrayendo el texto…';
   if (m.estado === 'error') return m.error ?? 'No se pudo leer el archivo';
+  if (medio) {
+    const n = m.transcripcion.length;
+    return `Transcripción${m.duracionS !== null ? ` de ${tiempo(m.duracionS)}` : ''} · ${n} ${n === 1 ? 'fragmento' : 'fragmentos'} con marca de tiempo`;
+  }
   const ocr = m.paginas.filter((p) => p.escaneada).length;
   const unidad = m.tipo === 'POWERPOINT' ? 'diapositiva' : 'página';
   return `${m.paginas.length} ${unidad}${m.paginas.length === 1 ? '' : 's'}${ocr ? ` · ${ocr} con OCR` : ''}`;
@@ -87,12 +101,13 @@ export function MaterialCliente({ proyectoId, puedeEditar, alCambiar }: { proyec
     }
   }
 
-  const visto = materiales?.find((m) => m.id === abierto && m.estado === 'listo' && m.paginas.length);
+  const conContenido = (m: Material) => m.estado === 'listo' && (m.paginas.length > 0 || m.transcripcion.length > 0);
+  const visto = materiales?.find((m) => m.id === abierto && conContenido(m));
 
   return (
     <section className="tarjeta kit-bloque" aria-label="Material del cliente">
       <h2>Material del cliente</h2>
-      <p className="sec">PDF, Word o PowerPoint. La IA trabaja con el texto de cada página; las páginas escaneadas pasan por OCR.</p>
+      <p className="sec">PDF, Word, PowerPoint, video o audio. Los documentos se leen por página (las escaneadas pasan por OCR) y el video y el audio se transcriben con marcas de tiempo.</p>
       {errores.length ? <div className="nota error" role="alert"><ul>{errores.map((x) => <li key={x}>{x}</li>)}</ul></div> : null}
       {puedeEditar ? (
         <>
@@ -102,7 +117,6 @@ export function MaterialCliente({ proyectoId, puedeEditar, alCambiar }: { proyec
               <input className="sr" type="file" multiple accept={ACEPTA} disabled={subiendo} aria-label="Archivos del material"
                 onChange={(e) => { void subir(e.target.files); e.target.value = ''; }} />
             </label>
-            <span className="sec">El video y el audio del cliente llegan en el siguiente sprint.</span>
           </div>
           <div className="kit-fila">
             <label className="campo material-tema">
@@ -119,7 +133,9 @@ export function MaterialCliente({ proyectoId, puedeEditar, alCambiar }: { proyec
       ) : (
         <ul className="lista-material" aria-label="Material">
           {materiales.map((m) => {
-            const avisos = m.paginas.filter((p) => p.posibleInstruccion).length;
+            const medio = MEDIO.has(m.tipo);
+            const avisos = (medio ? m.transcripcion : m.paginas).filter((p) => p.posibleInstruccion).length;
+            const unidad = medio ? 'fragmento' : 'página';
             return (
               <li key={m.id} className="fila-material">
                 <span className="chip">{NOMBRE_TIPO[m.tipo]}</span>
@@ -127,10 +143,10 @@ export function MaterialCliente({ proyectoId, puedeEditar, alCambiar }: { proyec
                   <b>{m.nombre ?? m.tema}</b>
                   <span className={m.estado === 'error' ? 'sec texto-error' : 'sec'} role={EN_CURSO.has(m.estado) ? 'status' : undefined}>{resumen(m)}</span>
                 </span>
-                {avisos ? <span className="chip aviso">{avisos === 1 ? '1 página con posible instrucción' : `${avisos} páginas con posible instrucción`}</span> : null}
-                {m.estado === 'listo' && m.paginas.length ? (
+                {avisos ? <span className="chip aviso">{avisos === 1 ? `1 ${unidad} con posible instrucción` : `${avisos} ${unidad}s con posible instrucción`}</span> : null}
+                {conContenido(m) ? (
                   <button className="boton" type="button" aria-expanded={abierto === m.id} onClick={() => setAbierto(abierto === m.id ? null : m.id)}>
-                    {abierto === m.id ? 'Ocultar texto' : 'Ver texto'}
+                    {abierto === m.id ? (medio ? 'Ocultar transcripción' : 'Ocultar texto') : (medio ? 'Ver transcripción' : 'Ver texto')}
                   </button>
                 ) : null}
               </li>
@@ -139,7 +155,19 @@ export function MaterialCliente({ proyectoId, puedeEditar, alCambiar }: { proyec
         </ul>
       )}
 
-      {visto ? (
+      {visto && MEDIO.has(visto.tipo) ? (
+        <ol className="paginas-material transcripcion" role="region" aria-label={`Transcripción de ${visto.nombre ?? 'el material'}`}>
+          {visto.transcripcion.map((s) => (
+            <li key={s.desde} className="segmento" aria-label={`Desde ${tiempo(s.desde)}`}>
+              <span className="num sec segmento-tiempo">{tiempo(s.desde)}–{tiempo(s.hasta)}</span>
+              <span className="segmento-texto">
+                {s.texto}
+                {s.posibleInstruccion ? <span className="chip aviso">Posible instrucción: se usa como contenido y la IA no la obedece</span> : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : visto ? (
         <div className="paginas-material" role="region" aria-label={`Texto de ${visto.nombre ?? 'el material'}`}>
           {visto.paginas.map((p) => (
             <article key={p.n} className="pagina-material" aria-label={`Página ${p.n}`}>

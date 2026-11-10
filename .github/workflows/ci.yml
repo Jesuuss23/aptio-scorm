@@ -72,6 +72,8 @@ jobs:
         run: pnpm db:deploy && pnpm db:seed
       - name: Almacenamiento cifrado
         run: pnpm almacen:preparar
+      - name: ffmpeg para la transcripción de video y audio (HU-0305)
+        run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg)
       - name: Pruebas (Vitest)
         run: pnpm test
       - name: Salidas de IA del caso LOTO

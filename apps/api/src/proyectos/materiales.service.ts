@@ -8,6 +8,8 @@ import type { MaterialDto, MaterialEntradaDto } from './material.dto.js';
 
 /** Tarea de la cola media que extrae el texto (la procesa apps/worker/src/material.ts). */
 export const TAREA_EXTRAER = 'EXTRAER_TEXTO';
+/** Tarea de la cola media que transcribe video y audio (apps/worker/src/transcribir.ts, HU-0305). */
+export const TAREA_TRANSCRIBIR = 'TRANSCRIBIR';
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 
 const TIPO_POR_MIME: Record<string, TipoMaterial> = {
@@ -18,10 +20,16 @@ const TIPO_POR_MIME: Record<string, TipoMaterial> = {
 
 const rechazo = (codigo: string, mensaje: string) => new UnprocessableEntityException({ codigo, mensaje });
 
-function aDto(m: MaterialFuente, nombre: string | null): MaterialDto {
+type DatosRecurso = { nombre: string; metadatos: unknown } | undefined;
+
+function aDto(m: MaterialFuente, r: DatosRecurso): MaterialDto {
+  const duracion = (r?.metadatos as { duracionS?: number } | null | undefined)?.duracionS;
   return {
-    id: m.id, tipo: m.tipo, recursoId: m.recursoId, nombre, tema: m.tema, estado: m.estado, error: m.error,
-    paginas: (m.paginas ?? []) as unknown as MaterialDto['paginas'], creadoEn: m.creadoEn.toISOString(),
+    id: m.id, tipo: m.tipo, recursoId: m.recursoId, nombre: r?.nombre ?? null, tema: m.tema, estado: m.estado, error: m.error,
+    paginas: (m.paginas ?? []) as unknown as MaterialDto['paginas'],
+    transcripcion: (m.transcripcion ?? []) as unknown as MaterialDto['transcripcion'],
+    duracionS: typeof duracion === 'number' ? duracion : null,
+    creadoEn: m.creadoEn.toISOString(),
   };
 }
 
@@ -41,8 +49,8 @@ export class MaterialesService {
     await this.proyecto(u, proyectoId);
     const materiales = await this.bd.materialFuente.findMany({ where: { proyectoId }, orderBy: { creadoEn: 'asc' } });
     const ids = materiales.map((m) => m.recursoId).filter((x): x is string => Boolean(x));
-    const nombres = new Map((await this.bd.recurso.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true } })).map((r) => [r.id, r.nombre]));
-    return materiales.map((m) => aDto(m, m.recursoId ? (nombres.get(m.recursoId) ?? null) : null));
+    const recursos = new Map((await this.bd.recurso.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, metadatos: true } })).map((r) => [r.id, r]));
+    return materiales.map((m) => aDto(m, m.recursoId ? recursos.get(m.recursoId) : undefined));
   }
 
   async agregar(u: UsuarioSesion, proyectoId: string, dto: MaterialEntradaDto): Promise<MaterialDto> {
@@ -53,30 +61,29 @@ export class MaterialesService {
     if (dto.tema) {
       const m = await this.bd.materialFuente.create({ data: { proyectoId, tipo: 'TEMA', tema: dto.tema, estado: 'listo' } });
       await this.auditar(u, organizacionId, m.id, { tipo: 'TEMA' });
-      return aDto(m, null);
+      return aDto(m, undefined);
     }
 
     // El recurso ya pasó por la verificación de tipo real al confirmarse la subida (CP-034).
     const recurso = await this.bd.recurso.findFirst({ where: { id: dto.recursoId!, organizacionId, proyectoId } });
     if (!recurso) throw new NotFoundException('Archivo no encontrado en este proyecto');
-    if (recurso.tipo === 'AUDIO' || recurso.tipo === 'VIDEO') {
-      throw rechazo('TRANSCRIPCION_PENDIENTE', 'La transcripción de video y audio llega con HU-0305 (S2). Por ahora sube PDF, Word o PowerPoint');
-    }
-    const tipo = TIPO_POR_MIME[recurso.mime];
-    if (!tipo) throw rechazo('TIPO_NO_PERMITIDO', 'El material debe ser PDF, Word (.docx) o PowerPoint (.pptx)');
+    // HU-0305: el video y el audio se transcriben con marcas de tiempo; los documentos se leen por página.
+    const medio = recurso.tipo === 'AUDIO' || recurso.tipo === 'VIDEO';
+    const tipo: TipoMaterial | undefined = medio ? recurso.tipo as TipoMaterial : TIPO_POR_MIME[recurso.mime];
+    if (!tipo) throw rechazo('TIPO_NO_PERMITIDO', 'El material debe ser PDF, Word (.docx), PowerPoint (.pptx), video o audio');
     const existente = await this.bd.materialFuente.findFirst({ where: { proyectoId, recursoId: recurso.id } });
-    if (existente) return aDto(existente, recurso.nombre);
+    if (existente) return aDto(existente, recurso);
 
     const m = await this.bd.materialFuente.create({ data: { proyectoId, tipo, recursoId: recurso.id } });
     try {
-      await this.colas.encolar('media', { trabajoId: m.id, organizacionId, tarea: TAREA_EXTRAER });
+      await this.colas.encolar('media', { trabajoId: m.id, organizacionId, tarea: medio ? TAREA_TRANSCRIBIR : TAREA_EXTRAER });
     } catch (e) {
       // Sin Redis no queda un material pendiente que nadie va a procesar.
-      await this.bd.materialFuente.update({ where: { id: m.id }, data: { estado: 'error', error: 'No se pudo encolar la extracción; intenta de nuevo' } });
+      await this.bd.materialFuente.update({ where: { id: m.id }, data: { estado: 'error', error: `No se pudo encolar la ${medio ? 'transcripción' : 'extracción'}; intenta de nuevo` } });
       throw e;
     }
     await this.auditar(u, organizacionId, m.id, { tipo, recursoId: recurso.id, nombre: recurso.nombre });
-    return aDto(m, recurso.nombre);
+    return aDto(m, recurso);
   }
 
   private async proyecto(u: UsuarioSesion, id: string) {
