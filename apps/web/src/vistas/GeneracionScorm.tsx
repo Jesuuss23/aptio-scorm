@@ -8,6 +8,7 @@ import { usd } from '../formato';
 import { EstructuraVista } from './EstructuraVista';
 import { GuionVista } from './GuionVista';
 import { PantallasVista } from './PantallasVista';
+import { VozVista } from './VozVista';
 import { ResumenMaterialVista } from './ResumenMaterialVista';
 
 const ACTIVAS = new Set<Generacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -27,6 +28,7 @@ const RESULTADOS: Partial<Record<EtapaGeneracion['etapa'], {
   OBJETIVOS_ESTRUCTURA: { ver: 'Ver estructura', ocultar: 'Ocultar estructura', Vista: EstructuraVista },
   STORYBOARD_GUION: { ver: 'Ver guion', ocultar: 'Ocultar guion', Vista: GuionVista },
   PANTALLAS: { ver: 'Ver pantallas', ocultar: 'Ocultar pantallas', enVivo: true, Vista: PantallasVista },
+  VOZ_ES: { ver: 'Escuchar narraciones', ocultar: 'Ocultar narraciones', enVivo: true, Vista: VozVista },
 };
 
 function titulo(g: Generacion): string {

@@ -1,5 +1,8 @@
 export { leerSalidaSimulada, tareasSimuladas, validarSalida, type ResultadoSimulado } from './simulado.js';
-export { type AudioVoz, idiomaDeVoz, type PedidoVoz, sintetizarGoogle, VozNoDisponible, vozSimulada } from './voz.js';
+export {
+  type AudioVoz, costoVoz, duracionAudio, hashNarracion, idiomaDeVoz, MS_POR_CARACTER_SIMULADO, type PedidoVoz, type Sintetizador, sintetizadorDesdeEntorno, sintetizarGoogle,
+  TARIFA_VOZ_USD_MILLON, textoHablado, VozNoDisponible, vozSimulada,
+} from './voz.js';
 export { materialParaPrompt, neutralizar, type PaginaMaterial, paginasParaPrompt, pareceInstruccion, textoSeguro } from './material.js';
 export {
   armarPrompt, type Consumo, costoTexto, ejecutarTarea, INTENTOS_MAXIMOS, leerJson, type MensajeProveedor, type PromptArmado, type ProveedorTexto,

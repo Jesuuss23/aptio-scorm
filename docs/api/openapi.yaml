@@ -2221,6 +2221,7 @@ paths:
       tags:
       - Personaje y voz
       summary: Listar narraciones
+      description: Roles del equipo y REVISOR_CLIENTE (solo de su cliente; otro cliente responde 404). Ordenadas como las pantallas del curso. `audioUrl` es una URL firmada que vence a los 15 minutos; `duracionS` se redondea a 0,1 s. La etapa 6 del generador (VOZ_ES, HU-0701) las crea con la voz del kit y el diccionario de pronunciación.
       operationId: get_cursos_cursoId_narraciones
       parameters:
       - name: cursoId
@@ -2234,6 +2235,9 @@ paths:
         required: false
         schema:
           type: string
+          enum:
+          - es
+          - en
       responses:
         '200':
           description: OK
@@ -2249,6 +2253,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /cursos/{cursoId}/narraciones/regenerar:
     post:
       tags:

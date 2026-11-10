@@ -260,3 +260,31 @@ export function repeticionesSeguidas(pantallas: Pick<PantallaCompuesta, 'id' | '
   if (actual && actual.ids.length >= 3) tramos.push(actual);
   return tramos;
 }
+
+// ---------- Etapa 6 · Voz en español (HU-0701) ----------
+
+/** Una narración lista: la pantalla, su duración real y la voz con que se dijo. */
+export interface NarracionLista {
+  pantallaId: string;
+  titulo: string;
+  texto: string;
+  duracionMs: number;
+  voz: string;
+  /** Términos del diccionario de pronunciación aplicados (p. ej. «LOTO»). */
+  pronunciados: string[];
+}
+
+/** Resultado (y avance, mientras corre) de la etapa 6. */
+export interface VozCurso {
+  total: number;
+  cursoId: string;
+  narraciones: NarracionLista[];
+  simulada: boolean;
+}
+
+/** «4 min 12 s» a partir de milisegundos. */
+export function duracionLegible(ms: number): string {
+  const s = Math.round(ms / 1000);
+  const m = Math.floor(s / 60);
+  return m ? `${m} min ${s % 60} s` : `${s} s`;
+}

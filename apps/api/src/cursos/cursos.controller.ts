@@ -3,7 +3,7 @@ import { ApiConflictResponse, ApiCookieAuth, ApiOkResponse, ApiTags } from '@nes
 import { EQUIPO } from '../comun/organizacion.js';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
-import { AprobacionDto, CambioResultadoDto, FiltroObservacionesDto, ObservacionDto, PantallaCambioDto } from './curso.dto.js';
+import { AprobacionDto, CambioResultadoDto, FiltroNarracionesDto, FiltroObservacionesDto, NarracionDto, ObservacionDto, PantallaCambioDto } from './curso.dto.js';
 import { CursosService } from './cursos.service.js';
 
 /** docs/14-modulos.md: editan pantallas todos los del equipo; aprueban administración y diseño instruccional. */
@@ -21,6 +21,14 @@ export class CursosController {
   @ApiOkResponse({ type: ObservacionDto, isArray: true })
   observaciones(@UsuarioActual() u: UsuarioSesion, @Param('cursoId', ParseUUIDPipe) id: string, @Query() f: FiltroObservacionesDto): Promise<ObservacionDto[]> {
     return this.cursos.observaciones(u, id, f);
+  }
+
+  @Get('narraciones')
+  @Roles(...EQUIPO, 'REVISOR_CLIENTE')
+  @ApiTags('Personaje y voz')
+  @ApiOkResponse({ type: NarracionDto, isArray: true, description: 'HU-0701: estado (ACTUALIZADA = «Lista»), duración y audio firmado por 15 minutos' })
+  narraciones(@UsuarioActual() u: UsuarioSesion, @Param('cursoId', ParseUUIDPipe) id: string, @Query() f: FiltroNarracionesDto): Promise<NarracionDto[]> {
+    return this.cursos.narraciones(u, id, f);
   }
 
   @Patch('pantallas/:pantallaId')
