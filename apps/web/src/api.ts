@@ -237,6 +237,18 @@ export interface Observacion {
   creadoEn: string;
 }
 
+/** HU-0701 · Narración de una pantalla: ACTUALIZADA se muestra como «Lista». */
+export interface Narracion {
+  pantallaId: string;
+  idioma: 'es' | 'en';
+  texto?: string;
+  duracionS?: number;
+  origen: 'tts' | 'grabacion';
+  voz?: string;
+  estado: 'ACTUALIZADA' | 'DESACTUALIZADA' | 'GENERANDO' | 'ERROR';
+  audioUrl?: string;
+}
+
 /** HU-0502 · Resultado de editar o aprobar. */
 export interface CambioResultado {
   version: number;
@@ -289,6 +301,7 @@ export const api = {
   cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
+  narraciones: (cursoId: string, idioma: 'es' | 'en' = 'es') => pedir<Narracion[]>(`/cursos/${cursoId}/narraciones?idioma=${idioma}`),
   observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
   editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; narracion?: TextoI18n }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),

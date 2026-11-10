@@ -134,4 +134,25 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p06`, { version: 6, titulo: { es: '  ' } })).status).toBe(422);
     expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p99`, { version: 6, titulo: { es: 'x' } })).status).toBe(404);
   });
+
+  it('HU-0701 · lista las narraciones en el orden de las pantallas con su estado, duración y audio firmado', async () => {
+    const audio = await prisma.recurso.create({
+      data: { organizacionId: orgId, proyectoId, tipo: 'AUDIO', origen: 'GENERADO', claveS3: `org/${orgId}/voz-${sufijo}`, mime: 'audio/mpeg', bytes: 10, duracionMs: 4485, hash: 'x', nombre: 'p01-es.mp3', proveedor: 'google', modelo: 'es-US-Neural2-A' },
+    });
+    await prisma.narracion.createMany({
+      data: [
+        { cursoId, pantallaId: 'p02', idioma: 'es', textoHash: 'b', origen: 'tts', voz: 'es-US-Neural2-A', estado: 'DESACTUALIZADA' },
+        { cursoId, pantallaId: 'p01', idioma: 'es', textoHash: 'a', origen: 'tts', voz: 'es-US-Neural2-A', audioRecursoId: audio.id, estado: 'ACTUALIZADA' },
+      ],
+    });
+    const r = await como('productor').get(`/cursos/${cursoId}/narraciones?idioma=es`);
+    expect(r.status).toBe(200);
+    expect(r.body.map((n: { pantallaId: string }) => n.pantallaId)).toEqual(['p01', 'p02']);
+    expect(r.body[0]).toMatchObject({ idioma: 'es', estado: 'ACTUALIZADA', origen: 'tts', voz: 'es-US-Neural2-A', duracionS: 4.5, texto: 'Hola, te doy la bienvenida a esta cápsula sobre bloqueo y etiquetado.' });
+    expect(r.body[0].audioUrl).toMatch(/X-Amz-Signature=/);
+    expect(r.body[1]).not.toHaveProperty('audioUrl');
+    expect((await como('grafico').get(`/cursos/${cursoId}/narraciones?idioma=fr`)).status).toBe(422);
+    expect((await como('revisor').get(`/cursos/${cursoId}/narraciones`)).status).toBe(404);
+    await prisma.recurso.delete({ where: { id: audio.id } });
+  });
 });

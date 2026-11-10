@@ -3,8 +3,7 @@
 // esperar al resto (CP-043). Cada pantalla con actividad pide además sus datos a IA-07 (HU-0407, CP-044). Al terminar
 // se arma el documento del curso con los bloques y se valida (CP-042).
 import { type CursoDoc, observacionesRegla } from '@aptio/schema/revision';
-import { createHash } from 'node:crypto';
-import { textoSeguro } from '@aptio/ai';
+import { hashNarracion, textoSeguro } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
 import { validarCurso, VERSION_ESQUEMA } from '@aptio/schema';
 import {
@@ -333,7 +332,7 @@ function soloEs(t: { es?: string; en?: string }, respaldo: string): { es: string
 /** Narración pendiente de voz (la genera la etapa 6): el hash liga el audio al texto y a la voz del kit. */
 function narracion(texto: string, voz: { proveedor: string; voz: string; velocidad?: number }, personajeBloqueId?: string) {
   const velocidad = voz.velocidad ?? 1;
-  const hashTexto = createHash('sha256').update(`${texto}|${voz.voz}|${velocidad}`).digest('hex');
+  const hashTexto = hashNarracion(texto, voz.voz, velocidad);
   return {
     texto: { es: texto },
     ...(personajeBloqueId ? { personajeBloqueId } : {}),

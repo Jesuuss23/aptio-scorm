@@ -70,6 +70,22 @@ describe.skipIf(!baseLista && !process.env.CI)('orquestador de la generación', 
     completar: async (p) => ({ ...(await base.completar(p)), modelo: 'claude-opus-5-5', consumo: { tokensEntrada: 12_000, tokensSalida: 2_500, tokensCacheLeidos: 0, tokensCacheEscritos: 0 } }),
   };
 
+  it('una etapa sin ejecutor no frena las siguientes que ya existen (Ilustraciones en espera, la voz corre)', async () => {
+    const g = await nuevaGeneracion();
+    const hecha: EjecutorEtapa = async () => ({ texto: 'hecho' });
+    const ejecutores = Object.fromEntries(['RESUMEN_MATERIAL', 'OBJETIVOS_ESTRUCTURA', 'STORYBOARD_GUION', 'PANTALLAS', 'VOZ_ES'].map((e) => [e, hecha]));
+    const generar = crearGenerador({ bd: prisma, redis, proveedor: conCosto, ejecutores });
+    expect(await generar(trabajo(g.id))).toEqual({ estado: 'COMPLETADO' });
+    const lista = await etapas(g.id);
+    const estado = Object.fromEntries(lista.map((e) => [e.etapa, e.estado]));
+    expect(estado).toMatchObject({ PANTALLAS: 'COMPLETADO', ILUSTRACIONES: 'EN_COLA', VOZ_ES: 'COMPLETADO', BOCA: 'EN_COLA', PAQUETE: 'EN_COLA' });
+    expect((lista.find((e) => e.etapa === 'ILUSTRACIONES')!.detalle as { texto: string }).texto).toBe(DETALLE_PROXIMAMENTE);
+    // Continuar no repite la voz y vuelve a saltar Ilustraciones.
+    await continuarComoApi(g.id);
+    expect(await generar(trabajo(g.id))).toEqual({ estado: 'COMPLETADO' });
+    expect((await etapas(g.id)).find((e) => e.etapa === 'VOZ_ES')!.estado).toBe('COMPLETADO');
+  });
+
   it('CP-036 · corre las etapas en orden, suma el costo y deja en cola las que aún no existen', async () => {
     const g = await nuevaGeneracion();
     let recibido: unknown;

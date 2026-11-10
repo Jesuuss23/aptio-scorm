@@ -29,9 +29,11 @@ test('CP-036 · lanza la generación y muestra las 11 etapas avanzando con su co
   await expect(etapa(gen, 'Pantallas con el kit')).toContainText('Lista', { timeout: 20_000 });
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('30 páginas → 29 ideas clave');
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('US$ 0.35');
+  await expect(etapa(gen, 'Voz en español')).toContainText('Lista', { timeout: 20_000 });
+  await expect(etapa(gen, 'Ilustraciones')).toContainText('Se habilita en un sprint siguiente');
   await expect(etapa(gen, 'Paquete de prueba')).toContainText('Se habilita en un sprint siguiente');
-  await expect(gen.getByText('36 %')).toBeVisible();
-  await expect(gen.getByText('US$ 1.50')).toBeVisible();
+  await expect(gen.getByText('45 %')).toBeVisible();
+  await expect(gen.getByText('US$ 1.53')).toBeVisible();
   await expect(gen.getByRole('button', { name: 'Generar de nuevo' })).toBeVisible();
 });
 
@@ -164,4 +166,27 @@ test('CP-043 · las pantallas aparecen en Producción mientras la etapa 4 corre;
   await expect(final.getByText('Calificada')).toHaveCount(1);
   await final.getByRole('button', { name: 'Celular' }).click();
   await expect(final.locator('.miniatura.celular')).toHaveCount(30);
+});
+
+test('CP-071 · la etapa 6 deja cada narración Lista con su duración, y se puede escuchar', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const gen = await conTema(page);
+  await gen.getByRole('button', { name: 'Generar SCORM' }).click();
+  const voz = etapa(gen, 'Voz en español');
+  // Mientras corre, las narraciones listas aparecen sin esperar al resto.
+  await expect(voz.getByText(/^(10|20) de 30 narraciones listas$/).first()).toBeVisible({ timeout: 25_000 });
+  await expect(voz).toContainText('30 narraciones listas · 2 min 10 s de audio · voz es-US-Neural2-A', { timeout: 20_000 });
+  await expect(etapa(gen, 'Ilustraciones')).toContainText('En espera');
+
+  await voz.getByRole('button', { name: 'Escuchar narraciones' }).click();
+  const lista = voz.getByRole('list', { name: 'Narraciones' }).getByRole('listitem');
+  await expect(lista).toHaveCount(30);
+  await expect(voz.getByText('30 de 30 narraciones listas · 2 min 10 s de audio')).toBeVisible();
+  const p01 = voz.getByRole('listitem', { name: 'Narración p01' });
+  await expect(p01).toContainText('Hola, te doy la bienvenida a esta cápsula sobre bloqueo y etiquetado.');
+  await expect(p01).toContainText('4.5 s');
+  await expect(p01.getByText('Lista', { exact: true })).toBeVisible();
+  await expect(p01.getByLabel('Escuchar la narración de p01')).toHaveAttribute('src', /s3-simulado\/p01-es\.mp3$/);
+  await expect(voz.getByRole('listitem', { name: 'Narración p16' })).toContainText('Pronunciación del diccionario: candado');
+  await expect(lista.filter({ hasText: 'Lista' })).toHaveCount(30);
 });

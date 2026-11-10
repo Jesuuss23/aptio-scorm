@@ -148,14 +148,29 @@ export const OBSERVACIONES = [
 export const cursoLoto = () => JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8')) as Record<string, unknown>;
 
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
-const ETAPAS_SIMULADAS = [
-  { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
-  { detalle: '3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad', costoUsd: 0.1 },
-  { detalle: '30 pantallas con texto en pantalla y narración · 1 pantalla supera 30 palabras en pantalla', costoUsd: 0.45 },
-  { detalle: '30 pantallas armadas con el kit · 9 actividades con sus datos · curso validado', costoUsd: 0.6 },
-];
-/** Pantallas que la etapa 4 deja listas en cada consulta. */
+const ETAPAS_SIMULADAS: Record<string, { detalle: string; costoUsd: number }> = {
+  RESUMEN_MATERIAL: { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
+  OBJETIVOS_ESTRUCTURA: { detalle: '3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad', costoUsd: 0.1 },
+  STORYBOARD_GUION: { detalle: '30 pantallas con texto en pantalla y narración · 1 pantalla supera 30 palabras en pantalla', costoUsd: 0.45 },
+  PANTALLAS: { detalle: '30 pantallas armadas con el kit · 9 actividades con sus datos · curso validado', costoUsd: 0.6 },
+  // HU-0701: 1998 caracteres con Neural2 (SUP-34). Ilustraciones (S9) queda en espera y no frena la voz.
+  VOZ_ES: { detalle: '30 narraciones listas · 2 min 10 s de audio · voz es-US-Neural2-A', costoUsd: 0.03 },
+};
+/** Pantallas que la etapa 4 deja listas en cada consulta (y narraciones, la etapa 6). */
 const PANTALLAS_POR_CONSULTA = 10;
+
+/** HU-0701 · Resultado de la etapa 6 con las narraciones del curso LOTO; con `listas` < 30 sigue en curso. */
+export function vozLoto(listas: number) {
+  const pantallas = (cursoLoto().modulos as { capsulas: { pantallas: { id: string; titulo: { es: string }; narracion: { texto: { es: string }; porIdioma: { es: { duracionMs: number; voz: { voz: string } } } } }[] }[] }[])
+    .flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
+  return {
+    total: 30, cursoId: CURSO_ID, simulada: false,
+    narraciones: pantallas.slice(0, listas).map((p) => ({
+      pantallaId: p.id, titulo: p.titulo.es, texto: p.narracion.texto.es, duracionMs: p.narracion.porIdioma.es.duracionMs, voz: p.narracion.porIdioma.es.voz.voz,
+      pronunciados: p.narracion.texto.es.includes('candado') ? ['candado'] : [],
+    })),
+  };
+}
 
 /** CP-033: el manual de ejemplo tiene 84 páginas y la 42 está escaneada; un archivo «inyeccion» trae una orden para la IA (CP-102). */
 function paginasDe(nombre: string) {
@@ -359,17 +374,20 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         estadoDe(g.proyectoId, 'BORRADOR');
         return;
       }
-      if (e.etapa === 'PANTALLAS') {
-        const listas = Math.min((pantallasListas.get(g.id) ?? 0) + PANTALLAS_POR_CONSULTA, 30);
-        pantallasListas.set(g.id, listas);
+      if (e.etapa === 'PANTALLAS' || e.etapa === 'VOZ_ES') {
+        const clave = `${g.id}:${e.etapa}`;
+        const listas = Math.min((pantallasListas.get(clave) ?? 0) + PANTALLAS_POR_CONSULTA, 30);
+        pantallasListas.set(clave, listas);
         if (listas < 30) {
-          e.detalle = `${listas} de 30 pantallas listas`;
+          e.detalle = `${listas} de 30 ${e.etapa === 'PANTALLAS' ? 'pantallas' : 'narraciones'} listas`;
           return;
         }
       }
-      Object.assign(e, { estado: 'COMPLETADO', ...ETAPAS_SIMULADAS[e.orden - 1] });
-      const siguiente = g.etapas.find((x) => x.estado === 'EN_COLA');
-      if (siguiente && siguiente.orden <= ETAPAS_SIMULADAS.length) {
+      Object.assign(e, { estado: 'COMPLETADO', ...ETAPAS_SIMULADAS[e.etapa] });
+      // Las etapas sin ejecutor quedan en espera; la generación sigue con la siguiente que sí lo tiene (SUP-24).
+      const siguiente = g.etapas.find((x) => x.estado === 'EN_COLA' && x.orden > e.orden && ETAPAS_SIMULADAS[x.etapa]);
+      for (const x of g.etapas.filter((y) => y.estado === 'EN_COLA' && y.orden > e.orden && (!siguiente || y.orden < siguiente.orden))) x.detalle = DETALLE_PROXIMAMENTE;
+      if (siguiente) {
         siguiente.estado = 'EN_CURSO';
       } else {
         for (const x of g.etapas.filter((y) => y.estado === 'EN_COLA')) x.detalle = DETALLE_PROXIMAMENTE;
@@ -411,7 +429,9 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const e = generaciones.find((x) => x.id === etapaDe[1])?.etapas.find((x) => x.etapa === etapaDe[2]);
       if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Etapa no encontrada' });
       const g = generaciones.find((x) => x.id === etapaDe[1])!;
-      const datos = e.etapa === 'PANTALLAS' && ['EN_CURSO', 'COMPLETADO'].includes(e.estado) ? pantallasLoto(e.estado === 'COMPLETADO' ? 30 : (pantallasListas.get(g.id) ?? 0))
+      const listas = (etapa: string) => (e.estado === 'COMPLETADO' ? 30 : (pantallasListas.get(`${g.id}:${etapa}`) ?? 0));
+      const datos = e.etapa === 'PANTALLAS' && ['EN_CURSO', 'COMPLETADO'].includes(e.estado) ? pantallasLoto(listas('PANTALLAS'))
+        : e.etapa === 'VOZ_ES' && ['EN_CURSO', 'COMPLETADO'].includes(e.estado) ? vozLoto(listas('VOZ_ES'))
         : e.estado !== 'COMPLETADO' ? null : e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : e.etapa === 'OBJETIVOS_ESTRUCTURA' ? estructuraLoto() : e.etapa === 'STORYBOARD_GUION' ? guionLoto() : null;
       return responder(200, { ...e, datos });
     }
@@ -443,6 +463,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).
     if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);
+    if (ruta === `/cursos/${CURSO_ID}/narraciones`) {
+      return responder(200, vozLoto(30).narraciones.map((n) => ({
+        pantallaId: n.pantallaId, idioma: 'es', texto: n.texto, duracionS: Math.round(n.duracionMs / 100) / 10, origen: 'tts', voz: n.voz, estado: 'ACTUALIZADA',
+        audioUrl: `${new URL(req.url()).origin}/s3-simulado/${n.pantallaId}-es.mp3`,
+      })));
+    }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
       const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; narracion?: { es: string } };
