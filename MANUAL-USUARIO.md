@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.9 · actualizado con la segunda entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.10 · actualizado con la tercera entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -122,6 +122,8 @@ Son plantillas de pantalla propias del cliente (por ejemplo, cómo se ve una por
 - **Pronunciación:** cómo debe leer la voz una palabra difícil o una sigla (por ejemplo, que «LOTO» se lea «lo-to»). Guarda con **Guardar pronunciación**.
 - **Escuchar muestra:** escribe una frase y escucha cómo la dirá la voz con esas reglas.
 
+Al guardar un cambio de pronunciación, las narraciones ya generadas que usan esa palabra quedan **«Por regenerar»** (ver 8.4).
+
 ---
 
 ## 6. Proyectos
@@ -230,6 +232,14 @@ Las pantallas que la IA agregó por su cuenta (una transición o un ejemplo) lle
 
 Si una etapa falla (por ejemplo, porque el servicio de IA no respondió), verás el motivo en rojo y podrás pulsar **Continuar** más tarde.
 
+**Narraciones «Por regenerar».** Una narración queda «Por regenerar» cuando cambia algo que afecta cómo suena: corriges su texto en Revisión o cambias la pronunciación de una palabra que usa. Si solo corriges el título, sigue «Lista». Al pulsar **Escuchar narraciones** verás un aviso amarillo con cuántas están así, y cada una lleva la marca «Por regenerar» en lugar de «Lista». Mientras tanto se sigue escuchando el audio anterior.
+
+Para actualizarlas, pulsa **Regenerar las desactualizadas (N)** en ese aviso. El botón lo ve el equipo (administración, diseño instruccional, diseño gráfico y producción), no el revisor del cliente. La generación retoma solo las etapas de voz y boca:
+
+- Se vuelven a narrar únicamente las que de verdad cambiaron, con su boca. Las demás no se tocan ni se vuelven a pagar.
+- Si una estaba marcada pero lo que dice la voz no cambió, vuelve a «Lista» sin costo.
+- Si ya hay una generación en curso, espera a que termine. Por ahora solo se regenera el español; el inglés llega con su etapa.
+
 ### 8.5 Costo de IA
 
 Cada etapa muestra lo que costó, y el proyecto suma el total. Ese costo también aparece en la lista de proyectos. Si una generación se cancela, lo que ya se gastó se cuenta igual.
@@ -329,6 +339,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.10 | 2026-11-10 | Narraciones «Por regenerar»: cuándo aparecen, el aviso en Producción y el botón para regenerar solo las que cambiaron. |
 | 0.9 | 2026-11-10 | Boca del personaje: Ana habla con la boca sincronizada al escuchar las narraciones y en la vista previa. |
 | 0.8 | 2026-11-10 | Voz en español: la generación narra cada pantalla con la voz del kit y se escuchan en «Escuchar narraciones». |
 | 0.7 | 2026-11-10 | Revisión: filtros, corregir título y narración, control de calidad, origen y aprobación de pantallas una por una o todas las que no tienen observaciones. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.9 · actualizado con la segunda entrega del Sprint 4 (10 de noviembre de 2026)**
+**Versión 0.10 · actualizado con la tercera entrega del Sprint 4 (10 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -102,6 +102,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - **Organización:** el worker vuelve a buscar cada entidad con la `organizacionId` del trabajo y nunca procesa datos de otra organización.
 - **Si no se puede encolar,** la entidad queda en `error` con un motivo legible y nunca en `pendiente` para siempre.
 - **Avance en vivo:** se publica con `publicarEvento` (`@aptio/colas`) y la API lo reenvía por SSE.
+- **Id del trabajo:** BullMQ descarta un trabajo con un id repetido y no acepta «:» en un id propio. La generación usa `{generacionId}-{intento}`; `GeneracionesService.intento()` cuenta las auditorías `GENERACION_CONTINUADA` y `NARRACIONES_REGENERADAS`.
 
 ### 6.3 Tareas de IA
 
@@ -169,12 +170,20 @@ Una etapa sin ejecutor ya no frena a las siguientes: si alguna posterior sí tie
 
 La etapa 6 (`apps/worker/src/etapas/voz.ts`) es el modelo para etapas de medios. `crearEtapaVoz({ sintetizar, subir, esperaMs })` recibe el sintetizador y la subida al almacenamiento para que las pruebas los reemplacen. Para cada pantalla:
 
-- calcula `hashNarracion(texto, voz, velocidad, términos)` (`@aptio/ai`, RN-07-1) y reutiliza la `Narracion` ACTUALIZADA con el mismo hash;
+- calcula `hashNarracion(texto, voz, velocidad, términos)` (`@aptio/ai`, RN-07-1) y reutiliza la `Narracion` con audio y el mismo hash (si estaba DESACTUALIZADA, vuelve a ACTUALIZADA);
 - aplica `aplicarPronunciacion` y reintenta hasta `INTENTOS_VOZ = 3`;
 - mide la duración con `duracionAudio` (WAV y MP3);
 - guarda `Recurso` y `Narracion` en una transacción, y un `TrabajoIA` con `costoVoz`.
 
 Al final actualiza el curso con bloqueo optimista y una `CursoVersion` con motivo `voz`. En el worker se registra en `index.ts` con `sintetizadorDesdeEntorno(process.env)`.
+
+**Regenerar (HU-0703).** `POST /cursos/{id}/narraciones/regenerar` (`GeneracionesService.regenerarNarraciones`) no crea otra generación. Bajo el mismo bloqueo de aviso que «Continuar», reabre VOZ_ES y BOCA de la última, guarda `parametros.regenerarVoz = { pantallaIds?, forzar }` (tipo `RegenerarVoz`) y encola. La etapa 6 lee ese pedido:
+
+- una pantalla fuera de `pantallaIds` conserva su audio y su estado;
+- dentro del pedido, decide el hash, salvo con `forzar`, que pide una toma nueva;
+- toda narración con audio nuevo queda con `bocas: null`, para que la etapa 7 la recalcule.
+
+La etapa 7 acepta narraciones ACTUALIZADA y DESACTUALIZADA con audio. Las marcas a DESACTUALIZADA las ponen la API al guardar el diccionario (`GlosarioService`, RN-02-4) y `CursosService.editar` cuando cambia el texto de la narración.
 
 La etapa 7 (`apps/worker/src/etapas/boca.ts`) sigue el mismo molde: `crearEtapaBoca({ calcular, leer })` recibe un `CalculadorBocas` y la lectura del almacenamiento.
 - `calculadorBocasDesdeEntorno(env)` (`src/extraer/rhubarb.ts`) devuelve `calculadorSimulado` en modo simulado o `calculadorRhubarb(RHUBARB_PATH)`, que pasa el audio por ffmpeg a WAV y corre `rhubarb -r phonetic -f json --extendedShapes GHX`.
@@ -245,6 +254,7 @@ Ninguna clave real va al repositorio.
 | La etapa 6 falla con «La voz de azure todavía no está disponible» | El kit usa una voz que no es de Google | Elige una voz de Google en el kit (SUP-34) |
 | La etapa 7 falla con «Rhubarb Lip Sync no está instalado» | Modo real sin Rhubarb en el worker | Instala Rhubarb 1.13 y define `RHUBARB_PATH` |
 | En la vista previa se ven todas las bocas encimadas | El SVG se insertó sin `mostrarBoca(svg, 'X')` | Inserta siempre con `svgEnLinea` y deja la boca en reposo |
+| `Custom Id cannot contain :` al encolar | Un id de trabajo con «:» | Usa «-» como separador |
 | `openapi:lint` con más de 7 avisos | Un componente sin usar o `nullable` sin `type` | Usa el componente o agrega `type` |
 | oxlint «solo exportar componentes» | Una función auxiliar en un `.tsx` | Muévela a `formato.ts` |
 
@@ -254,6 +264,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.10 | 2026-11-10 | Regenerar narraciones (`regenerarVoz`, `intento()`, id de trabajo con «-») y marcas «Por regenerar» desde Revisión. |
 | 0.9 | 2026-11-10 | Etapa 7 de boca (`crearEtapaBoca`, Rhubarb), módulo `boca.ts` del reproductor, «Siguiente» tras la narración y `urlsRecursos`/`svgPersonajes`. |
 | 0.8 | 2026-11-10 | Etapa 6 de voz (`crearEtapaVoz`), `ctx.gastar` y `ctx.comprobar`, `hashNarracion`, `duracionAudio`, `costoVoz` y `GET /cursos/{id}/narraciones`. |
 | 0.7 | 2026-11-10 | Módulo `cursos` (observaciones, editar y aprobar con bloqueo optimista), `@aptio/schema/revision` y la opción `marco` del reproductor. |
