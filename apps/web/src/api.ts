@@ -263,11 +263,16 @@ export interface Narracion {
   voz?: string;
   estado: 'ACTUALIZADA' | 'DESACTUALIZADA' | 'GENERANDO' | 'ERROR';
   audioUrl?: string;
+  /** HU-0702 · Marcas de boca calculadas del audio. */
+  bocas?: unknown[];
+  /** HU-0801 · WebVTT firmado. */
+  subtitulosUrl?: string;
 }
 
 /** HU-0502 · Resultado de editar o aprobar. */
 export interface CambioResultado {
   version: number;
+  /** HU-0503 · Lo que se regenera en cascada: `voz-es`, `boca` y `subtitulos-es`. */
   regenerando: string[];
   aprobadas?: string[];
   pendientes?: string[];

@@ -6,8 +6,9 @@ import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas } fro
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
-import { TAREA_GENERAR } from '@aptio/schema/generacion';
+import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
+import { crearCascada } from './cascada.js';
 import { EJECUTORES } from './etapas/index.js';
 import { crearEtapaVoz } from './etapas/voz.js';
 import { crearEtapaSubtitulos } from './etapas/subtitulos.js';
@@ -44,10 +45,13 @@ const subtitulos = crearEtapaSubtitulos({ subir: (clave, cuerpo, mime) => almace
 const generar = crearGenerador({
   bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: { ...EJECUTORES, VOZ_ES: vozEs, BOCA: boca, SUBTITULOS: subtitulos },
 });
+// La regeneración en cascada (HU-0503) corre las etapas 6, 7 y 8 de una sola pantalla, fuera de la generación.
+const cascada = crearCascada({ bd: prisma, voz: vozEs, boca, subtitulos });
 const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
   if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);
   if (trabajo.data.tarea === TAREA_GENERAR) return generar(trabajo);
+  if (trabajo.data.tarea === TAREA_CASCADA) return cascada(trabajo);
   return procesar(trabajo);
 };
 

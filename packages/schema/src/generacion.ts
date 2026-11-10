@@ -27,6 +27,12 @@ export type EstadoTrabajo = (typeof ESTADOS_TRABAJO)[number];
 export const ACTIVOS: readonly EstadoTrabajo[] = ['EN_COLA', 'EN_CURSO'];
 /** Tarea de la cola `ia` que ejecuta una generación completa en el worker. */
 export const TAREA_GENERAR = 'GENERAR';
+/** HU-0503 · Regeneración en cascada de una pantalla (voz, boca y subtítulos), en la cola `voz`, fuera de la generación. */
+export const TAREA_CASCADA = 'CASCADA';
+/** Espera sin cambios antes de lanzar la cascada (RN-05-5): otro guardado de la misma pantalla la reemplaza. */
+export const ESPERA_CASCADA_MS = 1000;
+/** Lo que se regenera en cascada al cambiar una narración en español (SUP-38: el inglés llega en el S7). */
+export const CASCADA_ES = ['voz-es', 'boca', 'subtitulos-es'] as const;
 /** Detalle de una etapa cuyo ejecutor aún no existe (se habilita en sprints siguientes). */
 export const DETALLE_PROXIMAMENTE = 'Se habilita en un sprint siguiente';
 

@@ -27,7 +27,7 @@ export class AprobacionDto {
 
 export class CambioResultadoDto {
   @ApiProperty() version: number;
-  @ApiProperty({ type: [String], description: 'Lo que se regenera en cascada (voz, boca, subtítulos, inglés). Vacío hasta el S4.' }) regenerando: string[];
+  @ApiProperty({ type: [String], description: 'HU-0503 · Lo que se regenera en cascada tras el cambio: `voz-es`, `boca` y `subtitulos-es` cuando cambia la narración en español de una pantalla que ya tenía voz. El inglés se suma en el S7.' }) regenerando: string[];
   @ApiPropertyOptional({ type: [String] }) aprobadas?: string[];
   @ApiPropertyOptional({ type: [String], description: 'Las que no se aprobaron porque tienen observaciones abiertas' }) pendientes?: string[];
   @ApiPropertyOptional({ description: 'Estado de la pantalla después del cambio' }) estado?: string;
@@ -63,5 +63,6 @@ export class NarracionDto {
   @ApiPropertyOptional() voz?: string;
   @ApiProperty({ enum: ['ACTUALIZADA', 'DESACTUALIZADA', 'GENERANDO', 'ERROR'] }) estado: string;
   @ApiPropertyOptional({ format: 'uri' }) audioUrl?: string;
+  @ApiPropertyOptional({ type: 'array', items: { type: 'array', items: {} }, description: "[[ms, 'A'..'X'], …]" }) bocas?: unknown[];
   @ApiPropertyOptional({ format: 'uri', description: 'HU-0801 · WebVTT de la narración (URL firmada de 15 minutos)' }) subtitulosUrl?: string;
 }

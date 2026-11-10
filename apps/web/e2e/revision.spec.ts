@@ -1,5 +1,5 @@
 // HU-0501 y HU-0502 · Revisión (PNT-20): filtro (CP-046), origen (CP-047), aprobar por lote (CP-048) y una aprobada que
-// cambia vuelve a borrador (CP-049).
+// cambia vuelve a borrador (CP-049). HU-0503 · corregir la narración regenera voz, boca y subtítulos (CP-050).
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
 
@@ -86,6 +86,26 @@ test.describe('con el diseñador instruccional', () => {
     await expect(page.getByRole('button', { name: 'Aprobar pantalla' })).toBeEnabled();
   });
 
+  test('CP-050 · corregir la narración muestra la voz, la boca y los subtítulos regenerándose hasta quedar listos', async ({ page }) => {
+    await page.goto(URL_REVISION);
+    await elegir(page, 'Apagado no es lo mismo que seguro');
+    const textos = page.getByRole('region', { name: 'Textos' });
+    await textos.getByLabel('Narración').fill('Apagar la máquina no la deja segura: bloquea cada fuente de energía.');
+    await textos.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.getByText('Cambios guardados. Se regeneran su voz, su boca y sus subtítulos en español.')).toBeVisible();
+    const chips = page.getByRole('region', { name: 'Regeneración' }).getByRole('listitem');
+    await expect(chips).toHaveText(['Voz ES: Regenerando…', 'Boca: Regenerando…', 'Subtítulos ES: Regenerando…']);
+    await expect(chips.first()).toHaveText('Voz ES: Lista', { timeout: 10_000 });
+    await expect(chips).toHaveText(['Voz ES: Lista', 'Boca: Lista', 'Subtítulos ES: Lista'], { timeout: 10_000 });
+    await expect(chips.filter({ hasText: 'Lista' })).toHaveClass(Array(3).fill(/validado/));
+    // Cambiar solo el título no regenera nada.
+    await elegir(page, 'Bloqueo y etiquetado');
+    await textos.getByLabel('Título en pantalla').fill('Bloqueo y etiquetado en planta');
+    await textos.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.getByRole('status').filter({ hasText: /^Cambios guardados\.$/ })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Regeneración' })).toHaveCount(0);
+  });
+
   test('sin cambios no se guarda; sin pantallas se explica qué hacer', async ({ page }) => {
     await page.goto(URL_REVISION);
     await expect(page.getByRole('button', { name: 'Guardar cambios' })).toBeDisabled();
@@ -125,4 +145,15 @@ test('en celular (390 px) la revisión no desborda y usa solo la escala de letra
   });
   expect(medida.scroll).toBeLessThanOrEqual(medida.ancho);
   for (const t of medida.tamanos) expect([11, 12, 14, 16, 20, 26]).toContain(t);
+});
+
+test('HU-0503 · si la voz falla, los chips quedan en error y se explica qué hacer', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL', cascada: 'falla' });
+  await page.goto(URL_REVISION);
+  const textos = page.getByRole('region', { name: 'Textos' });
+  await textos.getByLabel('Narración').fill('Hola, soy Ana. Hoy aprendes a bloquear y etiquetar.');
+  await textos.getByRole('button', { name: 'Guardar cambios' }).click();
+  const region = page.getByRole('region', { name: 'Regeneración' });
+  await expect(region.getByRole('listitem')).toHaveText(['Voz ES: Error', 'Boca: Error', 'Subtítulos ES: Error'], { timeout: 10_000 });
+  await expect(region.getByText(/No se pudo regenerar la voz de esta pantalla/)).toBeVisible();
 });
