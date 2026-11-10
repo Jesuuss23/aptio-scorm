@@ -33,3 +33,8 @@ export class GeneracionDto {
   @ApiProperty() creadoEn: string;
   @ApiProperty({ nullable: true }) terminadoEn: string | null;
 }
+
+export class EtapaResultadoDto extends EtapaDto {
+  @ApiProperty({ nullable: true, description: 'Lo que guardó la etapa (p. ej. ResumenMaterial en RESUMEN_MATERIAL); null si no terminó' })
+  datos: unknown;
+}

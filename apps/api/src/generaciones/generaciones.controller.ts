@@ -2,13 +2,14 @@
 import {
   Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Sse, type MessageEvent,
 } from '@nestjs/common';
-import { ApiAcceptedResponse, ApiCookieAuth, ApiOkResponse, ApiProduces, ApiTags } from '@nestjs/swagger';
+import { ApiAcceptedResponse, ApiCookieAuth, ApiOkResponse, ApiParam, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { filter, interval, map, merge, type Observable } from 'rxjs';
+import { ETAPAS } from '@aptio/schema/generacion';
 import { EQUIPO, organizacionDe } from '../comun/organizacion.js';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { EventosService } from '../trabajos/eventos.service.js';
-import { GeneracionDto, GeneracionEntradaDto } from './generacion.dto.js';
+import { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto } from './generacion.dto.js';
 import { GeneracionesService } from './generaciones.service.js';
 
 /** Lanzan, cancelan y continúan administración, diseño instruccional y producción (docs/14-modulos.md, M04). */
@@ -43,6 +44,17 @@ export class GeneracionesController {
   @ApiOkResponse({ type: GeneracionDto })
   ver(@UsuarioActual() u: UsuarioSesion, @Param('generacionId', ParseUUIDPipe) id: string): Promise<GeneracionDto> {
     return this.generaciones.ver(u, id);
+  }
+
+  @Get('generaciones/:generacionId/etapas/:etapa')
+  @ApiParam({ name: 'etapa', enum: ETAPAS })
+  @ApiOkResponse({ type: EtapaResultadoDto, description: 'Una etapa que no existe responde 404' })
+  verEtapa(
+    @UsuarioActual() u: UsuarioSesion,
+    @Param('generacionId', ParseUUIDPipe) id: string,
+    @Param('etapa') etapa: string,
+  ): Promise<EtapaResultadoDto> {
+    return this.generaciones.etapa(u, id, etapa);
   }
 
   @Post('generaciones/:generacionId/cancelar')

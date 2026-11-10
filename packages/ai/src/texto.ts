@@ -109,6 +109,14 @@ export function leerJson(texto: string): { datos?: unknown; error?: string } {
   }
 }
 
+/** Esquema primero; las reglas propias solo corren sobre una salida con la forma correcta. */
+function revisar(tarea: string, datos: unknown, extra?: (datos: unknown) => string[]): string[] {
+  // validarSalida acepta listas (salidas grabadas con varias respuestas); una respuesta debe ser un solo objeto.
+  if (Array.isArray(datos)) return ['La respuesta debe ser un objeto JSON, no una lista'];
+  const errores = validarSalida(tarea, datos);
+  return errores.length ? errores : (extra?.(datos) ?? []);
+}
+
 const sumar = (a: Consumo, b: Consumo): Consumo => ({
   tokensEntrada: a.tokensEntrada + b.tokensEntrada,
   tokensSalida: a.tokensSalida + b.tokensSalida,
@@ -165,7 +173,7 @@ export async function ejecutarTarea<T = unknown>(
     consumo = sumar(consumo, r.consumo);
     costoUsd = Math.round((costoUsd + costoTexto(r.modelo, r.consumo)) * 10_000) / 10_000;
     const leido = leerJson(r.texto);
-    errores = leido.error ? [leido.error] : [...validarSalida(tarea, leido.datos), ...(opciones.validarExtra?.(leido.datos) ?? [])];
+    errores = leido.error ? [leido.error] : revisar(tarea, leido.datos, opciones.validarExtra);
     const registro = { proveedor: proveedor.nombre, modelo, versionPrompt: `${tarea}.${prompt.version}`, intentos: intento, consumo, costoUsd, duracionMs: Date.now() - inicio };
     if (!errores.length) return { datos: leido.datos as T, ...registro };
     if (intento === INTENTOS_MAXIMOS) throw new SalidaNoValida(tarea, errores, registro);
@@ -183,6 +191,24 @@ export async function ejecutarTarea<T = unknown>(
 // ---------- Proveedor simulado ----------
 
 /**
+ * Ajusta la salida grabada del caso LOTO al pedido: de una lista por tema (IA-03) toma la del tema pedido o, si no
+ * existe, la primera con el id del tema; y usa el documentoId pedido (IA-01).
+ */
+function ajustarAlPedido(datos: unknown, pedido: string): unknown {
+  const temaId = pedido.match(/temaId = "([^"]+)"/)?.[1];
+  if (Array.isArray(datos)) {
+    const lista = datos as { temaId?: string; fragmentos?: { id: string }[] }[];
+    const propia = lista.find((d) => d.temaId === temaId);
+    if (propia || !temaId) return propia ?? lista[0];
+    const base = lista[0]!;
+    return { ...base, temaId, fragmentos: (base.fragmentos ?? []).map((f, i) => ({ ...f, id: `${temaId}-f${String(i + 1).padStart(2, '0')}` })) };
+  }
+  const documentoId = pedido.match(/documentoId = "([^"]+)"/)?.[1];
+  if (documentoId && datos && typeof datos === 'object' && 'documentoId' in datos) return { ...datos, documentoId };
+  return datos;
+}
+
+/**
  * Responde con las salidas grabadas del caso LOTO (modo simulado). `guion` permite a las pruebas forzar respuestas
  * (por ejemplo, una salida inválida) antes de la grabada.
  */
@@ -195,7 +221,7 @@ export function proveedorSimulado(guion: Partial<Record<string, string[]>> = {})
     async completar({ tarea, mensajes }) {
       llamadas.push({ tarea, mensajes: mensajes.map((m) => ({ ...m })) });
       const forzada = guion[tarea]?.shift();
-      const texto = forzada ?? JSON.stringify(leerSalidaSimulada(tarea).datos);
+      const texto = forzada ?? JSON.stringify(ajustarAlPedido(leerSalidaSimulada(tarea).datos, mensajes[0]?.texto ?? ''));
       return { texto, modelo: 'simulado-loto', consumo: SIN_CONSUMO };
     },
   };

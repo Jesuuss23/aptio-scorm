@@ -9,7 +9,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { crearGenerador, type EjecutorEtapa } from '../src/generar.js';
 
 const baseLista = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
-const variables = { cliente: { nombre: 'Minera Andina' }, documento: { id: 'd', nombre: 'm.pdf', rango: '1-2', texto_por_pagina: 'x' } };
+const variables = { cliente: { nombre: 'Minera Andina' }, documento: { id: 'doc-1', nombre: 'm.pdf', rango: '1-2', texto_por_pagina: 'x' } };
 
 describe.skipIf(!baseLista && !process.env.CI)('orquestador de la generación', () => {
   const sufijo = Math.random().toString(36).slice(2, 8);

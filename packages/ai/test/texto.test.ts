@@ -31,7 +31,15 @@ describe('salidas validadas y reintentos (CP-041)', () => {
   it('una salida válida se acepta al primer intento', async () => {
     const r = await ejecutarTarea(proveedorSimulado(), 'IA-01', variables);
     expect(r).toMatchObject({ proveedor: 'simulado', modelo: 'simulado-loto', versionPrompt: 'IA-01.v1', intentos: 1, costoUsd: 0 });
-    expect(r.datos).toEqual(valida);
+    // El modo simulado responde el caso LOTO con el documentoId pedido.
+    expect(r.datos).toEqual({ ...valida, documentoId: 'doc-1' });
+  });
+
+  it('una lista en vez de un objeto no se acepta', async () => {
+    const prov = proveedorSimulado({ 'IA-01': [JSON.stringify([valida, valida])] });
+    const r = await ejecutarTarea(prov, 'IA-01', variables);
+    expect(r.intentos).toBe(2);
+    expect(prov.llamadas[1]!.mensajes.at(-1)!.texto).toContain('La respuesta debe ser un objeto JSON, no una lista');
   });
 
   it('sin un campo obligatorio, reintenta con el error y acepta la corrección', async () => {
@@ -56,6 +64,21 @@ describe('salidas validadas y reintentos (CP-041)', () => {
   it('acepta reglas propias además del esquema', async () => {
     const e = await ejecutarTarea(proveedorSimulado(), 'IA-01', variables, { validarExtra: () => ['faltan páginas'] }).catch((x: unknown) => x);
     expect((e as SalidaNoValida).errores).toEqual(['faltan páginas']);
+  });
+});
+
+describe('modo simulado ajustado al pedido', () => {
+  const tema = (id: string) => ({ ...variables, tema: { id, titulo: 'Tema' } });
+
+  it('IA-03 responde el resumen del tema pedido', async () => {
+    const r = await ejecutarTarea<{ temaId: string; fragmentos: { id: string }[] }>(proveedorSimulado(), 'IA-03', tema('t06'));
+    expect(r.datos.temaId).toBe('t06');
+  });
+
+  it('IA-03 de un tema sin grabación usa la primera con el id del tema', async () => {
+    const r = await ejecutarTarea<{ temaId: string; fragmentos: { id: string }[] }>(proveedorSimulado(), 'IA-03', tema('d2-t04'));
+    expect(r.datos.temaId).toBe('d2-t04');
+    expect(r.datos.fragmentos[0]!.id).toBe('d2-t04-f01');
   });
 });
 

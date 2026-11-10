@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
@@ -49,9 +50,26 @@ export interface OpcionesSimulacion {
   generacion?: 'normal' | 'lenta' | 'falla' | 'ajena';
 }
 
+/** Resultado de la etapa 1 armado con las salidas grabadas del caso LOTO (como lo guarda el worker). */
+function resumenLoto() {
+  const leer = (f: string) => JSON.parse(readFileSync(new URL(`../../../packages/ai/casos/loto/salidas/${f}`, import.meta.url), 'utf8'));
+  const mapa = leer('01-IA-01-mapa-temas.json') as { temas: Record<string, unknown>[] };
+  const c = leer('01-IA-02-clasificacion.json') as { metaMinutos: number; minutosEstimados: number; clasificacion: { temaId: string; decision: string; motivo: string }[] };
+  const resumenes = leer('01-IA-03-resumenes.json') as { temaId: string; fragmentos: Record<string, unknown>[] }[];
+  const materialId = '00000000-0000-4000-8000-000000000900';
+  const archivo = 'PETS-SEG-014 Bloqueo y etiquetado.pdf';
+  return {
+    tema: null, documentos: [{ materialId, nombre: archivo, totalPaginas: 30 }],
+    temas: mapa.temas.map((t) => ({ ...t, materialId, ...c.clasificacion.find((x) => x.temaId === t.id) })),
+    metaMinutos: c.metaMinutos, minutosEstimados: c.minutosEstimados,
+    ideas: resumenes.flatMap((r) => r.fragmentos.map((f) => ({ ...f, temaId: r.temaId, materialId, archivo }))),
+    acta: leer('01-IA-13-acta-omitidos.json'), observaciones: [],
+  };
+}
+
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
 const ETAPAS_SIMULADAS = [
-  { detalle: '84 páginas → 14 ideas clave · 3 temas omitidos con motivo', costoUsd: 0.35 },
+  { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
   { detalle: '3 objetivos con nivel de Bloom · 3 módulos · 30 pantallas', costoUsd: 0.1 },
   { detalle: '30 pantallas con texto corto en pantalla y narración', costoUsd: 0.45 },
 ];
@@ -270,6 +288,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         return responder(409, { codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
       }
       return responder(202, conAvance(crear()));
+    }
+    const etapaDe = ruta.match(/^\/generaciones\/([0-9a-f-]+)\/etapas\/([A-Z_]+)$/);
+    if (etapaDe) {
+      const e = generaciones.find((x) => x.id === etapaDe[1])?.etapas.find((x) => x.etapa === etapaDe[2]);
+      if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Etapa no encontrada' });
+      return responder(200, { ...e, datos: e.estado === 'COMPLETADO' && e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : null });
     }
     const unaGeneracion = ruta.match(/^\/generaciones\/([0-9a-f-]+)(?:\/(cancelar|continuar))?$/);
     if (unaGeneracion) {

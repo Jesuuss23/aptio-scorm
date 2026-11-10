@@ -27,7 +27,7 @@ test('CP-036 · lanza la generación y muestra las 11 etapas avanzando con su co
   await expect(page.getByText('Minera Andina · Producción')).toBeVisible();
   await expect(gen.getByRole('button', { name: 'Cancelar' })).toBeVisible();
   await expect(etapa(gen, 'Storyboard y guion')).toContainText('Lista', { timeout: 15_000 });
-  await expect(etapa(gen, 'Leer y resumir el material')).toContainText('84 páginas → 14 ideas clave');
+  await expect(etapa(gen, 'Leer y resumir el material')).toContainText('30 páginas → 29 ideas clave');
   await expect(etapa(gen, 'Leer y resumir el material')).toContainText('US$ 0.35');
   await expect(etapa(gen, 'Paquete de prueba')).toContainText('Se habilita en un sprint siguiente');
   await expect(gen.getByText('27 %')).toBeVisible();
@@ -76,4 +76,22 @@ test('el diseñador gráfico ve la generación pero no la lanza', async ({ page 
   const gen = page.getByRole('region', { name: 'Generación del SCORM' });
   await expect(gen.getByText('Agrega el material del cliente', { exact: false })).toBeVisible();
   await expect(gen.getByRole('button')).toHaveCount(0);
+});
+
+test('CP-038 · el resumen muestra cada idea clave con su página y el acta de temas omitidos', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const gen = await conTema(page);
+  await gen.getByRole('button', { name: 'Generar SCORM' }).click();
+  const resumen = etapa(gen, 'Leer y resumir el material');
+  await resumen.getByRole('button', { name: 'Ver resumen' }).click({ timeout: 15_000 });
+  const vista = gen.getByRole('region', { name: 'Resumen del material' });
+  const definiciones = vista.getByRole('listitem', { name: 'Definiciones clave' });
+  await expect(definiciones.getByText('Se conserva')).toBeVisible();
+  const ideas = definiciones.getByRole('list', { name: 'Ideas clave de Definiciones clave' }).getByRole('listitem');
+  await expect(ideas).toHaveCount(3);
+  await expect(ideas.first()).toContainText('p. 7');
+  await expect(vista.getByRole('listitem', { name: 'Referencias' })).toContainText('Se omite');
+  const acta = vista.getByRole('region', { name: 'Acta de temas omitidos' });
+  await expect(acta.getByRole('heading', { name: 'Acta de temas omitidos · Bloqueo y etiquetado' })).toBeVisible();
+  await expect(acta).toContainText('Registros y anexos');
 });

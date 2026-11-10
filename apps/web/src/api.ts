@@ -266,6 +266,7 @@ export const api = {
   generaciones: (proyectoId: string) => pedir<Generacion[]>(`/proyectos/${proyectoId}/generaciones`),
   generacion: (id: string) => pedir<Generacion>(`/generaciones/${id}`),
   generar: (proyectoId: string) => pedir<Generacion>(`/proyectos/${proyectoId}/generaciones`, json({})),
+  etapaGeneracion: <T = unknown>(id: string, etapa: Etapa) => pedir<EtapaGeneracion & { datos: T | null }>(`/generaciones/${id}/etapas/${etapa}`),
   cancelarGeneracion: (id: string) => pedir<Generacion>(`/generaciones/${id}/cancelar`, { method: 'POST' }),
   continuarGeneracion: (id: string) => pedir<Generacion>(`/generaciones/${id}/continuar`, { method: 'POST' }),
   glosario: (clienteId: string) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`),

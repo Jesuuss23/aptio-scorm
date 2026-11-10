@@ -28,14 +28,25 @@ export function neutralizar(texto: string): string {
   return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-const atributo = (v: string) => neutralizar(v).replace(/"/g, '&quot;').replace(/[\r\n]+/g, ' ');
+/**
+ * Páginas listas para ir dentro de un <material_cliente> de una plantilla: marcadas como [p. N] (las escaneadas con
+ * «OCR») y con el texto neutralizado. `rango` es «primera-última».
+ */
+export function paginasParaPrompt(paginas: PaginaMaterial[]): { rango: string; texto: string } {
+  return {
+    rango: paginas.length ? `${paginas[0]!.n}-${paginas.at(-1)!.n}` : '0',
+    texto: paginas.map((p) => `[p. ${p.n}${p.escaneada ? ' · OCR' : ''}]\n${neutralizar(p.texto)}`).join('\n\n'),
+  };
+}
+
+/** Texto del cliente que va en un atributo o en una línea del prompt (nombre de archivo, tema): sin etiquetas ni saltos. */
+export const textoSeguro = (v: string) => neutralizar(v).replace(/"/g, '&quot;').replace(/[\r\n]+/g, ' ');
 
 /**
  * Bloque <material_cliente> para un prompt: páginas marcadas como [p. N] (las escaneadas con «OCR»)
  * y el texto neutralizado, de modo que nada dentro del documento pueda cerrar el bloque.
  */
 export function materialParaPrompt(documento: { nombre: string }, paginas: PaginaMaterial[]): string {
-  const rango = paginas.length ? `${paginas[0]!.n}-${paginas.at(-1)!.n}` : '0';
-  const cuerpo = paginas.map((p) => `[p. ${p.n}${p.escaneada ? ' · OCR' : ''}]\n${neutralizar(p.texto)}`).join('\n\n');
-  return `<material_cliente archivo="${atributo(documento.nombre)}" paginas="${rango}">\n${cuerpo}\n</material_cliente>`;
+  const { rango, texto } = paginasParaPrompt(paginas);
+  return `<material_cliente archivo="${textoSeguro(documento.nombre)}" paginas="${rango}">\n${texto}\n</material_cliente>`;
 }
