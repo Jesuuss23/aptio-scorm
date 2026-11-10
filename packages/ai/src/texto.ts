@@ -71,7 +71,8 @@ export class SalidaNoValida extends Error {
 // ---------- Prompts ----------
 
 function bloque(md: string, titulo: string): string {
-  const m = md.match(new RegExp(`## ${titulo}\\s*\\n+\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``));
+  const normalizado = md.replace(/\r\n/g, '\n');
+  const m = normalizado.match(new RegExp(`## ${titulo}\\s*\\n+\`\`\`text\\n([\\s\\S]*?)\\n\`\`\``));
   if (!m) throw new Error(`El prompt no tiene la sección «${titulo}»`);
   return m[1]!;
 }
