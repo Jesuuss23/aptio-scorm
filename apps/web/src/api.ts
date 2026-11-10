@@ -1,5 +1,5 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
-import type { Paleta } from '@aptio/schema/marca';
+import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 
 export interface Usuario {
   id: string;
@@ -42,6 +42,20 @@ export const EDITAN_CLIENTES: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL
 /** Roles que editan el kit de marca; el productor solo lo ve y el revisor no entra (docs/14-modulos.md). */
 export const EDITAN_KIT: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO'];
 export const VEN_KIT: Rol[] = [...EDITAN_KIT, 'PRODUCTOR'];
+/** Las pantallas modelo las diseñan diseño gráfico y administración (docs/14-modulos.md). */
+export const DISENAN_MODELOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_GRAFICO'];
+
+export interface PantallaModeloEntrada {
+  disposicion: string;
+  nombre: string;
+  definicion: DefinicionModelo;
+  orden?: number;
+  activa?: boolean;
+}
+export interface PantallaModelo extends Required<PantallaModeloEntrada> {
+  id: string;
+  miniaturaRecursoId: string | null;
+}
 
 export interface Voz {
   proveedor: 'google' | 'azure' | 'elevenlabs';
@@ -130,6 +144,13 @@ export const api = {
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
   guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
+  pantallasModelo: (clienteId: string) => pedir<PantallaModelo[]>(`/clientes/${clienteId}/kit/pantallas-modelo`),
+  guardarPantallaModelo: (clienteId: string, datos: PantallaModeloEntrada, id?: string) =>
+    id
+      ? pedir<PantallaModelo>(`/clientes/${clienteId}/kit/pantallas-modelo/${id}`, json(datos, 'PUT'))
+      : pedir<PantallaModelo>(`/clientes/${clienteId}/kit/pantallas-modelo`, json(datos)),
+  desactivarPantallaModelo: (clienteId: string, id: string) =>
+    pedir<void>(`/clientes/${clienteId}/kit/pantallas-modelo/${id}`, { method: 'DELETE' }),
   guardarPersonaje: (clienteId: string, datos: { recursoId: string; nombre: string; version: number }) =>
     pedir<Kit>(`/clientes/${clienteId}/kit/personaje`, json(datos, 'PUT')),
   /** Sube un archivo directo al almacenamiento cifrado (HU-1404): pide la URL firmada, envía el PUT y confirma. */
