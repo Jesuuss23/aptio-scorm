@@ -30,6 +30,10 @@
   flex-direction: column;
   gap: 14px;
 }
+.acceso-separador {
+  margin: 0;
+  text-align: center;
+}
 .ayuda {
   font-size: var(--texto-sm);
   color: var(--color-texto-sec);

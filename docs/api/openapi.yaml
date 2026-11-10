@@ -193,10 +193,13 @@ paths:
       - Acceso
       summary: Ingresar con Google
       operationId: get_auth_google
-      description: Redirige a Google (OpenID Connect con PKCE). Solo ingresan correos ya invitados por un administrador; no crea cuentas nuevas.
+      description: >-
+        HU-0108. Redirige a Google (OpenID Connect, código de autorización con PKCE S256, state y nonce guardados en la
+        cookie firmada `google_oidc` de 10 minutos). Solo ingresan correos ya invitados por un administrador; no crea
+        cuentas nuevas. Sin GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET redirige a `/ingresar?error=google_no_disponible`.
       responses:
         '302':
-          description: Redirección
+          description: Redirección a Google, o a la web con el motivo
       security: []
   /auth/google/callback:
     get:
@@ -204,7 +207,13 @@ paths:
       - Acceso
       summary: Retorno de Google
       operationId: get_auth_google_callback
-      description: Valida state y nonce, exige email_verified y vincula la cuenta por correo; crea la cookie de sesión y redirige a la web.
+      description: >-
+        Valida state (contra la cookie de la ida), canjea el código con el verificador PKCE, verifica la firma RS256 del
+        id_token con las claves de Google, el emisor, la audiencia, el vencimiento y el nonce, y exige email_verified
+        (CP-009). Busca al usuario por el identificador de Google o, la primera vez, por correo, y lo vincula (CP-007).
+        Si sale bien crea la cookie de sesión y redirige a la web; si no, redirige a `/ingresar?error=<motivo>` con
+        sin_acceso (correo no invitado, usuario desactivado o correo ya vinculado a otra cuenta de Google, CP-008),
+        correo_no_verificado, google_cancelado o google_fallo. Nunca crea cuentas.
       parameters:
       - name: code
         in: query
@@ -216,15 +225,15 @@ paths:
         required: false
         schema:
           type: string
+      - name: error
+        in: query
+        required: false
+        description: Lo envía Google si la persona cancela (access_denied).
+        schema:
+          type: string
       responses:
         '302':
-          description: Redirección
-        '401':
-          description: Credenciales incorrectas o correo no invitado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          description: Redirección a la web, con sesión o con `?error=<motivo>`
       security: []
   /auth/clave/olvido:
     post:

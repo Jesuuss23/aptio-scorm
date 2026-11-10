@@ -1,4 +1,4 @@
-// Ingreso, recuperación y creación de clave (HU-0104, HU-0109). Pantalla sin barra lateral.
+// Ingreso, recuperación y creación de clave (HU-0104, HU-0109) e ingreso con Google para invitados (HU-0108). Sin barra lateral.
 import { Marca } from '@aptio/ui';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { api, ErrorApi, type Usuario } from '../api';
@@ -43,10 +43,22 @@ function enlace(destino: string, texto: string) {
   );
 }
 
+/** Motivos con los que la API devuelve a /ingresar tras intentar con Google (CP-008, CP-009). */
+const ERRORES_GOOGLE: Record<string, string> = {
+  sin_acceso: 'Tu correo no tiene acceso. Pide a un administrador que te invite.',
+  correo_no_verificado: 'Google no confirmó tu correo. Verifícalo en tu cuenta de Google e intenta de nuevo.',
+  google_cancelado: 'Cancelaste el ingreso con Google.',
+  google_no_disponible: 'El ingreso con Google aún no está configurado. Usa tu correo y clave.',
+  google_fallo: 'No se pudo completar el ingreso con Google. Intenta de nuevo.',
+};
+
 export function Ingreso({ alIngresar }: { alIngresar: (u: Usuario) => void }) {
   const [email, setEmail] = useState('');
   const [clave, setClave] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => {
+    const motivo = new URLSearchParams(window.location.search).get('error');
+    return motivo ? (ERRORES_GOOGLE[motivo] ?? ERRORES_GOOGLE.google_fallo!) : '';
+  });
   const [enviando, setEnviando] = useState(false);
 
   async function enviar(e: FormEvent) {
@@ -78,6 +90,9 @@ export function Ingreso({ alIngresar }: { alIngresar: (u: Usuario) => void }) {
           {enviando ? 'Ingresando…' : 'Ingresar'}
         </button>
         <p className="sec">{enlace('/olvido', '¿Olvidaste tu clave?')}</p>
+        <p className="acceso-separador sec">o</p>
+        <a className="boton" href="/api/v1/auth/google">Ingresar con Google</a>
+        <p className="sec">Solo para correos invitados por un administrador.</p>
       </form>
     </Marco>
   );
