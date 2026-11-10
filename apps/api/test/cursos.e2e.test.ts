@@ -136,14 +136,17 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p99`, { version: 6, titulo: { es: 'x' } })).status).toBe(404);
   });
 
-  it('HU-0701 · lista las narraciones en el orden de las pantallas con su estado, duración y audio firmado', async () => {
+  it('HU-0701 y HU-0801 · lista las narraciones en el orden de las pantallas con su estado, duración, audio y subtítulos firmados', async () => {
     const audio = await prisma.recurso.create({
       data: { organizacionId: orgId, proyectoId, tipo: 'AUDIO', origen: 'GENERADO', claveS3: `org/${orgId}/voz-${sufijo}`, mime: 'audio/mpeg', bytes: 10, duracionMs: 4485, hash: 'x', nombre: 'p01-es.mp3', proveedor: 'google', modelo: 'es-US-Neural2-A' },
+    });
+    const vtt = await prisma.recurso.create({
+      data: { organizacionId: orgId, proyectoId, tipo: 'SUBTITULO', origen: 'GENERADO', claveS3: `org/${orgId}/vtt-${sufijo}`, mime: 'text/vtt', bytes: 10, hash: 'v', nombre: 'p01-es.vtt' },
     });
     await prisma.narracion.createMany({
       data: [
         { cursoId, pantallaId: 'p02', idioma: 'es', textoHash: 'b', origen: 'tts', voz: 'es-US-Neural2-A', estado: 'DESACTUALIZADA' },
-        { cursoId, pantallaId: 'p01', idioma: 'es', textoHash: 'a', origen: 'tts', voz: 'es-US-Neural2-A', audioRecursoId: audio.id, estado: 'ACTUALIZADA' },
+        { cursoId, pantallaId: 'p01', idioma: 'es', textoHash: 'a', origen: 'tts', voz: 'es-US-Neural2-A', audioRecursoId: audio.id, subtituloRecursoId: vtt.id, estado: 'ACTUALIZADA' },
       ],
     });
     const r = await como('productor').get(`/cursos/${cursoId}/narraciones?idioma=es`);
@@ -151,10 +154,12 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(r.body.map((n: { pantallaId: string }) => n.pantallaId)).toEqual(['p01', 'p02']);
     expect(r.body[0]).toMatchObject({ idioma: 'es', estado: 'ACTUALIZADA', origen: 'tts', voz: 'es-US-Neural2-A', duracionS: 4.5, texto: 'Hola, te doy la bienvenida a esta cápsula sobre bloqueo y etiquetado.' });
     expect(r.body[0].audioUrl).toMatch(/X-Amz-Signature=/);
+    expect(r.body[0].subtitulosUrl).toMatch(/X-Amz-Signature=/);
     expect(r.body[1]).not.toHaveProperty('audioUrl');
+    expect(r.body[1]).not.toHaveProperty('subtitulosUrl');
     expect((await como('grafico').get(`/cursos/${cursoId}/narraciones?idioma=fr`)).status).toBe(422);
     expect((await como('revisor').get(`/cursos/${cursoId}/narraciones`)).status).toBe(404);
-    await prisma.recurso.delete({ where: { id: audio.id } });
+    await prisma.recurso.deleteMany({ where: { id: { in: [audio.id, vtt.id] } } });
   });
 
   it('HU-0703 · corregir la narración en Revisión la deja «Por regenerar»; corregir solo el título, no', async () => {
@@ -172,7 +177,7 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(await estado()).toBe('DESACTUALIZADA');
   });
 
-  it('HU-0703 · regenerar continúa las etapas 6 y 7 de la última generación; 422 sin voz o en inglés, 409 si ya corre', async () => {
+  it('HU-0703 · regenerar continúa las etapas 6 a 8 de la última generación; 422 sin voz o en inglés, 409 si ya corre', async () => {
     const ruta = `/cursos/${cursoId}/narraciones/regenerar`;
     expect((await como('productor').post(ruta, {})).body).toMatchObject({ codigo: 'SIN_VOZ' });
     const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
@@ -196,7 +201,7 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     // p02 (sin audio), p03 (corregida en la prueba anterior) y p04 estaban «Por regenerar».
     expect(r.body).toMatchObject({ id: g.id, estado: 'EN_COLA', eventos: `/api/v1/generaciones/${g.id}/eventos`, pendientes: 3 });
     const etapas = await prisma.generacionEtapa.findMany({ where: { generacionId: g.id, estado: 'EN_COLA' } });
-    expect(etapas.map((e) => e.etapa)).toEqual(expect.arrayContaining(['VOZ_ES', 'BOCA']));
+    expect(etapas.map((e) => e.etapa)).toEqual(expect.arrayContaining(['VOZ_ES', 'BOCA', 'SUBTITULOS']));
     expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).toMatchObject({ pantallas: 30, regenerarVoz: { forzar: false } });
     expect((await como('grafico').post(ruta, { pantallaIds: ['p04'], soloDesactualizadas: false })).body).toMatchObject({ codigo: 'GENERACION_ACTIVA' });
 

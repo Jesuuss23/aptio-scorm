@@ -227,6 +227,8 @@ export interface Curso {
   urlsRecursos?: Record<string, string>;
   /** HU-0702 · SVG del personaje (saneado), por id de recurso. */
   svgPersonajes?: Record<string, string>;
+  /** HU-0801 · Texto WebVTT de cada narración, por id de recurso de subtítulos. */
+  subtitulos?: Record<string, string>;
 }
 
 export type TextoI18n = { es?: string; en?: string };

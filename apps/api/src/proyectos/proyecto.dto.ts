@@ -78,4 +78,6 @@ export class CursoDto {
   urlsRecursos: Record<string, string>;
   @ApiProperty({ type: 'object', additionalProperties: { type: 'string' }, description: 'HU-0702 · SVG saneado de cada personaje del curso, por id de recurso, para dibujarlo en línea y animar su boca' })
   svgPersonajes: Record<string, string>;
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'string' }, description: 'HU-0801 · Texto WebVTT de cada narración, por id de recurso de subtítulos' })
+  subtitulos: Record<string, string>;
 }

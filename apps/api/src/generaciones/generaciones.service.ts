@@ -158,7 +158,7 @@ export class GeneracionesService {
       const otra = await tx.generacion.findFirst({ where: { proyectoId: g.proyectoId, estado: { in: [...ACTIVOS] } }, select: { id: true } });
       if (otra) throw new ConflictException({ codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto', detalles: [{ generacionId: otra.id }] });
       const regenerarVoz = { ...(dto.pantallaIds?.length ? { pantallaIds: dto.pantallaIds } : {}), forzar: dto.soloDesactualizadas === false };
-      await tx.generacionEtapa.updateMany({ where: { generacionId: g.id, etapa: { in: ['VOZ_ES', 'BOCA'] } }, data: { estado: 'EN_COLA', detalle: Prisma.DbNull, inicio: null, fin: null } });
+      await tx.generacionEtapa.updateMany({ where: { generacionId: g.id, etapa: { in: ['VOZ_ES', 'BOCA', 'SUBTITULOS'] } }, data: { estado: 'EN_COLA', detalle: Prisma.DbNull, inicio: null, fin: null } });
       await tx.generacion.update({ where: { id: g.id }, data: { estado: 'EN_COLA', terminadoEn: null, parametros: { ...(g.parametros as Prisma.JsonObject), regenerarVoz } } });
       await tx.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'GENERANDO' } });
       await tx.auditoria.create({ data: { organizacionId: g.organizacionId, usuarioId: u.id, accion: 'NARRACIONES_REGENERADAS', entidad: 'Generacion', entidadId: g.id, datos: { cursoId, pendientes, ...regenerarVoz } } });
