@@ -773,6 +773,7 @@ paths:
       - Clientes y kits
       summary: Ver glosario
       operationId: get_clientes_clienteId_glosario
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (HU-0205).
       parameters:
       - name: clienteId
         in: path
@@ -800,7 +801,7 @@ paths:
       - Clientes y kits
       summary: Reemplazar glosario
       operationId: put_clientes_clienteId_glosario
-      description: Marca traducciones afectadas como PENDIENTE
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR. Reemplaza la lista completa. Las traducciones cuyo texto de origen usa un término agregado, quitado o cambiado vuelven a PENDIENTE. 422 con código TERMINOS_NO_VALIDOS (repetidos, o sin traducción ni «no traducir»).
       parameters:
       - name: clienteId
         in: path
@@ -839,6 +840,7 @@ paths:
       - Clientes y kits
       summary: Ver diccionario de pronunciación
       operationId: get_clientes_clienteId_pronunciacion
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (HU-0205).
       parameters:
       - name: clienteId
         in: path
@@ -866,7 +868,7 @@ paths:
       - Clientes y kits
       summary: Reemplazar diccionario de pronunciación
       operationId: put_clientes_clienteId_pronunciacion
-      description: Marca narraciones afectadas como DESACTUALIZADA
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR. Reemplaza la lista completa. Las narraciones del idioma cuyo texto usa un término agregado, quitado o cambiado quedan DESACTUALIZADA (RN-02-4). 422 con código TERMINOS_NO_VALIDOS (repetidos por idioma o con etiquetas en la pronunciación).
       parameters:
       - name: clienteId
         in: path
@@ -2198,7 +2200,7 @@ paths:
       - Personaje y voz
       summary: Escuchar una muestra con boca
       operationId: post_voz_muestra
-      description: Para probar voz y pronunciación; no se guarda en el curso
+      description: Para probar voz y pronunciación (CP-027); no se guarda en el curso. Con clienteId usa la voz del kit y el diccionario guardado del cliente. Con PROVEEDORES_MODO=simulado devuelve silencio y simulada = true. Roles del equipo (no el revisor del cliente).
       requestBody:
         required: true
         content:
@@ -2216,8 +2218,16 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+        '503':
+          description: VOZ_NO_DISPONIBLE · la voz no está configurada en el entorno o el proveedor no respondió
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /cursos/{cursoId}/traducciones:
     get:
       tags:
@@ -3423,9 +3433,13 @@ components:
       properties:
         termino:
           type: string
+          minLength: 1
+          maxLength: 80
         traduccion:
           type: string
+          maxLength: 80
           nullable: true
+          description: Obligatoria salvo con noTraducir
         noTraducir:
           type: boolean
     PronunciacionTermino:
@@ -3442,8 +3456,13 @@ components:
           - en
         escrito:
           type: string
+          minLength: 1
+          maxLength: 80
         pronunciado:
           type: string
+          minLength: 1
+          maxLength: 120
+          description: Texto llano, sin etiquetas; la app lo envía a la voz como <sub alias>
     FichaCompatibilidad:
       type: object
       required:
@@ -4469,9 +4488,26 @@ components:
         audioUrl:
           type: string
           format: uri
+          description: data URI con el audio (la muestra no se guarda)
         bocas:
           type: array
           items: {}
+          description: Vacío hasta M07 (S4)
+        ssml:
+          type: string
+        dicho:
+          type: string
+          description: Lo que dirá la voz con el diccionario aplicado
+        aplicados:
+          type: array
+          items:
+            type: string
+        proveedor:
+          type: string
+        voz:
+          type: string
+        simulada:
+          type: boolean
     Traduccion:
       type: object
       required:

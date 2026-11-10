@@ -44,6 +44,8 @@ export const EDITAN_KIT: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'D
 export const VEN_KIT: Rol[] = [...EDITAN_KIT, 'PRODUCTOR'];
 /** Las pantallas modelo las diseñan diseño gráfico y administración (docs/14-modulos.md). */
 export const DISENAN_MODELOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_GRAFICO'];
+/** HU-0205: el glosario y la pronunciación los edita todo el equipo, también producción. */
+export const EDITAN_GLOSARIO: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 
 export interface PantallaModeloEntrada {
   disposicion: string;
@@ -100,6 +102,28 @@ export interface Recurso {
   url?: string;
 }
 
+export interface TerminoGlosario {
+  termino: string;
+  traduccion: string | null;
+  noTraducir: boolean;
+}
+
+export interface TerminoPronunciacion {
+  idioma: 'es' | 'en';
+  escrito: string;
+  pronunciado: string;
+}
+
+export interface MuestraVoz {
+  audioUrl: string;
+  ssml: string;
+  dicho: string;
+  aplicados: string[];
+  proveedor: string;
+  voz: string;
+  simulada: boolean;
+}
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -151,6 +175,12 @@ export const api = {
       : pedir<PantallaModelo>(`/clientes/${clienteId}/kit/pantallas-modelo`, json(datos)),
   desactivarPantallaModelo: (clienteId: string, id: string) =>
     pedir<void>(`/clientes/${clienteId}/kit/pantallas-modelo/${id}`, { method: 'DELETE' }),
+  glosario: (clienteId: string) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`),
+  guardarGlosario: (clienteId: string, terminos: TerminoGlosario[]) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`, json(terminos, 'PUT')),
+  pronunciacion: (clienteId: string) => pedir<TerminoPronunciacion[]>(`/clientes/${clienteId}/pronunciacion`),
+  guardarPronunciacion: (clienteId: string, terminos: TerminoPronunciacion[]) =>
+    pedir<TerminoPronunciacion[]>(`/clientes/${clienteId}/pronunciacion`, json(terminos, 'PUT')),
+  muestraVoz: (datos: { texto: string; idioma: 'es' | 'en'; clienteId?: string }) => pedir<MuestraVoz>('/voz/muestra', json(datos)),
   guardarPersonaje: (clienteId: string, datos: { recursoId: string; nombre: string; version: number }) =>
     pedir<Kit>(`/clientes/${clienteId}/kit/personaje`, json(datos, 'PUT')),
   /** Sube un archivo directo al almacenamiento cifrado (HU-1404): pide la URL firmada, envía el PUT y confirma. */

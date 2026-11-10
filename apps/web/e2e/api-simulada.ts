@@ -45,6 +45,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
   const subidas = new Map<string, { nombre: string; mime: string }>();
   const modelos: Record<string, unknown>[] = [];
+  let glosario: { termino: string; traduccion: string | null; noTraducir: boolean }[] = [];
+  let pronunciacion: { idioma: string; escrito: string; pronunciado: string }[] = [];
   // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
   await page.route('**/s3-simulado/**', (route) => route.fulfill({ status: 200, body: '' }));
   let sesion = conSesion;
@@ -108,6 +110,35 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto }:
         id: confirmar[1], tipo: svg ? 'SVG' : 'IMAGEN', origen: 'SUBIDO', nombre: s.nombre, mime: s.mime, bytes: 100,
         ...(svg ? { eliminadosAlSanear: s.nombre.includes('peligrosa') ? ['script', 'atributos on*'] : [] } : {}),
         url: `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 40"><rect width="30" height="40" fill="#12355B"/></svg>')}`,
+      });
+    }
+    if (/^\/clientes\/[0-9a-f-]+\/glosario$/.test(ruta)) {
+      if (req.method() === 'PUT') {
+        const datos = req.postDataJSON() as { termino: string; traduccion?: string | null; noTraducir?: boolean }[];
+        const sinTraduccion = datos.find((t) => !t.noTraducir && !t.traduccion?.trim());
+        if (sinTraduccion) {
+          return responder(422, { codigo: 'TERMINOS_NO_VALIDOS', mensaje: 'Revisa los términos', detalles: [{ error: `«${sinTraduccion.termino}»: indica la traducción o marca «no traducir»` }] });
+        }
+        glosario = datos.map((t) => ({ termino: t.termino.trim(), traduccion: t.noTraducir ? null : (t.traduccion ?? null), noTraducir: Boolean(t.noTraducir) }));
+      }
+      return responder(200, glosario);
+    }
+    if (/^\/clientes\/[0-9a-f-]+\/pronunciacion$/.test(ruta)) {
+      if (req.method() === 'PUT') pronunciacion = req.postDataJSON() as typeof pronunciacion;
+      return responder(200, pronunciacion);
+    }
+    if (ruta === '/voz/muestra') {
+      const { texto, idioma } = req.postDataJSON() as { texto: string; idioma: string };
+      let dicho = texto;
+      const aplicados: string[] = [];
+      for (const t of pronunciacion.filter((p) => p.idioma === idioma)) {
+        const patron = new RegExp(`\\b${t.escrito}\\b`, 'gi');
+        if (patron.test(dicho)) aplicados.push(t.escrito);
+        dicho = dicho.replace(patron, t.pronunciado);
+      }
+      return responder(200, {
+        audioUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=', bocas: [], ssml: `<speak>${texto}</speak>`,
+        dicho, aplicados, proveedor: 'simulado', voz: 'es-US-Neural2-A', simulada: true,
       });
     }
     const listaModelos = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/pantallas-modelo$/);
