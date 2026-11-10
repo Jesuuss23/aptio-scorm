@@ -1612,7 +1612,7 @@ paths:
       - Curso
       summary: Ver documento del curso
       operationId: get_proyectos_proyectoId_curso
-      description: ETag = versión. Lo lee la vista previa con el reproductor único (HU-1101); 404 si aún no se generaron las pantallas.
+      description: ETag = versión. Lo lee la vista previa con el reproductor único (HU-1101); 404 si aún no se generaron las pantallas. Incluye `urlsRecursos` (audios firmados) y `svgPersonajes` para escuchar la narración con la boca sincronizada (HU-0702).
       parameters:
       - name: proyectoId
         in: path
@@ -4696,6 +4696,17 @@ components:
         actualizadoEn:
           type: string
           format: date-time
+        urlsRecursos:
+          type: object
+          description: HU-0702 · URL firmada (vence a los 15 minutos) de cada audio de narración del curso, por id de recurso. Solo en GET /proyectos/{proyectoId}/curso.
+          additionalProperties:
+            type: string
+            format: uri
+        svgPersonajes:
+          type: object
+          description: HU-0702 · SVG saneado de cada personaje que usa el curso, por id de recurso, para dibujarlo en línea y animar su boca sin depender del CORS del almacenamiento. Solo en GET /proyectos/{proyectoId}/curso.
+          additionalProperties:
+            type: string
     CursoEntrada:
       type: object
       required:

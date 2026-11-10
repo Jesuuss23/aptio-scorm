@@ -1,8 +1,40 @@
 // HU-0701 · Resultado de la etapa 6 «Voz en español»: cada narración con su duración y el estado «Lista». Mientras la
 // etapa corre, las listas aparecen sin esperar al resto; al terminar se pueden escuchar (audio firmado por 15 minutos).
+// HU-0702 · Al escuchar una, Ana la dice al lado con la boca sincronizada (marcas de la etapa 7).
+import { animarBoca, type ColoresUniforme, type MarcasBoca, mostrarBoca, parpadear, svgEnLinea } from '@aptio/player';
 import { duracionLegible, type VozCurso } from '@aptio/schema/generacion';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ErrorApi, type Narracion } from '../api';
+
+type PantallaDoc = { id: string; narracion?: { porIdioma?: { es?: { bocas?: MarcasBoca } } } };
+
+/** El personaje del kit en línea; mientras suena un audio mueve la boca con sus marcas. */
+function AnaHablando({ svg, audio, bocas, colores }: { svg: string; audio: HTMLAudioElement | null; bocas?: MarcasBoca; colores: ColoresUniforme }) {
+  const marco = useRef<HTMLDivElement>(null);
+  const dibujo = useRef<SVGSVGElement | null>(null);
+  useEffect(() => {
+    const el = svgEnLinea(svg, document, colores);
+    if (!el || !marco.current) return;
+    for (const pose of el.querySelectorAll<SVGElement>('[id^="pose_"]')) pose.style.display = pose.id === 'pose_explicando' ? 'inline' : 'none';
+    mostrarBoca(el, 'X');
+    marco.current.replaceChildren(el);
+    dibujo.current = el;
+    const dejar = parpadear(() => dibujo.current);
+    return () => {
+      dejar();
+      dibujo.current = null;
+    };
+  }, [svg, colores]);
+  useEffect(() => {
+    if (!audio || !bocas) return;
+    const detener = animarBoca(() => dibujo.current, { ms: () => audio.currentTime * 1000, sonando: () => !audio.paused && !audio.ended }, () => bocas);
+    return () => {
+      detener();
+      if (dibujo.current) mostrarBoca(dibujo.current, 'X');
+    };
+  }, [audio, bocas]);
+  return <div ref={marco} className="voz-ana" role="img" aria-label="Ana, la narradora" />;
+}
 
 const segundos = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
 
@@ -10,7 +42,31 @@ export function VozVista({ generacionId, clave }: { generacionId: string; clave?
   const [d, setD] = useState<VozCurso | null>(null);
   const [audios, setAudios] = useState<Map<string, Narracion>>(new Map());
   const [error, setError] = useState('');
+  const [svg, setSvg] = useState<string | null>(null);
+  const [colores, setColores] = useState<ColoresUniforme>({});
+  const [bocas, setBocas] = useState<Map<string, MarcasBoca>>(new Map());
+  const [sonando, setSonando] = useState<{ pantallaId: string; audio: HTMLAudioElement } | null>(null);
   const terminado = clave === undefined;
+
+  // El personaje del kit y las marcas de boca vienen con el curso del proyecto.
+  useEffect(() => {
+    if (!terminado) return;
+    api.generacion(generacionId).then((g) => {
+      // El uniforme de Ana toma los colores del kit del cliente.
+      api.proyecto(g.proyectoId).then((p) => api.kit(p.clienteId)).then((k) => setColores({ primario: k.paleta.primario, secundario: k.paleta.secundario, acento: k.paleta.acento }), () => undefined);
+      return api.curso(g.proyectoId);
+    }).then((c) => {
+      setSvg(Object.values(c.svgPersonajes ?? {})[0] ?? null);
+      const pantallas = (c.documento as { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[] }).modulos.flatMap((m) => m.capsulas.flatMap((x) => x.pantallas));
+      setBocas(new Map(pantallas.flatMap((p) => (p.narracion?.porIdioma?.es?.bocas ? [[p.id, p.narracion.porIdioma.es.bocas] as const] : []))));
+    }, () => undefined);
+  }, [generacionId, terminado]);
+
+  // Una narración a la vez: al empezar otra, la anterior se pausa.
+  const alSonar = (pantallaId: string, audio: HTMLAudioElement) => {
+    if (sonando && sonando.audio !== audio) sonando.audio.pause();
+    setSonando({ pantallaId, audio });
+  };
 
   useEffect(() => {
     api.etapaGeneracion<VozCurso>(generacionId, 'VOZ_ES').then(
@@ -33,6 +89,13 @@ export function VozVista({ generacionId, clave }: { generacionId: string; clave?
         {d.narraciones.length} de {d.total} narraciones listas{total ? ` · ${duracionLegible(total)} de audio` : ''}
       </p>
       {d.simulada ? <p className="nota">Voz simulada: el audio es silencio con la duración que tendría la voz. Con la voz de Google configurada se escucha a la narradora.</p> : null}
+      <div className={svg ? 'voz-con-ana' : undefined}>
+      {svg ? (
+        <figure className="voz-escenario">
+          <AnaHablando svg={svg} colores={colores} audio={sonando?.audio ?? null} bocas={sonando ? bocas.get(sonando.pantallaId) : undefined} />
+          <figcaption className="sec" role="status">{sonando ? `Narrando ${sonando.pantallaId}` : 'Elige una narración para escucharla con Ana'}</figcaption>
+        </figure>
+      ) : null}
       <ol className="voz-lista" aria-label="Narraciones">
         {d.narraciones.map((n) => {
           const audio = audios.get(n.pantallaId);
@@ -47,11 +110,14 @@ export function VozVista({ generacionId, clave }: { generacionId: string; clave?
               </div>
               <p className="voz-texto">{n.texto}</p>
               {n.pronunciados.length ? <p className="sec">Pronunciación del diccionario: {n.pronunciados.join(', ')}</p> : null}
-              {audio?.audioUrl ? <audio controls preload="none" src={audio.audioUrl} aria-label={`Escuchar la narración de ${n.pantallaId}`} /> : null}
+              {audio?.audioUrl ? (
+                <audio controls preload="none" src={audio.audioUrl} aria-label={`Escuchar la narración de ${n.pantallaId}`} onPlay={(e) => alSonar(n.pantallaId, e.currentTarget)} />
+              ) : null}
             </li>
           );
         })}
       </ol>
+      </div>
     </div>
   );
 }

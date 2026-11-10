@@ -1,5 +1,6 @@
 // Dibujo de una pantalla desde sus bloques (capa de contenido) con la disposición elegida por el generador (capa de
 // presentación). Modo guiado: la disposición acomoda los bloques sola y se adapta al ancho, sin lienzo fijo.
+import { mostrarBoca, mostrarPose, svgEnLinea } from './boca.ts';
 import { h } from './dom.ts';
 import { t, type Textos } from './textos.ts';
 import type { Bloque, BloqueInteraccion, Idioma, Pantalla, RolColor } from './tipos.ts';
@@ -12,6 +13,8 @@ export interface ContextoPantalla {
   /** Modo revisión: muestra el id de la pantalla y de la actividad. */
   revision: boolean;
   actividad: (b: BloqueInteraccion, p: Pantalla) => HTMLElement;
+  /** HU-0702 · El SVG del personaje como texto, para dibujarlo en línea y mover sus capas (boca, ojos y pose). */
+  cargarSvg?: (recursoId: string) => Promise<string | undefined>;
 }
 
 /** Luminancia relativa (WCAG) de un color #RRGGBB. */
@@ -25,12 +28,13 @@ export function luminancia(hex: string): number {
 
 const sufijo = (b: Bloque) => b.id.match(/-(titulo|subtitulo|numero|dato-grande|texto|burbuja|dato|item-\d+)$/)?.[1] ?? '';
 
-/** Silueta neutra mientras el personaje del kit no tenga su SVG cargado (S4 trae las bocas). */
+/** Silueta neutra mientras se carga el SVG del personaje, o si el kit no tiene uno. */
 function silueta(): SVGSVGElement {
   const ns = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('viewBox', '0 0 100 160');
   svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('class', 'ap-silueta');
   for (const [tag, attrs] of [['circle', { cx: '50', cy: '38', r: '24' }], ['path', { d: 'M12 160c0-44 17-70 38-70s38 26 38 70z' }]] as const) {
     const el = document.createElementNS(ns, tag);
     for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
@@ -77,9 +81,19 @@ export function dibujarPantalla(p: Pantalla, ctx: ContextoPantalla): HTMLElement
         texto.push(h('p', { class: 'ap-parrafo', 'data-bloque': b.id }, contenido));
       }
     } else if (b.tipo === 'personaje') {
-      const url = ctx.urlRecurso(b.recursoId);
-      medios.push(h('figure', { class: `ap-personaje ap-pose-${b.pose ?? 'neutral'} ap-lado-${b.lado ?? 'izquierda'}`, 'aria-hidden': 'true', 'data-bloque': b.id },
-        url ? h('img', { src: url, alt: '' }) : silueta()));
+      // El SVG va en línea para animar la boca; mientras llega (o si no se puede leer) se ve la silueta.
+      const figura = h('figure', { class: `ap-personaje ap-pose-${b.pose ?? 'neutral'} ap-lado-${b.lado ?? 'izquierda'}`, 'aria-hidden': 'true', 'data-bloque': b.id }, silueta());
+      if (ctx.cargarSvg) {
+        void ctx.cargarSvg(b.recursoId).then((marcado) => {
+          const svg = marcado ? svgEnLinea(marcado, document, { primario: ctx.paleta.primario, secundario: ctx.paleta.secundario, acento: ctx.paleta.acento }) : null;
+          if (!svg) return;
+          mostrarPose(svg, b.pose ?? 'neutral');
+          // En reposo hasta que suene la narración: sin esto se verían todas las bocas encimadas.
+          mostrarBoca(svg, 'X');
+          figura.replaceChildren(svg);
+        }, () => undefined);
+      }
+      medios.push(figura);
     } else if (b.tipo === 'imagen') {
       const url = ctx.urlRecurso(b.recursoId);
       const alt = b.decorativa ? '' : t(b.alt, ctx.idioma);

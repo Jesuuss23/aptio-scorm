@@ -56,6 +56,8 @@ export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCa
     const r = montar(contenedor.current, curso.documento as unknown as CursoReproductor, {
       kit: kit ? { paleta: kit.paleta, tipografias: kit.tipografias, personaje: kit.personaje?.nombre ?? null } : {},
       revision,
+      urlRecurso: (id) => curso.urlsRecursos?.[id],
+      cargarSvg: async (id) => curso.svgPersonajes?.[id],
       ...(revision && ultima.current ? { inicio: ultima.current } : {}),
       alCambiar: (e) => {
         ultima.current = e.pantallaId;

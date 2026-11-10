@@ -282,6 +282,15 @@ export interface VozCurso {
   simulada: boolean;
 }
 
+/** Resultado (y avance, mientras corre) de la etapa 7 (HU-0702): cuántas narraciones ya tienen sus marcas de boca. */
+export interface BocaCurso {
+  total: number;
+  listas: number;
+  cursoId: string;
+  /** `rhubarb` desde el audio o `simulado` por letras (SUP-35). */
+  metodo: 'rhubarb' | 'simulado';
+}
+
 /** «4 min 12 s» a partir de milisegundos. */
 export function duracionLegible(ms: number): string {
   const s = Math.round(ms / 1000);
