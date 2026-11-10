@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import type { Prisma } from '@aptio/db';
 import { avanceDe, type DatosTecnicos, perfilPropuesto } from '@aptio/schema/proyecto';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { AlmacenService } from '../recursos/almacen.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { CursoDto, FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
@@ -29,7 +30,10 @@ function limpiarDatos(d?: DatosTecnicos): Prisma.InputJsonValue {
 /** Proyectos de la organización (M03). El revisor del cliente solo ve los de su cliente (RN-01-3). */
 @Injectable()
 export class ProyectosService {
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(
+    private readonly baseDatos: BaseDatosService,
+    private readonly almacenes: AlmacenService,
+  ) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -122,9 +126,27 @@ export class ProyectosService {
     await this.buscar(u, id);
     const c = await this.bd.curso.findUnique({ where: { proyectoId: id } });
     if (!c) throw new NotFoundException('El proyecto aún no tiene curso: genera las pantallas en Producción');
+    // HU-0702 · La vista previa necesita oír cada narración y mover la boca del personaje: URL firmada de los audios y
+    // el SVG (ya saneado al subirlo) en la respuesta, para no depender del CORS del almacenamiento.
+    const doc = c.documento as { recursos?: { id: string; tipo: string }[]; modulos?: { capsulas: { pantallas: { bloques: { tipo: string; recursoId?: string }[] }[] }[] }[] };
+    const audios = (doc.recursos ?? []).filter((r) => r.tipo === 'audio').map((r) => r.id);
+    const personajes = [...new Set((doc.modulos ?? []).flatMap((m) => m.capsulas.flatMap((x) => x.pantallas.flatMap((p) => p.bloques.filter((b) => b.tipo === 'personaje' && b.recursoId).map((b) => b.recursoId!)))))];
+    const recursos = await this.bd.recurso.findMany({
+      where: { id: { in: [...audios, ...personajes].filter((x) => /^[0-9a-f-]{36}$/i.test(x)) }, organizacionId: c.organizacionId },
+      select: { id: true, claveS3: true, nombre: true, mime: true },
+    });
+    const urlsRecursos: Record<string, string> = {};
+    const svgPersonajes: Record<string, string> = {};
+    await Promise.all(recursos.map(async (r) => {
+      if (personajes.includes(r.id) && r.mime === 'image/svg+xml') {
+        svgPersonajes[r.id] = new TextDecoder().decode(await this.almacenes.almacen.leer(r.claveS3));
+      } else if (audios.includes(r.id)) {
+        urlsRecursos[r.id] = await this.almacenes.almacen.urlDescarga(r.claveS3, r.nombre);
+      }
+    }));
     return {
       id: c.id, proyectoId: c.proyectoId, versionEsquema: c.versionEsquema, version: c.version,
-      documento: c.documento as Record<string, unknown>, actualizadoEn: c.actualizadoEn.toISOString(),
+      documento: c.documento as Record<string, unknown>, actualizadoEn: c.actualizadoEn.toISOString(), urlsRecursos, svgPersonajes,
     };
   }
 

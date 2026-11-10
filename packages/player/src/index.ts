@@ -4,3 +4,4 @@ export { montar, PALETA_BASE, type EstadoReproductor, type OpcionesReproductor, 
 export { aplanar, modoDe, motivoBloqueo, type Avance, type Motivo, type PantallaPlana } from './navegacion.ts';
 export { seguimiento, type EstadoSeguimiento } from './seguimiento.ts';
 export type * from './tipos.ts';
+export { animarBoca, bocaDisponible, bocaEn, type MarcasBoca, mostrarBoca, mostrarPose, parpadear, type ColoresUniforme, MARCADORES_KIT, type RelojAudio, svgEnLinea } from './boca.ts';

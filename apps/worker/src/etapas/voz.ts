@@ -4,7 +4,7 @@
 // Continuar no paga otra vez: una narración ya lista con el mismo hash (texto, voz, velocidad y diccionario) se reusa.
 import { createHash, randomUUID } from 'node:crypto';
 import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, type Sintetizador, VozNoDisponible } from '@aptio/ai';
-import type { Prisma } from '@aptio/db';
+import { Prisma } from '@aptio/db';
 import { validarCurso } from '@aptio/schema';
 import { duracionLegible, type NarracionLista, type VozCurso } from '@aptio/schema/generacion';
 import { aplicarPronunciacion, type TerminoPronunciacion } from '@aptio/schema/voz';
@@ -18,7 +18,7 @@ export const INTENTOS_VOZ = 3;
 const PROVEEDORES = ['google'];
 
 type VozDoc = { proveedor: string; voz: string; velocidad?: number };
-type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number };
+type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown };
 type PantallaDoc = { id: string; titulo: { es?: string }; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } } };
 type RecursoDoc = { id: string; tipo: string; idioma?: string };
 type CursoDoc = { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[]; recursos: RecursoDoc[] };
@@ -33,7 +33,7 @@ export interface DependenciasVoz {
 const pantallasDe = (d: CursoDoc) => d.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
 const extension = (mime: string) => (mime === 'audio/mpeg' ? 'mp3' : 'wav');
 
-async function enParalelo<T>(lista: T[], n: number, trabajo: (x: T) => Promise<void>): Promise<void> {
+export async function enParalelo<T>(lista: T[], n: number, trabajo: (x: T) => Promise<void>): Promise<void> {
   let siguiente = 0;
   const hilo = async () => {
     while (siguiente < lista.length) await trabajo(lista[siguiente++]!);
@@ -149,7 +149,8 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         ctx.bd.narracion.upsert({
           where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma: 'es' } },
           create: { cursoId: curso.id, pantallaId: p.id, idioma: 'es', textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, estado: 'ACTUALIZADA' },
-          update: { textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, estado: 'ACTUALIZADA' },
+          // Un audio nuevo deja sin boca a la narración: la etapa 7 la calcula de nuevo (HU-0702).
+          update: { textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, bocas: Prisma.DbNull, estado: 'ACTUALIZADA' },
         }),
       ]);
       listas.set(p.id, { ...base, duracionMs, recursoId, mime: audio.mime });
@@ -167,6 +168,8 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         const n = listas.get(p.id);
         const es = p.narracion?.porIdioma.es;
         if (!n || !es || p.narracion!.texto.es?.trim() !== n.texto) continue;
+        // Con otro audio, las marcas de boca anteriores ya no sirven (las recalcula la etapa 7).
+        if (es.recursoAudioId !== n.recursoId) delete es.bocas;
         es.recursoAudioId = n.recursoId;
         es.duracionMs = n.duracionMs;
         es.hashTexto = n.hash;

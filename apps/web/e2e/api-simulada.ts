@@ -145,6 +145,19 @@ export const OBSERVACIONES = [
 ];
 
 /** El curso esperado del caso LOTO (30 pantallas, 9 actividades): el que dibuja el reproductor en la vista previa. */
+/** HU-0702 · La plantilla de Ana con sus bocas (docs/diseno/personaje). */
+export const ANA_SVG = readFileSync(new URL('../../../docs/diseno/personaje/plantilla-ana.svg', import.meta.url), 'utf8');
+
+/** Silencio WAV (8 kHz, 8 bits) de `ms` milisegundos, como la voz simulada. */
+export function wavSilencio(ms: number): Buffer {
+  const muestras = Math.round((8000 * ms) / 1000);
+  const b = Buffer.alloc(44 + muestras, 128);
+  b.write('RIFF', 0); b.writeUInt32LE(36 + muestras, 4); b.write('WAVE', 8); b.write('fmt ', 12);
+  b.writeUInt32LE(16, 16); b.writeUInt16LE(1, 20); b.writeUInt16LE(1, 22); b.writeUInt32LE(8000, 24);
+  b.writeUInt32LE(8000, 28); b.writeUInt16LE(1, 32); b.writeUInt16LE(8, 34); b.write('data', 36); b.writeUInt32LE(muestras, 40);
+  return b;
+}
+
 export const cursoLoto = () => JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8')) as Record<string, unknown>;
 
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
@@ -155,6 +168,8 @@ const ETAPAS_SIMULADAS: Record<string, { detalle: string; costoUsd: number }> = 
   PANTALLAS: { detalle: '30 pantallas armadas con el kit · 9 actividades con sus datos · curso validado', costoUsd: 0.6 },
   // HU-0701: 1998 caracteres con Neural2 (SUP-34). Ilustraciones (S9) queda en espera y no frena la voz.
   VOZ_ES: { detalle: '30 narraciones listas · 2 min 10 s de audio · voz es-US-Neural2-A', costoUsd: 0.03 },
+  // HU-0702: la boca se calcula en el worker, sin costo (SUP-35).
+  BOCA: { detalle: '30 narraciones con boca sincronizada · simulada por letras', costoUsd: 0 },
 };
 /** Pantallas que la etapa 4 deja listas en cada consulta (y narraciones, la etapa 6). */
 const PANTALLAS_POR_CONSULTA = 10;
@@ -216,10 +231,18 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // El curso del proyecto con pantallas: CP-047 lo muestra tomado del «Manual» del cliente y 3 pantallas tienen observaciones.
   const revision = { version: 1, documento: cursoLoto(), observaciones: OBSERVACIONES.map((o) => ({ ...o })) };
   (revision.documento.recursos as { tipo: string; nombre: string }[]).find((r) => r.tipo === 'documento')!.nombre = 'Manual.pdf';
-  type PantallaSim = { id: string; estado: string; titulo: { es: string }; narracion?: { texto: { es: string } } };
+  type PantallaSim = { id: string; estado: string; titulo: { es: string }; narracion?: { texto: { es: string }; porIdioma?: { es?: { duracionMs?: number } } } };
   const pantallasSim = () => (revision.documento.modulos as { capsulas: { pantallas: PantallaSim[] }[] }[]).flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
   // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
-  await page.route('**/s3-simulado/**', (route) => route.fulfill({ status: 200, body: '' }));
+  // HU-0702: los audios de narración se sirven como silencio WAV con la duración de su pantalla (o la pedida en el nombre).
+  await page.route('**/s3-simulado/**', (route) => {
+    const nombre = new URL(route.request().url()).pathname.split('/').pop() ?? '';
+    const deP = nombre.match(/^(p\d\d)-es\.(mp3|wav)$/);
+    const ms = nombre.match(/^audio-(\d+)\.wav$/)?.[1];
+    const dur = ms ? Number(ms) : deP ? pantallasSim().find((p) => p.id === deP[1])?.narracion?.porIdioma?.es?.duracionMs : undefined;
+    if (route.request().method() === 'GET' && dur) return route.fulfill({ status: 200, contentType: 'audio/wav', body: wavSilencio(dur) });
+    return route.fulfill({ status: 200, body: '' });
+  });
   let sesion = conSesion;
   const usuario = { ...USUARIO, ...(rol ? { rol } : {}) };
   const clientes = [
@@ -459,7 +482,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (deCurso) {
       const p = proyectos.find((x) => x.id === deCurso[1]);
       if (!p || !(p.avance as { total: number }).total) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El proyecto aún no tiene curso: genera las pantallas en Producción' });
-      return responder(200, { id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version, documento: revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z' });
+      const origen = new URL(req.url()).origin;
+      const urlsRecursos = Object.fromEntries((revision.documento.recursos as { id: string; tipo: string; nombre: string }[])
+        .filter((r) => r.tipo === 'audio').map((r) => [r.id, `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
+      return responder(200, {
+        id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version, documento: revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z',
+        urlsRecursos, svgPersonajes: { 'svg-ana': ANA_SVG },
+      });
     }
     // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).
     if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);

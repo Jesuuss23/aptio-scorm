@@ -66,7 +66,9 @@ button:disabled{cursor:not-allowed}
 .ap-medios{display:flex;gap:12px;justify-content:center;align-items:flex-end}
 .ap-personaje{margin:0;width:min(34cqi,160px);flex:0 0 auto}
 .ap-personaje svg,.ap-personaje img{display:block;width:100%;height:auto}
-.ap-personaje svg{fill:color-mix(in srgb,var(--ap-primario) 30%,transparent)}
+.ap-personaje .ap-silueta{fill:color-mix(in srgb,var(--ap-primario) 30%,transparent)}
+.ap-narracion{display:flex;justify-content:center;padding:4px 12px 0}
+.ap-narracion[hidden]{display:none}
 .ap-imagen,.ap-video{margin:0;flex:1;min-width:0}
 .ap-imagen img,.ap-video video{display:block;width:100%;height:auto;border-radius:10px}
 .ap-sin-imagen{display:grid;place-items:center;min-height:120px;width:100%;padding:12px;border:2px dashed color-mix(in srgb,currentColor 35%,transparent);border-radius:10px;font-size:13px;text-align:center;opacity:.8}

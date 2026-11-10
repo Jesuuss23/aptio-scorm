@@ -13,3 +13,7 @@ export {
   costoTranscripcion, type ProveedorTranscripcion, SEGUNDOS_POR_TRAMO, type SegmentoTranscripcion, TARIFA_TRANSCRIPCION_USD_MINUTO, TranscripcionNoDisponible,
   transcriptorDesdeEntorno, transcriptorGoogle, transcriptorSimulado, type TramoAudio,
 } from './transcripcion.js';
+export {
+  BocaNoDisponible, bocaDeLetra, bocasDeRhubarb, bocasSimuladas, type CalculadorBocas, calculadorSimulado, type FormaBoca, type MarcaBoca, normalizarBocas,
+  type PedidoBoca, type ResultadoBoca,
+} from './boca.js';

@@ -10,6 +10,8 @@ import { TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { EJECUTORES } from './etapas/index.js';
 import { crearEtapaVoz } from './etapas/voz.js';
+import { crearEtapaBoca } from './etapas/boca.js';
+import { calculadorBocasDesdeEntorno } from './extraer/rhubarb.js';
 import { cerrarOcr, ocrTesseract } from './extraer/ocr.js';
 import { crearGenerador } from './generar.js';
 import { mediosFfmpeg } from './extraer/medios.js';
@@ -34,7 +36,9 @@ const transcribir = crearTranscriptor({ bd: prisma, redis, leer: (clave) => alma
 // Generación de un proyecto (HU-0401): las 11 etapas en orden con el proveedor de texto del entorno.
 // La etapa 6 (HU-0701) necesita la voz del entorno y el almacenamiento para guardar los audios.
 const vozEs = crearEtapaVoz({ sintetizar: sintetizadorDesdeEntorno(process.env), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
-const generar = crearGenerador({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: { ...EJECUTORES, VOZ_ES: vozEs } });
+// La etapa 7 (HU-0702) lee cada audio y calcula su boca con Rhubarb (modo real) o por letras (simulado).
+const boca = crearEtapaBoca({ calcular: calculadorBocasDesdeEntorno(process.env), leer: (clave) => almacen.leer(clave) });
+const generar = crearGenerador({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: { ...EJECUTORES, VOZ_ES: vozEs, BOCA: boca } });
 const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
   if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);
