@@ -28,7 +28,7 @@ services:
     ports:
       - '9000:4566'
     environment:
-      - SERVICES=s3
+      - SERVICES=s3,kms
       - AWS_DEFAULT_REGION=us-east-1
     volumes:
       - s3_data:/var/lib/localstack

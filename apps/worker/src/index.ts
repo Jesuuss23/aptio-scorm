@@ -3,9 +3,11 @@
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas } from '@aptio/colas';
+import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
-import { Worker } from 'bullmq';
+import { Queue, Worker } from 'bullmq';
 import { crearProcesador } from './procesar.js';
+import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
 
 const redis = crearRedis();
 const procesar = crearProcesador({
@@ -23,13 +25,29 @@ const trabajadores = COLAS.map(
       concurrency: Number(process.env.WORKER_CONCURRENCIA ?? 2),
     }),
 );
+
+// Mantenimiento: borrado diario de documentos del cliente vencidos (HU-1404). Fuera de COLAS: no es un trabajo de IA.
+const almacen = new Almacen();
+const mantenimiento = new Queue(COLA_MANTENIMIENTO, { connection: opcionesRedis(), prefix: prefijoColas() });
+await mantenimiento.upsertJobScheduler(TAREA_BORRADO, { pattern: PATRON_BORRADO, tz: 'America/Lima' }, { name: TAREA_BORRADO });
+const mantenedor = new Worker(
+  COLA_MANTENIMIENTO,
+  async () => {
+    const r = await borrarDocumentosVencidos(prisma, almacen);
+    if (r.documentos > 0) console.log(`Borrados ${r.documentos} documentos vencidos de ${r.proyectos} proyectos`);
+    return r;
+  },
+  { connection: opcionesRedis(), prefix: prefijoColas() },
+);
+mantenedor.on('failed', (_job, err) => console.error(`[${COLA_MANTENIMIENTO}] borrado de documentos falló: ${err.message}`));
+
 for (const t of trabajadores) {
   t.on('failed', (job, err) => console.error(`[${t.name}] trabajo ${job?.data.trabajoId} falló: ${err.message}`));
 }
 console.log(`Worker escuchando las colas ${COLAS.join(', ')} en ${opcionesRedis().host}:${opcionesRedis().port}`);
 
 async function cerrar() {
-  await Promise.all(trabajadores.map((t) => t.close()));
+  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close()]);
   redis.disconnect();
   await prisma.$disconnect();
   process.exit(0);

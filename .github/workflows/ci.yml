@@ -33,12 +33,27 @@ jobs:
         ports: ['6379:6379']
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 10
+      # S3 y KMS locales para el almacenamiento cifrado (HU-1404, SUP-08).
+      localstack:
+        image: localstack/localstack:3.8.0
+        env:
+          SERVICES: s3,kms
+          AWS_DEFAULT_REGION: us-east-1
+        ports: ['9000:4566']
+        options: >-
+          --health-cmd "curl -sf http://localhost:4566/_localstack/health" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       # Solo para la base efímera de CI; no es un secreto.
       DATABASE_URL: postgresql://postgres:password123@localhost:5432/aptio_scorm?schema=public
       REDIS_HOST: localhost
       REDIS_PORT: '6379'
       PROVEEDORES_MODO: simulado
+      # Credenciales ficticias de LocalStack; no son secretos.
+      AWS_ENDPOINT: http://localhost:9000
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      KMS_KEY_ID: alias/aptio-documentos
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -55,6 +70,8 @@ jobs:
         run: pnpm typecheck
       - name: Migraciones y datos de ejemplo
         run: pnpm db:deploy && pnpm db:seed
+      - name: Almacenamiento cifrado
+        run: pnpm almacen:preparar
       - name: Pruebas (Vitest)
         run: pnpm test
       - name: Salidas de IA del caso LOTO

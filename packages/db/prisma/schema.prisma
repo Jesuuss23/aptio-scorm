@@ -43,6 +43,7 @@ model Organizacion {
   exportaciones Exportacion[]
   mediciones    MedicionProceso[]
   auditoria     Auditoria[]
+  subidas       Subida[]
 }
 
 // ---------- Personas y acceso ----------
@@ -481,6 +482,28 @@ model Recurso {
 
   @@index([clienteId, tipo])
   @@index([organizacionId, tipo])
+  @@index([eliminarEn])
+}
+
+/// Subida pedida con URL firmada y aún no confirmada (HU-1404). Al confirmar se verifica el tipo real y se crea el Recurso.
+model Subida {
+  id             String        @id @default(uuid()) @db.Uuid
+  organizacionId String        @db.Uuid
+  usuarioId      String        @db.Uuid
+  clienteId      String?       @db.Uuid
+  proyectoId     String?       @db.Uuid
+  origen         OrigenRecurso
+  nombre         String
+  mime           String
+  bytes          BigInt
+  claveS3        String        @unique
+  expira         DateTime
+  recursoId      String?       @db.Uuid // se llena al confirmar
+  creadoEn       DateTime      @default(now())
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+
+  @@index([organizacionId, usuarioId])
 }
 
 enum EstadoNarracion {
