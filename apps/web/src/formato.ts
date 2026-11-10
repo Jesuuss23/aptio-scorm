@@ -19,3 +19,12 @@ export const NOMBRE_INTERACCION: Record<string, string> = {
   'INT-01': 'Memoria', 'INT-02': 'Clasificar', 'INT-03': 'Ordenar pasos', 'INT-04': 'Tarjetas', 'INT-05': 'Quiz',
   'INT-06': 'Exploración', 'INT-07': 'Deslizar', 'INT-08': 'Decisión',
 };
+
+/** Marca de tiempo de un video o audio: 150 → «2:30», 3725 → «1:02:05». */
+export function tiempo(segundos: number): string {
+  const s = Math.floor(segundos);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}

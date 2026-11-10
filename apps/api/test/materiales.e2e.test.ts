@@ -30,7 +30,7 @@ describe.skipIf(!hayBase && !process.env.CI)('material del cliente (HU-0304)', (
   const encolados: { cola: NombreCola; datos: DatosTrabajo }[] = [];
   let colaCaida = false;
 
-  const recurso = (nombre: string, mime: string, tipo: 'DOCUMENTO' | 'AUDIO' | 'IMAGEN', proyecto = proyectoId) =>
+  const recurso = (nombre: string, mime: string, tipo: 'DOCUMENTO' | 'AUDIO' | 'VIDEO' | 'IMAGEN', proyecto = proyectoId) =>
     prisma.recurso.create({
       data: {
         organizacionId: orgId, clienteId, proyectoId: proyecto, tipo, origen: 'CLIENTE', claveS3: `prueba/${sufijo}/${Math.random()}`,
@@ -109,14 +109,28 @@ describe.skipIf(!hayBase && !process.env.CI)('material del cliente (HU-0304)', (
     expect(lista.body.map((m: { tipo: string }) => m.tipo)).toEqual(['PDF', 'TEMA']);
   });
 
-  it('pide archivo o tema, rechaza audio, otros tipos y archivos de otro proyecto', async () => {
+  it('CP-035 · un video o un audio del proyecto encola la transcripción y devuelve los tiempos al terminar', async () => {
+    const video = await recurso('Charla de seguridad.mp4', 'video/mp4', 'VIDEO');
+    const res = await como('productor').post(ruta(), { recursoId: video.id });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ tipo: 'VIDEO', estado: 'pendiente', transcripcion: [], duracionS: null });
+    expect(encolados.at(-1)).toEqual({ cola: 'media', datos: { trabajoId: res.body.id, organizacionId: orgId, tarea: 'TRANSCRIBIR' } });
+    const audio = await recurso('charla.mp3', 'audio/mpeg', 'AUDIO');
+    expect((await como('productor').post(ruta(), { recursoId: audio.id })).body).toMatchObject({ tipo: 'AUDIO', estado: 'pendiente' });
+    expect(encolados.at(-1)!.datos.tarea).toBe('TRANSCRIBIR');
+
+    // Lo que guarda el worker al terminar: segmentos en el material y duración en el recurso.
+    const segmentos = [{ desde: 0, hasta: 4.2, texto: 'Hoy hablamos de bloqueo.' }, { desde: 4.2, hasta: 150, texto: 'Fin.' }];
+    await prisma.materialFuente.update({ where: { id: res.body.id }, data: { estado: 'listo', transcripcion: segmentos } });
+    await prisma.recurso.update({ where: { id: video.id }, data: { metadatos: { duracionS: 150 } } });
+    const visto = (await como('grafico').get(ruta())).body.find((m: { id: string }) => m.id === res.body.id);
+    expect(visto).toMatchObject({ nombre: 'Charla de seguridad.mp4', estado: 'listo', transcripcion: segmentos, duracionS: 150, paginas: [] });
+  });
+
+  it('pide archivo o tema, rechaza otros tipos y archivos de otro proyecto', async () => {
     expect((await como('productor').post(ruta(), {})).body.codigo).toBe('MATERIAL_INCOMPLETO');
     const pdf = await recurso('a.pdf', PDF, 'DOCUMENTO');
     expect((await como('productor').post(ruta(), { recursoId: pdf.id, tema: 'Tema' })).status).toBe(422);
-    const audio = await recurso('charla.mp3', 'audio/mpeg', 'AUDIO');
-    const conAudio = await como('productor').post(ruta(), { recursoId: audio.id });
-    expect(conAudio.status).toBe(422);
-    expect(conAudio.body.codigo).toBe('TRANSCRIPCION_PENDIENTE');
     const imagen = await recurso('foto.png', 'image/png', 'IMAGEN');
     expect((await como('productor').post(ruta(), { recursoId: imagen.id })).body.codigo).toBe('TIPO_NO_PERMITIDO');
     const ajeno = await recurso('otro.pdf', PDF, 'DOCUMENTO', otroProyectoId);

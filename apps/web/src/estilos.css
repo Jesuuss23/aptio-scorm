@@ -765,3 +765,28 @@
 .guion-conteo .chip {
   white-space: normal;
 }
+
+/* HU-0305 · Transcripción de video y audio con marcas de tiempo. */
+.transcripcion {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+}
+.segmento {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  border-bottom: 1px solid var(--color-borde);
+  padding-bottom: 8px;
+}
+.segmento-texto {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.segmento-texto .chip {
+  white-space: normal;
+}

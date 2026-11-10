@@ -6,3 +6,7 @@ export {
   proveedorSimulado, type RespuestaProveedor, type ResultadoTarea, SalidaNoValida, SIN_CONSUMO, TARIFAS,
 } from './texto.js';
 export { MODELO_POR_DEFECTO, proveedorAnthropic, proveedorDesdeEntorno } from './anthropic.js';
+export {
+  costoTranscripcion, type ProveedorTranscripcion, SEGUNDOS_POR_TRAMO, type SegmentoTranscripcion, TARIFA_TRANSCRIPCION_USD_MINUTO, TranscripcionNoDisponible,
+  transcriptorDesdeEntorno, transcriptorGoogle, transcriptorSimulado, type TramoAudio,
+} from './transcripcion.js';

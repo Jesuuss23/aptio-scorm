@@ -1,4 +1,4 @@
-// HU-0304 y HU-1402 · Material del cliente en la web (CP-033, CP-034 y el aviso de CP-102) contra la API simulada.
+// HU-0304, HU-0305 y HU-1402 · Material del cliente en la web (CP-033, CP-034, CP-035 y el aviso de CP-102) contra la API simulada.
 import { expect, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
 
@@ -41,6 +41,32 @@ test('CP-102 · la página con una orden para la IA se marca y se explica que no
   const pagina = material.getByRole('article', { name: 'Página 2' });
   await expect(pagina.getByText('Posible instrucción', { exact: true })).toBeVisible();
   await expect(pagina.getByText('la IA no lo obedece', { exact: false })).toBeVisible();
+});
+
+test('CP-035 · un video de 2:30 muestra su transcripción con marcas de tiempo', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  await page.goto(PROYECTO);
+  const material = page.getByRole('region', { name: 'Material del cliente' });
+  await material.getByLabel('Archivos del material').setInputFiles({ name: 'Charla de seguridad.mp4', mimeType: 'video/mp4', buffer: Buffer.from('video de prueba') });
+  const fila = material.getByRole('listitem').filter({ hasText: 'Charla de seguridad.mp4' });
+  await expect(fila.getByText('Video', { exact: true })).toBeVisible();
+  await expect(fila.getByText('Transcripción de 2:30 · 5 fragmentos con marca de tiempo')).toBeVisible({ timeout: 10_000 });
+  await fila.getByRole('button', { name: 'Ver transcripción' }).click();
+  const t = material.getByRole('region', { name: 'Transcripción de Charla de seguridad.mp4' });
+  await expect(t.getByRole('listitem')).toHaveCount(5);
+  await expect(t.getByRole('listitem').first()).toContainText('0:00–0:30Hola, soy Ana, supervisora de seguridad.');
+  await expect(t.getByRole('listitem', { name: 'Desde 2:00' })).toContainText('2:00–2:30Verifica la energía cero antes de empezar.');
+});
+
+test('CP-102 · en un audio, el fragmento con una orden para la IA se marca', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  await page.goto(PROYECTO);
+  const material = page.getByRole('region', { name: 'Material del cliente' });
+  await material.getByLabel('Archivos del material').setInputFiles({ name: 'charla-inyeccion.mp3', mimeType: 'audio/mpeg', buffer: Buffer.from('audio de prueba') });
+  const fila = material.getByRole('listitem').filter({ hasText: 'charla-inyeccion.mp3' });
+  await expect(fila.getByText('1 fragmento con posible instrucción')).toBeVisible({ timeout: 10_000 });
+  await fila.getByRole('button', { name: 'Ver transcripción' }).click();
+  await expect(material.getByRole('listitem', { name: 'Desde 1:15' })).toContainText('la IA no la obedece');
 });
 
 test('sin archivo, basta con el tema', async ({ page }) => {
