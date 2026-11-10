@@ -1,5 +1,6 @@
 // HU-0406 · Etapa 4 «Pantallas con el kit» (IA-15 v2): disposición del kit y campos por pantalla, convertidos a bloques
 // del curso sin HTML; las pantallas listas se ven mientras la etapa corre (CP-043) y el curso armado valida (CP-042).
+import { type CursoDoc, observacionesRegla } from '@aptio/schema/revision';
 import { type ProveedorTexto, proveedorSimulado } from '@aptio/ai';
 import { prisma } from '@aptio/db';
 import { esCursoValido } from '@aptio/schema';
@@ -107,6 +108,9 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 4 en el generador', () => 
     // El texto del documento del cliente guarda su archivo y página.
     expect(pantallas.find((p) => p.id === 'p06')!.bloques[0]!.origen).toMatchObject({ tipo: 'documento', paginas: [13], revisado: false });
     expect(await prisma.cursoVersion.count({ where: { cursoId: curso.id } })).toBe(1);
+    // HU-0501: las observaciones por reglas quedan guardadas con el curso.
+    const reglas = observacionesRegla(curso.documento as unknown as CursoDoc);
+    expect(await prisma.observacion.count({ where: { cursoId: curso.id, origen: 'regla' } })).toBe(reglas.length);
   });
 
   it('CP-043 · cada pantalla lista se guarda mientras la etapa corre; con proveedor real se reintenta la que rompe una regla', async () => {
