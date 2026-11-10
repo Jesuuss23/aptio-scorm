@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-09 · Fase actual: **Sprint S0 en curso** (monorepo inicial levantado; especificación incorporada al repositorio).
+Última actualización: 2026-11-09 · Fase actual: **Sprint S1 en curso** (S0 cerrado: las 8 ramas fusionadas y `main` protegida con CI).
 
 ## Decisiones aprobadas
 
@@ -22,8 +22,11 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 | SUP-10 | La sesión es una cookie firmada sin estado (no se guarda en la base); para cerrar todas las sesiones de un usuario se sube `versionSesion`. No hay lista de sesiones abiertas por dispositivo hasta que se pida. | Ingeniero a cargo, al montar el entorno de pruebas (HU-1405) |
 | SUP-11 | El revisor del cliente no recibe `GET /eventos`, porque ese flujo muestra los trabajos de toda la organización; cuando revise un proyecto recibirá solo los eventos de ese proyecto. | Responsable del producto, al llegar la historia de revisión del cliente (M05) |
 | SUP-12 | El lint usa oxlint (ya estaba en el repositorio y usa reglas compatibles con ESLint) en lugar de ESLint; el formato con Prettier se agrega en un PR propio que solo reformatee, para no mezclarlo con cambios de lógica. | Ingeniero a cargo |
+| SUP-13 | Registran y editan clientes ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y PRODUCTOR; el diseñador gráfico los ve y edita su kit (HU-0202). | Responsable del producto |
 
 ## Cambios recientes
+
+- **HU-0201 · Clientes (2026-11-10):** `GET/POST /clientes`, `GET/PATCH /clientes/{id}`, con alta solo con el nombre (CP-019), búsqueda por nombre, retención de documentos editable (180 días por defecto) y 409 `CLIENTE_EXISTE` si se repite el nombre en la organización. El revisor del cliente solo ve el suyo. En la web se suma **Empresa → Clientes y kits** con la lista, el alta y el detalle editable; el kit se habilita en la rama del HU-0202.
 
 - **HU-0107 · Integración continua (2026-11-09):** `.github/workflows/ci.yml` corre en cada PR y en cada push a `main`, en dos trabajos. **Lint, tipos y pruebas:** oxlint en todo el repositorio sin avisos, tipos de todos los paquetes, migraciones y datos de ejemplo sobre PostgreSQL 16 y Redis 7 efímeros, Vitest de todos los paquetes, `ia:casos` y el lint del contrato OpenAPI. **Flujos de la web:** Playwright con la auditoría visual y el acceso. En CI las pruebas que usan base de datos o Redis fallan si el servicio no está, en vez de saltarse. `pnpm ci` repite en local lo mismo que el primer trabajo. Para que un PR en rojo no se pueda fusionar (CP-018), falta activar en GitHub la protección de `main` exigiendo esos dos controles: es una configuración del repositorio y la hace su administrador.
 

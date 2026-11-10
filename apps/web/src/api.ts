@@ -19,6 +19,24 @@ export const NOMBRE_ROL: Record<Rol, string> = {
   REVISOR_CLIENTE: 'Revisión del cliente',
 };
 
+export interface Cliente {
+  id: string;
+  nombre: string;
+  lmsHabitual: string | null;
+  idiomas: ('es' | 'en')[];
+  notas: string | null;
+  retencionDocumentosDias: number;
+  tieneKit: boolean;
+  creadoEn: string;
+}
+export type ClienteEntrada = Partial<Pick<Cliente, 'lmsHabitual' | 'idiomas' | 'notas' | 'retencionDocumentosDias'>> & { nombre: string };
+
+/** LMS conocidos; el cliente puede usar otro (decisión 11: cualquier LMS). */
+export const OPCIONES_LMS = ['Moodle 4.5 o superior', 'Blackboard', 'Chamilo', 'Canvas'];
+
+/** Roles que registran y editan clientes (la API lo vuelve a verificar). */
+export const EDITAN_CLIENTES: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -47,7 +65,7 @@ async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
   return cuerpo as T;
 }
 
-const json = (datos: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(datos) });
+const json = (datos: unknown, method = 'POST'): RequestInit => ({ method, body: JSON.stringify(datos) });
 
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
@@ -55,4 +73,8 @@ export const api = {
   salir: () => pedir<void>('/auth/salir', { method: 'POST' }),
   pedirClave: (email: string) => pedir<void>('/auth/clave/olvido', json({ email })),
   crearClave: (token: string, clave: string) => pedir<void>('/auth/clave/restablecer', json({ token, clave })),
+  clientes: (buscar = '') => pedir<Cliente[]>(`/clientes${buscar ? `?buscar=${encodeURIComponent(buscar)}` : ''}`),
+  cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
+  crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
+  editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
 };
