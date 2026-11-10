@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 
 export const USUARIO = {
@@ -40,7 +41,20 @@ export interface OpcionesSimulacion {
   kitEnConflicto?: boolean;
   /** Proyectos de ejemplo: 3 de Minera Andina y 2 de la Municipalidad (CP-029). */
   conProyectos?: boolean;
+  /**
+   * Cómo avanza la generación simulada (una etapa por consulta): `normal` hace las etapas 1 a 3; `lenta` se queda en
+   * la 3 para poder cancelarla (CP-045); `falla` da error en la 2 la primera vez (HU-0408); `ajena` responde 409 al
+   * lanzar porque otra persona ya la lanzó (CP-037).
+   */
+  generacion?: 'normal' | 'lenta' | 'falla' | 'ajena';
 }
+
+/** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
+const ETAPAS_SIMULADAS = [
+  { detalle: '84 páginas → 14 ideas clave · 3 temas omitidos con motivo', costoUsd: 0.35 },
+  { detalle: '3 objetivos con nivel de Bloom · 3 módulos · 30 pantallas', costoUsd: 0.1 },
+  { detalle: '30 pantallas con texto corto en pantalla y narración', costoUsd: 0.45 },
+];
 
 /** CP-033: el manual de ejemplo tiene 84 páginas y la 42 está escaneada; un archivo «inyeccion» trae una orden para la IA (CP-102). */
 function paginasDe(nombre: string) {
@@ -56,8 +70,13 @@ function paginasDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal' }: OpcionesSimulacion) {
   let conflicto = Boolean(kitEnConflicto);
+  type EtapaSim = { etapa: string; orden: number; estado: string; detalle: string | null; inicio: null; fin: null; costoUsd: number };
+  type GeneracionSim = { id: string; proyectoId: string; estado: string; avance: number; costoUsd: number; parametros: object; etapas: EtapaSim[]; creadoEn: string; terminadoEn: string | null };
+  const generaciones: GeneracionSim[] = [];
+  let falla = generacion === 'falla';
+  let ajena = generacion === 'ajena';
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
   const subidas = new Map<string, { nombre: string; mime: string }>();
   const modelos: Record<string, unknown>[] = [];
@@ -187,6 +206,89 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         : { ...base, tipo: 'PDF', recursoId: datos.recursoId, nombre: subidas.get(datos.recursoId!)?.nombre ?? 'archivo', tema: null, estado: 'pendiente' };
       lista.push(m);
       return responder(201, m);
+    }
+    // HU-0401: la generación termina una etapa en cada consulta, como si el worker la corriera.
+    const estadoDe = (proyectoId: string, estado: string) => {
+      const p = proyectos.find((x) => x.id === proyectoId);
+      if (p) p.estado = estado;
+    };
+    const conAvance = (g: GeneracionSim) => {
+      const hechas = g.etapas.filter((e) => e.estado === 'COMPLETADO');
+      return { ...g, avance: Math.round((hechas.length / ETAPAS.length) * 100), costoUsd: Math.round(hechas.reduce((t, e) => t + e.costoUsd, 0) * 100) / 100 };
+    };
+    const avanzar = (g: GeneracionSim) => {
+      if (g.estado === 'EN_COLA') {
+        g.estado = 'EN_CURSO';
+        g.etapas.find((e) => e.estado === 'EN_COLA')!.estado = 'EN_CURSO';
+      }
+      if (g.estado !== 'EN_CURSO') return;
+      const e = g.etapas.find((x) => x.estado === 'EN_CURSO');
+      if (!e) return;
+      if (generacion === 'lenta' && e.orden === 3) return;
+      if (falla && e.orden === 2) {
+        falla = false;
+        Object.assign(e, { estado: 'ERROR', detalle: 'El proveedor de IA no respondió (529). Continúa en unos minutos.' });
+        g.estado = 'ERROR';
+        estadoDe(g.proyectoId, 'BORRADOR');
+        return;
+      }
+      Object.assign(e, { estado: 'COMPLETADO', ...ETAPAS_SIMULADAS[e.orden - 1] });
+      const siguiente = g.etapas.find((x) => x.estado === 'EN_COLA');
+      if (siguiente && siguiente.orden <= ETAPAS_SIMULADAS.length) {
+        siguiente.estado = 'EN_CURSO';
+      } else {
+        for (const x of g.etapas.filter((y) => y.estado === 'EN_COLA')) x.detalle = DETALLE_PROXIMAMENTE;
+        g.estado = 'COMPLETADO';
+        g.terminadoEn = new Date().toISOString();
+        estadoDe(g.proyectoId, 'BORRADOR');
+      }
+    };
+    const deGeneraciones = ruta.match(/^\/proyectos\/([0-9a-f-]+)\/generaciones$/);
+    if (deGeneraciones) {
+      const proyectoId = deGeneraciones[1]!;
+      const propias = () => generaciones.filter((g) => g.proyectoId === proyectoId).reverse().map(conAvance);
+      if (req.method() === 'GET') return responder(200, propias());
+      const crear = () => {
+        const g: GeneracionSim = {
+          id: `00000000-0000-4000-8000-${String(950 + generaciones.length).padStart(12, '0')}`, proyectoId, estado: 'EN_COLA', avance: 0, costoUsd: 0,
+          parametros: {}, etapas: ETAPAS.map((etapa, i) => ({ etapa, orden: i + 1, estado: 'EN_COLA', detalle: null, inicio: null, fin: null, costoUsd: 0 })),
+          creadoEn: new Date().toISOString(), terminadoEn: null,
+        };
+        generaciones.push(g);
+        estadoDe(proyectoId, 'GENERANDO');
+        return g;
+      };
+      if (!(materiales.get(proyectoId) ?? []).some((m) => m.estado === 'listo')) {
+        return responder(422, { codigo: 'SIN_MATERIAL', mensaje: 'Agrega el material del cliente o el tema antes de generar' });
+      }
+      if (ajena) {
+        ajena = false;
+        crear();
+        return responder(409, { codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
+      }
+      if (generaciones.some((g) => g.proyectoId === proyectoId && ['EN_COLA', 'EN_CURSO'].includes(g.estado))) {
+        return responder(409, { codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
+      }
+      return responder(202, conAvance(crear()));
+    }
+    const unaGeneracion = ruta.match(/^\/generaciones\/([0-9a-f-]+)(?:\/(cancelar|continuar))?$/);
+    if (unaGeneracion) {
+      const g = generaciones.find((x) => x.id === unaGeneracion[1]);
+      if (!g) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Generación no encontrada' });
+      if (unaGeneracion[2] === 'cancelar') {
+        g.estado = 'CANCELADO';
+        for (const e of g.etapas.filter((x) => ['EN_COLA', 'EN_CURSO'].includes(x.estado))) e.estado = 'CANCELADO';
+        estadoDe(g.proyectoId, 'BORRADOR');
+        return responder(202, conAvance(g));
+      }
+      if (unaGeneracion[2] === 'continuar') {
+        for (const e of g.etapas.filter((x) => ['ERROR', 'CANCELADO'].includes(x.estado))) Object.assign(e, { estado: 'EN_COLA', detalle: null });
+        g.estado = 'EN_COLA';
+        estadoDe(g.proyectoId, 'GENERANDO');
+        return responder(202, conAvance(g));
+      }
+      avanzar(g);
+      return responder(200, conAvance(g));
     }
     const unProyecto = ruta.match(/^\/proyectos\/([0-9a-f-]+)$/);
     if (unProyecto) {

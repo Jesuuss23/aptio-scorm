@@ -1,5 +1,6 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
+import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 
 export interface Usuario {
@@ -177,6 +178,28 @@ export interface ProyectoEntrada {
   datosTecnicos?: DatosTecnicos;
 }
 
+/** HU-0401 · Una generación del SCORM y sus 11 etapas. */
+export interface EtapaGeneracion {
+  etapa: Etapa;
+  orden: number;
+  estado: EstadoTrabajo;
+  detalle: string | null;
+  inicio: string | null;
+  fin: string | null;
+  costoUsd: number;
+}
+export interface Generacion {
+  id: string;
+  proyectoId: string;
+  estado: EstadoTrabajo;
+  avance: number;
+  costoUsd: number;
+  parametros: Record<string, unknown>;
+  etapas: EtapaGeneracion[];
+  creadoEn: string;
+  terminadoEn: string | null;
+}
+
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 export class ErrorApi extends Error {
   readonly estado: number;
@@ -201,8 +224,9 @@ async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
   } catch {
     throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
   }
-  if (res.status === 204 || res.status === 202) return undefined as T;
-  const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string; detalles?: Record<string, unknown>[] };
+  if (res.status === 204) return undefined as T;
+  // Un 202 puede traer cuerpo (la generación aceptada) o venir vacío (el correo de recuperación).
+  const cuerpo = (await res.json().catch(() => (res.status === 202 ? undefined : {}))) as { codigo?: string; mensaje?: string; detalles?: Record<string, unknown>[] };
   if (!res.ok) throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'Ocurrió un error inesperado', cuerpo.detalles);
   return cuerpo as T;
 }
@@ -239,6 +263,11 @@ export const api = {
   materiales: (proyectoId: string) => pedir<Material[]>(`/proyectos/${proyectoId}/materiales`),
   agregarMaterial: (proyectoId: string, datos: { recursoId: string } | { tema: string }) =>
     pedir<Material>(`/proyectos/${proyectoId}/materiales`, json(datos)),
+  generaciones: (proyectoId: string) => pedir<Generacion[]>(`/proyectos/${proyectoId}/generaciones`),
+  generacion: (id: string) => pedir<Generacion>(`/generaciones/${id}`),
+  generar: (proyectoId: string) => pedir<Generacion>(`/proyectos/${proyectoId}/generaciones`, json({})),
+  cancelarGeneracion: (id: string) => pedir<Generacion>(`/generaciones/${id}/cancelar`, { method: 'POST' }),
+  continuarGeneracion: (id: string) => pedir<Generacion>(`/generaciones/${id}/continuar`, { method: 'POST' }),
   glosario: (clienteId: string) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`),
   guardarGlosario: (clienteId: string, terminos: TerminoGlosario[]) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`, json(terminos, 'PUT')),
   pronunciacion: (clienteId: string) => pedir<TerminoPronunciacion[]>(`/clientes/${clienteId}/pronunciacion`),

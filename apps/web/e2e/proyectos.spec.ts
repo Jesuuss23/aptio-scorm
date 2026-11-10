@@ -37,7 +37,7 @@ test('CP-030 y CP-031 · solo cliente y nombre; el proyecto se crea y, sin LMS, 
   await expect(page).toHaveURL(/\/proyectos\/[0-9a-f-]{36}$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Bloqueo y etiquetado' })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Perfil de entrega' })).toHaveText('Entrega · perfil propuesto: Genérico');
-  await expect(page.getByText('El proyecto ya tiene lo necesario para generar.', { exact: false })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Generación del SCORM' }).getByRole('button', { name: 'Generar SCORM' })).toBeVisible();
 
   // Los datos técnicos se completan después.
   await page.getByLabel('LMS destino').selectOption('Canvas');

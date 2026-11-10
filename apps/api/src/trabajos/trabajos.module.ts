@@ -7,6 +7,6 @@ import { TrabajosService } from './trabajos.service.js';
 @Module({
   controllers: [TrabajosController],
   providers: [ColasService, EventosService, TrabajosService],
-  exports: [ColasService],
+  exports: [ColasService, EventosService],
 })
 export class TrabajosModule {}

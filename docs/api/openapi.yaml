@@ -1374,12 +1374,43 @@ paths:
         '422':
           $ref: '#/components/responses/NoValido'
   /proyectos/{proyectoId}/generaciones:
+    get:
+      tags:
+      - Generación
+      summary: Listar generaciones del proyecto
+      operationId: get_proyectos_proyectoId_generaciones
+      description: Las 10 más recientes, de la más nueva a la más antigua. El revisor del cliente solo ve las de su cliente.
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Generacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
     post:
       tags:
       - Generación
       summary: Generar el SCORM
       operationId: post_proyectos_proyectoId_generaciones
-      description: Una generación activa por proyecto (409 si ya hay una)
+      description: >-
+        Crea las 11 etapas en cola y encola la generación (cola ia, tarea GENERAR). Lo que no se envía se toma del
+        proyecto. Una generación activa por proyecto: 409 GENERACION_ACTIVA (CP-037). 422 PROYECTO_ARCHIVADO,
+        SIN_MATERIAL o MATERIAL_EN_PROCESO. Solo administración, diseño instruccional y producción.
       parameters:
       - name: proyectoId
         in: path
@@ -1388,18 +1419,18 @@ paths:
           type: string
           format: uuid
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/GeneracionEntrada'
       responses:
         '202':
-          description: OK
+          description: Generación aceptada, con sus etapas en cola
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Trabajo202'
+                $ref: '#/components/schemas/Generacion'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -1442,7 +1473,9 @@ paths:
       - Generación
       summary: Cancelar generación
       operationId: post_generaciones_generacionId_cancelar
-      description: Conserva lo ya generado
+      description: >-
+        Conserva las etapas terminadas; las que estaban en cola o en curso quedan CANCELADO y lo que la etapa en curso
+        produzca después no se guarda (CP-045). 409 GENERACION_TERMINADA si ya no está activa.
       parameters:
       - name: generacionId
         in: path
@@ -1463,13 +1496,49 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+  /generaciones/{generacionId}/continuar:
+    post:
+      tags:
+      - Generación
+      summary: Continuar generación
+      operationId: post_generaciones_generacionId_continuar
+      description: >-
+        HU-0408. Retoma una generación con ERROR o CANCELADO desde la primera etapa sin terminar; las terminadas no se
+        repiten. 409 GENERACION_NO_RETOMABLE si no está en esos estados, o GENERACION_ACTIVA si el proyecto ya tiene otra
+        en curso.
+      parameters:
+      - name: generacionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Generacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
   /generaciones/{generacionId}/eventos:
     get:
       tags:
       - Generación
       summary: Eventos de avance (SSE)
       operationId: get_generaciones_generacionId_eventos
-      description: 'text/event-stream: etapa, pantalla-lista, costo, fin, error'
+      description: >-
+        text/event-stream. Hoy: event `etapa` con un EventoTrabajo (trabajoId = generación, tarea = etapa o GENERAR) en
+        cada cambio de estado, y `latido` cada 15 s. Previstos: pantalla-lista y costo.
       parameters:
       - name: generacionId
         in: path
@@ -3886,9 +3955,7 @@ components:
           - '4:3'
     GeneracionEntrada:
       type: object
-      required:
-      - pantallas
-      - idiomas
+      description: Todo es opcional; lo que no se envía se toma del proyecto.
       properties:
         pantallas:
           type: integer
@@ -3903,17 +3970,15 @@ components:
             - en
         publico:
           type: string
+          maxLength: 200
         tono:
           type: string
+          maxLength: 60
         porcentajeActividades:
           type: integer
           minimum: 0
           maximum: 100
-        etapas:
-          type: array
-          items:
-            type: string
-          description: Para regenerar solo algunas etapas; vacío = todas
+          default: 40
     EstadoTrabajo:
       type: string
       enum:
@@ -3949,14 +4014,16 @@ components:
           $ref: '#/components/schemas/EstadoTrabajo'
         detalle:
           type: string
-        proveedor:
-          type: string
+          nullable: true
+          description: Resumen legible de lo hecho o del error; «Se habilita en un sprint siguiente» si la etapa aún no tiene ejecutor
         inicio:
           type: string
           format: date-time
+          nullable: true
         fin:
           type: string
           format: date-time
+          nullable: true
         costoUsd:
           type: number
     Generacion:
@@ -3979,10 +4046,12 @@ components:
           type: number
           minimum: 0
           maximum: 100
-        pantallasListas:
-          type: integer
+          description: Porcentaje de etapas terminadas
         costoUsd:
           type: number
+        parametros:
+          type: object
+          description: Parámetros con los que se lanzó (pantallas, idiomas, público, tono, porcentajeActividades)
         etapas:
           type: array
           items:
@@ -3993,6 +4062,7 @@ components:
         terminadoEn:
           type: string
           format: date-time
+          nullable: true
     Trabajo:
       type: object
       description: Trabajo largo en una cola (TrabajoIA). Amplía Trabajo202.
