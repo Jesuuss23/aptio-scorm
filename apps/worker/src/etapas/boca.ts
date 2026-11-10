@@ -38,7 +38,8 @@ export function crearEtapaBoca({ calcular, leer }: DependenciasBoca): EjecutorEt
 
     const narradas = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto.es?.trim());
     const narraciones = new Map(
-      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma: 'es', estado: 'ACTUALIZADA', audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
+      // También las «Por regenerar» que siguen con su audio: la boca va con el audio que hay (HU-0703).
+      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma: 'es', estado: { in: ['ACTUALIZADA', 'DESACTUALIZADA'] }, audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
     );
     const faltan = narradas.filter((p) => !narraciones.has(p.id));
     if (faltan.length) {

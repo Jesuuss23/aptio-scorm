@@ -3,7 +3,7 @@
 import { Cabecera } from '@aptio/ui';
 import { FORMATOS, LMS_DESTINO, NOMBRE_ESTADO, NOMBRE_PERFIL, perfilPropuesto } from '@aptio/schema/proyecto';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
-import { api, CREAN_PROYECTOS, ErrorApi, type Material, type Proyecto, type Rol } from '../api';
+import { api, CREAN_PROYECTOS, ErrorApi, type Material, type Proyecto, REGENERAN_VOZ, type Rol } from '../api';
 import { navegar } from '../ruta';
 import { usd } from '../formato';
 import { GeneracionScorm } from './GeneracionScorm';
@@ -143,6 +143,7 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
       <GeneracionScorm
         proyectoId={proyecto.id}
         puedeGenerar={puedeEditar && proyecto.estado !== 'ARCHIVADO'}
+        puedeRegenerar={REGENERAN_VOZ.includes(rol) && proyecto.estado !== 'ARCHIVADO'}
         materialListo={materiales.some((m) => m.estado === 'listo') && !materiales.some((m) => m.estado === 'pendiente' || m.estado === 'procesando')}
         alCambiar={recargar}
       />

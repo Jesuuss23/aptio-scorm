@@ -49,6 +49,8 @@ export interface OpcionesSimulacion {
    * lanzar porque otra persona ya la lanzó (CP-037).
    */
   generacion?: 'normal' | 'lenta' | 'falla' | 'ajena';
+  /** HU-0703 · Narraciones «Por regenerar» (p. ej. las 4 con «pasos», SUP-36) hasta que se regeneran. */
+  porRegenerar?: string[];
 }
 
 /** Resultado de la etapa 1 armado con las salidas grabadas del caso LOTO (como lo guarda el worker). */
@@ -214,7 +216,8 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal' }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [] }: OpcionesSimulacion) {
+  const porRegenerar = new Set(desactualizadas);
   let conflicto = Boolean(kitEnConflicto);
   type EtapaSim = { etapa: string; orden: number; estado: string; detalle: string | null; inicio: null; fin: null; costoUsd: number };
   type GeneracionSim = { id: string; proyectoId: string; estado: string; avance: number; costoUsd: number; parametros: object; etapas: EtapaSim[]; creadoEn: string; terminadoEn: string | null };
@@ -477,6 +480,19 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       avanzar(g);
       return responder(200, conAvance(g));
     }
+    // HU-0703 · Regenerar continúa las etapas 6 y 7 de la última generación; las «Por regenerar» quedan listas.
+    if (ruta === `/cursos/${CURSO_ID}/narraciones/regenerar` && req.method() === 'POST') {
+      const g = generaciones[0];
+      if (!g) return responder(422, { codigo: 'SIN_VOZ', mensaje: 'El curso todavía no tiene voz: genera el SCORM primero' });
+      if (['EN_COLA', 'EN_CURSO'].includes(g.estado)) return responder(409, { codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
+      const pendientes = porRegenerar.size;
+      porRegenerar.clear();
+      // Como el worker: arranca por la 6 (la 5 sigue en espera, sin ejecutor) y después la 7.
+      for (const e of g.etapas.filter((x) => x.etapa === 'VOZ_ES' || x.etapa === 'BOCA')) Object.assign(e, { estado: e.etapa === 'VOZ_ES' ? 'EN_CURSO' : 'EN_COLA', detalle: null });
+      g.estado = 'EN_CURSO';
+      estadoDe(g.proyectoId, 'GENERANDO');
+      return responder(202, { id: g.id, estado: g.estado, eventos: `/api/v1/generaciones/${g.id}/eventos`, pendientes });
+    }
     // HU-1101: el proyecto con pantallas tiene el curso del caso LOTO; los demás aún no.
     const deCurso = ruta.match(/^\/proyectos\/([0-9a-f-]+)\/curso$/);
     if (deCurso) {
@@ -494,7 +510,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);
     if (ruta === `/cursos/${CURSO_ID}/narraciones`) {
       return responder(200, vozLoto(30).narraciones.map((n) => ({
-        pantallaId: n.pantallaId, idioma: 'es', texto: n.texto, duracionS: Math.round(n.duracionMs / 100) / 10, origen: 'tts', voz: n.voz, estado: 'ACTUALIZADA',
+        pantallaId: n.pantallaId, idioma: 'es', texto: n.texto, duracionS: Math.round(n.duracionMs / 100) / 10, origen: 'tts', voz: n.voz,
+        estado: porRegenerar.has(n.pantallaId) ? 'DESACTUALIZADA' : 'ACTUALIZADA',
         audioUrl: `${new URL(req.url()).origin}/s3-simulado/${n.pantallaId}-es.mp3`,
       })));
     }

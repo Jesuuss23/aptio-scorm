@@ -22,7 +22,7 @@ const CONSULTA_MS = 2000;
  * mientras corren (CP-043) y se vuelven a pedir con cada avance (`clave`).
  */
 const RESULTADOS: Partial<Record<EtapaGeneracion['etapa'], {
-  ver: string; ocultar: string; enVivo?: boolean; Vista: (p: { generacionId: string; clave?: string }) => ReactNode;
+  ver: string; ocultar: string; enVivo?: boolean; Vista: (p: { generacionId: string; clave?: string; puedeRegenerar?: boolean; alRegenerar?: () => void }) => ReactNode;
 }>> = {
   RESUMEN_MATERIAL: { ver: 'Ver resumen', ocultar: 'Ocultar resumen', Vista: ResumenMaterialVista },
   OBJETIVOS_ESTRUCTURA: { ver: 'Ver estructura', ocultar: 'Ocultar estructura', Vista: EstructuraVista },
@@ -45,9 +45,11 @@ function detalle(e: EtapaGeneracion): string {
   return e.estado === 'CANCELADO' ? 'Se detuvo antes de terminar; no se guardó nada de esta etapa' : '';
 }
 
-export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCambiar }: {
+export function GeneracionScorm({ proyectoId, puedeGenerar, puedeRegenerar = false, materialListo, alCambiar }: {
   proyectoId: string;
   puedeGenerar: boolean;
+  /** HU-0703: el equipo puede regenerar las narraciones «Por regenerar»; el aviso lo ve cualquiera. */
+  puedeRegenerar?: boolean;
   /** Hay material leído y nada en lectura (la API lo vuelve a verificar). */
   materialListo: boolean;
   /** Avisa al detalle del proyecto para refrescar su estado y costo. */
@@ -173,7 +175,7 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, materialListo, alCam
                     {abierta === e.etapa ? resultado.ocultar : resultado.ver}
                   </button>
                 ) : null}
-                {resultado && abierta === e.etapa ? <div className="etapa-resultado"><resultado.Vista generacionId={g.id} /></div> : null}
+                {resultado && abierta === e.etapa ? <div className="etapa-resultado"><resultado.Vista generacionId={g.id} puedeRegenerar={puedeRegenerar} alRegenerar={() => { setAbierta(null); refrescar(g.id); }} /></div> : null}
                 {enVivo ? <div className="etapa-resultado"><enVivo.Vista generacionId={g.id} clave={e.detalle ?? ''} /></div> : null}
               </li>
               );

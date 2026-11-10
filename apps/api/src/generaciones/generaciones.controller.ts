@@ -9,7 +9,7 @@ import { EQUIPO, organizacionDe } from '../comun/organizacion.js';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { EventosService } from '../trabajos/eventos.service.js';
-import { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto } from './generacion.dto.js';
+import { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto, NarracionSolicitudDto, RegeneracionDto } from './generacion.dto.js';
 import { GeneracionesService } from './generaciones.service.js';
 
 /** Lanzan, cancelan y continúan administración, diseño instruccional y producción (docs/14-modulos.md, M04). */
@@ -32,6 +32,15 @@ export class GeneracionesController {
   @ApiAcceptedResponse({ type: GeneracionDto, description: 'Una generación activa por proyecto (409 GENERACION_ACTIVA)' })
   lanzar(@UsuarioActual() u: UsuarioSesion, @Param('proyectoId', ParseUUIDPipe) id: string, @Body() dto: GeneracionEntradaDto): Promise<GeneracionDto> {
     return this.generaciones.lanzar(u, id, dto);
+  }
+
+  @Post('cursos/:cursoId/narraciones/regenerar')
+  @Roles(...EQUIPO)
+  @ApiTags('Personaje y voz')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiAcceptedResponse({ type: RegeneracionDto, description: 'HU-0703: continúa las etapas 6 y 7 de la última generación. 409 GENERACION_ACTIVA, 422 SIN_VOZ o IDIOMA_NO_DISPONIBLE' })
+  regenerar(@UsuarioActual() u: UsuarioSesion, @Param('cursoId', ParseUUIDPipe) id: string, @Body() dto: NarracionSolicitudDto): Promise<RegeneracionDto> {
+    return this.generaciones.regenerarNarraciones(u, id, dto);
   }
 
   @Get('proyectos/:proyectoId/generaciones')

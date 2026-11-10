@@ -6,6 +6,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { hashearClave, prisma, Rol } from '@aptio/db';
 import request from 'supertest';
+import { ETAPAS } from '@aptio/schema/generacion';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
@@ -154,5 +155,55 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await como('grafico').get(`/cursos/${cursoId}/narraciones?idioma=fr`)).status).toBe(422);
     expect((await como('revisor').get(`/cursos/${cursoId}/narraciones`)).status).toBe(404);
     await prisma.recurso.delete({ where: { id: audio.id } });
+  });
+
+  it('HU-0703 · corregir la narración en Revisión la deja «Por regenerar»; corregir solo el título, no', async () => {
+    await prisma.narracion.upsert({
+      where: { cursoId_pantallaId_idioma: { cursoId, pantallaId: 'p03', idioma: 'es' } },
+      create: { cursoId, pantallaId: 'p03', idioma: 'es', textoHash: 'c', origen: 'tts', estado: 'ACTUALIZADA' },
+      update: { estado: 'ACTUALIZADA' },
+    });
+    const estado = async () => (await prisma.narracion.findFirstOrThrow({ where: { cursoId, pantallaId: 'p03' } })).estado;
+    let version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, titulo: { es: 'Te acompaña Ana, tu guía' } })).status).toBe(200);
+    expect(await estado()).toBe('ACTUALIZADA');
+    version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, narracion: { es: 'Soy Ana, supervisora. Te muestro cómo protegerte.' } })).status).toBe(200);
+    expect(await estado()).toBe('DESACTUALIZADA');
+  });
+
+  it('HU-0703 · regenerar continúa las etapas 6 y 7 de la última generación; 422 sin voz o en inglés, 409 si ya corre', async () => {
+    const ruta = `/cursos/${cursoId}/narraciones/regenerar`;
+    expect((await como('productor').post(ruta, {})).body).toMatchObject({ codigo: 'SIN_VOZ' });
+    const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
+    const g = await prisma.generacion.create({
+      data: {
+        organizacionId: orgId, proyectoId, estado: 'COMPLETADO', parametros: { pantallas: 30 }, iniciadoPorId: di.id, terminadoEn: new Date(),
+        etapas: { create: ETAPAS.map((etapa, i) => ({ etapa, orden: i + 1, estado: i < 4 || etapa === 'VOZ_ES' || etapa === 'BOCA' ? 'COMPLETADO' as const : 'EN_COLA' as const })) },
+      },
+    });
+    const audio = await prisma.recurso.create({
+      data: { organizacionId: orgId, proyectoId, tipo: 'AUDIO', origen: 'GENERADO', claveS3: `org/${orgId}/regen-${sufijo}`, mime: 'audio/wav', bytes: 10, duracionMs: 1000, hash: 'y', nombre: 'p04-es.wav' },
+    });
+    await prisma.narracion.create({ data: { cursoId, pantallaId: 'p04', idioma: 'es', textoHash: 'd', origen: 'tts', audioRecursoId: audio.id, estado: 'DESACTUALIZADA' } });
+
+    expect((await como('productor').post(ruta, { idiomas: ['en'] })).body).toMatchObject({ codigo: 'IDIOMA_NO_DISPONIBLE' });
+    expect((await como('productor').post(ruta, { soloDesactualizadas: false })).body).toMatchObject({ codigo: 'PANTALLAS_REQUERIDAS' });
+    expect((await como('revisor').post(ruta, {})).status).toBe(403);
+
+    const r = await como('grafico').post(ruta, {});
+    expect(r.status).toBe(202);
+    // p02 (sin audio), p03 (corregida en la prueba anterior) y p04 estaban «Por regenerar».
+    expect(r.body).toMatchObject({ id: g.id, estado: 'EN_COLA', eventos: `/api/v1/generaciones/${g.id}/eventos`, pendientes: 3 });
+    const etapas = await prisma.generacionEtapa.findMany({ where: { generacionId: g.id, estado: 'EN_COLA' } });
+    expect(etapas.map((e) => e.etapa)).toEqual(expect.arrayContaining(['VOZ_ES', 'BOCA']));
+    expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).toMatchObject({ pantallas: 30, regenerarVoz: { forzar: false } });
+    expect((await como('grafico').post(ruta, { pantallaIds: ['p04'], soloDesactualizadas: false })).body).toMatchObject({ codigo: 'GENERACION_ACTIVA' });
+
+    // Una toma nueva de p04: se guarda el pedido para el worker.
+    await prisma.generacion.update({ where: { id: g.id }, data: { estado: 'COMPLETADO' } });
+    expect((await como('grafico').post(ruta, { pantallaIds: ['p04'], soloDesactualizadas: false })).status).toBe(202);
+    expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).toMatchObject({ regenerarVoz: { pantallaIds: ['p04'], forzar: true } });
+    await prisma.generacion.delete({ where: { id: g.id } });
   });
 });

@@ -7,7 +7,7 @@ import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { ColasService } from '../trabajos/colas.service.js';
-import type { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto } from './generacion.dto.js';
+import type { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto, NarracionSolicitudDto, RegeneracionDto } from './generacion.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 const conEtapas = { etapas: { orderBy: { orden: 'asc' } } } as const;
@@ -132,15 +132,52 @@ export class GeneracionesService {
       await tx.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'GENERANDO' } });
       await tx.auditoria.create({ data: { organizacionId: g.organizacionId, usuarioId: u.id, accion: 'GENERACION_CONTINUADA', entidad: 'Generacion', entidadId: id } });
     });
-    const intento = (await this.bd.auditoria.count({ where: { entidadId: id, accion: 'GENERACION_CONTINUADA' } })) + 1;
+    const intento = await this.intento(id);
     const actual = await this.generacion(u, id);
     await this.encolar(actual, intento);
     return aDto(actual);
   }
 
+  /**
+   * HU-0703 · Regenerar narraciones: continúa la última generación del curso reabriendo las etapas 6 (voz) y 7 (boca).
+   * El worker decide por el hash (RN-07-1): solo paga lo que cambió, o una toma nueva si se pide forzar.
+   */
+  async regenerarNarraciones(u: UsuarioSesion, cursoId: string, dto: NarracionSolicitudDto): Promise<RegeneracionDto> {
+    if (dto.idiomas?.includes('en')) throw rechazo('IDIOMA_NO_DISPONIBLE', 'La voz en inglés llega con la versión en inglés (M08); por ahora solo se regenera en español');
+    if (dto.soloDesactualizadas === false && !dto.pantallaIds?.length) throw rechazo('PANTALLAS_REQUERIDAS', 'Para pedir una toma nueva, indica las pantallas');
+    const curso = await this.bd.curso.findFirst({ where: { id: cursoId, proyecto: this.alcanceProyecto(u) }, select: { id: true, proyectoId: true, organizacionId: true } });
+    if (!curso) throw new NotFoundException('Curso no encontrado');
+    const g = await this.bd.generacion.findFirst({ where: { proyectoId: curso.proyectoId }, orderBy: { creadoEn: 'desc' }, include: conEtapas });
+    const conAudio = await this.bd.narracion.count({ where: { cursoId, audioRecursoId: { not: null } } });
+    if (!g || !conAudio) {
+      throw rechazo('SIN_VOZ', 'El curso todavía no tiene voz: genera el SCORM hasta la etapa «Voz en español»');
+    }
+    const pendientes = await this.bd.narracion.count({ where: { cursoId, idioma: 'es', estado: { in: ['DESACTUALIZADA', 'ERROR'] }, ...(dto.pantallaIds?.length ? { pantallaId: { in: dto.pantallaIds } } : {}) } });
+    await this.bd.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${g.proyectoId}))`;
+      const otra = await tx.generacion.findFirst({ where: { proyectoId: g.proyectoId, estado: { in: [...ACTIVOS] } }, select: { id: true } });
+      if (otra) throw new ConflictException({ codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto', detalles: [{ generacionId: otra.id }] });
+      const regenerarVoz = { ...(dto.pantallaIds?.length ? { pantallaIds: dto.pantallaIds } : {}), forzar: dto.soloDesactualizadas === false };
+      await tx.generacionEtapa.updateMany({ where: { generacionId: g.id, etapa: { in: ['VOZ_ES', 'BOCA'] } }, data: { estado: 'EN_COLA', detalle: Prisma.DbNull, inicio: null, fin: null } });
+      await tx.generacion.update({ where: { id: g.id }, data: { estado: 'EN_COLA', terminadoEn: null, parametros: { ...(g.parametros as Prisma.JsonObject), regenerarVoz } } });
+      await tx.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'GENERANDO' } });
+      await tx.auditoria.create({ data: { organizacionId: g.organizacionId, usuarioId: u.id, accion: 'NARRACIONES_REGENERADAS', entidad: 'Generacion', entidadId: g.id, datos: { cursoId, pendientes, ...regenerarVoz } } });
+    });
+    const intento = await this.intento(g.id);
+    const actual = await this.generacion(u, g.id);
+    await this.encolar(actual, intento);
+    return { id: g.id, estado: actual.estado, eventos: `/api/v1/generaciones/${g.id}/eventos`, pendientes };
+  }
+
+  /** Número del próximo encolado de una generación (continuar o regenerar): el id del trabajo en la cola no se repite. */
+  private async intento(generacionId: string): Promise<number> {
+    return (await this.bd.auditoria.count({ where: { entidadId: generacionId, accion: { in: ['GENERACION_CONTINUADA', 'NARRACIONES_REGENERADAS'] } } })) + 1;
+  }
+
   private async encolar(g: GeneracionCompleta, intento: number) {
+    // BullMQ no acepta «:» en un id propio.
     try {
-      await this.colas.encolar('ia', { trabajoId: g.id, organizacionId: g.organizacionId, tarea: TAREA_GENERAR }, `${g.id}:${intento}`);
+      await this.colas.encolar('ia', { trabajoId: g.id, organizacionId: g.organizacionId, tarea: TAREA_GENERAR }, `${g.id}-${intento}`);
     } catch (e) {
       // Sin cola nadie la procesaría: queda en error y se puede continuar luego.
       await this.bd.generacion.update({ where: { id: g.id }, data: { estado: 'ERROR', terminadoEn: new Date() } });
