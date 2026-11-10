@@ -1,11 +1,12 @@
 // HU-0501 y HU-0502 · Revisión (PNT-20): recorrer las pantallas con filtros, ver su origen y sus observaciones,
 // corregir el título o la narración y aprobar una pantalla o todas las que no tienen observaciones.
 // RN-05-1: no se aprueba con una observación que bloquea la entrega. RN-05-2: lo que se edita vuelve a borrador.
+// HU-0503 · Corregir la narración regenera su voz, boca y subtítulos en español; los chips muestran el avance.
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, montar } from '@aptio/player';
 import { type CursoDoc, origenDe, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Observacion, type Proyecto, type Rol, type TextoI18n } from '../api';
+import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Proyecto, type Rol, type TextoI18n } from '../api';
 import { navegar } from '../ruta';
 import './fuentes-kit';
 
@@ -17,6 +18,23 @@ const NOMBRE_ESTADO: Record<string, string> = { borrador: 'Borrador', 'propuesta
 const ChipEstado = ({ estado }: { estado: string }) => (
   <span className={`chip ${estado === 'aprobado' ? 'validado' : estado === 'propuesta-ia' ? 'ia' : ''}`}>{NOMBRE_ESTADO[estado] ?? estado}</span>
 );
+/** HU-0503 · Cada 2 s se consulta el avance de la cascada; a los 2 minutos se deja de esperar. */
+const CADA_MS = 2000;
+const LIMITE_MS = 120_000;
+type Fase = 'espera' | 'curso' | 'listo' | 'error';
+type Cascada = { pantallaId: string; desde: number; voz: Fase; boca: Fase; subtitulos: Fase; tarda?: boolean };
+const NOMBRE_FASE: Record<Fase, string> = { espera: 'En espera', curso: 'Regenerando…', listo: 'Lista', error: 'Error' };
+const CLASE_FASE: Record<Fase, string> = { espera: 'aviso', curso: '', listo: 'validado', error: 'error' };
+
+/** Fases de la cascada de una pantalla a partir de su narración en español y de si hay una generación activa. */
+function fasesCascada(n: Narracion | undefined, generacionActiva: boolean): Pick<Cascada, 'voz' | 'boca' | 'subtitulos'> {
+  if (n?.estado === 'ERROR') return { voz: 'error', boca: 'error', subtitulos: 'error' };
+  const enCurso: Fase = generacionActiva ? 'espera' : 'curso';
+  const voz: Fase = n?.estado === 'ACTUALIZADA' ? 'listo' : enCurso;
+  const boca: Fase = voz === 'listo' && n?.bocas?.length ? 'listo' : enCurso;
+  return { voz, boca, subtitulos: boca === 'listo' && n?.subtitulosUrl ? 'listo' : enCurso };
+}
+
 const conActividad = (p: PantallaDoc) => p.bloques.some((b) => b.tipo === 'interaccion');
 const mensajeDe = (e: unknown, otro: string) => (e instanceof ErrorApi ? e.message : otro);
 
@@ -31,6 +49,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
   const [filtro, setFiltro] = useState<Filtro>('todas');
   const [seleccion, setSeleccion] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [cascada, setCascada] = useState<Cascada | null>(null);
   const escenario = useRef<HTMLDivElement>(null);
   const editan = EDITAN_PANTALLAS.includes(rol);
   const aprueban = APRUEBAN_PANTALLAS.includes(rol);
@@ -56,6 +75,28 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
       (e: unknown) => setError(mensajeDe(e, 'No se pudo cargar el proyecto')),
     );
   }, [proyectoId, alCargar, recargar]);
+
+  // HU-0503 · Sondeo de la cascada: se detiene al terminar, con error o a los 2 minutos.
+  const cursoId = curso?.id;
+  const enMarcha = cascada && !cascada.tarda && [cascada.voz, cascada.boca, cascada.subtitulos].some((f) => f === 'espera' || f === 'curso');
+  useEffect(() => {
+    if (!enMarcha || !cursoId || !cascada) return;
+    const { pantallaId, desde } = cascada;
+    const t = setTimeout(async () => {
+      try {
+        const [narraciones, generaciones] = await Promise.all([api.narraciones(cursoId, 'es'), api.generaciones(proyectoId)]);
+        const activa = generaciones.some((g) => g.estado === 'EN_COLA' || g.estado === 'EN_CURSO');
+        const fases = fasesCascada(narraciones.find((n) => n.pantallaId === pantallaId), activa);
+        const tarda = Date.now() - desde > LIMITE_MS;
+        setCascada((c) => (c && c.pantallaId === pantallaId ? { ...c, ...fases, tarda } : c));
+        if (fases.subtitulos === 'listo') await recargar();
+      } catch {
+        // Un fallo de red no corta el seguimiento: se reintenta en el siguiente turno.
+        setCascada((c) => (c ? { ...c } : c));
+      }
+    }, CADA_MS);
+    return () => clearTimeout(t);
+  }, [cascada, enMarcha, cursoId, proyectoId, recargar]);
 
   const documento = curso ? (curso.documento as unknown as CursoDoc) : null;
   const pantallas = documento ? pantallasDe(documento) : [];
@@ -114,9 +155,11 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
 
   const guardar = (cambios: { titulo?: TextoI18n; narracion?: TextoI18n }) => hacer(async () => {
     const estaba = actual.estado;
-    await api.editarPantalla(curso.id, actual.id, { version: curso.version, ...cambios });
+    const r = await api.editarPantalla(curso.id, actual.id, { version: curso.version, ...cambios });
+    if (r.regenerando.length) setCascada({ pantallaId: actual.id, desde: Date.now(), voz: 'curso', boca: 'curso', subtitulos: 'curso' });
     await recargar();
-    return estaba === 'aprobado' ? 'Cambios guardados. La pantalla volvió a borrador: apruébala de nuevo cuando esté lista.' : 'Cambios guardados.';
+    const texto = estaba === 'aprobado' ? 'Cambios guardados. La pantalla volvió a borrador: apruébala de nuevo cuando esté lista.' : 'Cambios guardados.';
+    return r.regenerando.length ? `${texto} Se regeneran su voz, su boca y sus subtítulos en español.` : texto;
   });
   const aprobar = () => hacer(async () => {
     await api.aprobarPantalla(curso.id, actual.id);
@@ -187,6 +230,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
           </div>
           {/* La clave rehace los campos al cambiar de pantalla o al llegar una versión nueva del curso. */}
           <TextosPantalla key={`${actual.id}-${curso.version}`} pantalla={actual} editan={editan} ocupado={ocupado} alGuardar={guardar} />
+          {cascada && cascada.pantallaId === actual.id ? <ChipsCascada cascada={cascada} /> : null}
         </section>
 
         <aside className="revision-lateral">
@@ -255,9 +299,27 @@ function TextosPantalla({ pantalla, editan, ocupado, alGuardar }: {
           >
             Guardar cambios
           </button>
-          <span className="ayuda">{pantalla.estado === 'aprobado' ? 'Está aprobada: al guardar vuelve a borrador.' : 'La voz, la boca y el inglés se actualizan cuando lleguen esas etapas.'}</span>
+          <span className="ayuda">{pantalla.estado === 'aprobado' ? 'Está aprobada: al guardar vuelve a borrador.' : pantalla.narracion ? 'Si cambias la narración, su voz, su boca y sus subtítulos en español se regeneran solos.' : 'El inglés se actualiza cuando llegue esa etapa.'}</span>
         </div>
       ) : null}
+    </section>
+  );
+}
+
+/** HU-0503 · Avance de la regeneración en cascada de la pantalla: voz, boca y subtítulos en español. */
+function ChipsCascada({ cascada }: { cascada: Cascada }) {
+  const fases: [string, Fase][] = [['Voz ES', cascada.voz], ['Boca', cascada.boca], ['Subtítulos ES', cascada.subtitulos]];
+  const error = fases.some(([, f]) => f === 'error');
+  const espera = fases.some(([, f]) => f === 'espera');
+  return (
+    <section className="tarjeta kit-bloque" aria-label="Regeneración">
+      <h2>Regeneración</h2>
+      <ul className="fila-chips" role="status">
+        {fases.map(([nombre, f]) => <li key={nombre} className={`chip ${CLASE_FASE[f]}`}>{nombre}: {NOMBRE_FASE[f]}</li>)}
+      </ul>
+      {error ? <p className="nota error">No se pudo regenerar la voz de esta pantalla. Corrige el texto y guarda de nuevo, o regenera la voz desde Producción.</p> : null}
+      {espera && !error ? <p className="ayuda">Hay una generación en curso: la regeneración empieza cuando termine.</p> : null}
+      {cascada.tarda && !error ? <p className="ayuda">La regeneración tarda más de lo normal; revisa su avance más tarde en Producción.</p> : null}
     </section>
   );
 }

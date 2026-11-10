@@ -1,9 +1,11 @@
 // HU-0501 y HU-0502 · Revisión: observaciones, aprobar una o por lote y editar (CP-048, CP-049) contra PostgreSQL real.
+// HU-0503 · Corregir la narración encola la cascada con espera en Redis (CP-051), con un prefijo de colas propio.
 // Se salta sin DATABASE_URL, salvo en CI.
 import 'reflect-metadata';
 import { readFileSync } from 'node:fs';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { crearCola } from '@aptio/colas';
 import { hashearClave, prisma, Rol } from '@aptio/db';
 import request from 'supertest';
 import { ETAPAS } from '@aptio/schema/generacion';
@@ -15,6 +17,7 @@ const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
 const sufijo = Math.random().toString(36).slice(2, 8);
 const correo = (n: string) => `${n}-${sufijo}@prueba.test`;
+process.env.COLAS_PREFIJO = `prueba-cursos-${sufijo}`;
 const loto = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
 type Doc = { modulos: { capsulas: { pantallas: { id: string; estado: string; titulo: { es: string }; bloques: { id: string; contenido?: { es: string }; origen?: { tipo: string; revisado: boolean; paginas?: number[] } }[]; narracion?: { texto: { es: string }; porIdioma: { es: { hashTexto: string } } } }[] }[] }[] };
 const pantallas = (d: Doc) => d.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
@@ -66,6 +69,9 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
 
   afterAll(async () => {
     await app?.close();
+    const voz = crearCola('voz');
+    await voz.obliterate({ force: true });
+    await voz.close();
     await prisma.proyecto.deleteMany({ where: { organizacionId: orgId } });
     await prisma.usuario.deleteMany({ where: { email: { endsWith: `-${sufijo}@prueba.test` } } });
     await prisma.cliente.deleteMany({ where: { organizacionId: orgId } });
@@ -173,8 +179,34 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, titulo: { es: 'Te acompaña Ana, tu guía' } })).status).toBe(200);
     expect(await estado()).toBe('ACTUALIZADA');
     version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
-    expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, narracion: { es: 'Soy Ana, supervisora. Te muestro cómo protegerte.' } })).status).toBe(200);
+    const r = await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, narracion: { es: 'Soy Ana, supervisora. Te muestro cómo protegerte.' } });
+    expect(r.status).toBe(200);
+    expect(r.body.regenerando).toEqual(['voz-es', 'boca', 'subtitulos-es']);
     expect(await estado()).toBe('DESACTUALIZADA');
+  });
+
+  it('CP-051 · cinco guardados seguidos de la narración dejan un solo trabajo de cascada, que corre 1 s después del último', async () => {
+    const voz = crearCola('voz');
+    try {
+      let version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+      for (let i = 1; i <= 5; i++) {
+        const r = await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, narracion: { es: `Soy Ana, supervisora. Versión ${i}.` } });
+        expect(r.status).toBe(200);
+        version = r.body.version;
+      }
+      const trabajos = (await voz.getJobs(['delayed', 'waiting', 'active'])).filter((t) => t.data.trabajoId === cursoId);
+      expect(trabajos).toHaveLength(1);
+      expect(trabajos[0]).toMatchObject({ id: `cascada-${cursoId}-p03`, data: { tarea: 'CASCADA', pantallaId: 'p03', organizacionId: orgId }, delay: 1000 });
+      expect(await trabajos[0]!.getState()).toBe('delayed');
+      // Cambiar solo el título no regenera nada; una pantalla sin voz tampoco encola.
+      const titulo = await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, titulo: { es: 'Te acompaña Ana' } });
+      expect(titulo.body.regenerando).toEqual([]);
+      const sinVoz = await como('grafico').patch(`/cursos/${cursoId}/pantallas/p08`, { version: titulo.body.version, narracion: { es: 'Sin voz todavía.' } });
+      expect(sinVoz.body.regenerando).toEqual([]);
+      expect((await voz.getJobs(['delayed', 'waiting'])).filter((t) => t.data.trabajoId === cursoId)).toHaveLength(1);
+    } finally {
+      await voz.close();
+    }
   });
 
   it('HU-0703 · regenerar continúa las etapas 6 a 8 de la última generación; 422 sin voz o en inglés, 409 si ya corre', async () => {

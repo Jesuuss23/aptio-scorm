@@ -52,6 +52,8 @@ export interface OpcionesSimulacion {
   generacion?: 'normal' | 'lenta' | 'falla' | 'ajena';
   /** HU-0703 · Narraciones «Por regenerar» (p. ej. las 4 con «pasos», SUP-36) hasta que se regeneran. */
   porRegenerar?: string[];
+  /** HU-0503 · Cómo termina la cascada tras corregir una narración: avanza una etapa por consulta, o la voz falla. */
+  cascada?: 'normal' | 'falla';
 }
 
 /** HU-0801 · El WebVTT de cada narración del curso, por id de recurso, como lo escribe la etapa 8 (SUP-37). */
@@ -228,8 +230,10 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal' }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
+  // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
+  const cascadas = new Map<string, number>();
   let conflicto = Boolean(kitEnConflicto);
   type EtapaSim = { etapa: string; orden: number; estado: string; detalle: string | null; inicio: null; fin: null; costoUsd: number };
   type GeneracionSim = { id: string; proyectoId: string; estado: string; avance: number; costoUsd: number; parametros: object; etapas: EtapaSim[]; creadoEn: string; terminadoEn: string | null };
@@ -521,11 +525,19 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).
     if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);
     if (ruta === `/cursos/${CURSO_ID}/narraciones`) {
-      return responder(200, vozLoto(30).narraciones.map((n) => ({
-        pantallaId: n.pantallaId, idioma: 'es', texto: n.texto, duracionS: Math.round(n.duracionMs / 100) / 10, origen: 'tts', voz: n.voz,
-        estado: porRegenerar.has(n.pantallaId) ? 'DESACTUALIZADA' : 'ACTUALIZADA',
-        audioUrl: `${new URL(req.url()).origin}/s3-simulado/${n.pantallaId}-es.mp3`,
-      })));
+      const origen = new URL(req.url()).origin;
+      for (const [id, k] of cascadas) cascadas.set(id, k + 1);
+      return responder(200, vozLoto(30).narraciones.map((n) => {
+        // La cascada: 1.ª consulta «Por regenerar», 2.ª voz lista, 3.ª boca, 4.ª subtítulos (o error en la voz).
+        const k = cascadas.get(n.pantallaId) ?? 9;
+        const estado = cascada === 'falla' && cascadas.has(n.pantallaId) ? 'ERROR' : k < 2 || porRegenerar.has(n.pantallaId) ? 'DESACTUALIZADA' : 'ACTUALIZADA';
+        return {
+          pantallaId: n.pantallaId, idioma: 'es', texto: n.texto, duracionS: Math.round(n.duracionMs / 100) / 10, origen: 'tts', voz: n.voz, estado,
+          audioUrl: `${origen}/s3-simulado/${n.pantallaId}-es.mp3`,
+          ...(estado === 'ACTUALIZADA' && k >= 3 ? { bocas: [[0, 'X']] } : {}),
+          ...(estado === 'ACTUALIZADA' && k >= 4 ? { subtitulosUrl: `${origen}/s3-simulado/${n.pantallaId}-es.vtt` } : {}),
+        };
+      }));
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
@@ -533,9 +545,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
       if (datos.titulo) p.titulo = { es: datos.titulo.es.trim() };
+      const cambiaVoz = Boolean(datos.narracion && p.narracion && datos.narracion.es.trim() !== p.narracion.texto.es);
       if (datos.narracion && p.narracion) p.narracion.texto = { es: datos.narracion.es.trim() };
       p.estado = 'borrador';
-      return responder(200, { version: ++revision.version, regenerando: [], estado: 'borrador' });
+      // HU-0503: corregir la narración (todas tienen voz en el caso LOTO) encola la cascada en español.
+      if (cambiaVoz) cascadas.set(p.id, 0);
+      return responder(200, { version: ++revision.version, regenerando: cambiaVoz ? ['voz-es', 'boca', 'subtitulos-es'] : [], estado: 'borrador' });
     }
     const aprobarUna = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)/aprobar$`));
     if (aprobarUna) {
