@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { PERMITIDOS, VIGENCIA_URL_S, verificarContenido } from '@aptio/almacen';
+import { createHash } from 'node:crypto';
+import { PERMITIDOS, sanearSvg, SvgNoValido, VIGENCIA_URL_S, verificarContenido } from '@aptio/almacen';
 import type { Prisma, Recurso } from '@aptio/db';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
@@ -10,6 +11,12 @@ import type { FiltroRecursosDto, RecursoDto, SubidaSolicitudDto, SubidaUrlDto } 
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 const MB = 1024 * 1024;
+
+/** Lo que se quitó al sanear un SVG, para avisar al diseñador. */
+function svgEliminados(r: Recurso): string[] | null {
+  const m = r.metadatos as { svg?: { eliminados?: string[] } } | null;
+  return m?.svg?.eliminados ?? null;
+}
 
 function aDto(r: Recurso, url?: string): RecursoDto {
   return {
@@ -24,6 +31,7 @@ function aDto(r: Recurso, url?: string): RecursoDto {
     proyectoId: r.proyectoId,
     eliminarEn: r.eliminarEn?.toISOString() ?? null,
     creadoEn: r.creadoEn.toISOString(),
+    ...(svgEliminados(r) ? { eliminadosAlSanear: svgEliminados(r)! } : {}),
     ...(url ? { url } : {}),
   };
 }
@@ -106,20 +114,39 @@ export class RecursosService {
     if (info.bytes > permitido.maxBytes) {
       throw await descartar('ARCHIVO_GRANDE', `El archivo supera ${permitido.maxBytes / MB} MB para este tipo`, { bytes: info.bytes });
     }
-    const verificacion = await verificarContenido((n) => this.almacen.cabecera(subida.claveS3, n), subida.mime);
-    if (!verificacion.valido) {
-      throw await descartar('TIPO_NO_COINCIDE', verificacion.motivo ?? 'El contenido no coincide con el tipo', {
-        declarado: subida.mime, real: verificacion.mimeReal ?? null,
-      });
+    let bytes = info.bytes;
+    let hash: string;
+    let metadatos: Prisma.InputJsonValue | undefined;
+    if (subida.mime === 'image/svg+xml') {
+      // CP-024: el SVG se reconstruye sin scripts ni atributos on* y solo se guarda la versión limpia.
+      let saneado;
+      try {
+        saneado = sanearSvg(new TextDecoder().decode(await this.almacen.leer(subida.claveS3)));
+      } catch (e) {
+        if (!(e instanceof SvgNoValido)) throw e;
+        throw await descartar('TIPO_NO_COINCIDE', e.message, { declarado: subida.mime, real: null });
+      }
+      await this.almacen.subir(subida.claveS3, saneado.svg, subida.mime);
+      bytes = Buffer.byteLength(saneado.svg);
+      hash = createHash('sha256').update(saneado.svg).digest('hex');
+      metadatos = { svg: { eliminados: saneado.eliminados, ids: saneado.ids, viewBox: saneado.viewBox } };
+    } else {
+      const verificacion = await verificarContenido((n) => this.almacen.cabecera(subida.claveS3, n), subida.mime);
+      if (!verificacion.valido) {
+        throw await descartar('TIPO_NO_COINCIDE', verificacion.motivo ?? 'El contenido no coincide con el tipo', {
+          declarado: subida.mime, real: verificacion.mimeReal ?? null,
+        });
+      }
+      hash = await this.almacen.hash(subida.claveS3);
     }
 
-    const hash = await this.almacen.hash(subida.claveS3);
     const recurso = await this.bd.$transaction(async (tx) => {
       const r = await tx.recurso.create({
         data: {
           organizacionId, clienteId: subida.clienteId, proyectoId: subida.proyectoId,
           tipo: permitido.tipo, origen: subida.origen, claveS3: subida.claveS3,
-          mime: subida.mime, bytes: BigInt(info.bytes), hash, nombre: subida.nombre,
+          mime: subida.mime, bytes: BigInt(bytes), hash, nombre: subida.nombre,
+          ...(metadatos ? { metadatos } : {}),
         },
       });
       await tx.subida.update({ where: { id: subida.id }, data: { recursoId: r.id } });

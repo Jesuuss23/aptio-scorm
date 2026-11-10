@@ -4,3 +4,4 @@ export { prepararAlmacen } from './preparar.js';
 export {
   BYTES_CABECERA, BYTES_CABECERA_OOXML, PERMITIDOS, type TipoRecurso, verificarContenido, verificarTipo, type Verificacion,
 } from './tipos.js';
+export { sanearSvg, SvgNoValido, type SvgSaneado } from './svg.js';

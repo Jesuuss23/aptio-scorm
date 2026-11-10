@@ -1,11 +1,11 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { KitMarca, Prisma } from '@aptio/db';
-import { type Paleta, revisarPaleta } from '@aptio/schema/marca';
+import { type Paleta, revisarPaleta, revisarPersonaje } from '@aptio/schema/marca';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { AlmacenService } from '../recursos/almacen.service.js';
-import type { KitDto, KitEntradaDto } from './kit.dto.js';
+import type { KitDto, KitEntradaDto, PersonajeDto, PersonajeEntradaDto } from './kit.dto.js';
 
 /** Kit de marca del cliente (HU-0202). Cambiar la paleta no regenera contenido: el reproductor la aplica al mostrar (RN-02-1). */
 @Injectable()
@@ -67,6 +67,52 @@ export class KitService {
     return resultado;
   }
 
+  /**
+   * Personaje del kit (HU-0203): revisa las capas del SVG ya saneado y guarda qué bocas tiene, cuáles faltan
+   * y con cuál se reemplazan (CP-023). Sin las capas obligatorias no se puede usar.
+   */
+  async guardarPersonaje(u: UsuarioSesion, clienteId: string, dto: PersonajeEntradaDto): Promise<KitDto> {
+    const organizacionId = await this.cliente(u, clienteId);
+    const actual = await this.bd.kitMarca.findUnique({ where: { clienteId }, select: { version: true } });
+    if (!actual) throw new NotFoundException({ codigo: 'SIN_KIT', mensaje: 'Crea el kit antes de subir el personaje' });
+    const recurso = await this.bd.recurso.findFirst({ where: { id: dto.recursoId, organizacionId, clienteId } });
+    const svg = (recurso?.metadatos as { svg?: { ids: string[]; viewBox: string | null; eliminados: string[] } } | null)?.svg;
+    if (!recurso || recurso.tipo !== 'SVG' || !svg) {
+      throw new UnprocessableEntityException({ codigo: 'PERSONAJE_NO_VALIDO', mensaje: 'El personaje debe ser un SVG subido para este cliente' });
+    }
+    const revision = revisarPersonaje({ ids: svg.ids, viewBox: svg.viewBox, bytes: Number(recurso.bytes) });
+    if (revision.errores.length) {
+      throw new UnprocessableEntityException({
+        codigo: 'PERSONAJE_INCOMPLETO',
+        mensaje: 'Al personaje le faltan capas obligatorias. Revísalo con docs/diseno/personaje/validar-personaje.mjs',
+        detalles: revision.errores.map((error) => ({ error })),
+      });
+    }
+    const personaje: Omit<PersonajeDto, 'url'> = {
+      recursoId: recurso.id,
+      nombre: dto.nombre.trim() || 'Personaje',
+      bocasDisponibles: revision.bocasDisponibles,
+      bocasFaltantes: revision.bocasFaltantes,
+      reemplazos: revision.reemplazos as Record<string, string>,
+      poses: revision.poses,
+      avisos: revision.avisos,
+      eliminadosAlSanear: svg.eliminados,
+    };
+    const { count } = await this.bd.kitMarca.updateMany({
+      where: { clienteId, version: dto.version },
+      data: { personaje: personaje as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
+    });
+    if (count === 0) throw this.conflicto(actual.version);
+    const kit = await this.bd.kitMarca.findUniqueOrThrow({ where: { clienteId } });
+    await this.bd.auditoria.create({
+      data: {
+        organizacionId, usuarioId: u.id, accion: 'PERSONAJE_GUARDADO', entidad: 'KitMarca', entidadId: kit.id,
+        datos: { clienteId, recursoId: recurso.id, bocasFaltantes: revision.bocasFaltantes, eliminadosAlSanear: svg.eliminados },
+      },
+    });
+    return this.aDto(kit);
+  }
+
   private conflicto(versionActual: number) {
     return new ConflictException({
       codigo: 'KIT_DESACTUALIZADO',
@@ -90,6 +136,12 @@ export class KitService {
     }
   }
 
+  private async personajeDto(p: Omit<PersonajeDto, 'url'> | null): Promise<PersonajeDto | null> {
+    if (!p?.recursoId) return null;
+    const svg = await this.bd.recurso.findUnique({ where: { id: p.recursoId }, select: { claveS3: true, nombre: true } });
+    return svg ? { ...p, url: await this.almacenes.almacen.urlDescarga(svg.claveS3, svg.nombre) } : p;
+  }
+
   private async aDto(k: KitMarca): Promise<KitDto> {
     const paleta = k.paleta as unknown as Paleta;
     const { textoFondo, cumpleAA, advertencias } = revisarPaleta(paleta);
@@ -106,7 +158,7 @@ export class KitService {
       tipografias: k.tipografias as unknown as KitDto['tipografias'],
       logoRecursoId: k.logoRecursoId,
       ...(logoUrl ? { logoUrl } : {}),
-      personaje: (k.personaje as object | null) ?? null,
+      personaje: await this.personajeDto(k.personaje as Omit<PersonajeDto, 'url'> | null),
       voces: k.voces as unknown as KitDto['voces'],
       version: k.version,
       actualizadoEn: k.actualizadoEn.toISOString(),

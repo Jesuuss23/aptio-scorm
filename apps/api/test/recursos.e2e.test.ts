@@ -125,9 +125,9 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('recursos y almacenamie
   });
 
   it('rechaza tipos fuera de la lista, archivos demasiado grandes y confirmar sin haber subido', async () => {
-    const svg = await como('productor').post('/recursos/subidas', { nombre: 'a.svg', mime: 'image/svg+xml', bytes: 10 });
-    expect(svg.status).toBe(422);
-    expect(svg.body.codigo).toBe('TIPO_NO_PERMITIDO');
+    const exe = await como('productor').post('/recursos/subidas', { nombre: 'a.exe', mime: 'application/x-msdownload', bytes: 10 });
+    expect(exe.status).toBe(422);
+    expect(exe.body.codigo).toBe('TIPO_NO_PERMITIDO');
     const grande = await como('productor').post('/recursos/subidas', { nombre: 'a.png', mime: 'image/png', bytes: 50 * 1024 * 1024 });
     expect(grande.body.codigo).toBe('ARCHIVO_GRANDE');
     const sinCliente = await como('productor').post('/recursos/subidas', { nombre: 'a.pdf', mime: 'application/pdf', bytes: 10, origen: 'CLIENTE' });

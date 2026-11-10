@@ -56,11 +56,22 @@ export interface KitEntrada {
   voces: { es?: Voz; en?: Voz };
   version: number;
 }
+export interface Personaje {
+  recursoId: string;
+  nombre: string;
+  bocasDisponibles: string[];
+  bocasFaltantes: string[];
+  reemplazos: Record<string, string>;
+  poses: string[];
+  avisos: string[];
+  eliminadosAlSanear: string[];
+  url?: string;
+}
 export interface Kit extends KitEntrada {
   id: string;
   clienteId: string;
   logoUrl?: string;
-  personaje: object | null;
+  personaje: Personaje | null;
   actualizadoEn: string;
   contraste: { textoFondo: number; cumpleAA: boolean };
   advertencias: { codigo: string; mensaje: string; colores: string[]; relacion: number }[];
@@ -71,6 +82,7 @@ export interface Recurso {
   nombre: string;
   mime: string;
   bytes: number;
+  eliminadosAlSanear?: string[];
   url?: string;
 }
 
@@ -78,10 +90,12 @@ export interface Recurso {
 export class ErrorApi extends Error {
   readonly estado: number;
   readonly codigo: string;
-  constructor(estado: number, codigo: string, mensaje: string) {
+  readonly detalles: Record<string, unknown>[];
+  constructor(estado: number, codigo: string, mensaje: string, detalles: Record<string, unknown>[] = []) {
     super(mensaje);
     this.estado = estado;
     this.codigo = codigo;
+    this.detalles = detalles;
   }
 }
 
@@ -97,8 +111,8 @@ async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
     throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
   }
   if (res.status === 204 || res.status === 202) return undefined as T;
-  const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string };
-  if (!res.ok) throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'Ocurrió un error inesperado');
+  const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string; detalles?: Record<string, unknown>[] };
+  if (!res.ok) throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'Ocurrió un error inesperado', cuerpo.detalles);
   return cuerpo as T;
 }
 
@@ -116,6 +130,8 @@ export const api = {
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
   guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
+  guardarPersonaje: (clienteId: string, datos: { recursoId: string; nombre: string; version: number }) =>
+    pedir<Kit>(`/clientes/${clienteId}/kit/personaje`, json(datos, 'PUT')),
   /** Sube un archivo directo al almacenamiento cifrado (HU-1404): pide la URL firmada, envía el PUT y confirma. */
   async subir(archivo: File, destino: { clienteId?: string; proyectoId?: string; origen?: 'SUBIDO' | 'CLIENTE' }): Promise<Recurso> {
     const subida = await pedir<{ subidaId: string; url: string; cabeceras: Record<string, string> }>(

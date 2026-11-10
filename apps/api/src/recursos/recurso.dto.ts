@@ -36,6 +36,7 @@ export class RecursoDto {
   @ApiProperty({ format: 'uuid', nullable: true }) proyectoId: string | null;
   @ApiProperty({ nullable: true, description: 'Borrado programado de un documento del cliente' }) eliminarEn: string | null;
   @ApiProperty() creadoEn: string;
+  @ApiPropertyOptional({ type: [String], description: 'Solo SVG: lo que se quitó al sanearlo (scripts, atributos on*, …)' }) eliminadosAlSanear?: string[];
   @ApiPropertyOptional({ format: 'uri', description: 'URL firmada de 15 minutos' }) url?: string;
 }
 
