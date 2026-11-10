@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-10 · Fase actual: **Sprint S3 en curso** (S0, S1 y S2 cerrados; `main` protegida con CI). Los manuales de usuario, programador y sistema viven en la rama `docs/manuales` (PR #24, no se fusiona) y se actualizan tras cada entrega.
+Última actualización: 2026-11-10 · Fase actual: **Sprint S3 en cierre**: las 6 historias están hechas en código y en `main`. Faltan la demo, la prueba en Edge, Safari y un celular real, y el despliegue en el entorno de pruebas. S0, S1 y S2 están cerrados; `main` está protegida con CI. Los manuales de usuario, programador y sistema viven en la rama `docs/manuales` (PR #24, no se fusiona) y se actualizan tras cada entrega.
 
 ## Decisiones aprobadas
 
@@ -46,6 +46,7 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Cambios recientes
 
+- **Cierre del S3 (2026-11-10):** HU-0406, HU-0407, HU-1101, HU-1102, HU-0501 y HU-0502 están hechas en código (PR #27 y #28, y los anteriores del S3). Cumplen CP-042 a CP-044, CP-046 a CP-049, CP-085 y CP-086 con pruebas automáticas, respetan el contrato y no dejan errores de lint ni de tipos. Sobre `main`, el CI completo pasa 277 pruebas, incluidas 103 de la API contra PostgreSQL, y Playwright pasa 86 de 86, con la revisión a 390 px sin desborde. Faltan dos condiciones de la Definición de Terminado: probar en Edge, Safari y un celular real (Playwright corre solo Chromium) y desplegar en el entorno de pruebas (HU-1405). El guion de la demo con el caso LOTO está en el documento de cierre del S3.
 - **HU-0501 y HU-0502 · Revisión de pantallas (2026-11-10):** nueva vista Revisión (PNT-20) desde el proyecto: lista de las 30 pantallas con los filtros Todas, Revisar (solo las que tienen observaciones, CP-046) y Actividades; la pantalla en el centro con el reproductor único sin barra (`marco: false`), Anterior y Siguiente, y la tarjeta Textos para corregir título y narración; a la derecha, Control de calidad con las observaciones abiertas, Origen («Manual p. 12», CP-047) y «Aprobar pantalla». «Aprobar todas las que no tienen observaciones» deja 27 aprobadas y 3 pendientes (CP-048); editar una aprobada la devuelve a borrador (CP-049). En la API: `GET /cursos/{id}/observaciones`, `PATCH /cursos/{id}/pantallas/{pantallaId}` con bloqueo optimista por versión (409 `VERSION_CAMBIO`) y una versión en el historial por cada cambio, `POST /cursos/{id}/pantallas/{pantallaId}/aprobar` (409 `OBSERVACIONES_BLOQUEAN`, RN-05-1) y `POST /cursos/{id}/pantallas/aprobar`. Las reglas de observaciones y de origen viven en `@aptio/schema/revision` y las usan el worker, la API y la web. Supuesto en SUP-33.
 - **HU-1101 y HU-1102 · Reproductor único y vista previa clásica (2026-11-10):** nuevo paquete `@aptio/player` con `montar(contenedor, curso, opciones)`: dibuja cada pantalla desde sus bloques con la disposición del generador y los colores y letras del kit, y trae las 8 interacciones jugables (memoria, clasificar, ordenar, tarjetas, quiz con tiempo y vidas, exploración, verdadero o falso y decisión) con su puntaje. Las reglas de avance (`motivoBloqueo`) y el seguimiento (`seguimiento`) son funciones puras con pruebas. Con actividades obligatorias, Siguiente se deshabilita en una actividad sin hacer y dice «Completa la actividad para continuar» (CP-086); el temario tampoco deja saltarla. Empaquetado pesa 12 KB comprimido y su pantalla es idéntica a la de la vista previa (CP-085). La API suma `GET /proyectos/{id}/curso` con la versión en `ETag`. En la web, «Vista previa» en el proyecto abre PNT-12: marcos de celular, tableta y escritorio, modo participante o revisión (saltar a cualquier pantalla y ver los ids), reiniciar y el panel «Seguimiento simulado». Supuestos en SUP-31 y SUP-32.
 - **HU-0407 · Datos de las actividades (2026-11-10):** la etapa 4 pide a IA-07 v2 los datos de cada pantalla con actividad, después de componerla (`apps/worker/src/etapas/actividades.ts`: fichas del catálogo, `modoDe`, `revisarActividad` e `interaccionDe`). Cada actividad entra al curso como bloque `interaccion` (CP-044: clasificar con 2 grupos y 7 elementos, cada uno con su grupo y retroalimentación). El reto final es sumativo y el curso se completa por nota. En la web, la miniatura de cada actividad dice lo que trae («Clasificar: 2 grupos · 7 elementos») y el reto final lleva la marca «Calificada». Supuestos en SUP-30.
@@ -147,6 +148,7 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Pendientes
 
+- Cierre del S3: hacer la demo y llenar su tabla en `docs/18-plan-sprints.md`, probar en Edge, Safari y un celular real, y desplegar en el entorno de pruebas cuando exista (HU-1405).
 - Revisión: regeneración en cascada al cambiar un texto (HU-0503, S5); marcar observaciones como resueltas y editar disposición y fondo con el editor (SUP-33).
 - Correr IA-15 v2 e IA-07 v2 contra el caso LOTO con un modelo real (SUP-29, SUP-30).
 - Reproductor: arrastrar con dedo y ratón en clasificar y ordenar (hoy se hace con botones), y el resto de patrones de navegación en S8 (SUP-31, SUP-32).
@@ -167,9 +169,8 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Siguiente paso
 
-1. El responsable del producto y el ingeniero completan la lista de arranque (`docs/21-arranque-s0.md`): cuentas, accesos, límites de gasto y quién aprueba.
-2. El ingeniero a cargo revisa el paquete, importa `jira/jira-import.csv` y completa estimaciones, responsables y fechas.
-3. En paralelo, el equipo gráfico prepara a Ana y los estilos según `docs/20-guia-diseno.md` (los necesita la prueba PT-01 del S0 y el S4).
-4. Sprint S0 (`docs/18-plan-sprints.md`): entorno, esquema, base de datos, sesión y pruebas técnicas PT-01 a PT-03.
-5. En paralelo, el responsable del producto mide 2 proyectos con la tabla de `docs/11-medicion-y-piloto.md` (campos en blanco).
-6. Al cerrar cada sprint, demo en el entorno de pruebas y observaciones en Jira. Piloto al cerrar S6.
+1. Hacer la demo del S3 con el caso LOTO, siguiendo el guion del documento de cierre: ver las 30 pantallas en Producción, revisar y aprobar una pantalla, y recorrer la vista previa. Registrar los hallazgos en Jira y llenar la tabla de la demo.
+2. Probar las vistas del S3 en Edge, Safari y un celular real.
+3. Con el visto bueno, empezar el Sprint S4 (`docs/18-plan-sprints.md`): voz, boca y subtítulos. Necesita que el equipo gráfico tenga a Ana con sus bocas (`docs/20-guia-diseno.md`) y una clave de Google Text-to-Speech para probar con voz real.
+4. En paralelo, el responsable del producto mide 2 proyectos con la tabla de `docs/11-medicion-y-piloto.md`.
+5. Al cerrar cada sprint, demo en el entorno de pruebas y observaciones en Jira. Piloto al cerrar S6.

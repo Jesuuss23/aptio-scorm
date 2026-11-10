@@ -108,3 +108,21 @@ test('el revisor del cliente solo mira', async ({ page }) => {
   await expect(page.getByLabel('Título en pantalla')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Guardar cambios' })).toHaveCount(0);
 });
+
+test('en celular (390 px) la revisión no desborda y usa solo la escala de letra', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(URL_REVISION);
+  await expect(page.getByRole('region', { name: 'Pantalla p01' })).toBeVisible();
+  const medida = await page.evaluate(() => {
+    const tamanos = new Set<number>();
+    for (const el of document.querySelectorAll<HTMLElement>('main *')) {
+      const conTexto = [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
+      const r = el.getBoundingClientRect();
+      if (conTexto && r.width && r.height) tamanos.add(parseFloat(getComputedStyle(el).fontSize));
+    }
+    return { scroll: document.documentElement.scrollWidth, ancho: document.documentElement.clientWidth, tamanos: [...tamanos] };
+  });
+  expect(medida.scroll).toBeLessThanOrEqual(medida.ancho);
+  for (const t of medida.tamanos) expect([11, 12, 14, 16, 20, 26]).toContain(t);
+});
