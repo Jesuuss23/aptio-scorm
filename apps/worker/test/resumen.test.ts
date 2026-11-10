@@ -1,38 +1,12 @@
 // HU-0402 · Etapa 1 «Leer y resumir»: ideas clave con su página, acta de omitidos (CP-038), reglas propias con un
 // proveedor real, material del cliente delimitado (CP-102) y cancelación a mitad de la etapa. PostgreSQL real.
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
-import { leerSalidaSimulada, type MensajeProveedor, type ProveedorTexto, proveedorSimulado } from '@aptio/ai';
+import { leerSalidaSimulada } from '@aptio/ai';
 import { prisma } from '@aptio/db';
-import { ETAPAS, type ResumenMaterial, TAREA_GENERAR } from '@aptio/schema/generacion';
-import type { Redis } from 'ioredis';
+import type { ResumenMaterial } from '@aptio/schema/generacion';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EJECUTORES } from '../src/etapas/index.js';
 import { revisarActa, revisarClasificacion, revisarMapa, revisarResumen } from '../src/etapas/resumen.js';
-import { crearGenerador } from '../src/generar.js';
-
-const baseLista = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
-const AI = dirname(createRequire(import.meta.url).resolve('@aptio/ai/package.json'));
-/** El manual LOTO del caso de referencia: 30 páginas marcadas como [p. N]. */
-const PAGINAS = readFileSync(join(AI, 'casos/loto/entrada/manual-loto.md'), 'utf8')
-  .split(/^\[p\. (\d+)\]\n/m).slice(1)
-  .reduce<{ n: number; texto: string; escaneada: boolean }[]>((l, x, i, a) => (i % 2 ? l : [...l, { n: Number(x), texto: a[i + 1]!.trim(), escaneada: false }]), []);
-const redis = { publish: async () => 1 } as unknown as Redis;
-type Llamada = { tarea: string; mensajes: MensajeProveedor[] };
-
-/** Proveedor «real» (no simulado) sobre las salidas grabadas, con consumo: activa las reglas propias de la etapa. */
-function comoReal(guion: Partial<Record<string, string[]>> = {}, alLlamar?: (tarea: string) => Promise<void>) {
-  const base = proveedorSimulado(guion);
-  const p: ProveedorTexto & { llamadas: Llamada[] } = {
-    nombre: 'anthropic', modeloPara: () => 'claude-opus-5-5', llamadas: base.llamadas,
-    async completar(x) {
-      await alLlamar?.(x.tarea);
-      return { ...(await base.completar(x)), modelo: 'claude-opus-5-5', consumo: { tokensEntrada: 12_000, tokensSalida: 2_500, tokensCacheLeidos: 0, tokensCacheEscritos: 0 } };
-    },
-  };
-  return p;
-}
+import { baseLista, comoReal, conteo as contar, escenario, etapaDe, PAGINAS } from './apoyo-generacion.js';
 
 describe('reglas propias de la etapa 1', () => {
   const mapa = leerSalidaSimulada('IA-01').datos as { temas: { id: string; paginas: number[]; peso: number; titulo: string; resumen: string; tipoContenido: string }[] };
@@ -62,52 +36,14 @@ describe('reglas propias de la etapa 1', () => {
 });
 
 describe.skipIf(!baseLista && !process.env.CI)('etapa 1 en el generador', () => {
-  const sufijo = Math.random().toString(36).slice(2, 8);
-  let orgId: string;
-  let clienteId: string;
-  let usuarioId: string;
-
-  beforeAll(async () => {
-    orgId = (await prisma.organizacion.create({ data: { nombre: 'Org resumen', slug: `resumen-${sufijo}` } })).id;
-    clienteId = (await prisma.cliente.create({ data: { organizacionId: orgId, nombre: 'Minera Andina', glosario: { create: [{ termino: 'LOTO', noTraducir: true }] } } })).id;
-    usuarioId = (await prisma.usuario.create({ data: { nombre: 'di', email: `res-${sufijo}@prueba.test`, rol: 'DISENADOR_INSTRUCCIONAL', organizacionId: orgId } })).id;
-  });
-
-  afterAll(async () => {
-    await prisma.trabajoIA.deleteMany({ where: { organizacionId: orgId } });
-    await prisma.proyecto.deleteMany({ where: { organizacionId: orgId } });
-    await prisma.recurso.deleteMany({ where: { organizacionId: orgId } });
-    await prisma.usuario.deleteMany({ where: { organizacionId: orgId } });
-    await prisma.cliente.deleteMany({ where: { organizacionId: orgId } });
-    await prisma.organizacion.delete({ where: { id: orgId } });
-  });
-
-  /** Proyecto con el manual LOTO (u otras páginas) y una generación lista para correr. */
-  async function preparar(paginas: typeof PAGINAS | null = PAGINAS) {
-    const p = await prisma.proyecto.create({
-      data: { organizacionId: orgId, clienteId, nombre: 'Bloqueo y etiquetado', creadoPorId: usuarioId, pantallasObjetivo: 30, publico: 'Operarios de planta', estado: 'GENERANDO' },
-    });
-    let materialId: string | null = null;
-    if (paginas) {
-      const r = await prisma.recurso.create({
-        data: { organizacionId: orgId, proyectoId: p.id, tipo: 'DOCUMENTO', origen: 'CLIENTE', claveS3: `p/${p.id}`, mime: 'application/pdf', bytes: 1, hash: 'x', nombre: 'PETS-SEG-014 Bloqueo.pdf' },
-      });
-      materialId = (await prisma.materialFuente.create({ data: { proyectoId: p.id, tipo: 'PDF', recursoId: r.id, estado: 'listo', paginas } })).id;
-    } else {
-      await prisma.materialFuente.create({ data: { proyectoId: p.id, tipo: 'TEMA', tema: 'Uso de extintores', estado: 'listo' } });
-    }
-    const g = await prisma.generacion.create({
-      data: { organizacionId: orgId, proyectoId: p.id, iniciadoPorId: usuarioId, parametros: { pantallas: 30, publico: 'Operarios de planta' }, etapas: { create: ETAPAS.map((etapa, i) => ({ etapa, orden: i + 1 })) } },
-    });
-    return { proyectoId: p.id, generacionId: g.id, materialId };
-  }
-  const correr = (generacionId: string, proveedor: ProveedorTexto) =>
-    crearGenerador({ bd: prisma, redis, proveedor, ejecutores: EJECUTORES })({
-      data: { trabajoId: generacionId, organizacionId: orgId, tarea: TAREA_GENERAR }, queueName: 'ia', updateProgress: async () => undefined,
-    });
-  const etapa1 = (generacionId: string) => prisma.generacionEtapa.findFirstOrThrow({ where: { generacionId, etapa: 'RESUMEN_MATERIAL' } });
-  const conteo = async (generacionId: string) =>
-    Object.fromEntries((await prisma.trabajoIA.groupBy({ by: ['tarea'], where: { generacionId }, _count: true })).map((x) => [x.tarea, x._count]));
+  const e = escenario('resumen');
+  beforeAll(e.crear);
+  afterAll(e.borrar);
+  const preparar = (paginas: typeof PAGINAS | null = PAGINAS) => e.preparar(paginas);
+  // Solo la etapa 1: las siguientes se prueban en sus archivos.
+  const correr = (generacionId: string, proveedor: Parameters<typeof e.correr>[1]) => e.correr(generacionId, proveedor, { RESUMEN_MATERIAL: EJECUTORES.RESUMEN_MATERIAL! });
+  const etapa1 = (generacionId: string) => etapaDe(generacionId, 'RESUMEN_MATERIAL');
+  const conteo = contar;
 
   it('CP-038 · cada idea clave tiene su página y existe el acta de temas omitidos', async () => {
     const { generacionId, materialId } = await preparar();

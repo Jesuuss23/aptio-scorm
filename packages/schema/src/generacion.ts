@@ -76,3 +76,43 @@ export interface ResumenMaterial {
   acta: ActaOmitidos | null;
   observaciones: string[];
 }
+
+// ---------- Etapa 2 · Objetivos y estructura (HU-0403) ----------
+
+export type NivelBloom = 'recordar' | 'comprender' | 'aplicar' | 'analizar' | 'evaluar' | 'crear';
+export type TipoPantalla = 'portada' | 'objetivos' | 'contenido' | 'actividad' | 'evaluacion' | 'seccion' | 'resumen' | 'resultados' | 'cierre';
+
+export interface ObjetivoAprendizaje {
+  id: string;
+  texto: { es?: string; en?: string };
+  nivelBloom: NivelBloom;
+  verbo: string;
+}
+
+export interface PantallaEstructura {
+  id: string;
+  tipo: TipoPantalla;
+  proposito: string;
+  objetivoIds: string[];
+  fragmentoIds: string[];
+  actividadSugerida?: string;
+  /** Páginas del material de donde salen sus fragmentos (trazabilidad). */
+  paginas: number[];
+}
+
+/** Lo que guarda la etapa OBJETIVOS_ESTRUCTURA (salida de IA-04 con el origen de cada pantalla) y recibe la etapa 3. */
+export interface EstructuraCurso {
+  objetivos: ObjetivoAprendizaje[];
+  modulos: {
+    id: string;
+    titulo: { es?: string; en?: string };
+    capsulas: { id: string; titulo: { es?: string; en?: string }; objetivoIds: string[]; duracionEstimadaMin: number; pantallas: PantallaEstructura[] }[];
+  }[];
+  supuestos: string[];
+  /** Pantallas con actividad pedidas (pantallas × %) y logradas. */
+  actividades: { minimas: number | null; total: number };
+}
+
+const TIPOS_ACTIVIDAD: readonly string[] = ['actividad', 'evaluacion'];
+/** Cuenta como pantalla con actividad la de tipo actividad o evaluación, o la que sugiere una interacción (CP-039). */
+export const conActividad = (p: { tipo: string; actividadSugerida?: string }) => TIPOS_ACTIVIDAD.includes(p.tipo) || Boolean(p.actividadSugerida);

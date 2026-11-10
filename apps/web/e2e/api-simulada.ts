@@ -67,10 +67,25 @@ function resumenLoto() {
   };
 }
 
+/** Resultado de la etapa 2: la estructura LOTO con 2 actividades más para llegar a 12 de 30 (40 %), con sus páginas. */
+function estructuraLoto() {
+  const leer = (f: string) => JSON.parse(readFileSync(new URL(`../../../packages/ai/casos/loto/salidas/${f}`, import.meta.url), 'utf8'));
+  const e = leer('02-IA-04-estructura.json') as { objetivos: unknown[]; supuestos: string[]; modulos: { capsulas: { pantallas: Record<string, unknown>[] }[] }[] };
+  const paginas = new Map((leer('01-IA-03-resumenes.json') as { fragmentos: { id: string; paginas: number[] }[] }[]).flatMap((r) => r.fragmentos.map((f) => [f.id, f.paginas] as const)));
+  const extra: Record<string, string> = { p05: 'INT-04', p08: 'INT-02' };
+  for (const c of e.modulos.flatMap((m) => m.capsulas)) {
+    c.pantallas = c.pantallas.map((p) => ({
+      ...p, ...(extra[String(p.id)] ? { actividadSugerida: extra[String(p.id)] } : {}),
+      paginas: [...new Set((p.fragmentoIds as string[]).flatMap((f) => paginas.get(f) ?? []))].sort((a, b) => a - b),
+    }));
+  }
+  return { ...e, actividades: { minimas: 12, total: 12 } };
+}
+
 /** Lo que hacen las etapas con ejecutor en la simulación (textos y costos del prototipo). */
 const ETAPAS_SIMULADAS = [
   { detalle: '30 páginas → 29 ideas clave · 4 temas omitidos con motivo', costoUsd: 0.35 },
-  { detalle: '3 objetivos con nivel de Bloom · 3 módulos · 30 pantallas', costoUsd: 0.1 },
+  { detalle: '3 objetivos con nivel de Bloom · 1 módulo · 30 pantallas · 12 con actividad', costoUsd: 0.1 },
   { detalle: '30 pantallas con texto corto en pantalla y narración', costoUsd: 0.45 },
 ];
 
@@ -293,7 +308,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (etapaDe) {
       const e = generaciones.find((x) => x.id === etapaDe[1])?.etapas.find((x) => x.etapa === etapaDe[2]);
       if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Etapa no encontrada' });
-      return responder(200, { ...e, datos: e.estado === 'COMPLETADO' && e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : null });
+      const datos = e.estado !== 'COMPLETADO' ? null : e.etapa === 'RESUMEN_MATERIAL' ? resumenLoto() : e.etapa === 'OBJETIVOS_ESTRUCTURA' ? estructuraLoto() : null;
+      return responder(200, { ...e, datos });
     }
     const unaGeneracion = ruta.match(/^\/generaciones\/([0-9a-f-]+)(?:\/(cancelar|continuar))?$/);
     if (unaGeneracion) {
