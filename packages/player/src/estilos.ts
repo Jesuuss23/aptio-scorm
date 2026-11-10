@@ -8,6 +8,8 @@ export const ESTILOS = `
 button{font:inherit;cursor:pointer}
 button:disabled{cursor:not-allowed}
 :focus-visible{outline:3px solid var(--ap-acento);outline-offset:2px}
+.ap-sin-marco .ap-barra,.ap-sin-marco .ap-pie,.ap-sin-marco .ap-subtitulos{display:none}
+.ap-sin-marco{min-height:0}
 .ap-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .ap-barra{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ap-primario);color:var(--ap-blanco);flex:0 0 auto}
 .ap-titulo-curso{font-family:var(--ap-f-titulos),system-ui,sans-serif;font-weight:700;font-size:16px;flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

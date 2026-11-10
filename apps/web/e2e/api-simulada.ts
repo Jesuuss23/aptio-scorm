@@ -133,6 +133,17 @@ function pantallasLoto(listas: number) {
   };
 }
 
+const CURSO_ID = '00000000-0000-4000-8000-000000000990';
+const observacion = (n: number, pantallaId: string, tipo: string, severidad: string, mensaje: string) => ({
+  id: `00000000-0000-4000-8000-${String(950 + n).padStart(12, '0')}`, pantallaId, tipo, severidad, mensaje, origen: 'usuario', resuelta: false, creadoEn: '2026-11-10T10:00:00.000Z',
+});
+/** HU-0501 · Observaciones abiertas del curso LOTO: 3 pantallas; la de p20 bloquea la entrega (RN-05-1). */
+export const OBSERVACIONES = [
+  observacion(1, 'p05', 'CALIDAD', 'aviso', 'Revisar el ejemplo del tablero'),
+  observacion(2, 'p12', 'IDIOMA', 'info', 'Confirmar el término «candado de bloqueo»'),
+  observacion(3, 'p20', 'ACCESIBILIDAD', 'bloquea-entrega', 'Falta el texto alternativo de la escena'),
+];
+
 /** El curso esperado del caso LOTO (30 pantallas, 9 actividades): el que dibuja el reproductor en la vista previa. */
 export const cursoLoto = () => JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8')) as Record<string, unknown>;
 
@@ -187,6 +198,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   let glosario: { termino: string; traduccion: string | null; noTraducir: boolean }[] = [];
   let pronunciacion: { idioma: string; escrito: string; pronunciado: string }[] = [];
   const materiales = new Map<string, Record<string, unknown>[]>();
+  // El curso del proyecto con pantallas: CP-047 lo muestra tomado del «Manual» del cliente y 3 pantallas tienen observaciones.
+  const revision = { version: 1, documento: cursoLoto(), observaciones: OBSERVACIONES.map((o) => ({ ...o })) };
+  (revision.documento.recursos as { tipo: string; nombre: string }[]).find((r) => r.tipo === 'documento')!.nombre = 'Manual.pdf';
+  type PantallaSim = { id: string; estado: string; titulo: { es: string }; narracion?: { texto: { es: string } } };
+  const pantallasSim = () => (revision.documento.modulos as { capsulas: { pantallas: PantallaSim[] }[] }[]).flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
   // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
   await page.route('**/s3-simulado/**', (route) => route.fulfill({ status: 200, body: '' }));
   let sesion = conSesion;
@@ -423,7 +439,40 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (deCurso) {
       const p = proyectos.find((x) => x.id === deCurso[1]);
       if (!p || !(p.avance as { total: number }).total) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El proyecto aún no tiene curso: genera las pantallas en Producción' });
-      return responder(200, { id: '00000000-0000-4000-8000-000000000990', proyectoId: p.id, versionEsquema: '0.2.0', version: 1, documento: cursoLoto(), actualizadoEn: '2026-11-10T10:00:00.000Z' });
+      return responder(200, { id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version, documento: revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z' });
+    }
+    // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).
+    if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);
+    const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
+    if (editar && req.method() === 'PATCH') {
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; narracion?: { es: string } };
+      if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
+      const p = pantallasSim().find((x) => x.id === editar[1])!;
+      if (datos.titulo) p.titulo = { es: datos.titulo.es.trim() };
+      if (datos.narracion && p.narracion) p.narracion.texto = { es: datos.narracion.es.trim() };
+      p.estado = 'borrador';
+      return responder(200, { version: ++revision.version, regenerando: [], estado: 'borrador' });
+    }
+    const aprobarUna = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)/aprobar$`));
+    if (aprobarUna) {
+      if (revision.observaciones.some((o) => o.pantallaId === aprobarUna[1] && o.severidad === 'bloquea-entrega')) {
+        return responder(409, { codigo: 'OBSERVACIONES_BLOQUEAN', mensaje: 'Resuelve antes la observación que bloquea la entrega' });
+      }
+      pantallasSim().find((x) => x.id === aprobarUna[1])!.estado = 'aprobado';
+      return responder(200, { version: ++revision.version, regenerando: [], aprobadas: [aprobarUna[1]], estado: 'aprobado' });
+    }
+    if (ruta === `/cursos/${CURSO_ID}/pantallas/aprobar`) {
+      const con = new Set(revision.observaciones.map((o) => o.pantallaId));
+      const aprobadas: string[] = [];
+      const pendientes: string[] = [];
+      for (const p of pantallasSim().filter((x) => x.estado !== 'aprobado')) {
+        if (con.has(p.id)) pendientes.push(p.id);
+        else {
+          p.estado = 'aprobado';
+          aprobadas.push(p.id);
+        }
+      }
+      return responder(200, { version: ++revision.version, regenerando: [], aprobadas, pendientes });
     }
     const unProyecto = ruta.match(/^\/proyectos\/([0-9a-f-]+)$/);
     if (unProyecto) {
