@@ -23,8 +23,12 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 | SUP-11 | El revisor del cliente no recibe `GET /eventos`, porque ese flujo muestra los trabajos de toda la organización; cuando revise un proyecto recibirá solo los eventos de ese proyecto. | Responsable del producto, al llegar la historia de revisión del cliente (M05) |
 | SUP-12 | El lint usa oxlint (ya estaba en el repositorio y usa reglas compatibles con ESLint) en lugar de ESLint; el formato con Prettier se agrega en un PR propio que solo reformatee, para no mezclarlo con cambios de lógica. | Ingeniero a cargo |
 | SUP-13 | Registran y editan clientes ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y PRODUCTOR; el diseñador gráfico los ve y edita su kit (HU-0202). | Responsable del producto |
+| SUP-14 | El borrado programado cubre todo recurso de origen CLIENTE del proyecto (documentos, audio y video del cliente), no solo los PDF. Del texto extraído se borran las páginas y la transcripción; se conserva el mapa de temas (decisiones sin el texto) y el curso. | Responsable del producto, con el contrato de retención del primer cliente |
+| SUP-15 | Los SVG no se aceptan en las subidas hasta que HU-0203 los sanee. Tamaños máximos por tipo: imagen 20 MB, documento 200 MB (pptx 500 MB), audio 500 MB, video 4 GB, fuente 5 MB; son límites de subida, no del paquete exportado. | Ingeniero a cargo |
 
 ## Cambios recientes
+
+- **HU-1404 · Almacenamiento cifrado y borrado programado (2026-11-10):** paquete `@aptio/almacen` sobre S3. Todo objeto se guarda cifrado con KMS y se lee solo con URLs firmadas de 15 minutos (CP-103). El bucket no es público. La web sube directo al almacenamiento con un PUT firmado que obliga el tipo y el cifrado: `POST /recursos/subidas` y luego `POST /recursos/subidas/{id}/confirmar`, que verifica el cifrado, el tipo real por contenido (un .exe renombrado a .pdf se rechaza y se borra, CP-034) y el hash. Se suman `GET /recursos` y `GET /recursos/{id}`; el revisor solo ve los de su cliente. Al entregar un proyecto, `RetencionService.programarBorrado` marca sus documentos del cliente para la fecha de entrega más los días de retención; el worker los borra cada día a las 3:00 (Lima) y deja `DOCUMENTOS_BORRADOS` en Auditoría (CP-104). La llamada al entregar se conecta cuando exista la entrega del proyecto (M09). En local, `pnpm almacen:preparar` crea la clave KMS y el bucket en LocalStack (ahora con `SERVICES=s3,kms`); CI levanta LocalStack y prueba contra él.
 
 - **HU-0201 · Clientes (2026-11-10):** `GET/POST /clientes`, `GET/PATCH /clientes/{id}`, con alta solo con el nombre (CP-019), búsqueda por nombre, retención de documentos editable (180 días por defecto) y 409 `CLIENTE_EXISTE` si se repite el nombre en la organización. El revisor del cliente solo ve el suyo. En la web se suma **Empresa → Clientes y kits** con la lista, el alta y el detalle editable; el kit se habilita en la rama del HU-0202.
 
@@ -97,6 +101,8 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Pendientes
 
+- Conectar `RetencionService.programarBorrado` al paso del proyecto a ENTREGADO (M09).
+- En la nube (HU-1405): crear la clave KMS y el bucket con la infraestructura, con bloqueo de acceso público y CORS solo para el dominio de la web.
 - El ingeniero a cargo define equipo, plazos y estimación del backlog.
 - Reunir 3–5 proyectos reales con horas por pantalla para calibrar SUP-01 a SUP-03.
 - Diseño gráfico: 2 estilos base, 1 personaje con capas nombradas y bocas, y el kit del primer cliente (ver `docs/20-guia-diseno.md`).

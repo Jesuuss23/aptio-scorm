@@ -14,6 +14,7 @@
   "type": "module",
   "dependencies": {
     "@aptio/ai": "workspace:*",
+    "@aptio/almacen": "workspace:*",
     "@aptio/colas": "workspace:*",
     "@aptio/db": "workspace:*",
     "@aptio/schema": "workspace:*",

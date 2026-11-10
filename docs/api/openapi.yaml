@@ -1043,7 +1043,9 @@ paths:
       - Recursos
       summary: Pedir URL de subida firmada
       operationId: post_recursos_subidas
-      description: Tipos permitidos por lista; tamaño máximo por tipo configurable
+      description: >-
+        Tipos permitidos por lista y tamaño máximo por tipo (RN-14-1). Devuelve un PUT firmado de 15 minutos;
+        el navegador lo envía con las cabeceras indicadas, que fijan el tipo y el cifrado con KMS (HU-1404).
       requestBody:
         required: true
         content:
@@ -1069,7 +1071,10 @@ paths:
       - Recursos
       summary: Confirmar subida y crear recurso
       operationId: post_recursos_subidas_subidaId_confirmar
-      description: Verifica tipo real y hash; sanitiza SVG
+      description: >-
+        Verifica que el objeto esté cifrado con KMS, que su contenido real coincida con el tipo declarado
+        (CP-034) y calcula su hash. Si no coincide, borra el objeto y responde 422 TIPO_NO_COINCIDE.
+        Confirmar dos veces devuelve el mismo recurso. Los SVG se aceptarán saneados desde HU-0203.
       parameters:
       - name: subidaId
         in: path
@@ -1090,6 +1095,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /recursos:
     get:
       tags:
@@ -3493,11 +3500,19 @@ components:
         proyectoId:
           type: string
           format: uuid
+        origen:
+          type: string
+          enum:
+          - SUBIDO
+          - CLIENTE
+          default: SUBIDO
+          description: CLIENTE marca un documento del cliente, con borrado programado según su retención (ADR-009)
     SubidaUrl:
       type: object
       required:
       - subidaId
       - url
+      - cabeceras
       - expira
       properties:
         subidaId:
@@ -3506,9 +3521,12 @@ components:
         url:
           type: string
           format: uri
-        campos:
+          description: PUT firmado, vigente 15 minutos
+        cabeceras:
           type: object
-          additionalProperties: true
+          additionalProperties:
+            type: string
+          description: Cabeceras que el PUT debe enviar tal cual (tipo y cifrado KMS); sin ellas el almacenamiento rechaza la subida
         expira:
           type: string
           format: date-time
@@ -3554,12 +3572,31 @@ components:
           type: integer
         duracionMs:
           type: integer
+        hash:
+          type: string
+          description: sha256 del contenido
+        clienteId:
+          type: string
+          format: uuid
+          nullable: true
+        proyectoId:
+          type: string
+          format: uuid
+          nullable: true
+        eliminarEn:
+          type: string
+          format: date-time
+          nullable: true
+          description: Borrado programado de un documento del cliente (HU-1404)
+        creadoEn:
+          type: string
+          format: date-time
         alt:
           $ref: '#/components/schemas/TextoI18n'
         url:
           type: string
           format: uri
-          description: URL firmada temporal
+          description: URL firmada de 15 minutos; solo en GET /recursos/{recursoId} y al confirmar
     ImagenIaEntrada:
       type: object
       required:

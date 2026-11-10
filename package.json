@@ -11,6 +11,7 @@
     "schema:test": "pnpm --filter @aptio/schema test",
     "ia:casos": "node packages/ai/scripts/validar-casos.mjs && pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.json",
     "openapi:lint": "npx -y @redocly/cli@2.77.0 lint docs/api/openapi.yaml",
+    "almacen:preparar": "pnpm --filter @aptio/almacen preparar",
     "db:test": "pnpm --filter @aptio/db test",
     "web:e2e": "pnpm --filter web e2e",
     "lint": "oxlint --deny-warnings apps packages",
