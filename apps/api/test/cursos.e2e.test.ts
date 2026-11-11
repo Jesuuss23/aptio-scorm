@@ -313,8 +313,10 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(await prisma.cursoVersion.findFirst({ where: { cursoId, version: c.version + 1 } })).toMatchObject({ motivo: 'edición' });
 
     // Deshacer: la disposición anterior y, en el mismo cambio, los ajustes que tenía.
-    const deshacer = await como('grafico').patch(ruta, { version: c.version + 1, disposicion: 'idea', ajustes: ajustesAntes });
+    // HU-0607 · El editor rotula la versión con el motivo (SUP-46).
+    const deshacer = await como('grafico').patch(ruta, { version: c.version + 1, disposicion: 'idea', ajustes: ajustesAntes, motivo: 'deshacer' });
     expect(deshacer.status).toBe(200);
+    expect(await prisma.cursoVersion.findFirst({ where: { cursoId, version: c.version + 2 } })).toMatchObject({ motivo: 'deshacer' });
     const vuelta = p05De(await documento());
     expect(vuelta).toMatchObject({ disposicion: 'idea', plantilla: 'kit-minera-andina-idea', ajustes: ajustesAntes, extras });
     expect(vuelta.bloques).toEqual(antes.bloques);
@@ -323,6 +325,7 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     const v = c.version + 2;
     expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p07`, { version: v, disposicion: 'idea' })).body).toMatchObject({ codigo: 'DISENO_NO_PERMITIDO', mensaje: 'Esta pantalla tiene una actividad: su diseño se cambia en Revisión con la IA' });
     expect((await como('grafico').patch(ruta, { version: v, disposicion: 'quiz' })).body).toMatchObject({ codigo: 'DISENO_NO_PERMITIDO' });
+    expect((await como('grafico').patch(ruta, { version: v, disposicion: 'dato', motivo: 'aprobación' })).status).toBe(422);
     expect((await como('grafico').patch(ruta, { version: c.version, disposicion: 'dato' })).status).toBe(409);
     expect((await como('revisor').patch(ruta, { version: v, disposicion: 'dato' })).status).toBe(403);
     expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);

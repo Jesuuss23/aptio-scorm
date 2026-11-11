@@ -1798,7 +1798,8 @@ paths:
         CURSO_NO_VALIDO si un valor sale del esquema. HU-0605 · `disposicion` cambia el diseño de la pantalla (CP-060);
         422 DISENO_NO_PERMITIDO si la pantalla tiene una actividad, un video o es la de resultados, o si el diseño no es
         de contenido. HU-0606 · `extras` reemplaza los elementos agregados de la pantalla; 422 EXTRA_NO_VALIDO si un id
-        se repite o es el de un bloque. `ajustes` acepta también ids de extras.
+        se repite o es el de un bloque. `ajustes` acepta también ids de extras. HU-0607 · Deshacer y rehacer del editor
+        mandan el mismo cambio con `motivo` (`deshacer` o `rehacer`), que rotula la versión.
       parameters:
       - name: cursoId
         in: path
@@ -4933,6 +4934,13 @@ components:
             borra su ajuste.
           items:
             $ref: '#/components/schemas/ElementoExtra'
+        motivo:
+          type: string
+          enum:
+          - deshacer
+          - rehacer
+          description: HU-0607 · Rótulo de la versión cuando el cambio viene de deshacer o rehacer en el editor (SUP-46).
+            Sin él, la versión dice «edición».
         version:
           type: integer
       description: Cambios del editor sobre una pantalla. Dispara la regeneración en cascada de lo afectado.
