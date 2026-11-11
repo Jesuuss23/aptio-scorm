@@ -3,13 +3,18 @@
 // Clic fuera también guarda. Cada texto guardado crea una versión y deja la pantalla en borrador (RN-05-2).
 // HU-0602 · Un clic (o Tab y Espacio) elige un elemento: la barra contextual y el panel de Propiedades cambian su tamaño,
 // su color del kit, su alineación y su animación (CP-057). Se guardan en `ajustes` de la pantalla (RN-06-1).
-// El riel, la línea de tiempo, el modo Libre y deshacer llegan con la HU-0603 a la HU-0608.
+// HU-0603 · En modo Libre se arrastra un elemento (desde 4 px) o se mueve con las flechas de a 0,5 %; se guarda su
+// `desplazamiento` en % del ancho (CP-058, RN-06-2). El modo no se guarda en el curso (SUP-42).
+// El riel, la línea de tiempo y deshacer llegan con la HU-0604 a la HU-0608.
 import { type AjusteElemento, type CursoReproductor, montar, PALETA_BASE, type RolColor } from '@aptio/player';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Rol } from '../api';
 import { navegar } from '../ruta';
-import { ajusteCon, controlesDe, escalaSiguiente, nombreElemento, seRetoca, tamanoSiguiente } from './ajustes-elemento';
+import {
+  ajusteCon, cambioDesplazamiento, controlesDe, desplazado, escalaSiguiente, FLECHAS, nombreElemento, PASO_FLECHA, pxAPorcentaje, seRetoca,
+  tamanoSiguiente, UMBRAL_ARRASTRE_PX,
+} from './ajustes-elemento';
 import { type CambioTexto, edicionDe, esEditable } from './edicion-texto';
 import { type AccionesRetoque, BarraElemento, PanelPropiedades } from './propiedades';
 import './fuentes-kit';
@@ -25,6 +30,8 @@ const ESTILOS_EDICION = `
 [data-retocable] { cursor: pointer; outline: 2px dashed transparent; outline-offset: 3px; }
 [data-retocable]:hover, [data-retocable]:focus-visible { outline-color: currentColor; }
 [data-elegido] { outline: 2px solid var(--color-naranja, #ff6b35) !important; }
+.ap-r[data-libre] [data-retocable] { cursor: move; touch-action: none; user-select: none; }
+.ap-r[data-libre] [contenteditable] { cursor: auto; user-select: text; }
 `;
 
 type PantallaConAjustes = PantallaDoc & { ajustes?: Record<string, AjusteElemento> };
@@ -45,6 +52,8 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   // HU-0602 · Elemento elegido (de una pantalla) y el tamaño que se veía al elegirlo; «Ver animación» vuelve a montar.
   const [elegido, setElegido] = useState<{ pantallaId: string; bloqueId: string; tamanoVisto: number } | null>(null);
   const [repeticion, setRepeticion] = useState(0);
+  // HU-0603 · Modo de trabajo del editor (SUP-42): en Automático la disposición acomoda; en Libre se mueve.
+  const [modo, setModo] = useState<'auto' | 'libre'>('auto');
   const lienzo = useRef<HTMLDivElement>(null);
   /** Texto que recupera el foco cuando el lienzo se redibuja tras guardar con Enter (teclado). */
   const reenfocar = useRef<string | null>(null);
@@ -107,9 +116,18 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     return enviar(pantalla, r.cambio, 'Texto guardado.');
   };
   // El lienzo se monta una vez por versión; lee siempre la última función de guardado.
+  /** HU-0603 · Guarda el desplazamiento de un elemento (lo llama el lienzo al soltar o tras las flechas). */
+  const mover = (pantalla: PantallaDoc, bloqueId: string, d: { x: number; y: number }) => {
+    const previo = (pantalla as PantallaConAjustes).ajustes?.[bloqueId];
+    return enviar(pantalla, { ajustes: { [bloqueId]: ajusteCon(previo, cambioDesplazamiento(d)) } }, 'Posición guardada.');
+  };
   const guardarRef = useRef(guardar);
+  const moverRef = useRef(mover);
+  const modoRef = useRef(modo);
   useEffect(() => {
     guardarRef.current = guardar;
+    moverRef.current = mover;
+    modoRef.current = modo;
   });
 
   // Una sola pantalla, como la verá el participante, con sus textos editables.
@@ -207,6 +225,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         return;
       }
       const r = retocable(k.target);
+      if (r && r === k.target && alFlecha(k, r)) return;
       if (r && r === k.target && k.key === ' ') {
         k.preventDefault();
         elegir(r);
@@ -217,11 +236,76 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     const alSalir = (ev: Event) => {
       if (edicion && ev.target === edicion.el) void terminar(true);
     };
+
+    // HU-0603 · Arrastre en modo Libre: se ve en vivo con `translate` y se guarda al soltar, en % del ancho.
+    const anchoLienzo = () => sombra.querySelector<HTMLElement>('.ap-r')?.clientWidth ?? 0;
+    const desplazamientoDe = (id: string) => (actual as PantallaConAjustes).ajustes?.[id]?.desplazamiento;
+    const verEn = (el: HTMLElement, d: { x: number; y: number }) => {
+      el.style.translate = `${d.x}cqw ${d.y}cqw`;
+    };
+    let arrastre: { el: HTMLElement; id: string; sx: number; sy: number; movido: boolean; d: { x: number; y: number } } | null = null;
+    const alPresionar = (ev: Event) => {
+      const p = ev as PointerEvent;
+      const el = retocable(p.target);
+      if (!el || edicion || modoRef.current !== 'libre' || p.button !== 0) return;
+      arrastre = { el, id: el.dataset.bloque!, sx: p.clientX, sy: p.clientY, movido: false, d: desplazado(desplazamientoDe(el.dataset.bloque!), 0, 0) };
+      el.setPointerCapture?.(p.pointerId);
+    };
+    const alMover = (ev: Event) => {
+      const p = ev as PointerEvent;
+      if (!arrastre) return;
+      const dxPx = p.clientX - arrastre.sx;
+      const dyPx = p.clientY - arrastre.sy;
+      if (!arrastre.movido && Math.hypot(dxPx, dyPx) <= UMBRAL_ARRASTRE_PX) return;
+      arrastre.movido = true;
+      p.preventDefault();
+      const ancho = anchoLienzo();
+      const base = desplazamientoDe(arrastre.id);
+      arrastre.d = desplazado(base, pxAPorcentaje(dxPx, ancho), pxAPorcentaje(dyPx, ancho));
+      verEn(arrastre.el, arrastre.d);
+    };
+    const alSoltar = () => {
+      const a = arrastre;
+      arrastre = null;
+      if (!a?.movido) return;
+      // El clic que sigue al arrastre solo elige el elemento.
+      reenfocar.current = a.id;
+      void moverRef.current(actual, a.id, a.d);
+    };
+    // Flechas: se mueve al instante y se guarda una sola vez, 1 s después de la última.
+    let flechas: { id: string; d: { x: number; y: number }; t: ReturnType<typeof setTimeout> } | null = null;
+    const alFlecha = (k: KeyboardEvent, el: HTMLElement) => {
+      const dir = FLECHAS[k.key];
+      if (!dir || modoRef.current !== 'libre') return false;
+      k.preventDefault();
+      const id = el.dataset.bloque!;
+      const desde = flechas?.id === id ? flechas.d : desplazado(desplazamientoDe(id), 0, 0);
+      if (flechas) clearTimeout(flechas.t);
+      const d = desplazado(desde, dir[0] * PASO_FLECHA, dir[1] * PASO_FLECHA);
+      verEn(el, d);
+      flechas = {
+        id, d, t: setTimeout(() => {
+          flechas = null;
+          reenfocar.current = id;
+          void moverRef.current(actual, id, d);
+        }, 1000),
+      };
+      return true;
+    };
     sombra.addEventListener('click', alClic);
     sombra.addEventListener('dblclick', alDobleClic);
     sombra.addEventListener('keydown', alTecla);
     sombra.addEventListener('focusout', alSalir);
+    sombra.addEventListener('pointerdown', alPresionar);
+    sombra.addEventListener('pointermove', alMover);
+    sombra.addEventListener('pointerup', alSoltar);
+    sombra.addEventListener('pointercancel', alSoltar);
     return () => {
+      sombra.removeEventListener('pointerdown', alPresionar);
+      sombra.removeEventListener('pointermove', alMover);
+      sombra.removeEventListener('pointerup', alSoltar);
+      sombra.removeEventListener('pointercancel', alSoltar);
+      if (flechas) clearTimeout(flechas.t);
       sombra.removeEventListener('click', alClic);
       sombra.removeEventListener('dblclick', alDobleClic);
       sombra.removeEventListener('keydown', alTecla);
@@ -238,7 +322,8 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     const sombra = lienzo.current?.shadowRoot;
     if (!sombra) return;
     for (const el of sombra.querySelectorAll<HTMLElement>('[data-retocable]')) el.toggleAttribute('data-elegido', el.dataset.bloque === elegidoId);
-  }, [elegidoId, documento, actual, kit, repeticion]);
+    sombra.querySelector('.ap-r')?.toggleAttribute('data-libre', modo === 'libre');
+  }, [elegidoId, documento, actual, kit, repeticion, modo]);
 
   const aRevision = `/proyectos/${proyectoId}/revision`;
   const volver = (
@@ -284,6 +369,9 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       if (bloque) void enviar(actual, { ajustes: { [bloque.id]: null } }, 'Se restableció el elemento.');
     },
     alVerAnimacion: () => setRepeticion((n) => n + 1),
+    alVolverASuLugar: () => {
+      if (bloque) void mover(actual, bloque.id, { x: 0, y: 0 });
+    },
   };
   const irA = (id: string) => navegar(`/proyectos/${proyectoId}/editor?pantalla=${id}`);
   return (
@@ -293,6 +381,10 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         <span className="num sec">{String(indice + 1).padStart(2, '0')} / {pantallas.length}</span>
         <h1>{actual.titulo.es ?? actual.titulo.en}</h1>
         <span className={`chip ${actual.estado === 'aprobado' ? 'validado' : actual.estado === 'propuesta-ia' ? 'ia' : ''}`}>{NOMBRE_ESTADO[actual.estado] ?? actual.estado}</span>
+        <div className="opciones" role="group" aria-label="Modo de edición">
+          <button type="button" className="opcion" aria-pressed={modo === 'auto'} title="La disposición acomoda los elementos" onClick={() => setModo('auto')}>Automático</button>
+          <button type="button" className="opcion" aria-pressed={modo === 'libre'} title="Arrastra los elementos donde quieras" onClick={() => setModo('libre')}>Libre</button>
+        </div>
       </div>
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {aviso ? <div className="nota" role="status">{aviso}</div> : null}
@@ -308,8 +400,11 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
           <div className="revision-escenario">
             <div ref={lienzo} className="revision-reproductor" />
           </div>
+          <p className="editor-ayuda">
+            {modo === 'libre' ? 'Modo Libre: arrastra un elemento para moverlo, o elígelo y usa las flechas (0,5 % por pulsación).' : 'Modo Automático: la disposición acomoda los elementos. Cambia a Libre para moverlos.'}
+          </p>
         </section>
-        <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} acciones={acciones} />
+        <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones} />
       </div>
       <nav className="editor-tira" aria-label="Pantallas">
         <ol>

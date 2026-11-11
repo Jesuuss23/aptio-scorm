@@ -1269,3 +1269,8 @@ ul.fila-chips {
   padding: 4px 10px;
   font-size: var(--texto-sm);
 }
+.editor-ayuda {
+  margin: 0;
+  color: var(--color-texto-sec);
+  font-size: var(--texto-sm);
+}

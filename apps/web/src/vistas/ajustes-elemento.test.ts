@@ -1,6 +1,6 @@
 // HU-0602 · Retoques del elemento: pasos de A−/A+, rangos del esquema y el ajuste que se guarda.
 import { describe, expect, it } from 'vitest';
-import { ajusteCon, COLORES_KIT, controlesDe, escalaSiguiente, nombreElemento, tamanoSiguiente } from './ajustes-elemento';
+import { ajusteCon, cambioDesplazamiento, COLORES_KIT, controlesDe, desplazado, escalaSiguiente, nombreElemento, PASO_FLECHA, pxAPorcentaje, tamanoSiguiente } from './ajustes-elemento';
 
 describe('retoques del elemento', () => {
   it('A+ y A− cambian un 10 % el tamaño que se ve, a una décima', () => {
@@ -44,5 +44,23 @@ describe('retoques del elemento', () => {
     expect(nombreElemento({ tipo: 'texto', rol: 'titulo', contenido: { es: 'Bloqueo y etiquetado' } })).toBe('Título · Bloqueo y etiquetado');
     expect(nombreElemento({ tipo: 'texto', rol: 'cuerpo', contenido: { es: 'Un texto bastante largo que no cabe entero' } })).toBe('Texto · Un texto bastante largo que…');
     expect(nombreElemento({ tipo: 'personaje' })).toBe('Personaje');
+  });
+
+  it('HU-0603 · CP-058: lo arrastrado se guarda en % del ancho del reproductor', () => {
+    expect(pxAPorcentaje(100, 800)).toBe(12.5);
+    expect(pxAPorcentaje(-37, 1000)).toBe(-3.7);
+    expect(pxAPorcentaje(10, 0)).toBe(0);
+  });
+
+  it('HU-0603 · las flechas suman 0,5 % y el desplazamiento no pasa de ±100 %', () => {
+    expect(PASO_FLECHA).toBe(0.5);
+    expect(desplazado(undefined, PASO_FLECHA, 0)).toEqual({ x: 0.5, y: 0 });
+    expect(desplazado({ x: 12.5, y: -3 }, 0, -PASO_FLECHA)).toEqual({ x: 12.5, y: -3.5 });
+    expect(desplazado({ x: 99.8, y: -99.9 }, 1, -1)).toEqual({ x: 100, y: -100 });
+  });
+
+  it('HU-0603 · en (0, 0) se quita el desplazamiento; si no, vale para todos los dispositivos', () => {
+    expect(cambioDesplazamiento({ x: 2, y: 0 })).toEqual({ desplazamiento: { x: 2, y: 0, dispositivo: 'todos' } });
+    expect(ajusteCon({ color: 'acento', desplazamiento: { x: 1, y: 1 } }, cambioDesplazamiento({ x: 0, y: 0 }))).toEqual({ color: 'acento' });
   });
 });
