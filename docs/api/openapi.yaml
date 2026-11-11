@@ -4905,7 +4905,12 @@ components:
         titulo:
           $ref: '#/components/schemas/TextoI18n'
         narracion:
-          $ref: '#/components/schemas/TextoI18n'
+          allOf:
+          - $ref: '#/components/schemas/TextoI18n'
+          description: HU-0608 (RN-06-8, CP-067) · Al cambiar la narración en español, cada elemento con `anclaPalabra`
+            pasa al índice de la misma palabra en el texto nuevo; si la palabra ya no está, pierde el ancla, conserva su
+            `retardoS` y se crea la observación «Revisar tiempo» (origen `tiempo`, severidad `aviso`). Al regenerar la
+            voz, el worker da a cada ancla el segundo de su palabra. Cambiar la entrada o el ancla del elemento quita la observación.
         textos:
           type: object
           additionalProperties:
@@ -5112,6 +5117,8 @@ components:
           - regla
           - ia
           - usuario
+          - tiempo
+          description: '`tiempo`: «Revisar tiempo» de la línea de tiempo (HU-0608)'
         resuelta:
           type: boolean
         creadoEn:

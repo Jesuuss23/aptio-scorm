@@ -6,8 +6,9 @@
 // HU-0606 · Agregar elementos (CP-061), capas para ocultar y mostrar, y eliminar extras.
 // HU-0607 · Todo se guarda solo y sigue al recargar (CP-062); 20 Ctrl+Z vuelven al inicio en un solo guardado (CP-063).
 // HU-0608 · Línea de tiempo: arrastrar la entrada a una palabra (CP-064), la salida a los 4 s (CP-065) y la aguja (CP-066).
+// PR 2 · «✦ Sincronizar con la voz» como propuesta que se aplica y se deshace (CP-068).
 import { expect, type Page, test } from '@playwright/test';
-import { RETOQUES_P05, simularApi } from './api-simulada';
+import { OBSERVACIONES, RETOQUES_P05, simularApi } from './api-simulada';
 
 const PROYECTO = '00000000-0000-4000-8000-000000000701';
 const URL_EDITOR = `/proyectos/${PROYECTO}/editor?pantalla=p01`;
@@ -587,6 +588,74 @@ test.describe('HU-0608 · línea de tiempo', () => {
     await page.getByLabel('Ir a la pantalla').selectOption(id);
     return page.locator('.vista-previa-reproductor');
   };
+
+  test('CP-068 · «Sincronizar con la voz» propone los tiempos de los 4 elementos; al aplicarla se guarda y Ctrl+Z la deshace', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p05`);
+    await page.waitForLoadState('networkidle');
+    const sincronizar = linea(page).getByRole('button', { name: '✦ Sincronizar con la voz' });
+    const franja = linea(page).getByRole('region', { name: 'Propuesta: sincronizar con la voz' });
+    await linea(page).scrollIntoViewIfNeeded();
+    await expect(linea(page).locator('.lt-elemento')).toHaveCount(4);
+
+    // Descartar no guarda nada.
+    await sincronizar.click();
+    await expect(franja).toContainText('2 de 4 encontrados en la narración');
+    await franja.getByRole('button', { name: 'Descartar' }).click();
+    await expect(franja).toBeHidden();
+
+    // La propuesta se ve en las barras antes de aplicarla: el texto con «cualquier» y el dato con «puede».
+    await sincronizar.click();
+    await expect(barra(page, 'p05-texto')).toHaveAttribute('aria-valuenow', '0.2');
+    await expect(barra(page, 'p05-dato')).toHaveAttribute('aria-valuenow', '1.63');
+    await expect(barra(page, 'p05-dato')).toHaveClass(/propuesta/);
+    await expect(barra(page, 'p05-imagen')).toHaveAttribute('aria-valuenow', '0.9');
+    await expect(sincronizar).toBeDisabled();
+    expect(ediciones).toHaveLength(0);
+
+    await franja.getByRole('button', { name: 'Aplicar' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Tiempos sincronizados con la voz' })).toBeVisible();
+    await expect(franja).toBeHidden();
+    const sincronizados = { 'p05-titulo': { retardoS: 0 }, 'p05-texto': { retardoS: 0.2, anclaPalabra: 1 }, 'p05-dato': { retardoS: 1.63, anclaPalabra: 4 } };
+    expect(ediciones).toEqual([{ version: expect.any(Number), ajustes: sincronizados }]);
+    await expect(barra(page, 'p05-dato')).not.toHaveClass(/propuesta/);
+    await expect(page.locator('.editor-guardado')).toHaveText('✓ Guardado');
+
+    // Un solo Ctrl+Z deshace la sincronización entera, en un solo guardado.
+    await page.keyboard.press('Control+z');
+    await expect(barra(page, 'p05-dato')).toHaveAttribute('aria-valuenow', '0.6');
+    await expect.poll(() => ediciones.length).toBe(2);
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), ajustes: { 'p05-titulo': null, 'p05-texto': null, 'p05-dato': null }, motivo: 'deshacer' });
+
+    // Rehacer y recargar: la sincronización quedó guardada.
+    await expect(page.locator('.editor-guardado')).toHaveText('✓ Guardado');
+    await page.keyboard.press('Control+Shift+z');
+    await expect.poll(() => ediciones.length).toBe(3);
+    await expect(page.locator('.editor-guardado')).toHaveText('✓ Guardado');
+    await page.reload();
+    await linea(page).scrollIntoViewIfNeeded();
+    await expect(barra(page, 'p05-dato')).toHaveAttribute('aria-valuenow', '1.63');
+    await expect(barra(page, 'p05-texto')).toHaveAttribute('aria-valuenow', '0.2');
+    await barra(page, 'p05-dato').click();
+    await expect(page.getByLabel('Que aparezca cuando Ana dice…')).toHaveValue('4');
+  });
+
+  test('CP-067 · el elemento que perdió su palabra al cambiar la narración muestra «⚠ revisar tiempo» en el editor y en Revisión', async ({ page }) => {
+    const mensaje = 'Revisar tiempo: la palabra de anclaje fue eliminada (p08-dato).';
+    const revisar = { ...OBSERVACIONES[0]!, id: '00000000-0000-4000-8000-000000000960', pantallaId: 'p08', mensaje, origen: 'tiempo' };
+    await page.route('**/api/v1/cursos/*/observaciones*', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([...OBSERVACIONES, revisar]) }));
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p08`);
+    await linea(page).scrollIntoViewIfNeeded();
+    await expect(barra(page, 'p08-dato')).toHaveClass(/revisar/);
+    await expect(linea(page).locator('.lt-cab').filter({ hasText: '⚠ revisar tiempo' })).toHaveCount(1);
+    await expect(barra(page, 'p08-titulo')).not.toHaveClass(/revisar/);
+
+    await page.goto(`/proyectos/${PROYECTO}/revision`);
+    await page.getByRole('complementary', { name: 'Pantallas' }).getByRole('listitem').filter({ hasText: /^08/ }).getByRole('button').click();
+    const calidad = page.getByRole('region', { name: 'Control de calidad' });
+    await expect(calidad.getByText(mensaje)).toBeVisible();
+    await expect(calidad.getByText('⚠ revisar tiempo')).toBeVisible();
+  });
 
   test('CP-064 · arrastro la barra del dato hasta «residual»: se imanta, guarda retardoS y anclaPalabra, y la vista previa lo respeta', async ({ page }) => {
     const ediciones = contarEdiciones(page);

@@ -9,6 +9,7 @@ import { type CursoReproductor, montar } from '@aptio/player';
 import { cursoConPropuesta } from '@aptio/schema/propuesta';
 import { type CursoDoc, origenDe, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ORIGEN_REVISAR_TIEMPO } from '@aptio/schema/tiempos';
 import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Propuesta, type Proyecto, type Rol, type TextoI18n } from '../api';
 import { navegar } from '../ruta';
 import './fuentes-kit';
@@ -355,6 +356,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
                 {obsActual.map((o) => (
                   <li key={o.id}>
                     <span className={`chip ${CLASE_SEVERIDAD[o.severidad]}`}>{NOMBRE_SEVERIDAD[o.severidad]}</span>
+                    {o.origen === ORIGEN_REVISAR_TIEMPO ? <span className="chip lt-revisar">⚠ revisar tiempo</span> : null}
                     <span>{o.mensaje}</span>
                   </li>
                 ))}

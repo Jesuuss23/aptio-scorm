@@ -372,8 +372,9 @@ W(f"{SAL}/10-IA-12-calidad.json", {"observaciones": [
   {"id": "obs-4", "pantallaId": "p09", "tipo": "exactitud", "gravedad": "baja", "mensaje": "El ejemplo de la faja es contenido creado por la IA, no está en el manual.", "sugerencia": "Confirmar con el cliente o marcarlo como caso ilustrativo."},
   {"id": "obs-5", "pantallaId": "p04", "tipo": "accesibilidad", "gravedad": "baja", "mensaje": "El símbolo «≠» puede leerse mal con lector de pantalla.", "sugerencia": "Texto alternativo: «Apagado no es igual a energía cero»."}],
   "resumen": "Cápsula coherente con el manual; 1 observación alta (video faltante) y 4 menores. Los tres objetivos tienen actividad y preguntas en el reto final."})
-W(f"{SAL}/X-IA-16-sincronizar-p05.json", {"tipo": "sincronizar-voz", "titulo": "Sincronizar con la voz", "resumen": "El dato clave aparece cuando Ana dice «energía» y la imagen con «calentar».",
-  "patch": [{"op": "add", "path": "/ajustes", "value": {"p05-titulo": {"retardoS": 0}, "p05-texto": {"retardoS": 0.3}, "p05-imagen": {"retardoS": 1.95, "anclaPalabra": 8}, "p05-dato": {"retardoS": 0.85, "anclaPalabra": 2}}}]})
+# HU-0608 (SUP-48): es la salida de la heurística `sincronizarConVoz` de @aptio/schema/tiempos; una prueba las compara.
+W(f"{SAL}/X-IA-16-sincronizar-p05.json", {"tipo": "sincronizar-voz", "titulo": "Sincronizar con la voz", "resumen": "El texto aparece cuando Ana dice «cualquier» y el dato clave con «puede»; la imagen no se nombra y conserva su tiempo.",
+  "patch": [{"op": "add", "path": "/ajustes", "value": {"p05-titulo": {"retardoS": 0}, "p05-texto": {"retardoS": 0.2, "anclaPalabra": 1}, "p05-dato": {"retardoS": 1.63, "anclaPalabra": 4}}}]})
 W(f"{SAL}/X-IA-17-alineacion.json", {"resumen": "El objetivo 3 (aplicar) solo tiene preguntas de recordar en el quiz formativo p22; se propone una situación.",
   "cambios": [{"tipo": "ajustar-pregunta", "objetivoId": "obj-3", "nivelBloom": "aplicar", "motivo": "Convertir p22-q3 en una situación de trabajo.", "pantallaId": "p22"}],
   "patch": [{"op": "replace", "path": "/modulos/0/capsulas/0/pantallas/21/bloques/1/interaccion/datos/preguntas/2/enunciado", "value": {"es": "Cortaste la energía del motor con el interruptor. ¿Qué haces ahora?"}}]})
