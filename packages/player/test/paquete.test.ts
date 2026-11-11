@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { gzipSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error script en JavaScript sin tipos
 import { construir } from '../scripts/construir.mjs';
 
 describe('paquete del reproductor (CP-085)', () => {

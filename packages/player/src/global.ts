@@ -1,10 +1,12 @@
 // Entrada del paquete: deja el reproductor en `window.AptioReproductor` para el index.html del SCORM o del HTML.
+// HU-1202 · `iniciarPaquete` monta el curso y lo conecta con el LMS (SCORM 1.2) si encuentra su API.
+import { iniciarPaquete } from './paquete.ts';
 import { montar } from './reproductor.ts';
 
 declare global {
   interface Window {
-    AptioReproductor: { montar: typeof montar; version: string };
+    AptioReproductor: { montar: typeof montar; iniciarPaquete: typeof iniciarPaquete; version: string };
   }
 }
 
-window.AptioReproductor = { montar, version: '0.1.0' };
+window.AptioReproductor = { montar, iniciarPaquete, version: '0.1.0' };
