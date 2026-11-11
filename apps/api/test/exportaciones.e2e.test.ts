@@ -1,6 +1,7 @@
 // HU-1202 · Exportar SCORM 1.2 (M12) contra PostgreSQL, Redis y S3 de LocalStack reales: 202 con el trabajo en la cola
 // `export`, 422 si el curso no cumple el esquema o el formato no está disponible, 403 al revisor del cliente, historial
 // y descarga firmada solo cuando terminó. Se salta sin DATABASE_URL o sin S3, salvo en CI.
+// HU-1201 · CP-090 · Validar antes de exportar: un paquete de 300 MB advierte con alternativas y se exporta igual (202).
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -136,6 +137,50 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     const descarga = await fetch(lista2.body.descargaUrl);
     expect(descarga.status).toBe(200);
     expect(new Uint8Array(await descarga.arrayBuffer())).toEqual(zip);
+  });
+
+  it('CP-090 · con recursos de 300 MB, validar responde 200 con la advertencia y sus alternativas, y exportar sigue en 202', async () => {
+    const videoId = randomUUID();
+    const doc = JSON.parse(JSON.stringify(loto()).replaceAll('"vid-procedimiento"', `"${videoId}"`));
+    const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
+    const pesado = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId, nombre: 'Pesado', creadoPorId: di.id } });
+    const curso = await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: pesado.id, versionEsquema: '0.2.0', documento: doc, version: 2 } });
+    await prisma.recurso.create({ data: { id: videoId, organizacionId: orgId, clienteId, proyectoId: pesado.id, tipo: 'VIDEO', origen: 'CLIENTE', claveS3: `org/${orgId}/${clienteId}/${videoId}`, mime: 'video/mp4', bytes: BigInt(300 * 1024 * 1024), hash: 'x', nombre: 'procedimiento.mp4' } });
+
+    const v = await como('instruccional').post(`/cursos/${curso.id}/validar`, { formato: 'SCORM12', perfilLms: 'moodle' });
+    expect(v.status).toBe(200);
+    expect(v.body).toMatchObject({ errores: [], limiteMb: 100, origenLimite: 'referencia', superaLimite: true, pantallasTotal: 30, pantallasSinAprobar: 30 });
+    expect(v.body.pesoEstimadoMb).toBeGreaterThanOrEqual(300);
+    expect(v.body.alternativas).toHaveLength(5);
+    expect(v.body.alternativas[0]).toContain('amplíe el límite de subida');
+    expect(v.body.advertencias[0]).toMatch(/^El paquete pesaría unos 300(\.\d)? MB y el límite de subida del destino es 100 MB/);
+    expect(v.body.recursosPesados).toEqual([{ id: videoId, nombre: 'procedimiento.mp4', bytes: 300 * 1024 * 1024 }]);
+    expect(v.body.suspendDataCaracteres).toBeLessThanOrEqual(4096);
+    // Los recursos de ejemplo del caso (ids que no son filas de Recurso) se informan como faltantes, sin error.
+    expect(v.body.recursosFaltantes.length).toBeGreaterThan(0);
+
+    // RN-12-2: nunca se bloquea por tamaño.
+    expect((await como('productor').post(`/cursos/${curso.id}/exportaciones`, { formato: 'SCORM12' })).status).toBe(202);
+
+    // Con la ficha de compatibilidad del cliente, manda su límite.
+    await prisma.fichaCompatibilidad.create({ data: { clienteId, lmsNombre: 'Moodle 4.5', limiteSubidaMb: 512 } });
+    const conFicha = await como('grafico').post(`/cursos/${curso.id}/validar`, { formato: 'SCORM12' });
+    expect(conFicha.body).toMatchObject({ limiteMb: 512, origenLimite: 'ficha', superaLimite: false, alternativas: [] });
+    await prisma.fichaCompatibilidad.deleteMany({ where: { clienteId } });
+  });
+
+  it('validar: errores de esquema en 200, formato no disponible 422 y el revisor del cliente 403', async () => {
+    const roto = loto();
+    delete roto.seguimiento;
+    const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
+    const p = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId, nombre: 'Roto validar', creadoPorId: di.id } });
+    const malo = await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: p.id, versionEsquema: '0.2.0', documento: roto } });
+    const r = await como('instruccional').post(`/cursos/${malo.id}/validar`, { formato: 'SCORM12' });
+    expect(r.status).toBe(200);
+    expect(r.body.errores.length).toBeGreaterThan(0);
+    expect((await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'HTML' })).body.codigo).toBe('FORMATO_NO_DISPONIBLE');
+    expect((await como('revisor').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM12' })).status).toBe(403);
+    expect((await como('instruccional').post(`/cursos/${randomUUID()}/validar`, { formato: 'SCORM12' })).status).toBe(404);
   });
 
   it('una exportación de otra organización no se ve (404)', async () => {

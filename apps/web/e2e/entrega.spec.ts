@@ -1,6 +1,8 @@
 // HU-1202 · Entrega (PNT-13), CP-091 desde la web: elegir el LMS destino (solo cambia las recomendaciones), exportar,
 // ver el avance hasta «Listo» y descargar el ZIP del caso LOTO; el historial muestra versión, peso y estado.
 // La API se simula; el ZIP es el paquete real que arma @aptio/exporters.
+// HU-1201 · CP-090 · Verificación automática: un paquete de 300 MB advierte con alternativas y se exporta igual; un error
+// de esquema deshabilita Exportar; con pantallas sin aprobar se confirma antes (RN-12-3); cambiar el LMS vuelve a validar.
 import { codigoReproductor, construirScorm12 } from '@aptio/exporters';
 import { expect, type Page, test } from '@playwright/test';
 import JSZip from 'jszip';
@@ -13,15 +15,39 @@ const CURSO = '00000000-0000-4000-8000-000000000990';
 const URL_ENTREGA = `/proyectos/${PROYECTO}/entrega`;
 const DESCARGA = 'https://s3-descarga.prueba/paquete.zip?X-Amz-Expires=900';
 
+type Validacion = Record<string, unknown> & { errores: string[]; advertencias: string[] };
+const VALIDACION: Validacion = {
+  errores: [], advertencias: ['18 de 30 pantallas sin aprobar: revísalas antes de entregar al cliente.'], pesoEstimadoMb: 14.8, pesoEstimadoBytes: 15_518_924,
+  limiteMb: 100, origenLimite: 'referencia', superaLimite: false, alternativas: [], recursosPesados: [], suspendDataCaracteres: 162,
+  pantallasTotal: 30, pantallasSinAprobar: 18, recursosFaltantes: [],
+};
+const ALTERNATIVAS = [
+  'Exportar igual, con la recomendación de que el administrador del LMS amplíe el límite de subida.',
+  'Comprimir más el video y las imágenes.',
+  'Dividir el curso en varios paquetes (por módulo o cápsula).',
+  'Alojar el video fuera del paquete (servidor del cliente, plataforma de video o almacenamiento propio).',
+  'Usar el paquete de distribución (dispatch), cuando exista.',
+];
+const PESADA: Validacion = {
+  ...VALIDACION, pesoEstimadoMb: 300.4, pesoEstimadoBytes: 315_000_000, superaLimite: true, alternativas: ALTERNATIVAS,
+  advertencias: ['El paquete pesaría unos 300.4 MB y el límite de subida del destino es 100 MB (valor de referencia, el LMS del cliente puede aceptar más). Puedes exportar igual; revisa las alternativas.', ...VALIDACION.advertencias],
+  recursosPesados: [{ id: 'r1', nombre: 'procedimiento.mp4', bytes: 300 * 1024 * 1024 }, { id: 'r2', nombre: 'p01-es.mp3', bytes: 420_000 }],
+};
+
 type Exp = { id: string; cursoId: string; formato: string; perfilLms: string; modoIdioma: string; versionCurso: number; estado: string; bytes: number | null; informe: unknown; motivo: string | null; nombreArchivo: string | null; descargaUrl: string | null; creadoEn: string };
 
 /** Exportaciones simuladas: cada una pasa a EN_CURSO y a COMPLETADO en las consultas siguientes, como el worker. */
-async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { falla?: boolean } = {}) {
+async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { falla?: boolean; validacion?: Validacion } = {}) {
   const lista: Exp[] = [{
     id: '00000000-0000-4000-8000-00000000e001', cursoId: CURSO, formato: 'SCORM12', perfilLms: 'generico', modoIdioma: 'unico', versionCurso: 1, estado: 'COMPLETADO',
     bytes: 2_400_000, informe: { errores: [], advertencias: [] }, motivo: null, nombreArchivo: 'bloqueo-y-etiquetado-scorm12-v1.zip', descargaUrl: null, creadoEn: '2026-11-10T09:00:00.000Z',
   }];
   const pedidos: Record<string, unknown>[] = [];
+  const validaciones: Record<string, unknown>[] = [];
+  await page.route(`**/api/v1/cursos/${CURSO}/validar`, (r) => {
+    validaciones.push(r.request().postDataJSON() as Record<string, unknown>);
+    return r.fulfill({ json: opciones.validacion ?? VALIDACION });
+  });
   const consultas = new Map<string, number>();
   const avanzar = (e: Exp) => {
     const n = (consultas.get(e.id) ?? 0) + 1;
@@ -50,7 +76,7 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
   await page.route('https://s3-descarga.prueba/**', (r) => r.fulfill({
     body: Buffer.from(zip), headers: { 'content-type': 'application/zip', 'content-disposition': 'attachment; filename="bloqueo-y-etiquetado-scorm12-v3.zip"' },
   }));
-  return { pedidos };
+  return { pedidos, validaciones };
 }
 
 let zip: Uint8Array;
@@ -60,7 +86,7 @@ test.beforeAll(async () => {
 
 test('CP-091 · exportar desde Entrega: el perfil cambia las recomendaciones, se ve el avance y se descarga el ZIP', async ({ page }) => {
   await simularApi(page, { conSesion: true, conProyectos: true });
-  const { pedidos } = await simularExportaciones(page, zip);
+  const { pedidos, validaciones } = await simularExportaciones(page, zip);
 
   // Desde el detalle del proyecto, «Exportar SCORM» lleva a Entrega.
   await page.goto(`/proyectos/${PROYECTO}`);
@@ -77,11 +103,21 @@ test('CP-091 · exportar desde Entrega: el perfil cambia las recomendaciones, se
   await lms.getByRole('button', { name: 'Genérico (cualquier LMS)' }).click();
   await expect(page.getByText(/prueba antes el paquete en SCORM Cloud/)).toBeVisible();
   await expect(page.getByText('18 de 30 pantallas sin aprobar', { exact: false })).toBeVisible();
+  // Cada cambio de LMS vuelve a validar (moodle, canvas, genérico).
+  await expect.poll(() => validaciones.map((v) => v.perfilLms)).toEqual(['moodle', 'canvas', 'generico']);
+  const verificacion = page.getByRole('region', { name: 'Verificación automática' });
+  await expect(verificacion.getByText('14.8 MB', { exact: true })).toBeVisible();
+  await expect(verificacion.getByText('12 / 30')).toBeVisible();
+  await expect(verificacion.getByText(/caben en suspend_data \(162 de 4,096 caracteres\)/)).toBeVisible();
 
   const historial = page.getByRole('region', { name: 'Historial de exportaciones' });
   await expect(historial.getByRole('row')).toHaveCount(2);
 
   await page.getByRole('button', { name: 'Exportar SCORM 1.2' }).click();
+  // RN-12-3: con pantallas sin aprobar se confirma antes de exportar.
+  const confirmar = page.getByRole('dialog', { name: '¿Exportar con pantallas sin aprobar?' });
+  await expect(confirmar).toContainText('18 de 30 pantallas no están aprobadas');
+  await confirmar.getByRole('button', { name: 'Exportar igual' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'versión 3 del curso' })).toBeVisible();
   expect(pedidos).toEqual([{ formato: 'SCORM12', perfilLms: 'generico' }]);
   const fila = historial.getByRole('row').nth(1);
@@ -106,6 +142,7 @@ test('si la exportación falla, el historial muestra el motivo y no ofrece Desca
   await simularExportaciones(page, zip, { falla: true });
   await page.goto(URL_ENTREGA);
   await page.getByRole('button', { name: 'Exportar SCORM 1.2' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Exportar igual' }).click();
   const fila = page.getByRole('region', { name: 'Historial de exportaciones' }).getByRole('row').nth(1);
   await expect(fila).toContainText('Error', { timeout: 10_000 });
   await expect(fila).toContainText('No se pudo leer el recurso «ana.svg»');
@@ -120,7 +157,58 @@ test('el revisor del cliente ve la entrega sin el botón Exportar', async ({ pag
   await expect(page.getByRole('button', { name: 'Exportar SCORM 1.2' })).toHaveCount(0);
   await expect(page.getByText('Solo administración, diseño instruccional y producción exportan.')).toBeVisible();
   await expect(page.getByText('El historial y la descarga son del equipo de producción.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Verificación automática' })).toHaveCount(0);
   await page.goto(`/proyectos/${PROYECTO}`);
   await expect(page.getByRole('link', { name: 'Revisión' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Exportar SCORM' })).toHaveCount(0);
+});
+
+test('CP-090 · con un paquete de 300 MB advierte con las alternativas y los recursos más pesados, y se exporta igual', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const { pedidos } = await simularExportaciones(page, zip, { validacion: PESADA });
+  await page.goto(URL_ENTREGA);
+  const verificacion = page.getByRole('region', { name: 'Verificación automática' });
+  await expect(verificacion.getByText('300.4 MB', { exact: true })).toBeVisible();
+  await expect(verificacion.getByText('de 100 MB de referencia')).toBeVisible();
+  await expect(verificacion.getByText(/El paquete pesaría unos 300\.4 MB y el límite de subida del destino es 100 MB/)).toBeVisible();
+  const alternativas = verificacion.getByRole('listitem').filter({ hasText: /amplíe el límite|Comprimir|Dividir|Alojar el video|dispatch/ });
+  await expect(alternativas).toHaveCount(5);
+  const pesados = verificacion.getByRole('table', { name: 'Recursos que más pesan' });
+  await expect(pesados.getByRole('row').nth(1)).toContainText('procedimiento.mp4');
+  await expect(pesados.getByRole('row').nth(1)).toContainText('300 MB');
+
+  // RN-12-2: nunca se bloquea por tamaño. Al cancelar la confirmación no se exporta; al confirmar, sí.
+  const exportar = page.getByRole('button', { name: 'Exportar SCORM 1.2' });
+  await expect(exportar).toBeEnabled();
+  await exportar.click();
+  const confirmar = page.getByRole('dialog', { name: '¿Exportar con pantallas sin aprobar?' });
+  await expect(confirmar.getByRole('button', { name: 'Cancelar' })).toBeFocused();
+  await confirmar.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(confirmar).toBeHidden();
+  expect(pedidos).toEqual([]);
+  await exportar.click();
+  await confirmar.getByRole('button', { name: 'Exportar igual' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'versión 3 del curso' })).toBeVisible();
+  expect(pedidos).toHaveLength(1);
+});
+
+test('con un error de esquema, Exportar queda deshabilitado y se listan los errores', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  await simularExportaciones(page, zip, { validacion: { ...VALIDACION, errores: ['/seguimiento: falta la propiedad obligatoria'] } });
+  await page.goto(URL_ENTREGA);
+  const verificacion = page.getByRole('region', { name: 'Verificación automática' });
+  await expect(verificacion.getByText('El curso no cumple el esquema: corrígelo antes de exportar.')).toBeVisible();
+  await expect(verificacion.getByText('/seguimiento: falta la propiedad obligatoria')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Exportar SCORM 1.2' })).toBeDisabled();
+});
+
+test('con todas las pantallas aprobadas se exporta sin confirmar', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const { pedidos } = await simularExportaciones(page, zip, { validacion: { ...VALIDACION, advertencias: [], pantallasSinAprobar: 0 } });
+  await page.goto(URL_ENTREGA);
+  await expect(page.getByText('Todas las pantallas están aprobadas')).toBeVisible();
+  await page.getByRole('button', { name: 'Exportar SCORM 1.2' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'versión 3 del curso' })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(pedidos).toHaveLength(1);
 });

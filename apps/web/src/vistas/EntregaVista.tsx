@@ -1,12 +1,15 @@
 // HU-1202 · Entrega (PNT-13): exportar el SCORM 1.2, seguir su avance y descargarlo, con el historial de exportaciones.
 // El perfil del LMS destino solo agrega recomendaciones: el paquete cumple el estándar y es el mismo para todos (RN-12-1).
 // Cada exportación queda ligada a la versión del curso (RN-12-4). El avance llega por SSE con consulta cada 2 s de respaldo.
+// HU-1201 · «Verificación automática»: peso estimado contra el límite del destino (advierte con alternativas y nunca
+// bloquea, RN-12-2, CP-090), suspend_data, archivos y pantallas sin aprobar. Los errores de esquema deshabilitan Exportar;
+// con pantallas sin aprobar se pide confirmación (RN-12-3). Se vuelve a validar al cambiar el LMS destino.
 import { Cabecera } from '@aptio/ui';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type PerfilExportacion, type Proyecto, type Rol } from '../api';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
 import { navegar } from '../ruta';
-import { megas, PERFILES } from './entrega';
+import { LIMITE_SUSPEND, mb, megas, PERFILES } from './entrega';
 
 const CONSULTA_MS = 2000;
 const ACTIVAS = new Set<Exportacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -26,10 +29,15 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  /** La última validación y para qué LMS fue: si no coincide con el elegido, se está validando de nuevo. */
+  const [validada, setValidada] = useState<{ perfil: PerfilExportacion; v: Validacion } | null>(null);
+  const confirmar = useRef<HTMLDialogElement>(null);
   const puedeExportar = EXPORTAN.includes(rol);
   // El historial es del equipo: el revisor del cliente no lo ve (la API responde 403).
   const veHistorial = rol !== 'REVISOR_CLIENTE';
   const cursoId = curso?.id;
+  const validacion = validada?.v ?? null;
+  const validando = validada?.perfil !== perfil;
 
   useEffect(() => {
     api.proyecto(proyectoId).then((p) => {
@@ -42,6 +50,17 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
       });
     }, (e: unknown) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar el proyecto'));
   }, [proyectoId, alCargar]);
+
+  // HU-1201 · Validar el curso para el LMS elegido (la vista del revisor del cliente no valida: no exporta ni ve el historial).
+  useEffect(() => {
+    if (!cursoId || !veHistorial) return;
+    let vigente = true;
+    api.validar(cursoId, { formato: 'SCORM12', perfilLms: perfil }).then(
+      (v) => { if (vigente) setValidada({ perfil, v }); },
+      (e: unknown) => { if (vigente) setError(e instanceof ErrorApi ? e.message : 'No se pudo validar el curso'); },
+    );
+    return () => { vigente = false; };
+  }, [cursoId, perfil, veHistorial]);
 
   const recargar = useCallback(() => {
     if (!cursoId || !veHistorial) return;
@@ -77,7 +96,14 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
     };
   }, [activa, recargar]);
 
+  /** Con pantallas sin aprobar se confirma antes de exportar (RN-12-3); el peso nunca frena (RN-12-2). */
+  function pedirExportar() {
+    if (validacion?.pantallasSinAprobar && confirmar.current) confirmar.current.showModal();
+    else void exportar();
+  }
+
   async function exportar() {
+    confirmar.current?.close();
     if (!cursoId) return;
     setOcupado(true);
     setError('');
@@ -119,7 +145,14 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   if (!proyecto || !curso) return <p className="sec" role="status">Cargando entrega…</p>;
 
   const elegido = PERFILES.find((p) => p.id === perfil)!;
-  const { aprobadas, total } = proyecto.avance;
+  const v = validacion;
+  const total = v?.pantallasTotal ?? proyecto.avance.total;
+  const sinAprobar = v ? v.pantallasSinAprobar : Math.max(0, proyecto.avance.total - proyecto.avance.aprobadas);
+  const conErrores = Boolean(v?.errores.length);
+  const otrasAdvertencias = v?.advertencias.filter((a) => /^Falta/.test(a)) ?? [];
+  const irARevision = (
+    <a href={`/proyectos/${proyectoId}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/revision`); }}>Ir a revisión</a>
+  );
   return (
     <>
       <Cabecera titulo="Entrega" subtitulo={`${proyecto.nombre} · versión ${curso.version} del curso`} accion={volver} />
@@ -140,17 +173,59 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
             ))}
           </div>
           <p className="nota" aria-live="polite" data-perfil={elegido.id}>{elegido.recomendacion}</p>
-          {total && aprobadas < total ? (
-            <p className="nota aviso">
-              {total - aprobadas} de {total} pantallas sin aprobar. Puedes exportar igual; revísalas antes de entregar al cliente.{' '}
-              <a href={`/proyectos/${proyectoId}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/revision`); }}>Ir a revisión</a>
-            </p>
+          {veHistorial ? (
+            <section className="verificacion" aria-label="Verificación automática" aria-busy={validando}>
+              <h2>Verificación automática</h2>
+              {v ? (
+                <>
+                  <div className="cifras-entrega">
+                    <div className={v.superaLimite ? 'aviso' : ''}><span>Peso estimado</span><b className="num">{mb(v.pesoEstimadoMb)} MB</b><small>de {v.limiteMb} MB {v.origenLimite === 'ficha' ? 'según la ficha del cliente' : 'de referencia'}</small></div>
+                    <div className={sinAprobar ? 'aviso' : ''}><span>Pantallas aprobadas</span><b className="num">{total - sinAprobar} / {total}</b></div>
+                  </div>
+                  <ul className="comprobaciones">
+                    <Comprobacion ok={!conErrores} grave>
+                      {conErrores ? (
+                        <>El curso no cumple el esquema: corrígelo antes de exportar.<ul>{v.errores.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></>
+                      ) : 'Manifiesto SCORM 1.2 de un solo SCO · el curso cumple el esquema (perfil estricto)'}
+                    </Comprobacion>
+                    <Comprobacion ok={!v.superaLimite}>
+                      {v.superaLimite ? v.advertencias.find((a) => a.startsWith('El paquete pesaría')) : `El peso cabe en el límite de subida del destino (${v.limiteMb} MB)`}
+                    </Comprobacion>
+                    <Comprobacion ok={v.suspendDataCaracteres <= LIMITE_SUSPEND}>
+                      Avance, nota y reanudación caben en <span className="num">suspend_data</span> ({v.suspendDataCaracteres.toLocaleString('es-PE')} de {LIMITE_SUSPEND.toLocaleString('es-PE')} caracteres)
+                    </Comprobacion>
+                    <Comprobacion ok={!otrasAdvertencias.length}>{otrasAdvertencias[0] ?? 'Están todos los archivos del idioma exportado'}</Comprobacion>
+                    <Comprobacion ok={!sinAprobar}>
+                      {sinAprobar ? <>{sinAprobar} de {total} pantallas sin aprobar. Puedes exportar igual; revísalas antes de entregar al cliente. {irARevision}</> : 'Todas las pantallas están aprobadas'}
+                    </Comprobacion>
+                  </ul>
+                  {v.superaLimite ? (
+                    <div className="nota aviso alternativas-peso">
+                      <p><b>Alternativas para un paquete pesado</b></p>
+                      <ol>{v.alternativas.map((a) => <li key={a}>{a}</li>)}</ol>
+                      <table aria-label="Recursos que más pesan">
+                        <thead><tr><th scope="col">Recurso</th><th scope="col">Peso</th></tr></thead>
+                        <tbody>{v.recursosPesados.map((r) => <tr key={r.id}><td>{r.nombre}</td><td className="num">{megas(r.bytes)}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  ) : null}
+                </>
+              ) : <p className="sec" role="status">Validando el curso…</p>}
+            </section>
           ) : null}
           {puedeExportar ? (
             <div className="acciones-form">
-              <button className="boton primario" type="button" disabled={ocupado} onClick={() => void exportar()}>{ocupado ? 'Exportando…' : 'Exportar SCORM 1.2'}</button>
+              <button className="boton primario" type="button" disabled={ocupado || conErrores || !v} onClick={pedirExportar}>{ocupado ? 'Exportando…' : 'Exportar SCORM 1.2'}</button>
             </div>
           ) : <p className="sec">Solo administración, diseño instruccional y producción exportan.</p>}
+          <dialog ref={confirmar} className="confirmar-exportar" aria-labelledby="confirmar-exportar-titulo" aria-describedby="confirmar-exportar-detalle">
+            <h2 id="confirmar-exportar-titulo">¿Exportar con pantallas sin aprobar?</h2>
+            <p id="confirmar-exportar-detalle">{sinAprobar} de {total} pantallas no están aprobadas. El paquete saldrá con su contenido actual; revísalas antes de entregarlo al cliente.</p>
+            <div className="acciones-form">
+              <button className="boton" type="button" autoFocus onClick={() => confirmar.current?.close()}>Cancelar</button>
+              <button className="boton primario" type="button" onClick={() => void exportar()}>Exportar igual</button>
+            </div>
+          </dialog>
         </section>
 
         <section className="tarjeta kit-bloque" aria-label="Historial de exportaciones">
@@ -193,5 +268,16 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
         </section>
       </div>
     </>
+  );
+}
+
+/** Una línea de la verificación: ✓ si está bien; «!» si es advertencia o, con `grave`, error que impide exportar. */
+function Comprobacion({ ok, grave, children }: { ok: boolean; grave?: boolean; children: ReactNode }) {
+  return (
+    <li className={ok ? 'ok' : grave ? 'error' : 'aviso'}>
+      <span className="icono" aria-hidden="true">{ok ? '✓' : '!'}</span>
+      <span className="sr">{ok ? 'Correcto: ' : grave ? 'Error: ' : 'Advertencia: '}</span>
+      <span>{children}</span>
+    </li>
   );
 }
