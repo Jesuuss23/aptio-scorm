@@ -2660,7 +2660,12 @@ paths:
       - Entrega
       summary: Exportar
       operationId: post_cursos_cursoId_exportaciones
-      description: SCORM 1.2 por defecto, perfil Genérico
+      description: 'HU-1202 · Crea la exportación en EN_COLA ligada a la versión actual del curso (RN-12-4) y encola EXPORTAR
+        en la cola `export`; el worker arma el ZIP SCORM 1.2 de un solo SCO y la deja en COMPLETADO (o ERROR con `motivo`).
+        Por ahora solo `formato: SCORM12` y `modoIdioma: unico` (el primer idioma del curso, SUP-49). El perfil de LMS se
+        guarda y solo cambia las recomendaciones: el paquete es el mismo (RN-12-1). Se exporta aunque haya pantallas sin
+        aprobar (SUP-51). Exportan administración, diseño instruccional y producción. 422 con `codigo`: ESQUEMA_NO_VALIDO
+        (con `detalles`), FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE.'
       parameters:
       - name: cursoId
         in: path
@@ -2680,7 +2685,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Trabajo202'
+                $ref: '#/components/schemas/Exportacion'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -2694,6 +2699,8 @@ paths:
       - Entrega
       summary: Listar exportaciones
       operationId: get_cursos_cursoId_exportaciones
+      description: 'Historial del curso, de la más nueva a la más antigua (50 como máximo), sin `descargaUrl`. Lo ve el equipo;
+        el revisor del cliente no (403).'
       parameters:
       - name: cursoId
         in: path
@@ -2722,7 +2729,7 @@ paths:
       - Entrega
       summary: Ver exportación y descargar
       operationId: get_exportaciones_exportacionId
-      description: descargaUrl firmada por 15 min
+      description: 'Estado, informe y, solo en COMPLETADO, `descargaUrl` del ZIP firmada por 15 minutos'
       parameters:
       - name: exportacionId
         in: path
@@ -5498,29 +5505,76 @@ components:
       type: object
       required:
       - id
+      - cursoId
       - formato
+      - perfilLms
+      - modoIdioma
+      - versionCurso
       - estado
+      - creadoEn
       properties:
         id:
+          type: string
+          format: uuid
+        cursoId:
           type: string
           format: uuid
         formato:
           type: string
         perfilLms:
           type: string
+        modoIdioma:
+          type: string
+        versionCurso:
+          type: integer
+          description: Versión del curso exportada; volver a exportar no la cambia (RN-12-4)
         estado:
           $ref: '#/components/schemas/EstadoTrabajo'
         bytes:
           type: integer
+          nullable: true
         informe:
-          $ref: '#/components/schemas/Validacion'
+          $ref: '#/components/schemas/InformeExportacion'
+        motivo:
+          type: string
+          nullable: true
+          description: Por qué terminó en ERROR
+        nombreArchivo:
+          type: string
+          nullable: true
+          description: <proyecto>-scorm12-v<versión>.zip
         descargaUrl:
           type: string
           format: uri
           nullable: true
+          description: Solo en GET /exportaciones/{id} y en COMPLETADO; firmada por 15 minutos
         creadoEn:
           type: string
           format: date-time
+    InformeExportacion:
+      type: object
+      nullable: true
+      required:
+      - errores
+      - advertencias
+      properties:
+        errores:
+          type: array
+          items:
+            type: string
+        advertencias:
+          type: array
+          items:
+            type: string
+          description: Recursos que faltan; el paquete muestra su texto alternativo
+        recursosFaltantes:
+          type: array
+          items:
+            type: string
+        idioma:
+          type: string
+        archivos:
+          type: integer
     ConfigProveedor:
       type: object
       required:

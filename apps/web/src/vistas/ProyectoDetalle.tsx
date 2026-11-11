@@ -85,6 +85,7 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
               <>
                 <a className="boton primario" href={`/proyectos/${proyecto.id}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/revision`); }}>Revisión</a>
                 <a className="boton" href={`/proyectos/${proyecto.id}/vista-previa`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/vista-previa`); }}>Vista previa</a>
+                {rol !== 'REVISOR_CLIENTE' ? <a className="boton" href={`/proyectos/${proyecto.id}/entrega`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/entrega`); }}>Exportar SCORM</a> : null}
               </>
             ) : null}
             {puedeEditar && proyecto.estado !== 'ARCHIVADO' ? <button className="boton" type="button" onClick={() => void archivar()}>Archivar</button> : null}

@@ -336,6 +336,27 @@ async function pedir<T>(ruta: string, opciones: RequestInit = {}): Promise<T> {
 
 const json = (datos: unknown, method = 'POST'): RequestInit => ({ method, body: JSON.stringify(datos) });
 
+/** HU-1202 · Una exportación del curso (M12): queda ligada a la versión del curso que se exportó (RN-12-4). */
+export interface Exportacion {
+  id: string;
+  cursoId: string;
+  formato: string;
+  perfilLms: PerfilExportacion;
+  modoIdioma: string;
+  versionCurso: number;
+  estado: 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';
+  bytes: number | null;
+  informe: { errores: string[]; advertencias: string[]; recursosFaltantes?: string[]; idioma?: string; archivos?: number } | null;
+  motivo: string | null;
+  nombreArchivo: string | null;
+  /** Solo al pedir una exportación terminada: descarga firmada por 15 minutos. */
+  descargaUrl: string | null;
+  creadoEn: string;
+}
+export type PerfilExportacion = 'generico' | 'moodle' | 'blackboard' | 'chamilo' | 'canvas';
+/** Exportan administración, diseño instruccional y producción (HU-1202). */
+export const EXPORTAN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
   ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
@@ -363,6 +384,9 @@ export const api = {
   trabajo: (id: string) => pedir<TrabajoEstado>(`/trabajos/${id}`),
   aprobarSinObservaciones: (cursoId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/aprobar`, json({ soloSinObservaciones: true })),
   curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
+  exportar: (cursoId: string, datos: { formato: 'SCORM12'; perfilLms: PerfilExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
+  exportaciones: (cursoId: string) => pedir<Exportacion[]>(`/cursos/${cursoId}/exportaciones`),
+  exportacion: (id: string) => pedir<Exportacion>(`/exportaciones/${id}`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
   guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
   pantallasModelo: (clienteId: string) => pedir<PantallaModelo[]>(`/clientes/${clienteId}/kit/pantallas-modelo`),

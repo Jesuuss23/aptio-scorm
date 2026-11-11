@@ -6,6 +6,7 @@ import { BaseDatosModule } from './base-datos/base-datos.module.js';
 import { GuardaRoles } from './comun/guarda-roles.js';
 import { ClientesModule } from './clientes/clientes.module.js';
 import { CorreoModule } from './correo/correo.module.js';
+import { ExportacionesModule } from './exportaciones/exportaciones.module.js';
 import { GeneracionesModule } from './generaciones/generaciones.module.js';
 import { CursosModule } from './cursos/cursos.module.js';
 import { ProyectosModule } from './proyectos/proyectos.module.js';
@@ -28,6 +29,7 @@ import { VozModule } from './voz/voz.module.js';
     ProyectosModule,
     CursosModule,
     GeneracionesModule,
+    ExportacionesModule,
     RecursosModule,
     SaludModule,
     VozModule,

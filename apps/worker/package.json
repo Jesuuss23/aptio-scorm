@@ -17,6 +17,8 @@
     "@aptio/almacen": "workspace:*",
     "@aptio/colas": "workspace:*",
     "@aptio/db": "workspace:*",
+    "@aptio/exporters": "workspace:*",
+    "@aptio/player": "workspace:*",
     "@aptio/schema": "workspace:*",
     "@napi-rs/canvas": "^0.1.100",
     "@tesseract.js-data/eng": "^1.0.0",
