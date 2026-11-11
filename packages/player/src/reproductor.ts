@@ -13,11 +13,13 @@
 import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
+import { pieResultado } from './interacciones/comun.ts';
 import { aplanar, type Motivo, modoDe, motivoBloqueo } from './navegacion.ts';
 import { dibujarPantalla } from './pantalla.ts';
 import { type Cue, cueEn, leerVtt } from './subtitulos.ts';
 import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
 import { ESTILOS } from './estilos.ts';
+import { estadoReanudado, type Reanudacion } from './reanudacion.ts';
 import { activoEn, duracionDe, tiemposDe, ultimoCambio } from './tiempos.ts';
 import { t, textos } from './textos.ts';
 import type { AudioNarracion, BloqueInteraccion, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
@@ -50,6 +52,13 @@ export interface OpcionesReproductor {
   /** HU-0608 · true en el editor: se ve todo, sin reloj ni entrada escalonada, hasta que se mueve la aguja. */
   sinTiempos?: boolean;
   alCambiar?: (estado: EstadoReproductor) => void;
+  /**
+   * HU-1105 · Avance guardado con el que se vuelve al curso (no se usa en modo revisión). Con `preguntar`, antes de
+   * mostrar la pantalla aparece «¿Continuar donde lo dejaste?» con Continuar (foco inicial) y Empezar de nuevo.
+   */
+  reanudar?: Reanudacion & { preguntar?: boolean };
+  /** HU-1105 · Lo que eligió el participante (true: Continuar). Se avisa antes de mostrar la pantalla elegida. */
+  alReanudar?: (continuar: boolean) => void;
 }
 
 export interface EstadoReproductor extends EstadoSeguimiento {
@@ -105,6 +114,8 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   let maxima = 0;
   let vivo = true;
   let temarioAbierto = false;
+  /** HU-1105 · true mientras se pregunta si se reanuda: no se puede navegar. */
+  let pendiente = false;
   let conSubtitulos = preferenciaSubtitulos();
   const vistas = new Set<string>();
   const resultados = new Map<string, ResultadoActividad>();
@@ -246,7 +257,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   if (atajos) {
     raiz.addEventListener('keydown', (e) => {
       const destino = e.target as HTMLElement;
-      if (destino.closest('.ap-actividad, .ap-temario') || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (pendiente || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar') || e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === 'ArrowRight') irA(actual + 1, true);
       else if (e.key === 'ArrowLeft') irA(actual - 1, true);
     });
@@ -257,19 +268,25 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   // ---------- Actividades ----------
   const crearActividad = (b: BloqueInteraccion, p: Pantalla): HTMLElement => {
     const anuncio = h('p', { class: 'ap-oculto', 'aria-live': 'polite' });
+    const previa = resultados.get(p.id);
     const ctx: ContextoActividad = {
       id: p.id, idioma, tx, modo: b.interaccion.modo,
       intentosMaximos: curso.seguimiento.intentosMaximos ?? null,
+      intentosPrevios: previa?.intentos ?? 0,
       urlRecurso,
       anunciar: (texto) => { anuncio.textContent = texto; },
       activo: () => vivo,
       terminar: (r) => {
         const previo = resultados.get(p.id);
         const puntaje = mejor && previo?.puntaje != null && r.puntaje !== null ? Math.max(previo.puntaje, r.puntaje) : r.puntaje;
-        resultados.set(p.id, { completada: r.completada || Boolean(previo?.completada), puntaje });
+        resultados.set(p.id, { completada: r.completada || Boolean(previo?.completada), puntaje, intentos: (previo?.intentos ?? 0) + 1 });
         refrescar();
       },
     };
+    // HU-1105 · Una sumativa que ya usó todos sus intentos (en esta sesión o en una anterior) muestra su resultado.
+    if (ctx.modo === 'sumativa' && ctx.intentosMaximos !== null && (ctx.intentosPrevios ?? 0) >= ctx.intentosMaximos) {
+      return h('div', { class: 'ap-juego' }, pieResultado(ctx, previa?.puntaje ?? null, false, () => undefined), anuncio);
+    }
     const crear = ACTIVIDADES[b.interaccion.tipo];
     return h('div', { class: 'ap-juego' }, crear ? crear(b.interaccion.datos, ctx) : null, anuncio);
   };
@@ -464,8 +481,72 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   };
   const indiceDe = (d: string | number) => (typeof d === 'number' ? d : pantallas.findIndex((x) => x.pantalla.id === d));
 
-  // En modo revisión se puede empezar en cualquier pantalla; como participante, siempre desde la primera.
-  reiniciar(revision && opciones.inicio ? Math.max(0, indiceDe(opciones.inicio)) : 0);
+  // ---------- Reanudación (HU-1105) ----------
+  const mostrarActual = () => {
+    if (pantallas[actual]) vaciar(escena, pantallaDe(actual));
+    cargarNarracion();
+    empezarReloj();
+    refrescar();
+  };
+  const restaurar = (r: Reanudacion) => {
+    const x = estadoReanudado(pantallas, r);
+    actual = x.actual;
+    maxima = x.maxima;
+    vistas.clear();
+    resultados.clear();
+    dibujadas.clear();
+    escuchadas.clear();
+    for (const id of x.vistas) vistas.add(id);
+    for (const [id, v] of x.resultados) resultados.set(id, v);
+    // Las narraciones de lo ya visto no vuelven a frenar el avance; la de la pantalla actual, sí.
+    for (const id of x.vistas) if (id !== pantallas[actual]?.pantalla.id) escuchadas.add(id);
+  };
+  /** Aviso accesible dentro del Shadow DOM: el resto del curso queda inerte hasta que se elige. */
+  const preguntar = () => {
+    pendiente = true;
+    const fondo = [...raiz.children] as HTMLElement[];
+    // `inert` saca el fondo del foco y de los clics; aria-hidden, del árbol de accesibilidad en lectores que no conocen inert.
+    for (const el of fondo) { el.inert = true; el.setAttribute('aria-hidden', 'true'); }
+    const elegir = (continuar: boolean) => {
+      if (!pendiente) return;
+      pendiente = false;
+      dialogo.remove();
+      for (const el of fondo) { el.inert = false; el.removeAttribute('aria-hidden'); }
+      opciones.alReanudar?.(continuar);
+      if (continuar) mostrarActual();
+      else reiniciar(0);
+      escena.querySelector<HTMLElement>('.ap-titulo-pantalla')?.focus();
+    };
+    const continuar = h('button', { type: 'button', class: 'ap-nav ap-primario', onclick: () => elegir(true) }, tx.continuar);
+    const empezar = h('button', { type: 'button', class: 'ap-nav', onclick: () => elegir(false) }, tx.empezarDeNuevo);
+    const nombre = t(pantallas[actual]?.pantalla.titulo, idioma);
+    const dialogo = h('div', {
+      class: 'ap-reanudar', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'ap-reanudar-titulo', 'aria-describedby': 'ap-reanudar-detalle',
+      onkeydown: (ev: Event) => {
+        const e = ev as KeyboardEvent;
+        if (e.key === 'Escape') { e.preventDefault(); elegir(true); }
+        else if (e.key === 'Tab') {
+          // El foco no sale del aviso: va y vuelve entre sus dos botones.
+          e.preventDefault();
+          (sombra.activeElement === continuar ? empezar : continuar).focus();
+        }
+      },
+    }, h('div', { class: 'ap-reanudar-caja' },
+      h('h2', { class: 'ap-reanudar-titulo', id: 'ap-reanudar-titulo' }, tx.reanudarPregunta),
+      h('p', { id: 'ap-reanudar-detalle' }, tx.pantalla(actual + 1, pantallas.length), nombre ? h('span', { class: 'ap-reanudar-nombre' }, nombre) : null),
+      h('div', { class: 'ap-reanudar-botones' }, continuar, empezar)));
+    raiz.append(dialogo);
+    refrescar();
+    continuar.focus();
+  };
+
+  // En modo revisión se puede empezar en cualquier pantalla; como participante, desde la primera o donde lo dejó.
+  const reanudar = revision ? undefined : opciones.reanudar;
+  if (reanudar) {
+    restaurar(reanudar);
+    if (reanudar.preguntar) preguntar();
+    else mostrarActual();
+  } else reiniciar(revision && opciones.inicio ? Math.max(0, indiceDe(opciones.inicio)) : 0);
 
   return {
     ir: (d) => irA(indiceDe(d), false),
