@@ -12,6 +12,8 @@ export interface AccionesRetoque {
   alAnimar: (a: Animacion) => void;
   alRestablecer: () => void;
   alVerAnimacion: () => void;
+  /** HU-0603 · Quita solo el desplazamiento del modo Libre. */
+  alVolverASuLugar: () => void;
 }
 interface Elegido {
   nombre: string;
@@ -59,7 +61,9 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
 }
 
 /** Panel lateral de Propiedades: los mismos retoques, con un deslizador de tamaño. */
-export function PanelPropiedades({ elegido, paleta, ocupado, acciones }: { elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; acciones: AccionesRetoque }) {
+export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones }: {
+  elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; modo: 'auto' | 'libre'; acciones: AccionesRetoque;
+}) {
   if (!elegido) {
     return (
       <aside className="tarjeta kit-bloque editor-propiedades" aria-label="Propiedades">
@@ -100,6 +104,18 @@ export function PanelPropiedades({ elegido, paleta, ocupado, acciones }: { elegi
           <span className="ayuda">«Auto» entra como la disposición; el orden y los tiempos llegan con la línea de tiempo.</span>
         </div>
       ) : null}
+      {c.tamano ? (
+        <div className="campo">
+          <span>Posición</span>
+          <span className="num" aria-label="Desplazamiento">
+            {formatoPct(elegido.ajuste?.desplazamiento?.x ?? 0)} / {formatoPct(elegido.ajuste?.desplazamiento?.y ?? 0)} % del ancho
+          </span>
+          <span className="ayuda">{modo === 'libre' ? 'Arrastra en el lienzo o usa las flechas.' : 'Cambia a Libre para mover.'}</span>
+          {elegido.ajuste?.desplazamiento ? (
+            <button type="button" className="boton" disabled={ocupado} onClick={acciones.alVolverASuLugar}>Volver a su lugar</button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="acciones-form">
         <button type="button" className="boton" onClick={acciones.alVerAnimacion}>▶ Ver animación</button>
         {elegido.ajuste ? <button type="button" className="boton" disabled={ocupado} onClick={acciones.alRestablecer}>Restablecer</button> : null}
@@ -107,6 +123,8 @@ export function PanelPropiedades({ elegido, paleta, ocupado, acciones }: { elegi
     </aside>
   );
 }
+
+const formatoPct = (v: number) => (Math.round(v * 100) / 100).toLocaleString('es-PE', { maximumFractionDigits: 2 }).replace('.', ',');
 
 /** El deslizador mueve el valor al instante y guarda al soltarlo (o al terminar con las flechas). */
 function Deslizador({ tipo, inicial, ocupado, alCambiar }: { tipo: 'texto' | 'escala'; inicial: number; ocupado: boolean; alCambiar: (v: number) => void }) {

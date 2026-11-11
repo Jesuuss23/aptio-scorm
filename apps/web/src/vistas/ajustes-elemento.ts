@@ -61,3 +61,25 @@ export function nombreElemento(b: { tipo: string; rol?: string; contenido?: { es
   const texto = (b.contenido?.es ?? b.contenido?.en ?? '').trim();
   return texto ? `${nombre} · ${texto.length > 28 ? `${texto.slice(0, 27)}…` : texto}` : nombre;
 }
+
+/** HU-0603 · Modo Libre: las flechas mueven de a 0,5 % del ancho; un arrastre cuenta desde 4 px; tope ±100 %. */
+export const PASO_FLECHA = 0.5;
+export const UMBRAL_ARRASTRE_PX = 4;
+export const DESPLAZAMIENTO_MAX = 100;
+export const FLECHAS: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+
+/** Píxeles arrastrados a % del ancho del reproductor (RN-06-2), a centésimas. */
+export function pxAPorcentaje(px: number, anchoPx: number): number {
+  return anchoPx > 0 ? Math.round((px / anchoPx) * 10000) / 100 : 0;
+}
+
+/** El desplazamiento movido por (dx, dy) en %, dentro de ±100 % y a centésimas. */
+export function desplazado(actual: { x: number; y: number } | undefined, dx: number, dy: number): { x: number; y: number } {
+  const lim = (v: number) => Math.round(Math.min(DESPLAZAMIENTO_MAX, Math.max(-DESPLAZAMIENTO_MAX, v)) * 100) / 100;
+  return { x: lim((actual?.x ?? 0) + dx), y: lim((actual?.y ?? 0) + dy) };
+}
+
+/** El cambio de ajuste para un desplazamiento: en (0, 0) se quita; si no, vale para todos los dispositivos (SUP-42). */
+export function cambioDesplazamiento(d: { x: number; y: number }): Pick<AjusteElemento, 'desplazamiento'> | { desplazamiento: undefined } {
+  return d.x || d.y ? { desplazamiento: { x: d.x, y: d.y, dispositivo: 'todos' } } : { desplazamiento: undefined };
+}
