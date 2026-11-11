@@ -40,7 +40,9 @@ describe.skipIf(!conBase)('CP-003 · datos de ejemplo', () => {
         expect(u.hashClave!.startsWith('$argon2id$')).toBe(true);
       }
 
-      const admin = usuarios.find((u) => u.rol === Rol.ADMINISTRADOR)!;
+      // El administrador del seed por su correo: las pruebas e2e de la API corren a la vez (`pnpm -r test`) y crean
+      // otros administradores con su propia clave.
+      const admin = usuarios.find((u) => u.email === 'admin@aulaseducativas.test')!;
       expect(await verificarClave(admin.hashClave!, process.env.SEED_CLAVE!)).toBe(true);
     });
 
