@@ -7,7 +7,10 @@
 // `desplazamiento` en % del ancho (CP-058, RN-06-2). El modo no se guarda en el curso (SUP-42).
 // HU-0605 · Panel «Diseños»: la misma pantalla en otra composición de contenido; los ajustes se reinician y los extras
 // quedan (RN-06-3). «Deshacer» vuelve a la disposición anterior con sus ajustes (SUP-44).
-// Agregar y capas, la línea de tiempo y el deshacer general llegan con la HU-0606 a la HU-0608.
+// HU-0606 · Panel izquierdo con pestañas Diseños · Agregar · Capas: un elemento agregado aparece elegido y en modo Libre
+// (CP-061); en Capas se elige, se oculta o se muestra cada elemento. Los extras se eliminan (también con Supr); los
+// bloques del contenido solo se ocultan (SUP-45). Lo oculto se ve tenue en el editor y no se ve en el curso.
+// La línea de tiempo y el deshacer general llegan con la HU-0607 y la HU-0608.
 import { type AjusteElemento, type CursoReproductor, montar, PALETA_BASE, type RolColor } from '@aptio/player';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,6 +21,8 @@ import {
   tamanoSiguiente, UMBRAL_ARRASTRE_PX,
 } from './ajustes-elemento';
 import { type CambioTexto, edicionDe, esEditable } from './edicion-texto';
+import { capasDe, extraNuevo, nombreExtra, type PantallaConExtras, sinExtra, TIPOS_EXTRA, type TipoExtra } from './extras';
+import { PanelIzquierdo, type PestanaIzquierda } from './panel-izquierdo';
 import { PanelDisenos } from './disenos';
 import { nombreDiseno } from './disenos-pantalla';
 import { type AccionesRetoque, BarraElemento, PanelPropiedades } from './propiedades';
@@ -36,6 +41,7 @@ const ESTILOS_EDICION = `
 [data-elegido] { outline: 2px solid var(--color-naranja, #ff6b35) !important; }
 .ap-r[data-libre] [data-retocable] { cursor: move; touch-action: none; user-select: none; }
 .ap-r[data-libre] [contenteditable] { cursor: auto; user-select: text; }
+.ap-r .ap-oculto-el { display: revert !important; opacity: 0.35; outline: 2px dashed currentColor; outline-offset: 3px; }
 `;
 
 type PantallaConAjustes = PantallaDoc & { ajustes?: Record<string, AjusteElemento> };
@@ -62,6 +68,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const [modo, setModo] = useState<'auto' | 'libre'>('auto');
   const [deshacer, setDeshacer] = useState<DeshacerDiseno | null>(null);
   const panelDisenos = useRef<HTMLDivElement>(null);
+  const [pestana, setPestana] = useState<PestanaIzquierda>('disenos');
   const lienzo = useRef<HTMLDivElement>(null);
   /** Texto que recupera el foco cuando el lienzo se redibuja tras guardar con Enter (teclado). */
   const reenfocar = useRef<string | null>(null);
@@ -130,12 +137,19 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     const previo = (pantalla as PantallaConAjustes).ajustes?.[bloqueId];
     return enviar(pantalla, { ajustes: { [bloqueId]: ajusteCon(previo, cambioDesplazamiento(d)) } }, 'Posición guardada.');
   };
+  /** HU-0606 · Elimina un extra (solo los extras; los bloques del contenido se ocultan). */
+  const quitar = (pantalla: PantallaDoc, id: string) => {
+    setElegido(null);
+    return enviar(pantalla, { extras: sinExtra(pantalla as PantallaConExtras, id) }, 'Elemento eliminado.');
+  };
   const guardarRef = useRef(guardar);
   const moverRef = useRef(mover);
+  const quitarRef = useRef(quitar);
   const modoRef = useRef(modo);
   useEffect(() => {
     guardarRef.current = guardar;
     moverRef.current = mover;
+    quitarRef.current = quitar;
     modoRef.current = modo;
   });
 
@@ -147,6 +161,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       revision: true,
       marco: false,
       inicio: actual.id,
+      sinAcciones: true,
     });
     const sombra = lienzo.current.shadowRoot;
     if (!sombra || !editan) return () => r.destruir();
@@ -154,7 +169,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     estilo.textContent = ESTILOS_EDICION;
     sombra.append(estilo);
     for (const el of sombra.querySelectorAll<HTMLElement>('[data-bloque]')) {
-      const b = actual.bloques.find((x) => x.id === el.dataset.bloque);
+      const b = actual.bloques.find((x) => x.id === el.dataset.bloque) ?? (actual as PantallaConExtras).extras?.find((x) => x.id === el.dataset.bloque);
       if (!b || !seRetoca(b.tipo)) continue;
       el.dataset.retocable = '';
       el.tabIndex = 0;
@@ -235,6 +250,11 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       }
       const r = retocable(k.target);
       if (r && r === k.target && alFlecha(k, r)) return;
+      if (r && r === k.target && k.key === 'Delete' && (actual as PantallaConExtras).extras?.some((x) => x.id === r.dataset.bloque)) {
+        k.preventDefault();
+        void quitarRef.current(actual, r.dataset.bloque!);
+        return;
+      }
       if (r && r === k.target && k.key === ' ') {
         k.preventDefault();
         elegir(r);
@@ -359,11 +379,52 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
 
   const indice = pantallas.indexOf(actual);
   const paleta: Record<RolColor, string> = { ...PALETA_BASE, ...kit?.paleta };
-  const bloque = elegidoId ? actual.bloques.find((b) => b.id === elegidoId) : undefined;
+  const extras = (actual as PantallaConExtras).extras ?? [];
+  const bloqueElegido = elegidoId ? actual.bloques.find((b) => b.id === elegidoId) : undefined;
+  const extraElegido = elegidoId ? extras.find((e) => e.id === elegidoId) : undefined;
+  const bloque = bloqueElegido ?? extraElegido;
   const ajuste = bloque ? (actual as PantallaConAjustes).ajustes?.[bloque.id] : undefined;
   const control = bloque ? controlesDe(bloque.tipo) : null;
   const tamano = control?.tamano === 'escala' ? (ajuste?.escala ?? 1) : (ajuste?.tamanoCqw ?? elegido?.tamanoVisto ?? 2);
-  const datosElegido = bloque ? { nombre: nombreElemento(bloque), tipo: bloque.tipo, ajuste, tamano } : null;
+  const datosElegido = bloque
+    ? { nombre: extraElegido ? nombreExtra(extraElegido) : nombreElemento(bloqueElegido!), tipo: bloque.tipo, ajuste, tamano, extra: extraElegido ?? null }
+    : null;
+  /** El tamaño que se ve de un elemento, en % del ancho, para que A−/A+ partan de ahí (como al elegirlo con un clic). */
+  const tamanoVistoDe = (id: string) => {
+    const sombra = lienzo.current?.shadowRoot;
+    const el = sombra?.querySelector<HTMLElement>(`[data-bloque="${CSS.escape(id)}"]`);
+    const ancho = sombra?.querySelector<HTMLElement>('.ap-r')?.clientWidth || 1;
+    return el ? Math.round((parseFloat(getComputedStyle(el).fontSize) / ancho) * 1000) / 10 : 2;
+  };
+  const elegirCapa = (id: string) => setElegido({ pantallaId: actual.id, bloqueId: id, tamanoVisto: tamanoVistoDe(id) });
+  /** HU-0606 · Agrega un elemento: aparece elegido y en modo Libre, listo para mover (CP-061). */
+  const agregar = async (tipo: TipoExtra) => {
+    const personajeId = pantallas.flatMap((p) => p.bloques).find((b) => b.tipo === 'personaje') as { recursoId?: string } | undefined;
+    const nuevo = extraNuevo(tipo, actual as PantallaConExtras, personajeId?.recursoId);
+    const nombre = TIPOS_EXTRA.find(([t]) => t === tipo)![1];
+    reenfocar.current = nuevo.id;
+    if (await enviar(actual, { extras: [...extras, nuevo] }, `${nombre} agregado: arrástralo donde quieras.`)) {
+      setModo('libre');
+      setElegido({ pantallaId: actual.id, bloqueId: nuevo.id, tamanoVisto: 2 });
+    }
+  };
+  const alternarOculto = (id: string) => {
+    const previo = (actual as PantallaConAjustes).ajustes?.[id];
+    const ocultar = previo?.oculto !== true;
+    void enviar(actual, { ajustes: { [id]: ajusteCon(previo, { oculto: ocultar ? true : undefined }) } }, ocultar ? 'Elemento oculto: se puede mostrar desde Capas.' : 'Elemento visible.');
+  };
+  /** Cambia un dato del extra elegido (la imagen, su texto alternativo o lo que hace el botón). */
+  const cambiarExtra = (cambio: Partial<Pick<NonNullable<typeof extraElegido>, 'recursoId' | 'texto' | 'alClic'>>) => {
+    if (!extraElegido) return;
+    const lista = extras.map((e) => {
+      if (e.id !== extraElegido.id) return e;
+      const nuevo = { ...e, ...cambio };
+      if (!nuevo.recursoId) delete nuevo.recursoId;
+      return nuevo;
+    });
+    void enviar(actual, { extras: lista }, 'Cambio guardado.');
+  };
+  const imagenes = ((documento?.recursos ?? []) as { id: string; tipo: string; nombre: string }[]).filter((r) => r.tipo === 'imagen');
   const retocar = (cambio: Partial<Record<keyof AjusteElemento, unknown>>) => {
     if (!bloque) return;
     void enviar(actual, { ajustes: { [bloque.id]: ajusteCon(ajuste, cambio) } }, 'Cambio guardado.');
@@ -380,6 +441,12 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     alVerAnimacion: () => setRepeticion((n) => n + 1),
     alVolverASuLugar: () => {
       if (bloque) void mover(actual, bloque.id, { x: 0, y: 0 });
+    },
+    alOcultar: () => {
+      if (bloque) alternarOculto(bloque.id);
+    },
+    alEliminar: () => {
+      if (extraElegido) void quitar(actual, extraElegido.id);
     },
   };
   /** HU-0605 · Aplica otro diseño y deja a mano cómo deshacerlo. */
@@ -416,7 +483,9 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       ) : null}
       <div className="editor-cuerpo">
         <div ref={panelDisenos} className="editor-col-disenos" tabIndex={-1}>
-          <PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={(d) => void cambiarDiseno(d)} />
+          <PanelIzquierdo pestana={pestana} alCambiarPestana={setPestana} capas={capasDe(actual as PantallaConExtras)} elegidoId={elegidoId} ocupado={ocupado}
+            alAgregar={(t) => void agregar(t)} alElegirCapa={elegirCapa} alAlternarOculto={alternarOculto}
+            disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={(d) => void cambiarDiseno(d)} />} />
         </div>
         <section className="editor-lienzo" aria-label={`Lienzo de la pantalla ${actual.id}`}>
           {datosElegido && !escribiendo ? (
@@ -434,9 +503,13 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
           </p>
         </section>
         <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones}
+          imagenes={imagenes} alCambiarExtra={cambiarExtra}
           diseno={nombreDiseno(actual.disposicion)} alCambiarDiseno={() => {
-            panelDisenos.current?.scrollIntoView({ block: 'nearest' });
-            panelDisenos.current?.querySelector<HTMLButtonElement>('.editor-diseno:not([disabled])')?.focus();
+            setPestana('disenos');
+            setTimeout(() => {
+              panelDisenos.current?.scrollIntoView({ block: 'nearest' });
+              panelDisenos.current?.querySelector<HTMLButtonElement>('.editor-diseno:not([disabled])')?.focus();
+            }, 0);
           }} />
       </div>
       <nav className="editor-tira" aria-label="Pantallas">

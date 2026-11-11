@@ -1,6 +1,7 @@
 // HU-0602 · Barra contextual y panel de Propiedades del elemento elegido en el editor (CP-057): tamaño A−/A+, colores
 // del kit (RN-06-4), alineación y animación de entrada. Los dos usan las mismas acciones; el estado vive en EditorVista.
-import type { AjusteElemento, RolColor } from '@aptio/player';
+// HU-0606 · Ocultar o mostrar cualquier elemento; eliminar, la imagen y lo que hace el botón, solo en los extras.
+import type { AjusteElemento, ElementoExtra, RolColor } from '@aptio/player';
 import { useState } from 'react';
 import { ALINEACIONES, ANIMACIONES, type Animacion, COLORES_KIT, controlesDe, ESCALA, TAMANO } from './ajustes-elemento';
 
@@ -14,6 +15,10 @@ export interface AccionesRetoque {
   alVerAnimacion: () => void;
   /** HU-0603 · Quita solo el desplazamiento del modo Libre. */
   alVolverASuLugar: () => void;
+  /** HU-0606 · Oculta o muestra el elemento (también los bloques del contenido). */
+  alOcultar: () => void;
+  /** HU-0606 · Solo los extras se eliminan. */
+  alEliminar: () => void;
 }
 interface Elegido {
   nombre: string;
@@ -21,6 +26,18 @@ interface Elegido {
   ajuste: AjusteElemento | undefined;
   /** Tamaño que se ve ahora: % del ancho de la pantalla (texto) o escala (imagen y personaje). */
   tamano: number;
+  /** HU-0606 · El extra, si el elemento es uno agregado en el editor. */
+  extra: ElementoExtra | null;
+}
+type CambioExtra = Partial<Pick<ElementoExtra, 'recursoId' | 'texto' | 'alClic'>>;
+
+function OcultarEliminar({ elegido, ocupado, acciones }: { elegido: Elegido; ocupado: boolean; acciones: AccionesRetoque }) {
+  return (
+    <>
+      <button type="button" className="boton" disabled={ocupado} onClick={acciones.alOcultar}>{elegido.ajuste?.oculto ? 'Mostrar' : 'Ocultar'}</button>
+      {elegido.extra ? <button type="button" className="boton peligro" disabled={ocupado} onClick={acciones.alEliminar}>Eliminar</button> : null}
+    </>
+  );
 }
 
 function Colores({ elegido, paleta, ocupado, alColor }: { elegido: Elegido; paleta: Record<RolColor, string>; ocupado: boolean; alColor: (rol: RolColor) => void }) {
@@ -56,13 +73,16 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
         Animación: {ANIMACIONES.find(([a]) => a === animacion)?.[1]}
       </button>
       {elegido.ajuste ? <button type="button" className="boton" disabled={ocupado} onClick={acciones.alRestablecer}>Restablecer</button> : null}
+      <OcultarEliminar elegido={elegido} ocupado={ocupado} acciones={acciones} />
     </div>
   );
 }
 
 /** Panel lateral de Propiedades: los mismos retoques, con un deslizador de tamaño. */
-export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno }: {
+export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra }: {
   elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; modo: 'auto' | 'libre'; acciones: AccionesRetoque;
+  /** HU-0606 · Imágenes del curso para un extra «Imagen del kit» y cómo cambiar el extra elegido. */
+  imagenes?: { id: string; nombre: string }[]; alCambiarExtra?: (cambio: CambioExtra) => void;
   /** HU-0605 · Nombre del diseño de la pantalla y cómo ir al panel Diseños. */
   diseno: string; alCambiarDiseno: () => void;
 }) {
@@ -125,9 +145,11 @@ export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, dis
           ) : null}
         </div>
       ) : null}
+      {elegido.extra && alCambiarExtra ? <DatosExtra key={elegido.extra.id} extra={elegido.extra} imagenes={imagenes} ocupado={ocupado} alCambiar={alCambiarExtra} /> : null}
       <div className="acciones-form">
         <button type="button" className="boton" onClick={acciones.alVerAnimacion}>▶ Ver animación</button>
         {elegido.ajuste ? <button type="button" className="boton" disabled={ocupado} onClick={acciones.alRestablecer}>Restablecer</button> : null}
+        <OcultarEliminar elegido={elegido} ocupado={ocupado} acciones={acciones} />
       </div>
     </aside>
   );
@@ -148,5 +170,43 @@ function Deslizador({ tipo, inicial, ocupado, alCambiar }: { tipo: 'texto' | 'es
       <input type="range" min={r.min} max={r.max} step={r.paso} value={valor}
         onChange={(e) => setValor(Number(e.target.value))} onPointerUp={confirmar} onKeyUp={confirmar} onBlur={confirmar} />
     </label>
+  );
+}
+
+/** HU-0606 · Lo propio de un extra: qué hace el botón (por ahora «Siguiente» o «Nada», SUP-45) y la imagen del curso con su texto alternativo. */
+function DatosExtra({ extra, imagenes, ocupado, alCambiar }: { extra: ElementoExtra; imagenes: { id: string; nombre: string }[]; ocupado: boolean; alCambiar: (c: CambioExtra) => void }) {
+  const [alt, setAlt] = useState(extra.texto?.es ?? '');
+  if (extra.tipo === 'boton') {
+    return (
+      <label className="campo">
+        Al hacer clic
+        <select value={extra.alClic === 'siguiente' ? 'siguiente' : 'nada'} disabled={ocupado} onChange={(e) => alCambiar({ alClic: e.target.value as 'siguiente' | 'nada' })}>
+          <option value="siguiente">Ir a la pantalla siguiente</option>
+          <option value="nada">Nada</option>
+        </select>
+      </label>
+    );
+  }
+  if (extra.tipo !== 'imagen') return null;
+  const guardarAlt = () => {
+    const limpio = alt.replace(/\s+/g, ' ').trim();
+    if (limpio && limpio !== (extra.texto?.es ?? '')) alCambiar({ texto: { ...extra.texto, es: limpio } });
+  };
+  return (
+    <>
+      <label className="campo">
+        Imagen
+        <select value={extra.recursoId ?? ''} disabled={ocupado} onChange={(e) => alCambiar({ recursoId: e.target.value || undefined })}>
+          <option value="">Sin imagen (marco)</option>
+          {imagenes.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+        </select>
+        {imagenes.length ? null : <span className="ayuda">El curso aún no tiene imágenes; subirlas llega con el panel Imágenes.</span>}
+      </label>
+      <label className="campo">
+        Texto alternativo
+        <input type="text" value={alt} disabled={ocupado} onChange={(e) => setAlt(e.target.value)} onBlur={guardarAlt}
+          onKeyDown={(e) => { if (e.key === 'Enter') guardarAlt(); }} />
+      </label>
+    </>
   );
 }

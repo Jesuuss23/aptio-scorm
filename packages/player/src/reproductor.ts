@@ -40,6 +40,8 @@ export interface OpcionesReproductor {
   inicio?: string;
   /** false: solo la pantalla, sin barra ni botones (la usa la revisión para mostrar una pantalla a la vez). */
   marco?: boolean;
+  /** HU-0606 · true en el editor: los botones agregados se eligen y se escriben, pero no navegan. */
+  sinAcciones?: boolean;
   alCambiar?: (estado: EstadoReproductor) => void;
 }
 
@@ -249,7 +251,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     const p = pantallas[i]!.pantalla;
     let el = dibujadas.get(p.id);
     if (!el) {
-      el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad, cargarSvg });
+      el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad, cargarSvg, alSiguiente: opciones.sinAcciones ? undefined : () => irA(actual + 1, true) });
       dibujadas.set(p.id, el);
     }
     return el;

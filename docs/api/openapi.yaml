@@ -1797,7 +1797,8 @@ paths:
         si el elemento no está en la pantalla, COLOR_FUERA_DEL_KIT si un color no es un rol del kit (RN-06-4) y
         CURSO_NO_VALIDO si un valor sale del esquema. HU-0605 · `disposicion` cambia el diseño de la pantalla (CP-060);
         422 DISENO_NO_PERMITIDO si la pantalla tiene una actividad, un video o es la de resultados, o si el diseño no es
-        de contenido.
+        de contenido. HU-0606 · `extras` reemplaza los elementos agregados de la pantalla; 422 EXTRA_NO_VALIDO si un id
+        se repite o es el de un bloque. `ajustes` acepta también ids de extras.
       parameters:
       - name: cursoId
         in: path
@@ -4796,6 +4797,55 @@ components:
         creadoEn:
           type: string
           format: date-time
+    ElementoExtra:
+      type: object
+      description: HU-0606 · Elemento agregado en el editor (curso-v0 `elementoExtra`). x, y y ancho en % de la pantalla;
+        se mueve con `ajustes[id].desplazamiento` como un bloque (SUP-45).
+      required:
+      - id
+      - tipo
+      - x
+      - 'y'
+      - ancho
+      properties:
+        id:
+          type: string
+        tipo:
+          type: string
+          enum:
+          - titulo
+          - texto
+          - dato
+          - boton
+          - imagen
+          - insignia
+          - forma
+          - personaje
+        texto:
+          $ref: '#/components/schemas/TextoI18n'
+        recursoId:
+          type: string
+        x:
+          type: number
+          minimum: 0
+          maximum: 100
+        'y':
+          type: number
+          minimum: 0
+          maximum: 100
+        ancho:
+          type: number
+          minimum: 1
+          maximum: 100
+        alClic:
+          type: string
+          enum:
+          - nada
+          - siguiente
+          - retroalimentacion
+          - ventana
+          - audio
+          - puntos
     AjusteElemento:
       type: object
       properties:
@@ -4879,9 +4929,10 @@ components:
             - $ref: '#/components/schemas/AjusteElemento'
         extras:
           type: array
+          description: HU-0606 · Elementos agregados en el editor, como lista completa de la pantalla (RN-06-1). Quitar uno
+            borra su ajuste.
           items:
-            type: object
-            additionalProperties: true
+            $ref: '#/components/schemas/ElementoExtra'
         version:
           type: integer
       description: Cambios del editor sobre una pantalla. Dispara la regeneración en cascada de lo afectado.

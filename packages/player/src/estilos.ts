@@ -163,6 +163,21 @@ button:disabled{cursor:not-allowed}
   .ap-grupos{flex:0 0 55%}
   .ap-rejilla{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+/* HU-0606 · Elementos agregados en el editor: sobre la pantalla, en % de su ancho y alto. «oculto» los saca de la vista. */
+.ap-extras{position:absolute;inset:0;pointer-events:none}
+.ap-extra{position:absolute;margin:0;pointer-events:auto;box-sizing:border-box}
+.ap-extra-titulo{font-family:var(--ap-f-titulos),system-ui,sans-serif;font-weight:700;font-size:clamp(20px,5cqi,34px);line-height:1.1;color:var(--ap-primario)}
+.ap-oscuro .ap-extra-titulo{color:inherit}
+.ap-extra-texto{font-size:16px}
+.ap-extra-dato{background:var(--ap-blanco);color:var(--ap-texto);border-left:6px solid var(--ap-acento);border-radius:8px;padding:10px 14px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.ap-extra-boton{min-height:44px;border:0;border-radius:10px;padding:8px 16px;background:var(--ap-acento);color:var(--ap-texto);font:inherit;font-weight:700;cursor:pointer}
+.ap-extra-boton:focus-visible{outline:3px solid var(--ap-primario);outline-offset:2px}
+.ap-extra-imagen img{display:block;width:100%;height:auto;border-radius:8px}
+.ap-extra-insignia svg{display:block;width:100%;height:auto}
+.ap-insignia-fondo{fill:var(--ap-secundario)}
+.ap-insignia-estrella{fill:var(--ap-acento)}
+.ap-extra-forma{aspect-ratio:3/1;border-radius:10px;background:var(--ap-acento)}
+.ap-oculto-el{display:none!important}
 /* HU-0603 · Desplazamiento del modo Libre, en % del ancho del reproductor y por dispositivo. */
 .ap-desp{translate:var(--ap-dx) var(--ap-dy)}
 @container (min-width:640px){.ap-desp-escritorio{translate:var(--ap-dx) var(--ap-dy)}}
