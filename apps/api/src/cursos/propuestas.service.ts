@@ -6,6 +6,7 @@ import type { Prisma, Propuesta } from '@aptio/db';
 import type { OperacionPatch } from '@aptio/schema/patch';
 import { aplicarEnPantalla, type CambiosPropuesta, huellaPantalla, patchDe, TAREA_PROPUESTA, TIPOS_PROPUESTA, type Variante } from '@aptio/schema/propuesta';
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
+import { conservarRetoques } from '@aptio/schema/retoques';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
@@ -147,7 +148,8 @@ export class PropuestasService {
 
   /**
    * Deshacer (RN-05-3): crea una versión nueva con el documento de `version`. La narración de cada pantalla y los
-   * recursos se conservan como están ahora, para no desligar los audios, las bocas y los subtítulos (SUP-39).
+   * recursos se conservan como están ahora, para no desligar los audios, las bocas y los subtítulos (SUP-39); los retoques
+   * (ajustes y extras) también, porque son del editor y no del contenido (HU-0604).
    */
   async restaurar(u: UsuarioSesion, cursoId: string, version: number): Promise<CursoRestauradoDto> {
     const c = await this.cursos.buscar(u, cursoId);
@@ -156,10 +158,12 @@ export class PropuestasService {
     if (!vieja) throw new NotFoundException('Versión no encontrada');
     const r = await this.cursos.guardar(u, cursoId, c.version, 'restauración', (doc) => {
       const restaurado = structuredClone(vieja.documento) as unknown as CursoDoc & Record<string, unknown>;
-      const actuales = new Map(pantallasDe(doc).map((p) => [p.id, (p as { narracion?: unknown }).narracion]));
+      const actuales = new Map(pantallasDe(doc).map((p) => [p.id, p]));
       for (const p of pantallasDe(restaurado) as { id: string; narracion?: unknown }[]) {
-        const narracion = actuales.get(p.id);
-        if (narracion) p.narracion = narracion;
+        const actual = actuales.get(p.id) as { narracion?: unknown } | undefined;
+        if (actual?.narracion) p.narracion = actual.narracion;
+        // HU-0604 · Deshacer revierte el contenido; los retoques de diseño quedan como están ahora (SUP-43).
+        if (actual) conservarRetoques(actual, p);
       }
       if ('recursos' in doc) restaurado.recursos = doc.recursos;
       for (const k of Object.keys(doc)) delete (doc as Record<string, unknown>)[k];

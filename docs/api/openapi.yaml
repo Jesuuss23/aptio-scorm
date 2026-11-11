@@ -1753,7 +1753,8 @@ paths:
       operationId: post_cursos_cursoId_versiones_version_restaurar
       description: Crea una versión nueva con motivo «restauración». HU-0504 (Deshacer de una propuesta) · la narración
         de cada pantalla y los recursos se conservan como están ahora, para no desligar audios, bocas y subtítulos
-        (SUP-39). 422 VERSION_NO_ANTERIOR si la versión no es anterior a la actual.
+        (SUP-39); los retoques de cada pantalla (`ajustes` y `extras`) también (HU-0604, SUP-43). 422 VERSION_NO_ANTERIOR
+        si la versión no es anterior a la actual.
       parameters:
       - name: cursoId
         in: path
@@ -1987,7 +1988,10 @@ paths:
       description: 'HU-0504 · Aplica el patch (o la variante `varianteIndice`) a la pantalla, crea una versión del curso
         con motivo «propuesta» y la pantalla vuelve a borrador. 409 PROPUESTA_VENCIDA («Recalcular propuesta») si la
         pantalla cambió desde `versionBase` (solo cuenta esa pantalla, SUP-39), 409 PROPUESTA_RESUELTA si ya se aplicó o se
-        descartó, 422 VARIANTE_REQUERIDA o PROPUESTA_NO_APLICA. Se deshace restaurando la versión anterior.'
+        descartó, 422 VARIANTE_REQUERIDA o PROPUESTA_NO_APLICA. Se deshace restaurando la versión anterior. HU-0604 · el
+        patch no toca `ajustes` ni `extras` (PROPUESTA_NO_APLICA); al aplicar, los extras se conservan y los ajustes de los
+        elementos que siguen en la pantalla también, salvo si cambia la disposición, que los reinicia (RN-06-3). Mover o
+        retocar un elemento no vence la propuesta: la huella de la pantalla no cuenta los retoques (SUP-43).'
       parameters:
       - name: propuestaId
         in: path

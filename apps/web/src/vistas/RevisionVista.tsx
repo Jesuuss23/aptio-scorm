@@ -331,6 +331,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
               vencida={franja.estado === 'VENCIDA'}
               variante={variante}
               ocupado={ocupado}
+              conAjustes={Object.keys((actual as { ajustes?: object }).ajustes ?? {}).length > 0}
               alVerVariante={setVariante}
               alAplicar={() => void aplicarPropuesta(franja)}
               alDescartar={() => void descartarPropuesta(franja)}

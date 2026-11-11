@@ -5,7 +5,8 @@ import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
 import { DISPOSICIONES, modeloBase } from '@aptio/schema/marca';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { cursoConPropuesta, huellaPantalla, patchDe } from '@aptio/schema/propuesta';
-import type { CursoDoc } from '@aptio/schema/revision';
+import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
+import { conservarRetoques } from '@aptio/schema/retoques';
 
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -58,7 +59,15 @@ export interface OpcionesSimulacion {
   cascada?: 'normal' | 'falla';
   /** HU-0504 · El próximo pedido a la IA termina en error. */
   propuestaFalla?: boolean;
+  /** HU-0604 · p05 llega retocada en el editor: la imagen desplazada, el párrafo en acento y un botón agregado. */
+  retoquesP05?: boolean;
 }
+
+/** HU-0604 · Los retoques de p05 con `retoquesP05`. */
+export const RETOQUES_P05 = {
+  ajustes: { 'p05-imagen': { desplazamiento: { x: 12.5, y: -3, dispositivo: 'todos' } }, 'p05-texto': { color: 'acento' } },
+  extras: [{ id: 'p05-boton', tipo: 'boton', texto: { es: 'Ver ejemplo' }, x: 70, y: 80, ancho: 20, alClic: 'retroalimentacion' }],
+};
 
 /** HU-0801 · El WebVTT de cada narración del curso, por id de recurso, como lo escribe la etapa 8 (SUP-37). */
 export function subtitulosDe(documento: Record<string, unknown>): Record<string, string> {
@@ -234,7 +243,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05 }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -261,6 +270,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const materiales = new Map<string, Record<string, unknown>[]>();
   // El curso del proyecto con pantallas: CP-047 lo muestra tomado del «Manual» del cliente y 3 pantallas tienen observaciones.
   const revision = { version: 1, documento: cursoLoto(), observaciones: OBSERVACIONES.map((o) => ({ ...o })) };
+  if (retoquesP05) {
+    const p05 = pantallasDe(revision.documento as unknown as CursoDoc).find((x) => x.id === 'p05')!;
+    Object.assign(p05, structuredClone(RETOQUES_P05));
+  }
   (revision.documento.recursos as { tipo: string; nombre: string }[]).find((r) => r.tipo === 'documento')!.nombre = 'Manual.pdf';
   type PantallaSim = { id: string; estado: string; titulo: { es: string }; narracion?: { texto: { es: string }; porIdioma?: { es?: { duracionMs?: number } } } };
   const pantallasSim = () => (revision.documento.modulos as { capsulas: { pantallas: PantallaSim[] }[] }[]).flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
@@ -603,7 +616,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (restaurar) {
       const doc = historial.get(Number(restaurar[1]));
       if (!doc) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Versión no encontrada' });
-      revision.documento = structuredClone(doc);
+      // Como la API: vuelve el contenido y los retoques quedan como están ahora (HU-0604).
+      const restaurado = structuredClone(doc) as unknown as CursoDoc;
+      const actuales = new Map(pantallasDe(docSim()).map((x) => [x.id, x]));
+      for (const x of pantallasDe(restaurado)) if (actuales.has(x.id)) conservarRetoques(actuales.get(x.id)!, x);
+      revision.documento = restaurado as unknown as Record<string, unknown>;
       return responder(200, { id: CURSO_ID, version: ++revision.version, documento: revision.documento });
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
