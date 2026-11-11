@@ -63,6 +63,13 @@ button:disabled{cursor:not-allowed}
 .ap-d-portada .ap-titulo-pantalla,.ap-d-seccion .ap-titulo-pantalla,.ap-d-cierre .ap-titulo-pantalla{font-size:clamp(30px,8cqi,56px)}
 .ap-d-dato .ap-texto,.ap-d-cierre .ap-texto,.ap-d-vf .ap-texto{align-items:center;text-align:center}
 .ap-d-seccion .ap-numero-seccion{font-family:var(--ap-f-titulos),system-ui,sans-serif;font-weight:700;font-size:20px;opacity:.7;order:-1}
+/* HU-0605 · Cambiar diseño con los mismos bloques: en «Tarjetas con íconos» los párrafos y el dato son tarjetas; en «Dato grande», el destacado crece. */
+.ap-d-lista .ap-texto{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:10px}
+.ap-d-lista .ap-titulo-pantalla,.ap-d-lista .ap-subtitulo,.ap-d-lista .ap-items{grid-column:1/-1}
+.ap-d-lista .ap-parrafo,.ap-d-lista .ap-dato{max-width:none;background:var(--ap-blanco);color:var(--ap-texto);border:0;border-top:4px solid var(--ap-secundario);border-radius:10px;padding:12px 14px;font-weight:400;box-shadow:0 2px 8px rgba(0,0,0,.07)}
+.ap-d-lista .ap-parrafo::before,.ap-d-lista .ap-dato::before{content:"✓";display:grid;place-items:center;width:28px;height:28px;margin-bottom:6px;border-radius:50%;background:var(--ap-secundario);color:var(--ap-blanco);font-weight:700}
+.ap-d-dato .ap-dato{background:none;border:0;box-shadow:none;padding:0;font-family:var(--ap-f-titulos),system-ui,sans-serif;font-size:clamp(32px,9cqi,64px);line-height:1.05;color:var(--ap-primario)}
+.ap-oscuro.ap-d-dato .ap-dato{color:var(--ap-acento)}
 .ap-medios{display:flex;gap:12px;justify-content:center;align-items:flex-end}
 .ap-personaje{margin:0;width:min(34cqi,160px);flex:0 0 auto}
 .ap-personaje svg,.ap-personaje img{display:block;width:100%;height:auto}

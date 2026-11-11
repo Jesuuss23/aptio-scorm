@@ -8,6 +8,7 @@ import { hashNarracion } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
+import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
 import { type CursoDoc, observacionesRegla, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { AlmacenService } from '../recursos/almacen.service.js';
@@ -152,6 +153,24 @@ export class CursosService {
         const t = limpio(valor);
         if (!t) throw new UnprocessableEntityException({ codigo: 'TEXTO_VACIO', mensaje: 'Un texto no puede quedar vacío; quita el bloque en el editor' });
         editado(b, t);
+        cambios++;
+      }
+      // HU-0605 · Cambiar diseño: la misma pantalla en otra composición de contenido. Los bloques no se tocan; los ajustes
+      // se reinician y los extras quedan (RN-06-3). Si vienen `ajustes` en el mismo cambio, se aplican después (Deshacer).
+      if (dto.disposicion !== undefined) {
+        const destino = dto.disposicion;
+        if (!disenoPermitido(p, destino)) {
+          throw new UnprocessableEntityException({
+            codigo: 'DISENO_NO_PERMITIDO',
+            mensaje: disenosPara(p).length ? 'Ese diseño no está entre los de contenido' : 'Esta pantalla tiene una actividad: su diseño se cambia en Revisión con la IA',
+          });
+        }
+        const pd = p as PantallaDoc & { disposicion?: string; plantilla: string; ajustes?: unknown };
+        if (pd.disposicion !== destino) {
+          pd.disposicion = destino;
+          pd.plantilla = plantillaPara(pd.plantilla, destino);
+          delete pd.ajustes;
+        }
         cambios++;
       }
       if (dto.ajustes !== undefined) {

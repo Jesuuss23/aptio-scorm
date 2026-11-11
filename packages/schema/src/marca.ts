@@ -285,3 +285,37 @@ export function modelosParaGenerar(
     return propios.length ? propios : [{ disposicion, nombre: `${NOMBRE_DISPOSICION[disposicion]} (estilo base)`, definicion: modeloBase(disposicion), origen: 'base' as const }];
   });
 }
+
+// ---------- Cambiar diseño de la pantalla (HU-0605, RN-06-3, SUP-44) ----------
+
+/** Las composiciones de contenido que se intercambian en el editor, con los nombres del prototipo. */
+export const DISENOS_CONTENIDO = ['idea', 'personaje', 'dato', 'lista'] as const satisfies readonly Disposicion[];
+export type DisenoContenido = (typeof DISENOS_CONTENIDO)[number];
+export const NOMBRE_DISENO: Record<DisenoContenido, string> = {
+  idea: 'Idea + ilustración', personaje: 'Personaje habla', dato: 'Dato grande', lista: 'Tarjetas con íconos',
+};
+export const esDisenoContenido = (d: unknown): d is DisenoContenido => (DISENOS_CONTENIDO as readonly unknown[]).includes(d);
+
+/**
+ * Los diseños que se ofrecen para una pantalla: las 4 composiciones de contenido. Una pantalla con actividad o video,
+ * o la de resultados, no cambia de diseño en el editor (vacío).
+ */
+export function disenosPara(p: { disposicion?: string; bloques: { tipo: string }[] }): DisenoContenido[] {
+  if (p.disposicion === 'resultados' || p.bloques.some((b) => b.tipo === 'interaccion' || b.tipo === 'video')) return [];
+  return [...DISENOS_CONTENIDO];
+}
+
+/** Disposiciones sin actividad que no se ofrecen como diseño, pero a las que se puede volver (Deshacer). */
+export const DISPOSICIONES_DE_TEXTO = ['portada', 'objetivos', 'seccion', 'resumen', 'cierre'] as const satisfies readonly Disposicion[];
+
+/** Si la pantalla puede pasar a `destino`: una de contenido, o volver a una de texto, y nunca en una pantalla con actividad. */
+export function disenoPermitido(p: { disposicion?: string; bloques: { tipo: string }[] }, destino: unknown): destino is Disposicion {
+  if (!disenosPara(p).length) return false;
+  return esDisenoContenido(destino) || (DISPOSICIONES_DE_TEXTO as readonly unknown[]).includes(destino);
+}
+
+/** La plantilla del kit para la nueva disposición: cambia el sufijo (`kit-x-idea` → `kit-x-lista`); si no lo tiene, el estilo base. */
+export function plantillaPara(plantilla: string, disposicion: Disposicion): string {
+  const sufijo = DISPOSICIONES.find((d) => plantilla.endsWith(`-${d}`));
+  return sufijo ? `${plantilla.slice(0, -sufijo.length)}${disposicion}` : `base-${disposicion}`;
+}
