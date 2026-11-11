@@ -4,6 +4,7 @@
 // HU-0603 · Modo Libre: arrastrar y flechas guardan un desplazamiento en % del ancho (CP-058).
 // HU-0605 · Diseños: la misma pantalla en otra composición, con el mismo contenido y Deshacer (CP-060).
 // HU-0606 · Agregar elementos (CP-061), capas para ocultar y mostrar, y eliminar extras.
+// HU-0607 · Todo se guarda solo y sigue al recargar (CP-062); 20 Ctrl+Z vuelven al inicio en un solo guardado (CP-063).
 import { expect, type Page, test } from '@playwright/test';
 import { RETOQUES_P05, simularApi } from './api-simulada';
 
@@ -320,12 +321,14 @@ test.describe('HU-0605 · cambiar diseño', () => {
     await expect.poll(() => corrimientoX(page)).toBe(0);
     await expect(disenos(page).getByRole('button', { name: 'Tarjetas con íconos · actual' })).toBeVisible();
 
-    await page.getByRole('status').getByRole('button', { name: 'Deshacer' }).click();
-    await expect(page.getByRole('status').filter({ hasText: 'Se deshizo el cambio de diseño.' })).toBeVisible();
-    expect(ediciones[1]).toEqual({ version: expect.any(Number), disposicion: 'idea', ajustes: RETOQUES_P05.ajustes });
+    // HU-0607 · El deshacer general devuelve la disposición con sus retoques, en un solo cambio.
+    await page.getByRole('button', { name: 'Deshacer', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Se deshizo el último cambio.' })).toBeVisible();
     await expect(pantallaDibujada(page)).toHaveClass(/ap-d-idea/);
     await expect.poll(() => corrimientoX(page)).toBe(12.5);
-    await expect(page.getByRole('button', { name: 'Deshacer' })).toHaveCount(0);
+    await expect.poll(() => ediciones.length).toBe(2);
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), disposicion: 'idea', ajustes: RETOQUES_P05.ajustes, motivo: 'deshacer' });
+    await expect(page.getByRole('button', { name: 'Deshacer', exact: true })).toBeDisabled();
   });
 
   test('Propiedades muestra el diseño y «Cambiar» lleva al panel; una actividad no cambia de diseño aquí', async ({ page }) => {
@@ -444,3 +447,109 @@ test.describe('HU-0606 · agregar elementos y capas', () => {
   });
 });
 
+
+test.describe('HU-0607 · deshacer, rehacer y guardado automático', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'PRODUCTOR' });
+  });
+  const barra = (page: Page) => page.getByRole('toolbar', { name: 'Opciones del elemento' });
+  const deshacer = (page: Page) => page.getByRole('button', { name: 'Deshacer', exact: true });
+  const rehacer = (page: Page) => page.getByRole('button', { name: 'Rehacer', exact: true });
+  const subtitulo = (page: Page) => lienzo(page).getByText('Cápsula de seguridad · 15 min · 3 retos');
+
+  test('CP-062 · cambio el título, un color y agrego un botón: al recargar siguen ahí', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_EDITOR);
+    await empezarAEscribir(page, titulo(page));
+    await page.keyboard.type('Bloqueo seguro');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('status').filter({ hasText: 'Texto guardado.' })).toBeVisible();
+    await subtitulo(page).click();
+    await barra(page).getByRole('button', { name: 'Acento' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Cambio guardado.' })).toBeVisible();
+    await page.getByRole('tablist', { name: 'Panel del editor' }).getByRole('tab', { name: 'Agregar' }).click();
+    await page.getByRole('complementary', { name: 'Agregar' }).getByRole('button', { name: 'Botón' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Botón agregado' })).toBeVisible();
+    expect(ediciones).toHaveLength(3);
+    await expect(page.locator('.editor-guardado')).toHaveText('✓ Guardado');
+
+    await page.reload();
+    await expect(titulo(page)).toHaveText('Bloqueo seguro');
+    await expect(subtitulo(page)).toHaveCSS('color', 'rgb(242, 169, 0)');
+    await expect(lienzo(page).locator('[data-bloque="p01-extra-boton-1"]')).toHaveText('Continuar');
+    // El historial es de la sesión (SUP-46): tras recargar no hay nada que deshacer.
+    await expect(deshacer(page)).toBeDisabled();
+  });
+
+  test('CP-063 · 20 cambios y 20 Ctrl+Z vuelven al estado inicial con un solo guardado', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_EDITOR);
+    await titulo(page).click();
+    const inicial = await titulo(page).evaluate((el) => getComputedStyle(el).color);
+    const colores = ['Primario', 'Secundario', 'Acento', 'Texto'];
+    for (let i = 0; i < 20; i++) {
+      await barra(page).getByRole('button', { name: colores[i % 4]! }).click();
+      await expect.poll(() => ediciones.length).toBe(i + 1);
+    }
+    await expect(titulo(page)).not.toHaveCSS('color', inicial);
+    await expect(page.locator('.editor-guardado')).toHaveText('✓ Guardado');
+    await expect(deshacer(page)).toBeEnabled();
+
+    for (let i = 0; i < 20; i++) await page.keyboard.press('Control+z');
+    // Se ve al instante y se guarda una sola vez, 1 s después de la última pulsación (RN-06-5).
+    await expect(titulo(page)).toHaveCSS('color', inicial);
+    await expect.poll(() => ediciones.length).toBe(21);
+    expect(ediciones[20]).toEqual({ version: expect.any(Number), ajustes: { 'p01-titulo': null }, motivo: 'deshacer' });
+    await expect(page.locator('.editor-guardado')).toHaveText('✓ Guardado');
+    await page.waitForTimeout(1500);
+    expect(ediciones).toHaveLength(21);
+    await expect(deshacer(page)).toBeDisabled();
+    await expect(rehacer(page)).toBeEnabled();
+
+    // Rehacer (Ctrl+Shift+Z) vuelve a poner el primer cambio.
+    await page.keyboard.press('Control+Shift+z');
+    await expect.poll(() => ediciones.length).toBe(22);
+    expect(ediciones[21]).toEqual({ version: expect.any(Number), ajustes: { 'p01-titulo': { color: 'primario' } }, motivo: 'rehacer' });
+    await page.reload();
+    await expect(titulo(page)).not.toHaveCSS('color', inicial);
+  });
+
+  test('deshacer un cambio de otra pantalla lleva a esa pantalla; mientras se escribe, Ctrl+Z es del texto', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_EDITOR);
+    await subtitulo(page).click();
+    await barra(page).getByRole('button', { name: 'Acento' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Cambio guardado.' })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Pantallas' }).getByRole('button').nth(1).click();
+    await expect(page).toHaveURL(/pantalla=p02/);
+
+    await deshacer(page).click();
+    await expect(page).toHaveURL(URL_EDITOR);
+    await expect.poll(() => ediciones.length).toBe(2);
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), ajustes: { 'p01-subtitulo': null }, motivo: 'deshacer' });
+
+    await empezarAEscribir(page, titulo(page));
+    await page.keyboard.type('Otro');
+    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(1200);
+    expect(ediciones).toHaveLength(2);
+  });
+
+  test('si otra persona guardó antes de guardar lo deshecho (409), se recarga, se avisa y el historial se vacía', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_EDITOR);
+    await titulo(page).click();
+    await barra(page).getByRole('button', { name: 'Acento' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Cambio guardado.' })).toBeVisible();
+    await page.route('**/api/v1/cursos/*/pantallas/p01', (r) =>
+      r.request().method() === 'PATCH'
+        ? r.fulfill({ status: 409, json: { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso.' } })
+        : r.fallback());
+    await page.keyboard.press('Control+z');
+    await expect(page.getByRole('alert')).toContainText('Otra persona cambió el curso mientras editabas');
+    expect(ediciones).toEqual([expect.objectContaining({ ajustes: { 'p01-titulo': { color: 'acento' } } }), expect.objectContaining({ motivo: 'deshacer' })]);
+    await expect(deshacer(page)).toBeDisabled();
+    await expect(rehacer(page)).toBeDisabled();
+  });
+});
