@@ -1602,3 +1602,17 @@ ul.fila-chips {
   .linea-tiempo { --lt-cabeza: 96px; }
   .lt-detalle, .lt-zoom, .lt-fin-voz { display: none; }
 }
+
+/* HU-0608 PR 2 · «Sincronizar con la voz» (franja de la propuesta) y «⚠ revisar tiempo». */
+.lt-franja { margin: 0 0 8px; }
+.lt-revisar {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-error-suave);
+  color: var(--color-error);
+  font-size: var(--texto-xs);
+  white-space: nowrap;
+}
+.lt-elemento.revisar { border-color: var(--color-error); }
+.lt-elemento.propuesta { border: 2px dashed var(--color-naranja); background: var(--color-naranja-suave); color: var(--color-naranja-texto); }

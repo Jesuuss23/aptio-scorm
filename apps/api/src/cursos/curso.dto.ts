@@ -64,7 +64,7 @@ export class ObservacionDto {
   @ApiProperty({ enum: ['CALIDAD', 'ALINEACION', 'IDIOMA', 'ACCESIBILIDAD', 'MATERIAL_FALTANTE'] }) tipo: string;
   @ApiProperty({ enum: ['info', 'aviso', 'bloquea-entrega'] }) severidad: string;
   @ApiProperty() mensaje: string;
-  @ApiProperty({ enum: ['regla', 'ia', 'usuario'] }) origen: string;
+  @ApiProperty({ enum: ['regla', 'ia', 'usuario', 'tiempo'], description: '`tiempo`: «Revisar tiempo» de la línea de tiempo (HU-0608)' }) origen: string;
   @ApiProperty() resuelta: boolean;
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
 }

@@ -18,8 +18,11 @@
 // se arrastra (CP-064, CP-065); la aguja deja el lienzo en ese segundo, con solo lo activo (CP-066). El lienzo se monta
 // con `sinTiempos` (todo a la vista) hasta que se mueve la aguja; ■ vuelve a mostrar todo. Los tiempos van en `ajustes`
 // y pasan por el historial como cualquier retoque.
+// HU-0608 PR 2 · «✦ Sincronizar con la voz» (SUP-48) calcula la propuesta aquí, sin IA: se ve en la franja morada con
+// las barras donde quedarían; Aplicar la guarda en un solo PATCH y Ctrl+Z la deshace (CP-068). Las barras de los
+// elementos que perdieron su palabra al cambiar la narración muestran «⚠ revisar tiempo» (CP-067).
 import { type AjusteElemento, type CursoReproductor, duracionDe, leerVtt, montar, PALETA_BASE, type Pantalla, type Reproductor, type RolColor, tiemposDe } from '@aptio/player';
-import { marcasPalabra } from '@aptio/schema/tiempos';
+import { elementoRevisarTiempo, marcasPalabra, ORIGEN_REVISAR_TIEMPO, sincronizarConVoz, type TiempoSincronizado } from '@aptio/schema/tiempos';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Rol } from '../api';
@@ -102,6 +105,9 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const [corriendo, setCorriendo] = useState<string | null>(null);
   const [conLinea, setConLinea] = useState(true);
   const agujaRef = useRef<{ pantallaId: string; s: number } | null>(null);
+  // HU-0608 PR 2 · La propuesta de «Sincronizar con la voz» (de una pantalla) y los elementos con «Revisar tiempo».
+  const [sincro, setSincro] = useState<{ pantallaId: string; tiempos: Record<string, TiempoSincronizado>; encontrados: number; total: number } | null>(null);
+  const [revisar, setRevisar] = useState<Set<string>>(new Set());
   const reproductor = useRef<Reproductor | null>(null);
   const lienzo = useRef<HTMLDivElement>(null);
   /** Texto que recupera el foco cuando el lienzo se redibuja tras guardar con Enter (teclado). */
@@ -114,6 +120,11 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     const c = await api.curso(proyectoId);
     cursoRef.current = c;
     setCurso(c);
+    // «Revisar tiempo» (CP-067) se marca en las barras; si no se pueden leer las observaciones, el editor sigue.
+    api.observaciones(c.id).then(
+      (obs) => setRevisar(new Set(obs.filter((o) => o.origen === ORIGEN_REVISAR_TIEMPO && o.pantallaId).map((o) => `${o.pantallaId}:${elementoRevisarTiempo(o.mensaje) ?? ''}`))),
+      () => setRevisar(new Set()),
+    );
   }, [proyectoId]);
 
   useEffect(() => {
@@ -584,11 +595,46 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const bocaLinea = conPersonaje && vozEs?.bocas?.length ? tramosBoca(vozEs.bocas, vozEs.duracionMs ?? 0) : null;
   const capas = capasDe(actual as PantallaConExtras);
   const tiempos = new Map(tiemposDe(actual as unknown as Pantalla).map((x) => [x.id, x]));
-  const barras = capas.map((c) => ({ id: c.id, nombre: c.nombre, inicioS: tiempos.get(c.id)?.inicioS ?? 0, finS: tiempos.get(c.id)?.finS ?? null, oculto: c.oculto }));
+  const propuesta = sincro?.pantallaId === actual.id ? sincro : null;
+  const barras = capas.map((c) => {
+    const t = tiempos.get(c.id);
+    const nuevo = propuesta?.tiempos[c.id];
+    const largoBarra = t?.finS != null ? t.finS - t.inicioS : null;
+    // Con la propuesta a la vista, la barra se ve donde quedaría (la salida se corre con la entrada, como al arrastrar).
+    const inicioS = nuevo ? nuevo.retardoS : (t?.inicioS ?? 0);
+    return {
+      id: c.id, nombre: c.nombre, inicioS, finS: nuevo && largoBarra !== null ? Math.round((inicioS + largoBarra) * 100) / 100 : (t?.finS ?? null), oculto: c.oculto,
+      revisar: revisar.has(`${actual.id}:${c.id}`), propuesta: Boolean(nuevo),
+    };
+  });
   const duracion = duracionDe(actual as unknown as Pantalla, 'es');
   const cambiarTiempo = (id: string, c: CambioTiempo) => {
     const previo = (actual as PantallaConAjustes).ajustes?.[id];
     void enviar(actual, { ajustes: { [id]: ajusteCon(previo, c) } }, 'Tiempo guardado.');
+  };
+  /** CP-068 · Calcula la propuesta (no guarda nada hasta Aplicar). */
+  const sincronizar = () => {
+    detenerTiempo();
+    setSincro({ pantallaId: actual.id, ...sincronizarConVoz({ bloques: actual.bloques as Parameters<typeof sincronizarConVoz>[0]['bloques'], extras: extras as Parameters<typeof sincronizarConVoz>[0]['extras'] }, marcas) });
+  };
+  /** Aplica la propuesta en un solo cambio: queda en el historial y Ctrl+Z la deshace. */
+  const aplicarSincronizacion = async () => {
+    if (!propuesta) return;
+    const ajustes: Record<string, AjusteElemento | null> = {};
+    for (const [id, t] of Object.entries(propuesta.tiempos)) {
+      const previo = (actual as PantallaConAjustes).ajustes?.[id];
+      const tiempo = tiempos.get(id);
+      const largoBarra = tiempo?.finS != null && previo?.finS !== undefined ? tiempo.finS - tiempo.inicioS : null;
+      const cambio = { retardoS: t.retardoS, anclaPalabra: t.anclaPalabra, ...(largoBarra !== null ? { finS: Math.round((t.retardoS + largoBarra) * 100) / 100 } : {}) };
+      if (previo?.retardoS === cambio.retardoS && previo?.anclaPalabra === cambio.anclaPalabra) continue;
+      ajustes[id] = ajusteCon(previo, cambio);
+    }
+    setSincro(null);
+    if (!Object.keys(ajustes).length) {
+      setAviso('Los tiempos ya estaban sincronizados con la voz.');
+      return;
+    }
+    await enviar(actual, { ajustes }, 'Tiempos sincronizados con la voz · revisa con ▶ Reproducir.');
   };
   const bloqueElegido = elegidoId ? actual.bloques.find((b) => b.id === elegidoId) : undefined;
   const extraElegido = elegidoId ? extras.find((e) => e.id === elegidoId) : undefined;
@@ -730,7 +776,9 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         <LineaTiempo key={actual.id} barras={barras} marcas={marcas} subtitulos={subtitulosLinea} boca={bocaLinea} vozS={(vozEs?.duracionMs ?? 0) / 1000}
           duracion={duracion} tiempo={tiempo} reproduciendo={reproduciendo} elegidoId={elegidoId} ocupado={ocupado}
           alIr={irTiempo} alReproducir={reproducirTiempo} alPausar={pausarTiempo} alDetener={detenerTiempo} alCambiar={cambiarTiempo}
-          alElegir={elegirCapa} alAlternarOculto={alternarOculto} alOcultar={() => { detenerTiempo(); setConLinea(false); }} />
+          alElegir={elegirCapa} alAlternarOculto={alternarOculto} alOcultar={() => { detenerTiempo(); setConLinea(false); }}
+          sincronizacion={propuesta ? { encontrados: propuesta.encontrados, total: propuesta.total } : null}
+          alSincronizar={sincronizar} alAplicarSincronizacion={() => void aplicarSincronizacion()} alDescartarSincronizacion={() => setSincro(null)} />
       ) : (
         <section className="tarjeta linea-tiempo linea-tiempo-plegada" aria-label="Línea de tiempo">
           <b>Línea de tiempo</b>

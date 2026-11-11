@@ -160,10 +160,15 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 4 en el generador', () => 
     await prisma.materialFuente.create({ data: { proyectoId, tipo: 'VIDEO', recursoId: video.id, estado: 'listo' } });
 
     const vistas: number[] = [];
+    // Las pantallas se piden en paralelo: las lecturas van en cadena para que se anoten en el orden en que se hicieron.
+    let lecturas = Promise.resolve();
     const base = comoReal({}, async (tarea) => {
       if (tarea !== 'IA-15') return;
-      const d = (await etapaDe(generacionId, 'PANTALLAS')).detalle as { datos?: PantallasCurso } | null;
-      vistas.push(d?.datos?.pantallas.length ?? -1);
+      lecturas = lecturas.then(async () => {
+        const d = (await etapaDe(generacionId, 'PANTALLAS')).detalle as { datos?: PantallasCurso } | null;
+        vistas.push(d?.datos?.pantallas.length ?? -1);
+      });
+      await lecturas;
     });
     let forzada = false;
     const proveedor: ProveedorTexto = {

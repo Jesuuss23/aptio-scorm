@@ -363,4 +363,33 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(p01.ajustes).toEqual({ 'p01-titulo': { color: 'acento' } });
     expect((await como('grafico').patch(ruta, { version: v + 2, ajustes: { 'x-boton-1': { color: 'acento' } } })).body).toMatchObject({ codigo: 'BLOQUE_NO_EXISTE' });
   });
+  it('HU-0608 · CP-067: al corregir la narración, el ancla sigue a su palabra; si ya no está, queda el segundo y «Revisar tiempo»', async () => {
+    type Pa = { id: string; ajustes?: Record<string, Record<string, unknown>> };
+    const p05De = (d: Doc) => pantallas(d).find((x) => x.id === 'p05') as unknown as Pa;
+    const ruta = `/cursos/${cursoId}/pantallas/p05`;
+    const revisar = () => prisma.observacion.findMany({ where: { cursoId, pantallaId: 'p05', origen: 'tiempo' } });
+    let v = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    // «Es cualquier energía que puede mover, calentar o liberar…»: el dato con «puede» (4) y el texto con «calentar» (6).
+    const r = await como('grafico').patch(ruta, { version: v, ajustes: { 'p05-dato': { retardoS: 1.63, anclaPalabra: 4, color: 'acento' }, 'p05-texto': { retardoS: 2.47, anclaPalabra: 6 } } });
+    expect(r.status).toBe(200);
+    v = r.body.version;
+
+    const n = await como('grafico').patch(ruta, { version: v, narracion: { es: 'Cualquier energía puede mover o liberar algo sin aviso.' } });
+    expect(n.status).toBe(200);
+    v = n.body.version;
+    expect(p05De(await documento()).ajustes).toMatchObject({
+      'p05-dato': { retardoS: 1.63, anclaPalabra: 2, color: 'acento' },
+      'p05-texto': { retardoS: 2.47 },
+    });
+    expect(p05De(await documento()).ajustes!['p05-texto']).not.toHaveProperty('anclaPalabra');
+    expect(await revisar()).toMatchObject([{ tipo: 'CALIDAD', severidad: 'aviso', mensaje: 'Revisar tiempo: la palabra de anclaje fue eliminada (p05-texto).', resuelta: false }]);
+    // Se ve en la lista de observaciones de Revisión.
+    expect((await como('grafico').get(`/cursos/${cursoId}/observaciones?pantallaId=p05`)).body).toEqual(expect.arrayContaining([expect.objectContaining({ origen: 'tiempo', pantallaId: 'p05' })]));
+
+    // Otro retoque del mismo elemento no la quita; mover su entrada, sí.
+    v = (await como('grafico').patch(ruta, { version: v, ajustes: { 'p05-texto': { retardoS: 2.47, color: 'acento' } } })).body.version;
+    expect(await revisar()).toHaveLength(1);
+    expect((await como('grafico').patch(ruta, { version: v, ajustes: { 'p05-texto': { retardoS: 2.1, color: 'acento' } } })).status).toBe(200);
+    expect(await revisar()).toHaveLength(0);
+  });
 });
