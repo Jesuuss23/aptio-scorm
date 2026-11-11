@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.24 · actualizado con la segunda entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.25 · actualizado con la tercera entrega del Sprint 6 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -364,6 +364,9 @@ Las actividades y la narración se cambian desde Revisión. Con esto el editor d
 
 ## 9. Preguntas frecuentes
 
+**¿Qué ve el participante si cierra el curso a medias y vuelve?**
+Si el LMS guardó su avance, el curso pregunta «¿Continuar donde lo dejaste?» y dice en qué pantalla quedó. Con **Continuar** vuelve a esa pantalla con sus puntos y actividades hechas; con **Empezar de nuevo** arranca desde la primera pantalla sin avance. Si ya había aprobado, el LMS lo sigue mostrando como aprobado y su nota no baja. El aviso se usa con teclado y lector de pantalla. Si quedó en la primera pantalla, no pregunta.
+
 **¿Puedo crear un proyecto sin tener todos los datos?**
 Sí. Solo necesitas el cliente y el nombre. Lo demás se completa después.
 
@@ -420,6 +423,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.22 | 2026-11-11 | Editor: «Sincronizar con la voz» y «⚠ revisar tiempo» cuando cambia la narración. |
 | 0.23 | 2026-11-11 | Entrega: el paquete SCORM 1.2 registra avance, nota y estado en el LMS (la vista Entrega llega en el PR 2). |
 | 0.24 | 2026-11-11 | Entrega: elegir el LMS destino, exportar el SCORM 1.2, ver el avance y descargarlo desde el historial. |
+| 0.25 | 2026-11-11 | Reanudación: al volver al curso en el LMS, el participante elige continuar donde lo dejó o empezar de nuevo. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.24 · actualizado con la segunda entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.25 · actualizado con la tercera entrega del Sprint 6 (11 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -125,6 +125,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - Entrada: `montar(contenedor, curso, { kit, revision, inicio, marco, urlRecurso, alCambiar })`. Con `marco: false` dibuja solo la pantalla, sin barra, pie ni atajos de teclado (lo usa la Revisión). Se monta en un Shadow DOM propio; los estilos viven en `src/estilos.ts` con variables `--ap-*` que salen del kit.
 - Las reglas de avance (`src/navegacion.ts`) y el seguimiento (`src/seguimiento.ts`) son funciones puras: cualquier patrón nuevo las reutiliza.
 - Cada interacción es una función `(datos, ctx) => HTMLElement` en `src/interacciones/` que llama `ctx.terminar({ completada, puntaje })`. Todo con botones; el orden barajado usa `barajar(lista, clave)` con el id de la pantalla para que vista previa y paquete coincidan.
+- Reanudación (HU-1105): `montar(..., { reanudar: { pantallaId, vistas, resultados, preguntar }, alReanudar })` restaura el avance y, con `preguntar`, muestra el aviso «¿Continuar donde lo dejaste?» dentro del Shadow DOM. La decisión y la restauración son funciones puras en `src/reanudacion.ts`. `suspend_data` v2 vive en `src/suspend.ts` (`2|<huella>|<idioma>|<vistas>|<pos:c:p[:intentos]>`; la huella sale de `huellaCurso(curso.id, orden)`) y se sigue leyendo v1. `leerSuspend` nunca lanza: lo inválido devuelve `null`. `conectarScorm12` no hace commit al entrar, no degrada un `lesson_status` cerrado y, con `mejorNota`, no baja `score.raw`. `iniciarPaquete` no reporta nada hasta que el participante elige. Si cambias el formato, súbele la versión y conserva la lectura de las anteriores.
 - Para el paquete: `pnpm --filter @aptio/player construir` deja `packages/player/dist/aptio-reproductor.js` con `window.AptioReproductor.montar`.
 
 ### 6.6 Cambios al documento del curso (M05)
@@ -347,6 +348,7 @@ Ninguna clave real va al repositorio.
 | 0.22 | 2026-11-11 | HU-0608, PR 2: `reanclar`, `sincronizarConVoz`, anclas en la API y en la etapa de voz. |
 | 0.23 | 2026-11-11 | HU-1202, PR 1: paquete `@aptio/exporters` (`construirScorm12`, manifiesto SCORM 1.2, ZIP determinista) y adaptador `scorm12.ts` con `iniciarPaquete`. |
 | 0.24 | 2026-11-11 | HU-1202, PR 2: módulo `exportaciones` de la API, `crearExportador` en la cola `export` (tarea EXPORTAR), columna `motivo` y vista `EntregaVista`. |
+| 0.25 | 2026-11-11 | HU-1105: `src/suspend.ts` (v2 con huella e intentos), `src/reanudacion.ts`, opción `reanudar` del reproductor y LMS de prueba compartido `e2e/lms-prueba.ts`. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
