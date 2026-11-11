@@ -64,6 +64,8 @@ export interface EstadoReproductor extends EstadoSeguimiento {
   modo: ModoNavegacion;
   /** Actividades hechas, por id de pantalla. */
   resultados: Record<string, ResultadoActividad>;
+  /** HU-1202 · Pantallas vistas, en el orden del curso (el paquete las guarda en `suspend_data`). */
+  vistas: string[];
 }
 
 export interface Reproductor {
@@ -384,6 +386,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       puedeSiguiente: !ultima && m === null, motivo: ultima ? null : textoMotivo(m),
       patron: curso.navegacion?.patron ?? 'clasico', patronAplicado: 'clasico', modo,
       resultados: Object.fromEntries(resultados),
+      vistas: pantallas.filter((x) => vistas.has(x.pantalla.id)).map((x) => x.pantalla.id),
     };
   };
 
