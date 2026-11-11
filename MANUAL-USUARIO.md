@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.26 · actualizado con la cuarta entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.27 · actualizado con la quinta entrega del Sprint 6 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -123,6 +123,14 @@ Son plantillas de pantalla propias del cliente (por ejemplo, cómo se ve una por
 - **Escuchar muestra:** escribe una frase y escucha cómo la dirá la voz con esas reglas.
 
 Al guardar un cambio de pronunciación, las narraciones ya generadas que usan esa palabra quedan **«Por regenerar»** (ver 8.4).
+
+### 5.6 Fichas de compatibilidad LMS
+
+En el detalle del cliente, **Fichas de compatibilidad LMS** guarda lo que se sabe de la plataforma del cliente: LMS, versión, **límite de subida en MB**, notas y, si lo hay, el **informe del modo diagnóstico** (ver 8.10). La lista muestra la ficha más nueva primero, y su límite de subida es el que usa la verificación antes de exportar (8.9).
+
+- Pulsa **Nueva ficha**, completa al menos el LMS y pega el informe tal cual lo copió el paquete. Si el texto pegado no es el informe completo, verás «El informe no es un JSON válido» y no se guarda nada.
+- La columna **Diagnóstico** resume el informe: «API encontrada», «Sin API SCORM» y el navegador donde se probó.
+- Las fichas las crean administración, diseño instruccional y producción; el diseñador gráfico las ve, y el revisor del cliente no las ve.
 
 ---
 
@@ -373,6 +381,17 @@ Desde el proyecto, **Exportar SCORM** abre **Entrega**. Ahí eliges el **LMS des
 
 Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**.
 
+### 8.10 Modo diagnóstico del paquete (para el soporte)
+
+Cuando un cliente dice «el curso no guarda el avance» o «no llega la nota», el propio paquete puede mostrar qué pasa en su LMS. El participante nunca lo ve: se abre solo a pedido.
+
+1. Con el curso abierto en el LMS, haz clic dentro del curso y pulsa **Ctrl + Alt + Shift + D**. También se abre si a la dirección del paquete se le agrega `?diagnostico=1`.
+2. El panel **Modo diagnóstico** dice si encontró la conexión con el LMS (la API SCORM 1.2) y en qué ventana, qué ventanas revisó, lo que el LMS tenía guardado al entrar y la lista de llamadas al LMS, que se actualiza mientras avanzas. Las filas con error se marcan en rojo.
+3. Pulsa **Copiar informe** y pégalo en la ficha del cliente (5.6). Si el LMS no deja copiar, el informe queda seleccionado: cópialo con **Ctrl + C**.
+4. Cierra con **Cerrar** o **Escape**.
+
+Si dice **«No se encontró la API SCORM 1.2»**, el curso funciona pero el LMS no recibe avance ni nota: suele pasar cuando el paquete se abrió fuera del LMS o en una ventana que el LMS no controla. El informe no incluye el nombre ni el código del participante.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -416,7 +435,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Subtítulos en inglés y elegir el idioma de los subtítulos.
 - Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
-- Control de calidad y paquete SCORM para subir a la plataforma del cliente.
+- Control de calidad y otros formatos de entrega (HTML, SCORM 2004).
 - Otra ilustración desde la revisión y comentarios del cliente.
 
 ---
@@ -436,6 +455,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.24 | 2026-11-11 | Entrega: elegir el LMS destino, exportar el SCORM 1.2, ver el avance y descargarlo desde el historial. |
 | 0.25 | 2026-11-11 | Reanudación: al volver al curso en el LMS, el participante elige continuar donde lo dejó o empezar de nuevo. |
 | 0.26 | 2026-11-11 | Entrega: verificación automática antes de exportar (peso contra el límite con alternativas, pantallas sin aprobar con confirmación, errores que deshabilitan Exportar). |
+| 0.27 | 2026-11-11 | Modo diagnóstico del paquete (Ctrl+Alt+Shift+D o `?diagnostico=1`, Copiar informe) y fichas de compatibilidad LMS en el detalle del cliente. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
