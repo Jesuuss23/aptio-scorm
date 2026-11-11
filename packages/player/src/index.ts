@@ -5,3 +5,5 @@ export { aplanar, modoDe, motivoBloqueo, type Avance, type Motivo, type Pantalla
 export { seguimiento, type EstadoSeguimiento } from './seguimiento.ts';
 export type * from './tipos.ts';
 export { animarBoca, bocaDisponible, bocaEn, type MarcasBoca, mostrarBoca, mostrarPose, parpadear, type ColoresUniforme, MARCADORES_KIT, type RelojAudio, svgEnLinea } from './boca.ts';
+export { type Cue, cueEn, leerVtt } from './subtitulos.ts';
+export { activoEn, duracionDe, ESCALONADO_S, type TiempoElemento, tiemposDe } from './tiempos.ts';

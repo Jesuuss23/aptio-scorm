@@ -6,7 +6,11 @@
 // la boca según sus marcas (CP-072). Con «Siguiente se habilita al terminar la narración», se avanza al terminarla.
 // HU-0801 · Subtítulos: con «CC», mientras suena el audio se ve la frase del WebVTT que se está diciendo; en pausa o
 // sin audio, el texto completo de la narración. La preferencia se recuerda en el navegador (SUP-37).
-import { animarBoca, mostrarBoca, parpadear } from './boca.ts';
+// HU-0608 · Línea de tiempo: cada elemento aparece en su `retardoS` y sale en su `finS`; sin tiempo, entra escalonado de
+// a 0,3 s (RN-06-9). El reloj de la pantalla es el audio de la narración si está sonando (o ya sonó) y, si no, el tiempo
+// desde que se mostró. El editor monta con `sinTiempos` (todo a la vista) y mueve la aguja con `irA`, `reproducir`,
+// `pausar` y `verTodo`: en ese segundo se ven solo los elementos activos, con la boca y el subtítulo de ese instante.
+import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
 import { aplanar, type Motivo, modoDe, motivoBloqueo } from './navegacion.ts';
@@ -14,6 +18,7 @@ import { dibujarPantalla } from './pantalla.ts';
 import { type Cue, cueEn, leerVtt } from './subtitulos.ts';
 import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
 import { ESTILOS } from './estilos.ts';
+import { activoEn, duracionDe, tiemposDe, ultimoCambio } from './tiempos.ts';
 import { t, textos } from './textos.ts';
 import type { AudioNarracion, BloqueInteraccion, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
 
@@ -42,6 +47,8 @@ export interface OpcionesReproductor {
   marco?: boolean;
   /** HU-0606 · true en el editor: los botones agregados se eligen y se escriben, pero no navegan. */
   sinAcciones?: boolean;
+  /** HU-0608 · true en el editor: se ve todo, sin reloj ni entrada escalonada, hasta que se mueve la aguja. */
+  sinTiempos?: boolean;
   alCambiar?: (estado: EstadoReproductor) => void;
 }
 
@@ -65,6 +72,16 @@ export interface Reproductor {
   anterior(): boolean;
   reiniciar(): void;
   estado(): EstadoReproductor;
+  /** HU-0608 · Deja la pantalla quieta en el segundo `s`: solo lo activo, con la boca y el subtítulo de ese instante. */
+  irA(segundo: number): void;
+  /** HU-0608 · Corre la pantalla desde `desde` (con la narración, si tiene) y avisa el segundo en cada cuadro. */
+  reproducir(desde: number, alTiempo?: (segundo: number, terminado: boolean) => void): void;
+  /** HU-0608 · Detiene la aguja donde está. */
+  pausar(): void;
+  /** HU-0608 · Vuelve a mostrar todo (■ en el editor). */
+  verTodo(): void;
+  /** HU-0608 · Duración de la pantalla actual en segundos (RN-06-7). */
+  duracion(): number;
   destruir(): void;
 }
 
@@ -119,6 +136,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const textoSubtitulos = () => {
     const p = pantallas[actual]?.pantalla;
     if (!p?.narracion) return '';
+    if (fijo !== null && cues.length) return cueEn(cues, fijo * 1000)?.texto ?? '';
     if (!audio.paused && !audio.ended && cues.length) return cueEn(cues, audio.currentTime * 1000)?.texto ?? '';
     return t(p.narracion.texto, idioma);
   };
@@ -152,12 +170,18 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     if (svg) mostrarBoca(svg, 'X');
   };
   audio.addEventListener('play', () => {
+    seguirReloj();
     callar();
     detenerBoca = animarBoca(personaje, { ms: () => audio.currentTime * 1000, sonando: () => !audio.paused && !audio.ended }, () => audioDe(actual)?.bocas);
     refrescar();
     seguirSubtitulos();
   });
-  audio.addEventListener('pause', () => { callar(); refrescar(); });
+  audio.addEventListener('pause', () => {
+    callar();
+    // Con la aguja quieta (editor), la boca queda en la de ese instante.
+    if (fijo !== null && !enReproduccion) quieta(fijo);
+    refrescar();
+  });
   audio.addEventListener('ended', () => {
     const p = pantallas[actual]?.pantalla;
     if (p) escuchadas.add(p.id);
@@ -172,7 +196,8 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       if (audio.getAttribute('src') !== url) audio.src = url;
       audio.currentTime = 0;
     } else audio.removeAttribute('src');
-    barraNarracion.hidden = !url;
+    // En el editor la narración suena con ▶ Reproducir de la línea de tiempo.
+    barraNarracion.hidden = !url || opciones.sinTiempos === true;
     cues = [];
     const vttId = audioDe(actual)?.subtitulosId;
     const indice = actual;
@@ -252,9 +277,101 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     let el = dibujadas.get(p.id);
     if (!el) {
       el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad, cargarSvg, alSiguiente: opciones.sinAcciones ? undefined : () => irA(actual + 1, true) });
+      if (!opciones.sinTiempos) escalonar(el, p);
       dibujadas.set(p.id, el);
     }
     return el;
+  };
+
+  // ---------- Línea de tiempo (HU-0608) ----------
+  /** El segundo en que el editor dejó la aguja; null: corre el reloj (o, con `sinTiempos`, se ve todo). */
+  let fijo: number | null = null;
+  /** true mientras el editor reproduce la pantalla con ▶. */
+  let enReproduccion = false;
+  let inicioReloj = 0;
+  let latido = 0;
+  const elementoDe = (id: string) => escena.querySelector<HTMLElement>(`[data-bloque="${CSS.escape(id)}"]`);
+  /** RN-06-9 · Lo que no tiene tiempo entra escalonado: el retraso va en la animación, sin mover el resto. */
+  function escalonar(el: HTMLElement, p: Pantalla) {
+    for (const x of tiemposDe(p)) {
+      if (x.definido || !x.inicioS) continue;
+      const nodo = el.querySelector<HTMLElement>(`[data-bloque="${CSS.escape(x.id)}"]`);
+      if (!nodo) continue;
+      if (![...nodo.classList].some((c) => c.startsWith('ap-anim-'))) nodo.classList.add('ap-entra');
+      nodo.style.animationDelay = `${x.inicioS}s`;
+    }
+  }
+  /** Muestra lo activo en el segundo `s`: todos los elementos (editor) o solo los que tienen tiempo (el reloj). */
+  const aplicarTiempo = (s: number, todos: boolean) => {
+    const p = pantallas[actual]?.pantalla;
+    if (!p) return;
+    for (const x of tiemposDe(p)) if (todos || x.definido) elementoDe(x.id)?.classList.toggle('ap-fuera', !activoEn(x, s));
+  };
+  /** El segundo de la pantalla: el del audio si está sonando o ya sonó; si no, desde que se mostró. */
+  /** El audio manda solo si de verdad suena (o ya sonó): si no carga, el reloj sigue igual. */
+  const sonando = () => !audio.paused && !audio.ended && audio.readyState >= 3;
+  const relojS = () => (audio.getAttribute('src') && (sonando() || audio.currentTime > 0) ? audio.currentTime : (performance.now() - inicioReloj) / 1000);
+  function seguirReloj() {
+    // Con ▶ del editor, el que mueve la pantalla es `reproducir`.
+    if (enReproduccion) return;
+    cancelAnimationFrame(latido);
+    const p = pantallas[actual]?.pantalla;
+    if (!vivo || opciones.sinTiempos || fijo !== null || !p) return;
+    const tiempos = tiemposDe(p);
+    if (!tiempos.some((x) => x.definido)) return;
+    const hasta = ultimoCambio(tiempos);
+    const paso = () => {
+      if (!vivo || fijo !== null) return;
+      const s = relojS();
+      aplicarTiempo(s, false);
+      if (s <= hasta || !audio.paused) latido = requestAnimationFrame(paso);
+    };
+    paso();
+  }
+  const empezarReloj = () => {
+    fijo = null;
+    inicioReloj = performance.now();
+    seguirReloj();
+  };
+  /** Editor: la aguja en `s`, con la boca de ese instante si no está sonando. */
+  const quieta = (s: number) => {
+    fijo = s;
+    cancelAnimationFrame(latido);
+    aplicarTiempo(s, true);
+    const svg = personaje();
+    if (svg && audio.paused) mostrarBoca(svg, bocaEn(audioDe(actual)?.bocas ?? [], s * 1000));
+    if (conSubtitulos) subtitulos.textContent = textoSubtitulos();
+  };
+  const reproducir = (desde: number, alTiempo?: (s: number, terminado: boolean) => void) => {
+    const p = pantallas[actual]?.pantalla;
+    if (!vivo || !p) return;
+    cancelAnimationFrame(latido);
+    enReproduccion = true;
+    const total = duracionDe(p, idioma);
+    const conAudio = Boolean(audio.getAttribute('src'));
+    const voz = (audioDe(actual)?.duracionMs ?? 0) / 1000;
+    const salida = performance.now() - desde * 1000;
+    if (conAudio && desde < voz) {
+      audio.currentTime = desde;
+      void audio.play().catch(() => undefined);
+    }
+    const paso = () => {
+      if (!vivo) return;
+      const s = sonando() ? audio.currentTime : (performance.now() - salida) / 1000;
+      const terminado = s >= total;
+      fijo = Math.min(s, total);
+      aplicarTiempo(fijo, true);
+      const svg = personaje();
+      if (svg && (audio.paused || audio.ended)) mostrarBoca(svg, bocaEn(audioDe(actual)?.bocas ?? [], fijo * 1000));
+      if (conSubtitulos) subtitulos.textContent = textoSubtitulos();
+      alTiempo?.(fijo, terminado);
+      if (!terminado) latido = requestAnimationFrame(paso);
+      else {
+        enReproduccion = false;
+        audio.pause();
+      }
+    };
+    paso();
   };
 
   // ---------- Estado y refresco ----------
@@ -320,6 +437,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     vistas.add(pantallas[destino]!.pantalla.id);
     vaciar(escena, pantallaDe(destino));
     cargarNarracion();
+    empezarReloj();
     refrescar();
     if (enfocar) escena.querySelector<HTMLElement>('.ap-titulo-pantalla')?.focus();
     return true;
@@ -338,6 +456,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       vaciar(escena, pantallaDe(inicio));
     }
     cargarNarracion();
+    empezarReloj();
     refrescar();
   };
   const indiceDe = (d: string | number) => (typeof d === 'number' ? d : pantallas.findIndex((x) => x.pantalla.id === d));
@@ -351,8 +470,35 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     anterior: () => irA(actual - 1, false),
     reiniciar: () => reiniciar(0),
     estado,
+    irA: (s) => {
+      enReproduccion = false;
+      audio.pause();
+      quieta(Math.max(0, s));
+    },
+    reproducir,
+    pausar: () => {
+      enReproduccion = false;
+      cancelAnimationFrame(latido);
+      audio.pause();
+      if (fijo !== null) quieta(fijo);
+    },
+    verTodo: () => {
+      enReproduccion = false;
+      cancelAnimationFrame(latido);
+      audio.pause();
+      fijo = null;
+      for (const el of escena.querySelectorAll('.ap-fuera')) el.classList.remove('ap-fuera');
+      callar();
+      refrescar();
+      if (!opciones.sinTiempos) empezarReloj();
+    },
+    duracion: () => {
+      const p = pantallas[actual]?.pantalla;
+      return p ? duracionDe(p, idioma) : 0;
+    },
     destruir: () => {
       vivo = false;
+      cancelAnimationFrame(latido);
       cancelAnimationFrame(siguiendo);
       callar();
       audio.pause();

@@ -2,7 +2,9 @@
 // del kit (RN-06-4), alineación y animación de entrada. Los dos usan las mismas acciones; el estado vive en EditorVista.
 // HU-0606 · Ocultar o mostrar cualquier elemento; eliminar, la imagen y lo que hace el botón, solo en los extras.
 import type { AjusteElemento, ElementoExtra, RolColor } from '@aptio/player';
-import { useState } from 'react';
+import type { MarcaPalabra } from '@aptio/schema/tiempos';
+import { type KeyboardEvent, useState } from 'react';
+import type { CambioTiempo } from './linea-tiempo';
 import { ALINEACIONES, ANIMACIONES, type Animacion, COLORES_KIT, controlesDe, ESCALA, TAMANO } from './ajustes-elemento';
 
 export interface AccionesRetoque {
@@ -79,12 +81,16 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
 }
 
 /** Panel lateral de Propiedades: los mismos retoques, con un deslizador de tamaño. */
-export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra }: {
+/** HU-0608 · El tiempo del elemento elegido en la línea de tiempo y las palabras de la narración. */
+export type TiempoElegido = { inicioS: number; finS: number | null; anclaPalabra?: number | undefined; palabras: MarcaPalabra[]; alCambiar: (c: CambioTiempo) => void };
+
+export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra, tiempo }: {
   elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; modo: 'auto' | 'libre'; acciones: AccionesRetoque;
   /** HU-0606 · Imágenes del curso para un extra «Imagen del kit» y cómo cambiar el extra elegido. */
   imagenes?: { id: string; nombre: string }[]; alCambiarExtra?: (cambio: CambioExtra) => void;
   /** HU-0605 · Nombre del diseño de la pantalla y cómo ir al panel Diseños. */
   diseno: string; alCambiarDiseno: () => void;
+  tiempo?: TiempoElegido | null;
 }) {
   if (!elegido) {
     return (
@@ -130,7 +136,7 @@ export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, dis
               <button key={a} type="button" className="opcion" aria-pressed={(elegido.ajuste?.animacion ?? 'auto') === a} disabled={ocupado} onClick={() => acciones.alAnimar(a)}>{nombre}</button>
             ))}
           </div>
-          <span className="ayuda">«Auto» entra como la disposición; el orden y los tiempos llegan con la línea de tiempo.</span>
+          <span className="ayuda">«Auto» entra como la disposición; cuándo entra y sale se elige abajo o en la línea de tiempo.</span>
         </div>
       ) : null}
       {c.tamano ? (
@@ -145,6 +151,7 @@ export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, dis
           ) : null}
         </div>
       ) : null}
+      {tiempo ? <TiempoElemento key={`${elegido.nombre}-${tiempo.inicioS}-${tiempo.finS}`} tiempo={tiempo} ocupado={ocupado} /> : null}
       {elegido.extra && alCambiarExtra ? <DatosExtra key={elegido.extra.id} extra={elegido.extra} imagenes={imagenes} ocupado={ocupado} alCambiar={alCambiarExtra} /> : null}
       <div className="acciones-form">
         <button type="button" className="boton" onClick={acciones.alVerAnimacion}>▶ Ver animación</button>
@@ -152,6 +159,47 @@ export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, dis
         <OcultarEliminar elegido={elegido} ocupado={ocupado} acciones={acciones} />
       </div>
     </aside>
+  );
+}
+
+const numeroDe = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.')));
+
+/** HU-0608 · Aparece (s), Sale (s) y «Que aparezca cuando Ana dice…»; se guarda al salir del campo o con Enter. */
+function TiempoElemento({ tiempo, ocupado }: { tiempo: TiempoElegido; ocupado: boolean }) {
+  const [aparece, setAparece] = useState(String(tiempo.inicioS));
+  const [sale, setSale] = useState(tiempo.finS === null ? '' : String(tiempo.finS));
+  const confirmar = () => {
+    const a = numeroDe(aparece);
+    const f = numeroDe(sale);
+    if (a === null || Number.isNaN(a) || a < 0 || (f !== null && (Number.isNaN(f) || f <= a))) return;
+    const cambio: CambioTiempo = {};
+    if (a !== tiempo.inicioS) Object.assign(cambio, { retardoS: Math.round(a * 100) / 100, anclaPalabra: undefined });
+    if (f !== tiempo.finS) cambio.finS = f === null ? undefined : Math.round(f * 100) / 100;
+    if (Object.keys(cambio).length && !ocupado) tiempo.alCambiar(cambio);
+  };
+  const alEnter = (e: KeyboardEvent) => {
+    if (e.key === 'Enter') confirmar();
+  };
+  return (
+    <fieldset className="campo editor-tiempo">
+      <legend>En la línea de tiempo</legend>
+      <div className="editor-tiempo-campos">
+        <label>Aparece (s)<input type="number" min="0" step="0.1" value={aparece} disabled={ocupado} onChange={(e) => setAparece(e.target.value)} onBlur={confirmar} onKeyDown={alEnter} /></label>
+        <label>Sale (s)<input type="number" min="0" step="0.1" value={sale} placeholder="al final" disabled={ocupado} onChange={(e) => setSale(e.target.value)} onBlur={confirmar} onKeyDown={alEnter} /></label>
+      </div>
+      {tiempo.palabras.length ? (
+        <label>Que aparezca cuando Ana dice…
+          <select value={tiempo.anclaPalabra ?? ''} disabled={ocupado}
+            onChange={(e) => {
+              const m = tiempo.palabras.find((p) => String(p.indice) === e.target.value);
+              if (m) tiempo.alCambiar({ retardoS: Math.round(m.inicioS * 100) / 100, anclaPalabra: m.indice });
+            }}>
+            <option value="">Elegir palabra de la narración</option>
+            {tiempo.palabras.map((p) => <option key={p.indice} value={p.indice}>{`${p.inicioS.toFixed(1).replace('.', ',')} s · ${p.texto}`}</option>)}
+          </select>
+        </label>
+      ) : null}
+    </fieldset>
   );
 }
 
