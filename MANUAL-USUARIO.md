@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.17 · actualizado con la sexta entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.18 · actualizado con la séptima entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -340,7 +340,9 @@ A la derecha, el panel **Propiedades** tiene las mismas opciones, un deslizador 
 
 La posición se guarda en proporción al ancho de la pantalla, así que se ve en el mismo lugar en un celular, una tableta o una computadora. En **Propiedades** ves la posición y el botón **Volver a su lugar**, que deshace solo el movimiento sin tocar el tamaño ni el color. Las actividades no se mueven.
 
-Las actividades y la narración se cambian desde Revisión. Agregar elementos, deshacer y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
+**Cambiar el diseño.** A la izquierda del lienzo está el panel **Diseños** (en el celular, debajo). Muestra la misma pantalla en cuatro composiciones: **Idea + ilustración**, **Personaje habla**, **Dato grande** y **Tarjetas con íconos**. La actual dice «· actual». Al elegir otra, la pantalla cambia de composición con el mismo contenido y aparece **Deshacer**, que la deja como estaba, con sus retoques. Al cambiar de diseño, el tamaño, el color y la posición que retocaste vuelven a como los dibuja el kit; los elementos que agregaste se quedan. En **Propiedades**, sin un elemento elegido, ves el diseño de la pantalla y el botón **Cambiar**. Las pantallas con una actividad o un video no cambian de diseño aquí: usa «✦ Convertir en actividad» o «✦ Ver 3 variantes» en Revisión.
+
+Las actividades y la narración se cambian desde Revisión. Agregar elementos, el deshacer general y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
 
 ---
 
@@ -396,6 +398,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | --- | --- | --- |
 | 0.16 | 2026-11-11 | Editor: modo Libre para mover elementos con el mouse o las flechas. |
 | 0.17 | 2026-11-11 | Los retoques del editor se conservan al aplicar propuestas de la IA, al deshacer y al generar de nuevo. |
+| 0.18 | 2026-11-11 | Editor: panel Diseños para ver la pantalla en otra composición y Deshacer. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

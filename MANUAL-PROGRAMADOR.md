@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.17 · actualizado con la sexta entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.18 · actualizado con la séptima entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -227,6 +227,12 @@ El modo Libre (HU-0603):
 - Las flechas acumulan en `flechas` y guardan con un `setTimeout` de 1 s. `modoRef` y `moverRef` evitan montar el lienzo de nuevo.
 - `ajustes-elemento.ts` tiene `pxAPorcentaje`, `desplazado` (tope ±100) y `cambioDesplazamiento`.
 
+Cambiar diseño (HU-0605):
+- `@aptio/schema/marca` tiene `DISENOS_CONTENIDO`, `NOMBRE_DISENO`, `disenosPara` (vacío con actividad, video o resultados), `disenoPermitido` (además vuelve a portada, objetivos, sección, resumen o cierre) y `plantillaPara` (cambia el sufijo de la plantilla del kit).
+- `CursosService.editar` aplica `dto.disposicion` antes de `dto.ajustes`: cambia disposición y plantilla, borra `ajustes` y deja `extras`. Así Deshacer es un solo `PATCH` con la disposición y los ajustes de antes.
+- En la web, `disenos-pantalla.ts` (lógica, con Vitest) tiene `opcionesDiseno`, `nombreDiseno` y `cursoConDiseno`, que arma un curso de una sola pantalla para la miniatura; `disenos.tsx` dibuja `PanelDisenos` con `montar()` por miniatura (`inert`, a 640 px y reducida). `EditorVista` guarda `deshacer` con la disposición y los ajustes previos.
+- El reproductor compone por la clase `ap-d-*`: reglas nuevas `.ap-d-lista .ap-parrafo/.ap-dato` (tarjetas) y `.ap-d-dato .ap-dato` (destacado grande).
+
 Retoques separados del contenido (HU-0604):
 - `packages/schema/src/retoques.ts` (`@aptio/schema/retoques`) tiene `sinRetoques` y `conservarRetoques(antes, despues)`: copia los extras siempre y los ajustes de los elementos que siguen, solo si la disposición no cambió (RN-06-3).
 - En `@aptio/schema/propuesta`, `rutaProtegida` cubre `/ajustes` y `/extras`; `pantallaParaPrompt` y `huellaPantalla` usan `sinRetoques`; `aplicarEnPantalla` pasa por `conservarRetoques`; `cambiaDisposicion(patch)` dice si un patch toca `/disposicion`.
@@ -310,6 +316,7 @@ Ninguna clave real va al repositorio.
 | --- | --- | --- |
 | 0.16 | 2026-11-11 | Modo Libre (HU-0603): `translate` en cqw en el reproductor, arrastre y flechas en `EditorVista`. |
 | 0.17 | 2026-11-11 | Retoques separados del contenido (HU-0604): `@aptio/schema/retoques`, rutas protegidas y `cambiaDisposicion`. |
+| 0.18 | 2026-11-11 | Cambiar diseño (HU-0605): `disposicion` en el PATCH, catálogo en `@aptio/schema/marca`, `PanelDisenos`. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
