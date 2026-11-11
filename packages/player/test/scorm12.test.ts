@@ -1,13 +1,15 @@
 // HU-1202 · Adaptador SCORM 1.2: búsqueda de la API (algoritmo de ADL), ciclo de vida, tolerancia a errores del LMS y
 // límite de suspend_data (CP-091, CP-092 preliminar).
+// HU-1105 · Sin LMSCommit al entrar y sin degradar un «passed» ni bajar la nota que el LMS ya tenía (CP-092).
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { aplanar } from '../src/navegacion.ts';
-import { type ApiScorm12, buscarApi, codificarSuspend, conectarScorm12, LIMITE_SUSPEND, leerSuspend, tiempoScorm, type VentanaLms } from '../src/scorm12.ts';
+import { type ApiScorm12, buscarApi, codificarSuspend, conectarScorm12, huellaCurso, LIMITE_SUSPEND, leerSuspend, tiempoScorm, type VentanaLms } from '../src/scorm12.ts';
 import type { CursoReproductor } from '../src/tipos.ts';
 
 const loto = JSON.parse(readFileSync(new URL('../../ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8')) as CursoReproductor;
 const orden = aplanar(loto).map((x) => x.pantalla.id);
+const H = huellaCurso('', orden);
 
 /** LMS de prueba: guarda los valores y registra cada llamada. `fallar` hace que esos elementos respondan error 405. */
 function lmsDePrueba(inicial: Record<string, string> = {}, fallar: string[] = []) {
@@ -76,11 +78,13 @@ describe('ciclo de vida CMI', () => {
     expect(llamadas[0]).toBe('LMSInitialize');
     expect(valores['cmi.core.lesson_status']).toBe('incomplete');
     expect(valores['cmi.core.exit']).toBe('suspend');
+    // Al entrar no se hace LMSCommit: lo guardado no cambia hasta el primer avance.
+    expect(llamadas).not.toContain('LMSCommit');
 
     reloj = 65_000;
     expect(lms.reportar(estado('p03'))).toBe(true);
     expect(valores['cmi.core.lesson_location']).toBe('p03');
-    expect(valores['cmi.suspend_data']).toBe('1|es|0-2|');
+    expect(valores['cmi.suspend_data']).toBe(`2|${H}|es|0-2|`);
     expect(valores['cmi.core.session_time']).toBe('00:01:05');
     expect(llamadas.at(-1)).toBe('LMSCommit');
 
@@ -103,7 +107,29 @@ describe('ciclo de vida CMI', () => {
   it('lee lo guardado al volver y no reabre un estado ya cerrado', () => {
     const { api, valores } = lmsDePrueba({ 'cmi.core.lesson_status': 'passed', 'cmi.core.entry': 'resume', 'cmi.core.lesson_location': 'p12', 'cmi.suspend_data': '1|es|0-11|' });
     const lms = conectarScorm12(api, { orden, idioma: 'es', avisar: () => {} });
-    expect(lms.inicial).toEqual({ entrada: 'resume', ubicacion: 'p12', suspendData: '1|es|0-11|', estado: 'passed' });
+    expect(lms.inicial).toEqual({ entrada: 'resume', ubicacion: 'p12', suspendData: '1|es|0-11|', estado: 'passed', nota: '' });
+    expect(valores['cmi.core.lesson_status']).toBe('passed');
+  });
+
+  it('un «passed» guardado no vuelve a incomplete al empezar de nuevo, y la nota no baja (mejor nota)', () => {
+    const { api, valores } = lmsDePrueba({ 'cmi.core.lesson_status': 'passed', 'cmi.core.score.raw': '90', 'cmi.core.entry': 'resume' });
+    const lms = conectarScorm12(api, { orden, idioma: 'es', avisar: () => {} });
+    lms.reportar(estado('p01'));
+    expect(valores['cmi.core.lesson_status']).toBe('passed');
+    expect(valores['cmi.core.lesson_location']).toBe('p01');
+    expect(valores['cmi.suspend_data']).toBe(`2|${H}|es|0|`);
+    lms.reportar(estado('p28', { nota: 60, leccion: 'failed', vistas: orden }));
+    expect(valores).toMatchObject({ 'cmi.core.lesson_status': 'passed', 'cmi.core.score.raw': '90' });
+    lms.reportar(estado('p28', { nota: 95, leccion: 'passed', vistas: orden }));
+    expect(valores['cmi.core.score.raw']).toBe('95');
+  });
+
+  it('con «última nota» la nota puede bajar, pero el estado no se degrada', () => {
+    const { api, valores } = lmsDePrueba({ 'cmi.core.lesson_status': 'completed', 'cmi.core.score.raw': '90' });
+    const lms = conectarScorm12(api, { orden, idioma: 'es', mejorNota: false, avisar: () => {} });
+    lms.reportar(estado('p28', { nota: 40, leccion: 'incomplete', vistas: orden }));
+    expect(valores).toMatchObject({ 'cmi.core.lesson_status': 'completed', 'cmi.core.score.raw': '40' });
+    lms.reportar(estado('p28', { nota: 80, leccion: 'passed', vistas: orden }));
     expect(valores['cmi.core.lesson_status']).toBe('passed');
   });
 
@@ -113,7 +139,7 @@ describe('ciclo de vida CMI', () => {
     const lms = conectarScorm12(api, { orden, idioma: 'es', avisar: (m) => avisos.push(m) });
     expect(() => lms.reportar(estado('p28', { nota: 90, leccion: 'passed' }))).not.toThrow();
     expect(valores['cmi.core.lesson_status']).toBe('passed');
-    expect(valores['cmi.suspend_data']).toMatch(/^1\|es\|/);
+    expect(valores['cmi.suspend_data']).toMatch(/^2\|[0-9a-z]+\|es\|/);
     expect(avisos).toEqual(['LMSSetValue("cmi.core.score.raw") respondió el error 405 (Incorrect Data Type).']);
   });
 
@@ -146,7 +172,7 @@ describe('suspend_data', () => {
   it('codifica y lee avance y resultados de LOTO en pocos caracteres', () => {
     const datos = { idioma: 'es', vistas: orden, resultados: { p07: { completada: true, puntaje: 100 }, p20: { completada: true, puntaje: null }, p28: { completada: true, puntaje: 80 } } };
     const texto = codificarSuspend(orden, datos);
-    expect(texto).toBe('1|es|0-29|6:1:100,19:1:-,27:1:80');
+    expect(texto).toBe(`2|${H}|es|0-29|6:1:100,19:1:-,27:1:80`);
     expect(leerSuspend(orden, texto)).toEqual(datos);
     expect(leerSuspend(orden, 'otro formato')).toBeNull();
     expect(leerSuspend(orden, '')).toBeNull();

@@ -7,5 +7,7 @@ export type * from './tipos.ts';
 export { animarBoca, bocaDisponible, bocaEn, type MarcasBoca, mostrarBoca, mostrarPose, parpadear, type ColoresUniforme, MARCADORES_KIT, type RelojAudio, svgEnLinea } from './boca.ts';
 export { type Cue, cueEn, leerVtt } from './subtitulos.ts';
 export { activoEn, duracionDe, ESCALONADO_S, type TiempoElemento, tiemposDe } from './tiempos.ts';
-export { buscarApi, codificarSuspend, conectarScorm12, LIMITE_SUSPEND, leerSuspend, NIVELES_ADL, tiempoScorm, type ApiScorm12, type ConexionScorm12, type DatosSuspend, type OpcionesScorm12, type VentanaLms } from './scorm12.ts';
+export { buscarApi, conectarScorm12, LIMITE_SUSPEND, NIVELES_ADL, tiempoScorm, type ApiScorm12, type ConexionScorm12, type OpcionesScorm12, type VentanaLms } from './scorm12.ts';
+export { codificarSuspend, type DatosSuspend, huellaCurso, leerSuspend } from './suspend.ts';
+export { decidirReanudacion, estadoReanudado, type GuardadoLms, type Reanudacion } from './reanudacion.ts';
 export { iniciarPaquete, type DatosPaquete, type Paquete } from './paquete.ts';
