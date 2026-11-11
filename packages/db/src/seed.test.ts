@@ -43,7 +43,7 @@ describe.skipIf(!conBase)('CP-003 · datos de ejemplo', () => {
       // El administrador del seed por su correo: las pruebas e2e de la API corren a la vez (`pnpm -r test`) y crean
       // otros administradores con su propia clave.
       const admin = usuarios.find((u) => u.email === 'admin@aulaseducativas.test')!;
-      expect(await verificarClave(admin.hashClave!, process.env.SEED_CLAVE!)).toBe(true);
+      expect(await verificarClave(admin.hashClave!, process.env.SEED_CLAVE ?? 'Aptio-local-2026')).toBe(true);
     });
 
   it('vincula al revisor con su cliente', async () => {
