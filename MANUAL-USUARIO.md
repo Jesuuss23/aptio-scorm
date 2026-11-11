@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.25 · actualizado con la tercera entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.26 · actualizado con la cuarta entrega del Sprint 6 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -362,6 +362,17 @@ Las actividades y la narración se cambian desde Revisión. Con esto el editor d
 
 ---
 
+### 8.9 Entrega: validar, exportar y descargar
+
+Desde el proyecto, **Exportar SCORM** abre **Entrega**. Ahí eliges el **LMS destino** (Genérico, Moodle 4.5+, Blackboard, Chamilo o Canvas). El paquete es el mismo para todos: el LMS solo cambia la recomendación que ves debajo.
+
+**Verificación automática.** Antes de exportar, Entrega revisa el curso para ese LMS y lo vuelve a revisar si cambias de LMS:
+- **Peso estimado** frente al límite de subida del destino. El límite sale de la ficha de compatibilidad del cliente; si no la tiene, se usa un valor de referencia de 100 MB, que el LMS del cliente puede superar. Si el paquete pesa más, ves las alternativas (pedir al administrador que amplíe el límite, comprimir, dividir el curso, alojar el video fuera o el paquete de distribución) y los recursos que más pesan. **Puedes exportar igual**: el peso nunca bloquea.
+- **Pantallas aprobadas.** Si quedan pantallas sin aprobar, al pulsar **Exportar SCORM 1.2** se pide confirmación: **Cancelar** (elegido de entrada) o **Exportar igual**. El enlace **Ir a revisión** te lleva a aprobarlas.
+- **Avance y reanudación** (si caben en lo que guarda el LMS), **archivos que faltan** (el paquete muestra su texto alternativo) y **esquema del curso**. Si el curso no cumple el esquema, el botón Exportar queda deshabilitado y ves qué corregir.
+
+Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -424,6 +435,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.23 | 2026-11-11 | Entrega: el paquete SCORM 1.2 registra avance, nota y estado en el LMS (la vista Entrega llega en el PR 2). |
 | 0.24 | 2026-11-11 | Entrega: elegir el LMS destino, exportar el SCORM 1.2, ver el avance y descargarlo desde el historial. |
 | 0.25 | 2026-11-11 | Reanudación: al volver al curso en el LMS, el participante elige continuar donde lo dejó o empezar de nuevo. |
+| 0.26 | 2026-11-11 | Entrega: verificación automática antes de exportar (peso contra el límite con alternativas, pantallas sin aprobar con confirmación, errores que deshabilitan Exportar). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
