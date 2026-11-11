@@ -1,5 +1,5 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
-import type { AjusteElemento } from '@aptio/player';
+import type { AjusteElemento, ElementoExtra } from '@aptio/player';
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
 import type { OperacionPatch } from '@aptio/schema/patch';
@@ -350,7 +350,7 @@ export const api = {
   regenerarNarraciones: (cursoId: string, datos: { pantallaIds?: string[]; soloDesactualizadas?: boolean } = {}) =>
     pedir<Regeneracion>(`/cursos/${cursoId}/narraciones/regenerar`, json(datos)),
   observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
-  editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string }) =>
+  editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string; extras?: ElementoExtra[] }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
   aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),
   // HU-0504 · Propuestas de la IA y Deshacer.

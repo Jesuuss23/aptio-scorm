@@ -17,9 +17,11 @@ export const TAMANO = { min: 0.5, max: 20 } as const;
 export const ESCALA = { min: 0.3, max: 3 } as const;
 
 /** Lo que se retoca según el tipo de bloque: los textos todo; la imagen y el personaje, la escala y la animación. */
+// HU-0606 · Los extras: título, dato y botón como un texto; la insignia como una imagen; la forma, escala y su color.
 export function controlesDe(tipo: string): { tamano: 'texto' | 'escala' | null; color: boolean; alineacion: boolean; animacion: boolean } {
-  if (tipo === 'texto') return { tamano: 'texto', color: true, alineacion: true, animacion: true };
-  if (tipo === 'imagen' || tipo === 'personaje') return { tamano: 'escala', color: false, alineacion: false, animacion: true };
+  if (tipo === 'texto' || tipo === 'titulo' || tipo === 'dato' || tipo === 'boton') return { tamano: 'texto', color: true, alineacion: true, animacion: true };
+  if (tipo === 'imagen' || tipo === 'personaje' || tipo === 'insignia') return { tamano: 'escala', color: false, alineacion: false, animacion: true };
+  if (tipo === 'forma') return { tamano: 'escala', color: true, alineacion: false, animacion: true };
   return { tamano: null, color: false, alineacion: false, animacion: false };
 }
 export const seRetoca = (tipo: string) => controlesDe(tipo).tamano !== null;

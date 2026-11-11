@@ -625,7 +625,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
-      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string };
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[] };
       historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
@@ -648,8 +648,19 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
           delete pa.ajustes;
         }
       }
+      // HU-0606: los extras llegan como lista completa; quitar uno borra su ajuste.
+      const pe = p as unknown as { extras?: { id: string }[] };
+      if (datos.extras !== undefined) {
+        const ids = datos.extras.map((e) => e.id);
+        const repetido = ids.find((id, i) => ids.indexOf(id) !== i || bloques.some((b) => b.id === id));
+        if (repetido) return responder(422, { codigo: 'EXTRA_NO_VALIDO', mensaje: `El id «${repetido}» ya está en la pantalla` });
+        for (const e of pe.extras ?? []) if (!ids.includes(e.id) && pa.ajustes) delete pa.ajustes[e.id];
+        if (pa.ajustes && !Object.keys(pa.ajustes).length) delete pa.ajustes;
+        if (datos.extras.length) pe.extras = datos.extras;
+        else delete pe.extras;
+      }
       for (const [id, ajuste] of Object.entries(datos.ajustes ?? {})) {
-        if (!bloques.some((x) => x.id === id)) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
+        if (!bloques.some((x) => x.id === id) && !(pe.extras ?? []).some((x) => x.id === id)) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
         const color = (ajuste as { color?: string } | null)?.color;
         if (color && !['primario', 'secundario', 'acento', 'texto', 'blanco', 'alerta', 'fondo'].includes(color)) return responder(422, { codigo: 'COLOR_FUERA_DEL_KIT', mensaje: 'Solo se pueden usar los colores del kit' });
         pa.ajustes = { ...pa.ajustes };

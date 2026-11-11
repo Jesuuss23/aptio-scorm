@@ -173,11 +173,31 @@ export class CursosService {
         }
         cambios++;
       }
+      // HU-0606 · Extras: la lista completa de la pantalla. Un id repetido o igual al de un bloque no se acepta; lo demás
+      // (tipos, posición y ancho) lo valida el esquema. Al quitar un extra se borra su ajuste (SUP-45).
+      if (dto.extras !== undefined) {
+        const pe = p as PantallaDoc & { extras?: { id: string }[]; ajustes?: Record<string, unknown> };
+        if (!Array.isArray(dto.extras) || dto.extras.some((e) => !e || typeof e !== 'object' || typeof (e as { id?: unknown }).id !== 'string')) {
+          throw new UnprocessableEntityException({ codigo: 'EXTRA_NO_VALIDO', mensaje: 'Cada elemento agregado necesita un id' });
+        }
+        const ids = dto.extras.map((e) => (e as { id: string }).id);
+        const repetido = ids.find((id, i) => ids.indexOf(id) !== i || bloques.some((b) => b.id === id));
+        if (repetido) throw new UnprocessableEntityException({ codigo: 'EXTRA_NO_VALIDO', mensaje: `El id «${repetido}» ya está en la pantalla` });
+        const antes = (pe.extras ?? []).map((e) => e.id);
+        for (const id of antes) if (!ids.includes(id) && pe.ajustes) delete pe.ajustes[id];
+        if (pe.ajustes && !Object.keys(pe.ajustes).length) delete pe.ajustes;
+        if (dto.extras.length) pe.extras = dto.extras as { id: string }[];
+        else delete pe.extras;
+        cambios++;
+      }
       if (dto.ajustes !== undefined) {
         const pa = p as PantallaDoc & { ajustes?: Record<string, unknown> };
         const ajustes = { ...(pa.ajustes ?? {}) };
         for (const [id, ajuste] of Object.entries(dto.ajustes)) {
-          if (!bloques.some((x) => x.id === id)) throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
+          const extras = (p as { extras?: { id: string }[] }).extras ?? [];
+          if (!bloques.some((x) => x.id === id) && !extras.some((x) => x.id === id)) {
+            throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
+          }
           if (ajuste === null) {
             delete ajustes[id];
           } else {

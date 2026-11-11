@@ -37,8 +37,22 @@ export interface Pantalla {
   fondo?: RolColor;
   fondoRecursoId?: string;
   narracion?: { texto: TextoI18n; personajeBloqueId?: string; porIdioma?: Partial<Record<Idioma, AudioNarracion>> };
-  /** HU-0602 · Retoques del editor por id de bloque (RN-06-1). */
+  /** HU-0602 · Retoques del editor por id de bloque o de extra (RN-06-1). */
   ajustes?: Record<string, AjusteElemento>;
+  /** HU-0606 · Elementos agregados en el editor, sobre la pantalla (RN-06-1). */
+  extras?: ElementoExtra[];
+}
+
+/** Elemento agregado en el editor (curso-v0 `elementoExtra`): posición y ancho en % de la pantalla. */
+export interface ElementoExtra {
+  id: string;
+  tipo: 'titulo' | 'texto' | 'dato' | 'boton' | 'imagen' | 'insignia' | 'forma' | 'personaje';
+  texto?: TextoI18n;
+  recursoId?: string;
+  x: number;
+  y: number;
+  ancho: number;
+  alClic?: 'nada' | 'siguiente' | 'retroalimentacion' | 'ventana' | 'audio' | 'puntos';
 }
 
 /** Retoque de un elemento (curso-v0 `ajusteElemento`). Lo que el reproductor aún no usa (desplazamiento, tiempos) se ignora. */

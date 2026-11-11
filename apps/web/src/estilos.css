@@ -1229,6 +1229,98 @@ ul.fila-chips {
     grid-template-columns: 216px minmax(0, 1fr) 280px;
   }
 }
+/* HU-0606 · Pestañas del panel izquierdo, Agregar y Capas. */
+.editor-izquierda {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.editor-pestanas {
+  flex-wrap: wrap;
+}
+.editor-agregar-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.editor-agregar-tipo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 72px;
+  padding: 6px;
+  border: 2px solid var(--color-borde);
+  border-radius: 10px;
+  background: var(--color-superficie);
+  color: inherit;
+  font: inherit;
+  font-size: var(--texto-sm);
+  cursor: pointer;
+}
+.editor-agregar-tipo:hover:not([disabled]),
+.editor-agregar-tipo:focus-visible {
+  border-color: var(--color-naranja);
+}
+.editor-agregar-muestra {
+  display: grid;
+  place-items: center;
+  height: 32px;
+}
+.muestra-titulo { font-size: var(--titulo-panel); }
+.muestra-dato { border-left: 4px solid var(--color-naranja); padding: 2px 6px; }
+.muestra-boton { border-radius: 6px; padding: 2px 8px; background: var(--color-naranja); color: var(--color-superficie); font-weight: 700; }
+.muestra-imagen { width: 32px; height: 24px; border: 2px dashed var(--color-borde); border-radius: 4px; }
+.muestra-insignia { font-size: var(--titulo-panel); color: var(--color-naranja); }
+.muestra-forma { width: 40px; height: 14px; border-radius: 5px; background: var(--color-naranja); }
+.muestra-personaje { width: 20px; height: 28px; border-radius: 10px 10px 4px 4px; background: var(--color-borde); }
+.editor-capas-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.editor-capas-lista li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 8px;
+}
+.editor-capas-lista li.activa {
+  background: var(--color-naranja-suave);
+}
+.editor-capa {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--texto-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.editor-ojo {
+  flex: 0 0 36px;
+  height: 36px;
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+  background: var(--color-superficie);
+  color: inherit;
+  cursor: pointer;
+}
+.boton.peligro {
+  color: var(--color-error);
+}
 /* HU-0605 · Panel «Diseños»: en celular va debajo del lienzo, con las miniaturas en una fila que se desliza. */
 .editor-col-disenos {
   order: 2;

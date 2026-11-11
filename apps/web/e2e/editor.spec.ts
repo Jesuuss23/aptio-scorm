@@ -3,6 +3,7 @@
 // HU-0602 · Barra contextual y propiedades: tamaño, color del kit (CP-057), alineación y animación.
 // HU-0603 · Modo Libre: arrastrar y flechas guardan un desplazamiento en % del ancho (CP-058).
 // HU-0605 · Diseños: la misma pantalla en otra composición, con el mismo contenido y Deshacer (CP-060).
+// HU-0606 · Agregar elementos (CP-061), capas para ocultar y mostrar, y eliminar extras.
 import { expect, type Page, test } from '@playwright/test';
 import { RETOQUES_P05, simularApi } from './api-simulada';
 
@@ -18,6 +19,14 @@ function contarEdiciones(page: Page) {
     if (r.method() === 'PATCH' && /\/cursos\/[^/]+\/pantallas\/p\d+$/.test(r.url())) cuerpos.push(r.postDataJSON());
   });
   return cuerpos;
+}
+
+/** Doble clic para escribir; si el lienzo se redibujó justo en ese momento (llegó el kit), se vuelve a intentar. */
+async function empezarAEscribir(page: Page, el: ReturnType<Page['locator']>) {
+  await expect(async () => {
+    await el.dblclick();
+    await expect(page.getByText('Escribiendo… Enter para terminar · Esc para cancelar')).toBeVisible({ timeout: 1000 });
+  }).toPass();
 }
 
 test.describe('con el productor', () => {
@@ -58,8 +67,7 @@ test.describe('con el productor', () => {
   test('CP-056 · Esc cancela: el texto vuelve y no se guarda nada', async ({ page }) => {
     const ediciones = contarEdiciones(page);
     await page.goto(URL_EDITOR);
-    const subtitulo = lienzo(page).getByText('Cápsula de seguridad · 15 min · 3 retos');
-    await subtitulo.dblclick();
+    await empezarAEscribir(page, lienzo(page).getByText('Cápsula de seguridad · 15 min · 3 retos'));
     await page.keyboard.type('Otro texto');
     await page.keyboard.press('Escape');
     await expect(lienzo(page).getByText('Cápsula de seguridad · 15 min · 3 retos')).toBeVisible();
@@ -93,7 +101,7 @@ test.describe('con el productor', () => {
   test('un texto vacío no se guarda y vuelve el que tenía', async ({ page }) => {
     const ediciones = contarEdiciones(page);
     await page.goto(URL_EDITOR);
-    await titulo(page).dblclick();
+    await empezarAEscribir(page, titulo(page));
     await page.keyboard.press('Delete');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('alert')).toHaveText('Un texto no puede quedar vacío; se dejó el que tenía.');
@@ -330,6 +338,109 @@ test.describe('HU-0605 · cambiar diseño', () => {
     await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p07`);
     await expect(disenos(page)).toContainText('Esta pantalla tiene una actividad o un video: su diseño se cambia en Revisión');
     await expect(disenos(page).getByRole('button')).toHaveCount(0);
+  });
+});
+
+test.describe('HU-0606 · agregar elementos y capas', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'PRODUCTOR' });
+    await page.setViewportSize({ width: 1440, height: 900 });
+  });
+  const pestana = (page: Page, nombre: string) => page.getByRole('tablist', { name: 'Panel del editor' }).getByRole('tab', { name: nombre }).click();
+  const agregar = (page: Page) => page.getByRole('complementary', { name: 'Agregar' });
+  const capas = (page: Page) => page.getByRole('complementary', { name: 'Capas' });
+  const barra = (page: Page) => page.getByRole('toolbar', { name: 'Opciones del elemento' });
+  const URL_P05 = `/proyectos/${PROYECTO}/editor?pantalla=p05`;
+
+  test('CP-061 · elijo «Botón»: aparece en la pantalla, elegido y en modo Libre, y se arrastra', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_P05);
+    await pestana(page, 'Agregar');
+    await expect(agregar(page).locator('.editor-agregar-nombre')).toHaveText(['Título', 'Texto', 'Dato clave', 'Botón', 'Imagen del kit', 'Insignia', 'Forma', 'Personaje']);
+    await agregar(page).getByRole('button', { name: 'Botón' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Botón agregado: arrástralo donde quieras.' })).toBeVisible();
+    expect(ediciones).toEqual([{
+      version: expect.any(Number),
+      extras: [{ id: 'p05-extra-boton-1', tipo: 'boton', texto: { es: 'Continuar' }, x: 40, y: 80, ancho: 14, alClic: 'siguiente' }],
+    }]);
+    const boton = lienzo(page).locator('[data-bloque="p05-extra-boton-1"]');
+    await expect(boton).toHaveText('Continuar');
+    await expect(boton).toHaveAttribute('data-elegido', '');
+    await expect(page.getByRole('group', { name: 'Modo de edición' }).getByRole('button', { name: 'Libre' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(barra(page)).toContainText('Botón · Continuar');
+    await expect(barra(page).getByRole('button', { name: 'Eliminar' })).toBeVisible();
+
+    // Listo para mover: un arrastre guarda su desplazamiento, como el de un bloque (SUP-45).
+    await page.waitForLoadState('networkidle');
+    const caja = (await boton.boundingBox())!;
+    await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(caja.x + caja.width / 2 + 40, caja.y + caja.height / 2 - 20, { steps: 4 });
+    await page.mouse.move(caja.x + caja.width / 2 + 80, caja.y + caja.height / 2 - 40, { steps: 4 });
+    await page.mouse.up();
+    await expect(page.getByRole('status').filter({ hasText: 'Posición guardada.' })).toBeVisible();
+    const d = (ediciones[1] as { ajustes: Record<string, { desplazamiento: { x: number; y: number } }> }).ajustes['p05-extra-boton-1']!.desplazamiento;
+    expect(d.x).toBeGreaterThan(0);
+    expect(d.y).toBeLessThan(0);
+  });
+
+  test('en Capas el ojo oculta un elemento (se ve tenue en el editor) y lo vuelve a mostrar', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_P05);
+    await pestana(page, 'Capas');
+    await expect(capas(page).locator('.editor-capa')).toHaveText([/^Título · ¿Qué es la energía/, /^Texto · Es cualquier energía/, /^Dato clave · Si puede moverse/, 'Imagen']);
+    await capas(page).getByRole('button', { name: 'Ocultar Imagen' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Elemento oculto: se puede mostrar desde Capas.' })).toBeVisible();
+    expect(ediciones).toEqual([{ version: expect.any(Number), ajustes: { 'p05-imagen': { oculto: true } } }]);
+    const imagen = lienzo(page).locator('[data-bloque="p05-imagen"]');
+    await expect(imagen).toHaveClass(/ap-oculto-el/);
+    await expect(imagen).toBeVisible();
+    expect(await imagen.evaluate((el) => getComputedStyle(el).opacity)).toBe('0.35');
+    // Un clic en la capa elige el elemento.
+    await capas(page).getByRole('button', { name: 'Imagen', exact: true }).click();
+    await expect(barra(page)).toContainText('Imagen');
+    await expect(barra(page).getByRole('button', { name: 'Eliminar' })).toHaveCount(0);
+    await capas(page).getByRole('button', { name: 'Mostrar Imagen' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Elemento visible.' })).toBeVisible();
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), ajustes: { 'p05-imagen': null } });
+    await expect(imagen).not.toHaveClass(/ap-oculto-el/);
+  });
+
+  test('Supr elimina un extra; en un bloque del contenido no hace nada', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_P05);
+    await pestana(page, 'Agregar');
+    await agregar(page).getByRole('button', { name: 'Título' }).click();
+    const titulo = lienzo(page).locator('[data-bloque="p05-extra-titulo-1"]');
+    await expect(titulo).toHaveText('Nuevo título');
+    await expect(titulo).toBeFocused();
+    await page.keyboard.press('Delete');
+    await expect(page.getByRole('status').filter({ hasText: 'Elemento eliminado.' })).toBeVisible();
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), extras: [] });
+    await expect(titulo).toHaveCount(0);
+    await lienzo(page).locator('[data-bloque="p05-titulo"]').focus();
+    await page.keyboard.press('Delete');
+    await page.waitForTimeout(300);
+    expect(ediciones).toHaveLength(2);
+  });
+
+  test('el texto de un extra se escribe con doble clic, y en la vista previa el botón lleva a la pantalla siguiente', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p01`);
+    await pestana(page, 'Agregar');
+    await agregar(page).getByRole('button', { name: 'Botón' }).click();
+    const boton = lienzo(page).locator('[data-bloque="p01-extra-boton-1"]');
+    await expect(boton).toHaveText('Continuar');
+    await boton.dblclick();
+    await page.keyboard.type('Empezar');
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('status').filter({ hasText: 'Texto guardado.' })).toBeVisible();
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), extras: [expect.objectContaining({ id: 'p01-extra-boton-1', texto: { es: 'Empezar' } })] });
+
+    await page.goto(`/proyectos/${PROYECTO}/vista-previa`);
+    await expect(page.getByLabel('Seguimiento simulado').getByText('1 de 30', { exact: true })).toBeVisible();
+    await page.locator('.vista-previa-reproductor').getByRole('button', { name: 'Empezar' }).click();
+    await expect(page.getByLabel('Seguimiento simulado').getByText('2 de 30', { exact: true })).toBeVisible();
   });
 });
 
