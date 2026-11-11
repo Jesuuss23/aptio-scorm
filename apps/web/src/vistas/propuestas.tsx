@@ -1,5 +1,6 @@
 // HU-0504 · Propuestas de la IA en Revisión (RN-05-3, RN-05-4): la tarjeta «Ajustar con IA» y la franja con la
 // propuesta para aplicar o descartar. El estado vive en RevisionVista, que también dibuja la variante elegida.
+import { cambiaDisposicion } from '@aptio/schema/propuesta';
 import { useState } from 'react';
 import type { Propuesta } from '../api';
 
@@ -33,11 +34,16 @@ export function AjustarConIA({ ocupado, calculando, alPedir }: { ocupado: boolea
 }
 
 /** Franja de la propuesta (prototipo: Revisión). Con variantes, se elige una para verla antes de aplicarla. */
-export function FranjaPropuesta({ propuesta, vencida, variante, ocupado, alVerVariante, alAplicar, alDescartar, alRecalcular }: {
+export function FranjaPropuesta({ propuesta, vencida, variante, ocupado, conAjustes, alVerVariante, alAplicar, alDescartar, alRecalcular }: {
   propuesta: Propuesta; vencida: boolean; variante: number | null; ocupado: boolean;
+  /** HU-0604 · La pantalla tiene retoques de tamaño, color o posición (ajustes). */
+  conAjustes: boolean;
   alVerVariante: (i: number | null) => void; alAplicar: () => void; alDescartar: () => void; alRecalcular: () => void;
 }) {
   const variantes = propuesta.vistaPrevia ?? [];
+  // RN-06-3: si la propuesta cambia la disposición, los ajustes vuelven a como los dibuja el kit; los extras quedan.
+  const patch = variantes.length ? (variante === null ? null : variantes[variante]?.patch) : propuesta.cambios;
+  const reinicia = !vencida && conAjustes && patch ? cambiaDisposicion(patch) : false;
   return (
     <div className="franja-ia" role="region" aria-label="Propuesta de la IA">
       <div className="franja-ia-texto">
@@ -64,6 +70,11 @@ export function FranjaPropuesta({ propuesta, vencida, variante, ocupado, alVerVa
         <button type="button" className="boton" disabled={ocupado} onClick={alDescartar}>Descartar</button>
         {!vencida && variantes.length && variante === null ? <span className="ayuda">Elige una variante para verla en la pantalla.</span> : null}
       </div>
+      {reinicia ? (
+        <p className="aviso-retoques" role="note">
+          Esta propuesta cambia el diseño de la pantalla: el tamaño, el color y la posición que retocaste vuelven a como los dibuja el kit. Los elementos que agregaste se conservan.
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1139,6 +1139,13 @@ ul.fila-chips {
   color: var(--color-naranja-texto);
   font-size: var(--texto-base);
 }
+/* HU-0604 · La propuesta cambia la disposición y la pantalla tiene retoques (RN-06-3). */
+.aviso-retoques {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--color-naranja-texto);
+  font-size: var(--texto-sm);
+}
 .fila-aviso {
   display: flex;
   flex-wrap: wrap;

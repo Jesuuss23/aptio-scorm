@@ -1,8 +1,11 @@
 // HU-0501 y HU-0502 · Revisión (PNT-20): filtro (CP-046), origen (CP-047), aprobar por lote (CP-048) y una aprobada que
 // cambia vuelve a borrador (CP-049). HU-0503 · corregir la narración regenera voz, boca y subtítulos (CP-050).
 // HU-0504 · propuestas de la IA: aplicar y deshacer (CP-052) y propuesta vencida (CP-053).
+// HU-0604 · los retoques del editor sobreviven a la IA (CP-059).
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
+
+const CURSO_ID = '00000000-0000-4000-8000-000000000990';
 
 const PROYECTO = '00000000-0000-4000-8000-000000000701';
 const URL_REVISION = `/proyectos/${PROYECTO}/revision`;
@@ -230,4 +233,71 @@ test('HU-0503 · si la voz falla, los chips quedan en error y se explica qué ha
   const region = page.getByRole('region', { name: 'Regeneración' });
   await expect(region.getByRole('listitem')).toHaveText(['Voz ES: Error', 'Boca: Error', 'Subtítulos ES: Error'], { timeout: 10_000 });
   await expect(region.getByText(/No se pudo regenerar la voz de esta pantalla/)).toBeVisible();
+});
+
+test.describe('HU-0604 · con p05 retocada en el editor', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL', retoquesP05: true });
+  });
+  const imagen = (page: Page) => page.locator('.revision-reproductor [data-bloque="p05-imagen"]');
+  /** Corrimiento horizontal de la imagen como % del ancho del reproductor. */
+  const corrimientoX = (page: Page) => imagen(page).evaluate((el) => {
+    const ancho = (el.getRootNode() as ShadowRoot).querySelector?.<HTMLElement>('.ap-r')?.clientWidth ?? Number.NaN;
+    const t = getComputedStyle(el).translate;
+    return t === 'none' ? 0 : Math.round((parseFloat(t.split(' ')[0]!) / ancho) * 1000) / 10;
+  });
+  /** Lo que hace el editor al soltar un arrastre: guarda el desplazamiento nuevo de la imagen. */
+  const moverImagen = (page: Page, x: number) => page.evaluate(async ({ curso, proyecto, x }) => {
+    const c = await (await fetch(`/api/v1/proyectos/${proyecto}/curso`)).json() as { version: number };
+    const r = await fetch(`/api/v1/cursos/${curso}/pantallas/p05`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version: c.version, ajustes: { 'p05-imagen': { desplazamiento: { x, y: -3, dispositivo: 'todos' } } } }),
+    });
+    return r.status;
+  }, { curso: CURSO_ID, proyecto: PROYECTO, x });
+
+  test('CP-059 · «Menos texto» cambia el texto y la imagen sigue movida; moverla no vence la propuesta', async ({ page }) => {
+    await page.goto(URL_REVISION);
+    await elegir(page, '¿Qué es la energía peligrosa?');
+    await expect.poll(() => corrimientoX(page)).toBe(12.5);
+    await page.getByRole('region', { name: 'Ajustar con IA' }).getByRole('button', { name: '✦ Menos texto' }).click();
+    const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+    await expect(franja.getByRole('button', { name: 'Aplicar' })).toBeVisible({ timeout: 10_000 });
+    // Menos texto no cambia la disposición: no hay aviso.
+    await expect(franja.getByRole('note')).toHaveCount(0);
+
+    expect(await moverImagen(page, 20)).toBe(200);
+    await franja.getByRole('button', { name: 'Aplicar' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Propuesta aplicada: «Menos texto».' })).toBeVisible();
+    const escena = page.locator('.revision-reproductor');
+    await expect(escena.getByText('Energía que puede mover, calentar o liberar algo sin aviso.')).toBeVisible();
+    await expect.poll(() => corrimientoX(page)).toBe(20);
+
+    // Deshacer devuelve el texto y deja la imagen donde está ahora.
+    await page.getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Se deshizo la propuesta.' })).toBeVisible();
+    await expect(escena.getByText('Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.')).toBeVisible();
+    await expect.poll(() => corrimientoX(page)).toBe(20);
+  });
+
+  test('una variante con otra disposición avisa que los retoques se reinician', async ({ page }) => {
+    await page.goto(URL_REVISION);
+    await elegir(page, '¿Qué es la energía peligrosa?');
+    await page.getByRole('region', { name: 'Ajustar con IA' }).getByRole('button', { name: '✦ Ver 3 variantes' }).click();
+    const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+    await expect(franja.getByRole('button', { name: 'Aplicar esta variante' })).toBeDisabled({ timeout: 10_000 });
+    await expect(franja.getByRole('note')).toHaveCount(0);
+    await franja.getByRole('button', { name: 'Variante 1 · Lista con íconos' }).click();
+    await expect(franja.getByRole('note')).toHaveText(/Esta propuesta cambia el diseño de la pantalla: el tamaño, el color y la posición que retocaste vuelven a como los dibuja el kit\. Los elementos que agregaste se conservan\./);
+  });
+});
+
+test('HU-0604 · sin retoques, una variante con otra disposición no avisa', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL' });
+  await page.goto(URL_REVISION);
+  await elegir(page, '¿Qué es la energía peligrosa?');
+  await page.getByRole('region', { name: 'Ajustar con IA' }).getByRole('button', { name: '✦ Ver 3 variantes' }).click();
+  const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+  await franja.getByRole('button', { name: 'Variante 1 · Lista con íconos' }).click({ timeout: 10_000 });
+  await expect(franja.getByRole('note')).toHaveCount(0);
 });

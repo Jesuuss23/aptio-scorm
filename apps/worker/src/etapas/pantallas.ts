@@ -2,7 +2,8 @@
 // campos, sin HTML. Se componen hasta 4 a la vez y cada una lista se guarda como avance para verla en Producción sin
 // esperar al resto (CP-043). Cada pantalla con actividad pide además sus datos a IA-07 (HU-0407, CP-044). Al terminar
 // se arma el documento del curso con los bloques y se valida (CP-042).
-import { type CursoDoc, observacionesRegla } from '@aptio/schema/revision';
+import { type CursoDoc, observacionesRegla, pantallasDe } from '@aptio/schema/revision';
+import { conservarRetoques } from '@aptio/schema/retoques';
 import { hashNarracion, textoSeguro } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
 import { validarCurso, VERSION_ESQUEMA } from '@aptio/schema';
@@ -304,6 +305,16 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
     seguimiento: { criterioCompletado: sumativa ? 'sumativa' : 'pantallas-obligatorias', notaMinima: 70, intentosMaximos: null, notaReportada: 'mejor' },
     recursos,
   };
+  // HU-0604 · Generar de nuevo cambia el contenido, no los retoques del editor: cada pantalla que sigue con su id
+  // conserva sus extras, y sus ajustes si mantiene la disposición (RN-06-3, SUP-43).
+  const anterior = await ctx.bd.curso.findUnique({ where: { proyectoId: proyecto.id }, select: { documento: true } });
+  if (anterior) {
+    const viejas = new Map(pantallasDe(anterior.documento as unknown as CursoDoc).map((p) => [p.id, p]));
+    for (const p of pantallasDe(documento as unknown as CursoDoc)) {
+      const vieja = viejas.get(p.id);
+      if (vieja) conservarRetoques(vieja, p);
+    }
+  }
   const v = validarCurso(documento);
   if (!v.valido) throw new Error(`El curso armado no valida: ${v.errores.slice(0, 3).join('; ')}`);
 
