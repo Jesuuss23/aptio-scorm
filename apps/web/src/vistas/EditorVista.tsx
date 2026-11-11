@@ -5,7 +5,9 @@
 // su color del kit, su alineación y su animación (CP-057). Se guardan en `ajustes` de la pantalla (RN-06-1).
 // HU-0603 · En modo Libre se arrastra un elemento (desde 4 px) o se mueve con las flechas de a 0,5 %; se guarda su
 // `desplazamiento` en % del ancho (CP-058, RN-06-2). El modo no se guarda en el curso (SUP-42).
-// El riel, la línea de tiempo y deshacer llegan con la HU-0604 a la HU-0608.
+// HU-0605 · Panel «Diseños»: la misma pantalla en otra composición de contenido; los ajustes se reinician y los extras
+// quedan (RN-06-3). «Deshacer» vuelve a la disposición anterior con sus ajustes (SUP-44).
+// Agregar y capas, la línea de tiempo y el deshacer general llegan con la HU-0606 a la HU-0608.
 import { type AjusteElemento, type CursoReproductor, montar, PALETA_BASE, type RolColor } from '@aptio/player';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,6 +18,8 @@ import {
   tamanoSiguiente, UMBRAL_ARRASTRE_PX,
 } from './ajustes-elemento';
 import { type CambioTexto, edicionDe, esEditable } from './edicion-texto';
+import { PanelDisenos } from './disenos';
+import { nombreDiseno } from './disenos-pantalla';
 import { type AccionesRetoque, BarraElemento, PanelPropiedades } from './propiedades';
 import './fuentes-kit';
 
@@ -35,7 +39,9 @@ const ESTILOS_EDICION = `
 `;
 
 type PantallaConAjustes = PantallaDoc & { ajustes?: Record<string, AjusteElemento> };
-type CambioPantalla = CambioTexto | { ajustes: Record<string, AjusteElemento | null> };
+type CambioPantalla = CambioTexto | { ajustes: Record<string, AjusteElemento | null> } | { disposicion: string; ajustes?: Record<string, AjusteElemento | null> };
+/** HU-0605 · Lo necesario para deshacer un cambio de diseño: la disposición y los ajustes de antes. */
+type DeshacerDiseno = { pantallaId: string; disposicion: string; ajustes?: Record<string, AjusteElemento> };
 
 type Guardar = (pantalla: PantallaDoc, bloqueId: string, escrito: string) => Promise<boolean>;
 
@@ -54,6 +60,8 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const [repeticion, setRepeticion] = useState(0);
   // HU-0603 · Modo de trabajo del editor (SUP-42): en Automático la disposición acomoda; en Libre se mueve.
   const [modo, setModo] = useState<'auto' | 'libre'>('auto');
+  const [deshacer, setDeshacer] = useState<DeshacerDiseno | null>(null);
+  const panelDisenos = useRef<HTMLDivElement>(null);
   const lienzo = useRef<HTMLDivElement>(null);
   /** Texto que recupera el foco cuando el lienzo se redibuja tras guardar con Enter (teclado). */
   const reenfocar = useRef<string | null>(null);
@@ -84,6 +92,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     if (!curso) return false;
     setError('');
     setAviso('');
+    setDeshacer(null);
     setOcupado(true);
     try {
       const estaba = pantalla.estado;
@@ -373,6 +382,18 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       if (bloque) void mover(actual, bloque.id, { x: 0, y: 0 });
     },
   };
+  /** HU-0605 · Aplica otro diseño y deja a mano cómo deshacerlo. */
+  const cambiarDiseno = async (disposicion: string) => {
+    const antes: DeshacerDiseno = { pantallaId: actual.id, disposicion: actual.disposicion ?? 'idea', ajustes: (actual as PantallaConAjustes).ajustes };
+    setElegido(null);
+    if (await enviar(actual, { disposicion }, `Diseño aplicado: ${nombreDiseno(disposicion)}.`)) setDeshacer(antes);
+  };
+  const deshacerDiseno = () => {
+    const d = deshacer;
+    const pantalla = d && pantallas.find((p) => p.id === d.pantallaId);
+    if (!d || !pantalla) return;
+    void enviar(pantalla, { disposicion: d.disposicion, ...(d.ajustes ? { ajustes: d.ajustes } : {}) }, 'Se deshizo el cambio de diseño.');
+  };
   const irA = (id: string) => navegar(`/proyectos/${proyectoId}/editor?pantalla=${id}`);
   return (
     <div className="editor">
@@ -387,8 +408,16 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         </div>
       </div>
       {error ? <div className="nota error" role="alert">{error}</div> : null}
-      {aviso ? <div className="nota" role="status">{aviso}</div> : null}
+      {aviso ? (
+        <div className="nota fila-aviso" role="status">
+          <span>{aviso}</span>
+          {deshacer && deshacer.pantallaId === actual.id ? <button type="button" className="boton" disabled={ocupado} onClick={deshacerDiseno}>Deshacer</button> : null}
+        </div>
+      ) : null}
       <div className="editor-cuerpo">
+        <div ref={panelDisenos} className="editor-col-disenos" tabIndex={-1}>
+          <PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={(d) => void cambiarDiseno(d)} />
+        </div>
         <section className="editor-lienzo" aria-label={`Lienzo de la pantalla ${actual.id}`}>
           {datosElegido && !escribiendo ? (
             <BarraElemento elegido={datosElegido} paleta={paleta} ocupado={ocupado} acciones={acciones} />
@@ -404,7 +433,11 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
             {modo === 'libre' ? 'Modo Libre: arrastra un elemento para moverlo, o elígelo y usa las flechas (0,5 % por pulsación).' : 'Modo Automático: la disposición acomoda los elementos. Cambia a Libre para moverlos.'}
           </p>
         </section>
-        <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones} />
+        <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones}
+          diseno={nombreDiseno(actual.disposicion)} alCambiarDiseno={() => {
+            panelDisenos.current?.scrollIntoView({ block: 'nearest' });
+            panelDisenos.current?.querySelector<HTMLButtonElement>('.editor-diseno:not([disabled])')?.focus();
+          }} />
       </div>
       <nav className="editor-tira" aria-label="Pantallas">
         <ol>

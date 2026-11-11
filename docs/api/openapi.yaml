@@ -1795,7 +1795,9 @@ paths:
         curso. `regenerando` lista lo que se regenera; el avance se sigue en `GET /cursos/{cursoId}/narraciones`.
         HU-0602 · `ajustes` guarda los retoques del editor por elemento, aparte del contenido (RN-06-1); 422 BLOQUE_NO_EXISTE
         si el elemento no está en la pantalla, COLOR_FUERA_DEL_KIT si un color no es un rol del kit (RN-06-4) y
-        CURSO_NO_VALIDO si un valor sale del esquema.
+        CURSO_NO_VALIDO si un valor sale del esquema. HU-0605 · `disposicion` cambia el diseño de la pantalla (CP-060);
+        422 DISENO_NO_PERMITIDO si la pantalla tiene una actividad, un video o es la de resultados, o si el diseño no es
+        de contenido.
       parameters:
       - name: cursoId
         in: path
@@ -4859,7 +4861,12 @@ components:
             $ref: '#/components/schemas/TextoI18n'
           description: Clave = id del bloque de texto de la pantalla
         disposicion:
-          $ref: '#/components/schemas/Disposicion'
+          description: HU-0605 · Otra composición de contenido (idea, personaje, dato o lista; o volver a portada, objetivos,
+            sección, resumen o cierre) con los mismos bloques. Cambia
+            la plantilla, reinicia los ajustes y conserva los extras (RN-06-3); los `ajustes` del mismo cambio se aplican
+            después, para deshacer.
+          allOf:
+          - $ref: '#/components/schemas/Disposicion'
         fondo:
           type: string
         ajustes:

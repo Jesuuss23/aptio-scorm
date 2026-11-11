@@ -22,6 +22,11 @@ export class PantallaCambioDto {
     description: 'HU-0602 · Retoques por id de bloque (RN-06-1). Cada clave reemplaza el ajuste de ese elemento; null lo restablece. Colores solo por rol del kit (RN-06-4).',
   })
   @IsOptional() @IsObject() ajustes?: Record<string, Record<string, unknown> | null>;
+  @ApiPropertyOptional({
+    enum: ['idea', 'personaje', 'dato', 'lista', 'portada', 'objetivos', 'seccion', 'resumen', 'cierre'],
+    description: 'HU-0605 · Otra composición de contenido (idea, personaje, dato o lista; o volver a portada, objetivos, sección, resumen o cierre) con los mismos bloques: cambia la plantilla, reinicia los ajustes y conserva los extras (RN-06-3). Los `ajustes` del mismo cambio se aplican después (Deshacer). 422 DISENO_NO_PERMITIDO en una pantalla con actividad o con otro valor.',
+  })
+  @IsOptional() @IsString() disposicion?: string;
 }
 
 /** HU-0502 · Aprobar varias: las indicadas o, con soloSinObservaciones, todas las que no tienen observaciones abiertas. */
