@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.19 · actualizado con la octava entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.20 · actualizado con la novena entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -340,7 +340,9 @@ A la derecha, el panel **Propiedades** tiene las mismas opciones, un deslizador 
 
 La posición se guarda en proporción al ancho de la pantalla, así que se ve en el mismo lugar en un celular, una tableta o una computadora. En **Propiedades** ves la posición y el botón **Volver a su lugar**, que deshace solo el movimiento sin tocar el tamaño ni el color. Las actividades no se mueven.
 
-**Cambiar el diseño.** A la izquierda del lienzo está el panel **Diseños** (en el celular, debajo). Muestra la misma pantalla en cuatro composiciones: **Idea + ilustración**, **Personaje habla**, **Dato grande** y **Tarjetas con íconos**. La actual dice «· actual». Al elegir otra, la pantalla cambia de composición con el mismo contenido y aparece **Deshacer**, que la deja como estaba, con sus retoques. Al cambiar de diseño, el tamaño, el color y la posición que retocaste vuelven a como los dibuja el kit; los elementos que agregaste se quedan. En **Propiedades**, sin un elemento elegido, ves el diseño de la pantalla y el botón **Cambiar**. Las pantallas con una actividad o un video no cambian de diseño aquí: usa «✦ Convertir en actividad» o «✦ Ver 3 variantes» en Revisión.
+**Cambiar el diseño.** A la izquierda del lienzo está el panel **Diseños** (en el celular, debajo). Muestra la misma pantalla en cuatro composiciones: **Idea + ilustración**, **Personaje habla**, **Dato grande** y **Tarjetas con íconos**. La actual dice «· actual». Al elegir otra, la pantalla cambia de composición con el mismo contenido; **↶ Deshacer** (o Ctrl+Z) la deja como estaba, con sus retoques. Al cambiar de diseño, el tamaño, el color y la posición que retocaste vuelven a como los dibuja el kit; los elementos que agregaste se quedan. En **Propiedades**, sin un elemento elegido, ves el diseño de la pantalla y el botón **Cambiar**. Las pantallas con una actividad o un video no cambian de diseño aquí: usa «✦ Convertir en actividad» o «✦ Ver 3 variantes» en Revisión.
+
+**Deshacer, rehacer y guardado.** Todo lo que cambias se guarda solo: arriba, junto al título, ves «Guardando…» y luego «✓ Guardado», y al recargar la página los cambios siguen ahí. **↶ Deshacer** (o Ctrl+Z) vuelve atrás un cambio, y puedes pulsarlo muchas veces seguidas (hasta 60 cambios). **↷** (o Ctrl+Shift+Z, o Ctrl+Y) lo rehace. Lo deshecho se ve al instante y se guarda un segundo después de la última pulsación. Si el cambio era de otra pantalla, el editor te lleva a ella. Mientras escribes en un texto, Ctrl+Z deshace lo que escribes, no el historial. El historial es de esta sesión: al recargar empieza vacío; para volver a una versión anterior del curso usa el historial de versiones. Si otra persona guardó cambios mientras tanto, el editor carga la última versión, te avisa y el historial se vacía.
 
 **Agregar elementos.** El panel de la izquierda tiene tres pestañas: **Diseños**, **Agregar** y **Capas**. En **Agregar** eliges qué poner en la pantalla: título, texto, dato, botón, imagen, insignia, forma o personaje. El elemento aparece ya elegido y el editor pasa a **Libre**, así que lo arrastras de inmediato adonde quieras. Su texto se escribe con doble clic, como cualquier otro. En **Propiedades**, el botón tiene «Al hacer clic»: **Siguiente pantalla** o **Nada**; la imagen se elige entre las del curso y lleva su texto alternativo para quien no la ve. En la vista previa y en el paquete, el botón «Siguiente» lleva a la pantalla que sigue.
 
@@ -404,6 +406,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.17 | 2026-11-11 | Los retoques del editor se conservan al aplicar propuestas de la IA, al deshacer y al generar de nuevo. |
 | 0.18 | 2026-11-11 | Editor: panel Diseños para ver la pantalla en otra composición y Deshacer. |
 | 0.19 | 2026-11-11 | Editor: pestañas Agregar y Capas; ocultar, mostrar y eliminar elementos. |
+| 0.20 | 2026-11-11 | Editor: deshacer y rehacer (Ctrl+Z), guardado automático con indicador. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

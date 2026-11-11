@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.19 · actualizado con la octava entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.20 · actualizado con la novena entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -227,6 +227,12 @@ El modo Libre (HU-0603):
 - Las flechas acumulan en `flechas` y guardan con un `setTimeout` de 1 s. `modoRef` y `moverRef` evitan montar el lienzo de nuevo.
 - `ajustes-elemento.ts` tiene `pxAPorcentaje`, `desplazado` (tope ±100) y `cambioDesplazamiento`.
 
+Deshacer, rehacer y guardado automático (HU-0607):
+- `apps/web/src/vistas/historial.ts` (con Vitest) tiene `fotoDe` (título, textos, narración, disposición, ajustes y extras, copiados), `conFoto` (la pantalla como se ve en la foto, con la plantilla de su disposición), `cambioHacia(guardada, foto)` (el `PATCH`: si cambia la disposición manda todos los ajustes; si no, solo los que cambian, con `null` para los que sobran salvo los de extras que se quitan) y la pila `registrar`/`mover` con tope `MAX_HISTORIAL` (60).
+- `EditorVista` registra la foto de antes en cada `enviar` correcto. `paso('deshacer' | 'rehacer')` usa refs (`historialRef`, `pendientesRef`, `cursoRef`) porque varias pulsaciones pueden llegar antes de dibujar; deja la foto en `pendientes`, que `documento` (memo) aplica para verla, y arma un temporizador de `ESPERA_GUARDADO_MS`. `guardarPendientes` manda un `PATCH` por pantalla con `motivo`; `enviar` lo llama antes de cada cambio nuevo, y también se llama al salir del editor. `fallo` con 409 recarga y vacía el historial.
+- Los atajos van en `document` (`keydown`) y se ignoran si `composedPath()[0]` es un campo o un texto en edición.
+- La API acepta `motivo` (`deshacer` o `rehacer`) en `PantallaCambioDto` y lo pasa a `guardar` para la `CursoVersion`.
+
 Agregar elementos y capas (HU-0606):
 - El reproductor dibuja `pantalla.extras` en `.ap-extras` con `dibujarExtra` (`pantalla.ts`); cada extra lleva `data-bloque` y `data-extra`, la posición base de `posicionExtra` (`left/top/width` en %) y pasa por `aplicarAjuste`, que ahora suma al estilo en vez de reemplazarlo. `TIPO_AJUSTE` reusa los ajustes de texto o de imagen; `a.oculto` agrega `ap-oculto-el`. El botón usa `accionBoton` y `ContextoPantalla.alSiguiente`; `montar(…, { sinAcciones: true })` lo deja inerte en el editor.
 - `CursosService.editar` procesa `dto.extras` entre la disposición y los ajustes: valida ids (422 EXTRA_NO_VALIDO), purga los ajustes de los extras quitados y deja `extras` o lo borra si queda vacío. Los ajustes aceptan ids de extras.
@@ -323,6 +329,7 @@ Ninguna clave real va al repositorio.
 | 0.17 | 2026-11-11 | Retoques separados del contenido (HU-0604): `@aptio/schema/retoques`, rutas protegidas y `cambiaDisposicion`. |
 | 0.18 | 2026-11-11 | Cambiar diseño (HU-0605): `disposicion` en el PATCH, catálogo en `@aptio/schema/marca`, `PanelDisenos`. |
 | 0.19 | 2026-11-11 | Agregar elementos y capas (HU-0606): `extras` en el reproductor y en el PATCH, `extras.ts`, `panel-izquierdo.tsx`. |
+| 0.20 | 2026-11-11 | Deshacer, rehacer y guardado automático (HU-0607): `historial.ts`, `motivo` en el PATCH. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
