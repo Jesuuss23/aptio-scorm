@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.23 · actualizado con la primera entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.24 · actualizado con la segunda entrega del Sprint 6 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -419,6 +419,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.21 | 2026-11-11 | Editor: línea de tiempo para decidir cuándo aparece y sale cada elemento. |
 | 0.22 | 2026-11-11 | Editor: «Sincronizar con la voz» y «⚠ revisar tiempo» cuando cambia la narración. |
 | 0.23 | 2026-11-11 | Entrega: el paquete SCORM 1.2 registra avance, nota y estado en el LMS (la vista Entrega llega en el PR 2). |
+| 0.24 | 2026-11-11 | Entrega: elegir el LMS destino, exportar el SCORM 1.2, ver el avance y descargarlo desde el historial. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
