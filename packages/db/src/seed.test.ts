@@ -31,11 +31,18 @@ describe.skipIf(!conBase)('CP-003 · datos de ejemplo', () => {
   });
 
   it('guarda las claves con argon2id, nunca en texto plano', async () => {
-    const usuarios = await prisma.usuario.findMany();
-    for (const u of usuarios) expect(u.hashClave?.startsWith('$argon2id$')).toBe(true);
-    const admin = usuarios.find((u) => u.rol === Rol.ADMINISTRADOR)!;
-    expect(await verificarClave(admin.hashClave!, process.env.SEED_CLAVE ?? 'Aptio-local-2026')).toBe(true);
-  });
+      const usuarios = await prisma.usuario.findMany({
+        where: { hashClave: { not: null } },
+      });
+      expect(usuarios.length).toBeGreaterThan(0);
+
+      for (const u of usuarios) {
+        expect(u.hashClave!.startsWith('$argon2id$')).toBe(true);
+      }
+
+      const admin = usuarios.find((u) => u.rol === Rol.ADMINISTRADOR)!;
+      expect(await verificarClave(admin.hashClave!, process.env.SEED_CLAVE!)).toBe(true);
+    });
 
   it('vincula al revisor con su cliente', async () => {
     const revisor = await prisma.usuario.findFirstOrThrow({ where: { rol: Rol.REVISOR_CLIENTE }, include: { cliente: true } });
