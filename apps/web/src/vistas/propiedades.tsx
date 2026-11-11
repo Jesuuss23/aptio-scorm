@@ -61,13 +61,22 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
 }
 
 /** Panel lateral de Propiedades: los mismos retoques, con un deslizador de tamaño. */
-export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones }: {
+export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno }: {
   elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; modo: 'auto' | 'libre'; acciones: AccionesRetoque;
+  /** HU-0605 · Nombre del diseño de la pantalla y cómo ir al panel Diseños. */
+  diseno: string; alCambiarDiseno: () => void;
 }) {
   if (!elegido) {
     return (
       <aside className="tarjeta kit-bloque editor-propiedades" aria-label="Propiedades">
         <h2>Propiedades</h2>
+        <div className="campo">
+          <span>Diseño</span>
+          <div className="fila-aviso">
+            <span className="chip">{diseno}</span>
+            <button type="button" className="boton" onClick={alCambiarDiseno}>Cambiar</button>
+          </div>
+        </div>
         <p className="sec">Elige un elemento en el lienzo para cambiarlo: un clic, o Tab hasta él y Espacio.</p>
       </aside>
     );

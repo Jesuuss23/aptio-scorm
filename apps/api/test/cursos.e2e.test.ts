@@ -285,4 +285,46 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(mala.status).toBe(422);
     expect(mala.body).toMatchObject({ codigo: 'CURSO_NO_VALIDO' });
   });
+
+  it('HU-0605 · CP-060: «Idea + ilustración» pasa a «Tarjetas con íconos» con el mismo contenido y se puede deshacer', async () => {
+    type Pd = { id: string; disposicion: string; plantilla: string; estado: string; bloques: unknown[]; ajustes?: Record<string, unknown>; extras?: unknown[] };
+    const p05De = (d: Doc) => pantallas(d).find((x) => x.id === 'p05') as unknown as Pd;
+    // p05 llega con la imagen movida (HU-0603) y un botón agregado en el editor.
+    const c = await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } });
+    const doc = structuredClone(c.documento) as unknown as Doc;
+    const extras = [{ id: 'p05-boton', tipo: 'boton', texto: { es: 'Ver ejemplo' }, x: 70, y: 80, ancho: 20, alClic: 'retroalimentacion' }];
+    p05De(doc).extras = extras;
+    await prisma.curso.update({ where: { id: cursoId }, data: { documento: doc as object } });
+    const antes = p05De(doc);
+    expect(antes).toMatchObject({ disposicion: 'idea', plantilla: 'kit-minera-andina-idea' });
+    const ajustesAntes = antes.ajustes;
+    expect(ajustesAntes).toBeDefined();
+    const ruta = `/cursos/${cursoId}/pantallas/p05`;
+
+    const r = await como('grafico').patch(ruta, { version: c.version, disposicion: 'lista' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ version: c.version + 1, estado: 'borrador' });
+    const despues = p05De(await documento());
+    expect(despues).toMatchObject({ disposicion: 'lista', plantilla: 'kit-minera-andina-lista', estado: 'borrador' });
+    // Se conserva el contenido; los ajustes se reinician y los extras quedan (RN-06-3).
+    expect(despues.bloques).toEqual(antes.bloques);
+    expect(despues.ajustes).toBeUndefined();
+    expect(despues.extras).toEqual(extras);
+    expect(await prisma.cursoVersion.findFirst({ where: { cursoId, version: c.version + 1 } })).toMatchObject({ motivo: 'edición' });
+
+    // Deshacer: la disposición anterior y, en el mismo cambio, los ajustes que tenía.
+    const deshacer = await como('grafico').patch(ruta, { version: c.version + 1, disposicion: 'idea', ajustes: ajustesAntes });
+    expect(deshacer.status).toBe(200);
+    const vuelta = p05De(await documento());
+    expect(vuelta).toMatchObject({ disposicion: 'idea', plantilla: 'kit-minera-andina-idea', ajustes: ajustesAntes, extras });
+    expect(vuelta.bloques).toEqual(antes.bloques);
+
+    // Una pantalla con actividad o un diseño fuera del catálogo: 422 sin guardar; versión vieja, 409; el revisor no.
+    const v = c.version + 2;
+    expect((await como('grafico').patch(`/cursos/${cursoId}/pantallas/p07`, { version: v, disposicion: 'idea' })).body).toMatchObject({ codigo: 'DISENO_NO_PERMITIDO', mensaje: 'Esta pantalla tiene una actividad: su diseño se cambia en Revisión con la IA' });
+    expect((await como('grafico').patch(ruta, { version: v, disposicion: 'quiz' })).body).toMatchObject({ codigo: 'DISENO_NO_PERMITIDO' });
+    expect((await como('grafico').patch(ruta, { version: c.version, disposicion: 'dato' })).status).toBe(409);
+    expect((await como('revisor').patch(ruta, { version: v, disposicion: 'dato' })).status).toBe(403);
+    expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  contraste, DISPOSICIONES, erroresDefinicion, FAMILIAS_KIT, FUENTES_KIT, KIT_INICIAL, modeloBase, modelosParaGenerar, revisarPaleta, revisarPersonaje,
+  contraste, DISENOS_CONTENIDO, disenoPermitido, disenosPara, DISPOSICIONES, esDisenoContenido, NOMBRE_DISENO, plantillaPara, erroresDefinicion, FAMILIAS_KIT, FUENTES_KIT, KIT_INICIAL, modeloBase, modelosParaGenerar, revisarPaleta, revisarPersonaje,
 } from '../src/marca.js';
 
 describe('marca del kit', () => {
@@ -83,5 +83,36 @@ describe('pantallas modelo', () => {
     const modelos = modelosParaGenerar([]);
     expect(modelos.map((m) => m.disposicion)).toEqual([...DISPOSICIONES]);
     expect(modelos.every((m) => m.origen === 'base')).toBe(true);
+  });
+});
+
+describe('HU-0605 · cambiar diseño', () => {
+  it('ofrece las 4 composiciones de contenido con los nombres del prototipo', () => {
+    expect(DISENOS_CONTENIDO.map((d) => NOMBRE_DISENO[d])).toEqual(['Idea + ilustración', 'Personaje habla', 'Dato grande', 'Tarjetas con íconos']);
+    expect(disenosPara({ disposicion: 'idea', bloques: [{ tipo: 'texto' }, { tipo: 'imagen' }] })).toEqual(['idea', 'personaje', 'dato', 'lista']);
+    expect(disenosPara({ disposicion: 'portada', bloques: [{ tipo: 'texto' }] })).toHaveLength(4);
+  });
+
+  it('una actividad, un video o los resultados no cambian de diseño en el editor', () => {
+    expect(disenosPara({ disposicion: 'memoria', bloques: [{ tipo: 'texto' }, { tipo: 'interaccion' }] })).toEqual([]);
+    expect(disenosPara({ disposicion: 'video', bloques: [{ tipo: 'video' }] })).toEqual([]);
+    expect(disenosPara({ disposicion: 'resultados', bloques: [] })).toEqual([]);
+    expect(esDisenoContenido('lista')).toBe(true);
+    expect(esDisenoContenido('quiz')).toBe(false);
+  });
+
+  it('se puede volver a una disposición de texto (Deshacer), pero no pasar a una actividad', () => {
+    const texto = { disposicion: 'idea', bloques: [{ tipo: 'texto' }] };
+    expect(disenoPermitido(texto, 'lista')).toBe(true);
+    expect(disenoPermitido(texto, 'portada')).toBe(true);
+    expect(disenoPermitido(texto, 'quiz')).toBe(false);
+    expect(disenoPermitido(texto, 'nada')).toBe(false);
+    expect(disenoPermitido({ disposicion: 'memoria', bloques: [{ tipo: 'interaccion' }] }, 'idea')).toBe(false);
+  });
+
+  it('la plantilla sigue al kit: cambia el sufijo o usa el estilo base', () => {
+    expect(plantillaPara('kit-minera-andina-idea', 'lista')).toBe('kit-minera-andina-lista');
+    expect(plantillaPara('base-portada', 'dato')).toBe('base-dato');
+    expect(plantillaPara('otra', 'idea')).toBe('base-idea');
   });
 });

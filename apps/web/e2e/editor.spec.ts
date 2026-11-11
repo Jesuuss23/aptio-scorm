@@ -2,8 +2,9 @@
 // con teclado se entra con Tab y Enter; si otra persona guardó antes, se recarga y se avisa.
 // HU-0602 · Barra contextual y propiedades: tamaño, color del kit (CP-057), alineación y animación.
 // HU-0603 · Modo Libre: arrastrar y flechas guardan un desplazamiento en % del ancho (CP-058).
+// HU-0605 · Diseños: la misma pantalla en otra composición, con el mismo contenido y Deshacer (CP-060).
 import { expect, type Page, test } from '@playwright/test';
-import { simularApi } from './api-simulada';
+import { RETOQUES_P05, simularApi } from './api-simulada';
 
 const PROYECTO = '00000000-0000-4000-8000-000000000701';
 const URL_EDITOR = `/proyectos/${PROYECTO}/editor?pantalla=p01`;
@@ -208,7 +209,9 @@ test.describe('HU-0603 · modo Libre', () => {
     return { x: parseFloat(x) / ancho, y: parseFloat(y) / ancho, ancho };
   });
   async function arrastrar(page: Page, dx: number, dy: number) {
-    await imagen(page).waitFor();
+    // El lienzo se vuelve a montar cuando llega el kit: se espera a que la red quede quieta y a que la imagen tenga caja.
+    await page.waitForLoadState('networkidle');
+    await expect.poll(() => imagen(page).boundingBox()).not.toBeNull();
     const caja = (await imagen(page).boundingBox())!;
     await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
     await page.mouse.down();
@@ -233,8 +236,8 @@ test.describe('HU-0603 · modo Libre', () => {
     expect(guardado.dispositivo).toBe('todos');
     const grande = await corrimiento(page);
     expect(grande.x).toBeCloseTo(guardado.x / 100, 3);
-    // En otra resolución el reproductor es más angosto, pero el corrimiento sigue siendo la misma fracción del ancho.
-    await page.setViewportSize({ width: 820, height: 900 });
+    // En otra resolución (con el panel Diseños al lado) el reproductor es más angosto, pero el corrimiento sigue siendo la misma fracción del ancho.
+    await page.setViewportSize({ width: 1180, height: 900 });
     await expect.poll(async () => (await corrimiento(page)).ancho).toBeLessThan(ancho);
     const chico = await corrimiento(page);
     expect(chico.x).toBeCloseTo(grande.x, 3);
@@ -271,6 +274,62 @@ test.describe('HU-0603 · modo Libre', () => {
     expect((await corrimiento(page)).x).toBe(0);
     await imagen(page).click();
     await expect(propiedades(page)).toContainText('Cambia a Libre para mover.');
+  });
+});
+
+test.describe('HU-0605 · cambiar diseño', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'PRODUCTOR', retoquesP05: true });
+  });
+  const disenos = (page: Page) => page.getByRole('complementary', { name: 'Diseños' });
+  const pantallaDibujada = (page: Page) => lienzo(page).locator('.ap-pantalla');
+  const PARRAFO = 'Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada mientras trabajas en un equipo.';
+  /** Corrimiento horizontal de la imagen en % del ancho del reproductor. */
+  const corrimientoX = (page: Page) => lienzo(page).locator('[data-bloque="p05-imagen"]').evaluate((el) => {
+    const ancho = (el.getRootNode() as ShadowRoot).querySelector?.<HTMLElement>('.ap-r')?.clientWidth ?? Number.NaN;
+    const t = getComputedStyle(el).translate;
+    return t === 'none' ? 0 : Math.round((parseFloat(t.split(' ')[0]!) / ancho) * 1000) / 10;
+  });
+
+  test('CP-060 · «Idea + ilustración» pasa a «Tarjetas con íconos» con el mismo contenido y Deshacer la devuelve', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p05`);
+    await expect(disenos(page).locator('.editor-diseno-nombre')).toHaveText(['Idea + ilustración · actual', 'Personaje habla', 'Dato grande', 'Tarjetas con íconos']);
+    await expect(disenos(page).getByRole('button', { name: 'Idea + ilustración · actual' })).toHaveAttribute('aria-current', 'true');
+    // Cada miniatura es la misma pantalla dibujada por el reproductor en su composición.
+    await expect(disenos(page).getByRole('button', { name: 'Tarjetas con íconos' }).locator('.ap-pantalla.ap-d-lista')).toHaveCount(1);
+    await expect(disenos(page).getByRole('button', { name: 'Tarjetas con íconos' }).getByText(PARRAFO)).toHaveCount(1);
+    await expect(pantallaDibujada(page)).toHaveClass(/ap-d-idea/);
+    await expect.poll(() => corrimientoX(page)).toBe(12.5);
+
+    await disenos(page).getByRole('button', { name: 'Tarjetas con íconos' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Diseño aplicado: Tarjetas con íconos.' })).toBeVisible();
+    expect(ediciones).toEqual([{ version: expect.any(Number), disposicion: 'lista' }]);
+    await expect(pantallaDibujada(page)).toHaveClass(/ap-d-lista/);
+    // Se conserva el contenido; los retoques de posición se reinician (RN-06-3).
+    await expect(lienzo(page).getByText(PARRAFO)).toBeVisible();
+    await expect.poll(() => corrimientoX(page)).toBe(0);
+    await expect(disenos(page).getByRole('button', { name: 'Tarjetas con íconos · actual' })).toBeVisible();
+
+    await page.getByRole('status').getByRole('button', { name: 'Deshacer' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Se deshizo el cambio de diseño.' })).toBeVisible();
+    expect(ediciones[1]).toEqual({ version: expect.any(Number), disposicion: 'idea', ajustes: RETOQUES_P05.ajustes });
+    await expect(pantallaDibujada(page)).toHaveClass(/ap-d-idea/);
+    await expect.poll(() => corrimientoX(page)).toBe(12.5);
+    await expect(page.getByRole('button', { name: 'Deshacer' })).toHaveCount(0);
+  });
+
+  test('Propiedades muestra el diseño y «Cambiar» lleva al panel; una actividad no cambia de diseño aquí', async ({ page }) => {
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p05`);
+    const propiedades = page.getByRole('complementary', { name: 'Propiedades' });
+    await expect(propiedades.getByText('Idea + ilustración')).toBeVisible();
+    await propiedades.getByRole('button', { name: 'Cambiar' }).click();
+    await expect(disenos(page).getByRole('button', { name: 'Personaje habla' })).toBeFocused();
+
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p07`);
+    await expect(disenos(page)).toContainText('Esta pantalla tiene una actividad o un video: su diseño se cambia en Revisión');
+    await expect(disenos(page).getByRole('button')).toHaveCount(0);
   });
 });
 
