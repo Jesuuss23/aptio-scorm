@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.21 · actualizado con la décima entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.22 · actualizado con la undécima entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -240,6 +240,12 @@ Línea de tiempo (HU-0608, PR 1):
 - En la web, `vistas/linea-tiempo.ts` (lógica pura, con Vitest) tiene el zoom, `tramosBoca`, `tramosSubtitulos`, `arrastrar(x, borde, dS, marcas, duracion, libre)` (devuelve el `CambioTiempo` de cuerpo, inicio o fin), `marcasRegla` y `formatoS`. El componente es `LineaTiempo.tsx` (no `linea-tiempo.tsx`: dos archivos con el mismo nombre rompen la resolución de módulos).
 - `EditorVista` guarda la aguja por pantalla (`aguja`), maneja `irTiempo`, `reproducirTiempo`, `pausarTiempo` y `detenerTiempo`, y `cambiarTiempo` manda el ajuste con `enviar`, así que pasa por el historial. Espacio reproduce si el foco está en la página o en la línea de tiempo. `propiedades.tsx` suma Aparece, Sale y el ancla a una palabra.
 
+Línea de tiempo (HU-0608, PR 2):
+- `@aptio/schema/tiempos` suma `reanclar(viejo, nuevo, indice)` (alineación por la subsecuencia común más larga de palabras normalizadas con `normalizarPalabra`), `retardoDeAncla`, `reanclarAjustes` y `recalcularAnclas` (cambian los `ajustes` y devuelven los ids sin palabra), `sincronizarConVoz` (SUP-48) y el mensaje de «Revisar tiempo» (`mensajeRevisarTiempo`, `elementoRevisarTiempo`, `ORIGEN_REVISAR_TIEMPO` = `tiempo`).
+- `CursosService.editar`, al cambiar la narración en español, llama a `reanclarAjustes`; tras guardar, `revisarTiempo` crea las observaciones de los perdidos y borra las de los elementos cuya entrada o ancla cambió (se compara con el ajuste anterior, porque el editor manda el ajuste entero).
+- `etapas/voz.ts` llama a `recalcularAnclas` con `marcasPalabra(texto, duracionMs)` al poner un audio nuevo en el documento, y crea las observaciones en la misma transacción.
+- En la web, `EditorVista` guarda la propuesta en `sincro` (por pantalla) y la pasa a `LineaTiempo` (`sincronizacion`, `alSincronizar`, `alAplicarSincronizacion`, `alDescartarSincronizacion`); las barras llevan `propuesta` y `revisar`. `recargar` lee las observaciones con origen `tiempo`. `X-IA-16-sincronizar-p05.json` es la salida de `sincronizarConVoz` y `test/sincronizar.test.ts` las compara.
+
 Agregar elementos y capas (HU-0606):
 - El reproductor dibuja `pantalla.extras` en `.ap-extras` con `dibujarExtra` (`pantalla.ts`); cada extra lleva `data-bloque` y `data-extra`, la posición base de `posicionExtra` (`left/top/width` en %) y pasa por `aplicarAjuste`, que ahora suma al estilo en vez de reemplazarlo. `TIPO_AJUSTE` reusa los ajustes de texto o de imagen; `a.oculto` agrega `ap-oculto-el`. El botón usa `accionBoton` y `ContextoPantalla.alSiguiente`; `montar(…, { sinAcciones: true })` lo deja inerte en el editor.
 - `CursosService.editar` procesa `dto.extras` entre la disposición y los ajustes: valida ids (422 EXTRA_NO_VALIDO), purga los ajustes de los extras quitados y deja `extras` o lo borra si queda vacío. Los ajustes aceptan ids de extras.
@@ -338,6 +344,7 @@ Ninguna clave real va al repositorio.
 | 0.19 | 2026-11-11 | Agregar elementos y capas (HU-0606): `extras` en el reproductor y en el PATCH, `extras.ts`, `panel-izquierdo.tsx`. |
 | 0.20 | 2026-11-11 | Deshacer, rehacer y guardado automático (HU-0607): `historial.ts`, `motivo` en el PATCH. |
 | 0.21 | 2026-11-11 | Línea de tiempo (HU-0608, PR 1): `@aptio/schema/tiempos`, tiempos e `irA` en el reproductor, `LineaTiempo`. |
+| 0.22 | 2026-11-11 | HU-0608, PR 2: `reanclar`, `sincronizarConVoz`, anclas en la API y en la etapa de voz. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |

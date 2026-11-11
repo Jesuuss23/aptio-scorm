@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.21 · actualizado con la décima entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.22 · actualizado con la undécima entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -350,13 +350,15 @@ La posición se guarda en proporción al ancho de la pantalla, así que se ve en
 - En **Propiedades** también puedes escribir **Aparece** y **Sale** en segundos, o elegir en «Que aparezca cuando Ana dice…» la palabra exacta.
 - **▶ Reproducir** (o la barra espaciadora) reproduce la pantalla con la voz; **❚❚ Pausa** la detiene, y **■** vuelve al inicio y muestra todo para seguir editando. El reloj dice dónde estás y cuánto dura la pantalla.
 - Con **−**, **Ajustar** y **+** cambias el zoom. La marca «Termina la voz → se habilita Siguiente» muestra cuándo el participante puede avanzar. **Ocultar** pliega la línea de tiempo.
+- **✦ Sincronizar con la voz** propone que cada elemento aparezca cuando Ana lo nombra: el título y el personaje entran al inicio, y los demás se pegan a la primera palabra suya que Ana dice. Lo que Ana no nombra conserva su tiempo. La propuesta aparece en una franja y las barras muestran dónde quedarían; **Aplicar** la guarda y **Descartar** la quita sin guardar. Si no te convence, **↶ Deshacer** (o Ctrl+Z) la deshace entera.
+- **Si cambias la narración**, los elementos pegados a una palabra la siguen aunque se mueva, y cuando se regenera la voz aparecen justo cuando Ana la dice. Si borraste esa palabra, el elemento se queda en su segundo y su barra muestra **⚠ revisar tiempo**; la misma observación aparece en Revisión. Desaparece cuando mueves ese elemento o lo vuelves a pegar a una palabra.
 Cada cambio se guarda solo y se puede deshacer. La vista previa y el paquete muestran los elementos en los mismos segundos.
 
 **Agregar elementos.** El panel de la izquierda tiene tres pestañas: **Diseños**, **Agregar** y **Capas**. En **Agregar** eliges qué poner en la pantalla: título, texto, dato, botón, imagen, insignia, forma o personaje. El elemento aparece ya elegido y el editor pasa a **Libre**, así que lo arrastras de inmediato adonde quieras. Su texto se escribe con doble clic, como cualquier otro. En **Propiedades**, el botón tiene «Al hacer clic»: **Siguiente pantalla** o **Nada**; la imagen se elige entre las del curso y lleva su texto alternativo para quien no la ve. En la vista previa y en el paquete, el botón «Siguiente» lleva a la pantalla que sigue.
 
 **Capas, ocultar y eliminar.** En **Capas** ves todos los elementos de la pantalla, los del contenido y los que agregaste («· agregado»). Clic en un nombre lo elige; el ojo lo oculta o lo muestra. En el editor lo oculto se ve tenue y con borde punteado para que puedas elegirlo otra vez; en la vista previa y en el paquete no aparece. También puedes usar **Ocultar** y **Mostrar** en la barra o en Propiedades. **Eliminar** (o la tecla Supr) solo está para lo que agregaste: lo que puso la IA no se borra, se oculta.
 
-Las actividades y la narración se cambian desde Revisión. Volver a ajustar los tiempos cuando se regenera la voz y «Sincronizar con la voz» llegarán en la próxima entrega. El revisor del cliente no entra al editor.
+Las actividades y la narración se cambian desde Revisión. Con esto el editor del Sprint 5 está completo. El revisor del cliente no entra al editor.
 
 ---
 
@@ -402,7 +404,6 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
 - Otra ilustración desde la revisión y comentarios del cliente.
-- En el editor: tiempos que se reacomodan al regenerar la voz y «Sincronizar con la voz».
 
 ---
 
@@ -416,6 +417,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.19 | 2026-11-11 | Editor: pestañas Agregar y Capas; ocultar, mostrar y eliminar elementos. |
 | 0.20 | 2026-11-11 | Editor: deshacer y rehacer (Ctrl+Z), guardado automático con indicador. |
 | 0.21 | 2026-11-11 | Editor: línea de tiempo para decidir cuándo aparece y sale cada elemento. |
+| 0.22 | 2026-11-11 | Editor: «Sincronizar con la voz» y «⚠ revisar tiempo» cuando cambia la narración. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
