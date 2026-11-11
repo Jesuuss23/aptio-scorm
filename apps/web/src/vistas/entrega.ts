@@ -1,0 +1,18 @@
+// HU-1202 · Datos de la vista Entrega (PNT-13): perfiles de LMS con sus recomendaciones y el peso legible.
+import type { PerfilExportacion } from '../api';
+
+/** Recomendaciones de docs/08-entregas-y-lms.md. La compatibilidad con cada LMS se declara solo después de probarla. */
+export const PERFILES: { id: PerfilExportacion; nombre: string; recomendacion: string }[] = [
+  { id: 'generico', nombre: 'Genérico (cualquier LMS)', recomendacion: 'Cumple SCORM 1.2 de forma estricta, sin ajustes para ningún LMS. Si el LMS del cliente es desconocido, prueba antes el paquete en SCORM Cloud.' },
+  { id: 'moodle', nombre: 'Moodle 4.5+', recomendacion: 'Moodle importa SCORM 1.2 de forma nativa. En la actividad SCORM, elige el método de calificación y el número de intentos.' },
+  { id: 'blackboard', nombre: 'Blackboard', recomendacion: 'Blackboard Learn lo abre con su reproductor SCORM integrado. Pruébalo con una cuenta de prueba antes de entregar.' },
+  { id: 'chamilo', nombre: 'Chamilo', recomendacion: 'Chamilo no implementa todo el estándar: el paquete ya es simple, con un solo SCO y sin secuenciación.' },
+  { id: 'canvas', nombre: 'Canvas', recomendacion: 'Canvas necesita una herramienta LTI de SCORM que la institución debe tener activa; confírmalo con el cliente. Puede importarse como tarea calificada.' },
+];
+
+export function megas(bytes: number | null): string {
+  if (bytes === null) return '—';
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString('es-PE')} KB`;
+  return `${(bytes / 1024 / 1024).toLocaleString('es-PE', { maximumFractionDigits: 1 })} MB`;
+}
+

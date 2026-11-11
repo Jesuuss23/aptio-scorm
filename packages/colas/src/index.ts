@@ -7,6 +7,9 @@ import { Redis } from 'ioredis';
 export const COLAS = ['ia', 'voz', 'media', 'export'] as const;
 export type NombreCola = (typeof COLAS)[number];
 
+/** HU-1202 · Tarea de la cola `export`: arma el paquete de una Exportacion (`trabajoId` es su id). */
+export const TAREA_EXPORTAR = 'EXPORTAR';
+
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 
 /** Datos con los que se encola un trabajo. El detalle vive en TrabajoIA (base de datos). */

@@ -1616,3 +1616,20 @@ ul.fila-chips {
 }
 .lt-elemento.revisar { border-color: var(--color-error); }
 .lt-elemento.propuesta { border: 2px dashed var(--color-naranja); background: var(--color-naranja-suave); color: var(--color-naranja-texto); }
+
+/* ---- HU-1202 · Entrega: historial de exportaciones ---- */
+.tabla-entrega {
+  overflow-x: auto;
+}
+.tabla-entrega table {
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+  width: 100%;
+}
+.tabla-entrega th,
+.tabla-entrega td {
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-borde);
+}

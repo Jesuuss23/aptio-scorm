@@ -2,7 +2,7 @@
 // Variables del worker y, como respaldo, las de packages/db (DATABASE_URL), igual que la API.
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
-import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas } from '@aptio/colas';
+import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas, TAREA_EXPORTAR } from '@aptio/colas';
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
@@ -20,6 +20,7 @@ import { cerrarOcr, ocrTesseract } from './extraer/ocr.js';
 import { crearGenerador } from './generar.js';
 import { mediosFfmpeg } from './extraer/medios.js';
 import { crearExtractor, TAREA_EXTRAER } from './material.js';
+import { crearExportador } from './exportar.js';
 import { crearProcesador, type TrabajoEnCola } from './procesar.js';
 import { crearTranscriptor, TAREA_TRANSCRIBIR } from './transcribir.js';
 import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
@@ -51,7 +52,10 @@ const generar = crearGenerador({
 const cascada = crearCascada({ bd: prisma, voz: vozEs, boca, subtitulos });
 // Las propuestas de la IA (HU-0504) usan el mismo proveedor de texto que la generación.
 const proponer = crearPropuestas({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
+// La exportación SCORM 1.2 (HU-1202) lee los recursos del almacenamiento y guarda el ZIP como recurso PAQUETE.
+const exportar = crearExportador({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
 const despachar = (trabajo: TrabajoEnCola) => {
+  if (trabajo.data.tarea === TAREA_EXPORTAR) return exportar(trabajo);
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
   if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);
   if (trabajo.data.tarea === TAREA_GENERAR) return generar(trabajo);
