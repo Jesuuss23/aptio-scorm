@@ -130,7 +130,7 @@ export class CursosService {
   async editar(u: UsuarioSesion, cursoId: string, pantallaId: string, dto: PantallaCambioDto): Promise<CambioResultadoDto> {
     /** Idiomas cuya narración cambió de verdad: su audio queda «Por regenerar» (HU-0703, RN-07-1). */
     const narracionCambiada: string[] = [];
-    const r = await this.guardar(u, cursoId, dto.version, 'edición', (doc) => {
+    const r = await this.guardar(u, cursoId, dto.version, dto.motivo ?? 'edición', (doc) => {
       const p = this.pantalla(doc, pantallaId);
       const bloques = p.bloques as Bloque[];
       const editado = (b: Bloque, contenido: Texto) => {

@@ -10,10 +10,13 @@
 // HU-0606 · Panel izquierdo con pestañas Diseños · Agregar · Capas: un elemento agregado aparece elegido y en modo Libre
 // (CP-061); en Capas se elige, se oculta o se muestra cada elemento. Los extras se eliminan (también con Supr); los
 // bloques del contenido solo se ocultan (SUP-45). Lo oculto se ve tenue en el editor y no se ve en el curso.
-// La línea de tiempo y el deshacer general llegan con la HU-0607 y la HU-0608.
+// HU-0607 · Deshacer y rehacer (↶ ↷, Ctrl+Z, Ctrl+Shift+Z o Ctrl+Y): cada cambio guarda antes una foto de la pantalla
+// (hasta 60). Deshacer se ve al instante y se guarda 1 s después de la última pulsación, en un solo PATCH (RN-06-5,
+// SUP-46); si la foto es de otra pantalla, el editor va a ella. Si otra persona guardó antes (409), se recarga y se
+// vacía el historial. Mientras se escribe, Ctrl+Z es el del texto. La línea de tiempo llega con la HU-0608.
 import { type AjusteElemento, type CursoReproductor, montar, PALETA_BASE, type RolColor } from '@aptio/player';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Rol } from '../api';
 import { navegar } from '../ruta';
 import {
@@ -22,6 +25,7 @@ import {
 } from './ajustes-elemento';
 import { type CambioTexto, edicionDe, esEditable } from './edicion-texto';
 import { capasDe, extraNuevo, nombreExtra, type PantallaConExtras, sinExtra, TIPOS_EXTRA, type TipoExtra } from './extras';
+import { cambioHacia, conFoto, type Foto, fotoDe, type Historial, HISTORIAL_VACIO, mover as moverHistorial, registrar } from './historial';
 import { PanelIzquierdo, type PestanaIzquierda } from './panel-izquierdo';
 import { PanelDisenos } from './disenos';
 import { nombreDiseno } from './disenos-pantalla';
@@ -46,8 +50,10 @@ const ESTILOS_EDICION = `
 
 type PantallaConAjustes = PantallaDoc & { ajustes?: Record<string, AjusteElemento> };
 type CambioPantalla = CambioTexto | { ajustes: Record<string, AjusteElemento | null> } | { disposicion: string; ajustes?: Record<string, AjusteElemento | null> };
-/** HU-0605 · Lo necesario para deshacer un cambio de diseño: la disposición y los ajustes de antes. */
-type DeshacerDiseno = { pantallaId: string; disposicion: string; ajustes?: Record<string, AjusteElemento> };
+/** HU-0607 · Lo que se ve y falta guardar de una pantalla tras deshacer o rehacer. */
+type Pendiente = { foto: Foto; motivo: 'deshacer' | 'rehacer' };
+/** Espera tras la última pulsación de deshacer o rehacer antes de guardar (RN-06-5). */
+const ESPERA_GUARDADO_MS = 1000;
 
 type Guardar = (pantalla: PantallaDoc, bloqueId: string, escrito: string) => Promise<boolean>;
 
@@ -66,7 +72,21 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const [repeticion, setRepeticion] = useState(0);
   // HU-0603 · Modo de trabajo del editor (SUP-42): en Automático la disposición acomoda; en Libre se mueve.
   const [modo, setModo] = useState<'auto' | 'libre'>('auto');
-  const [deshacer, setDeshacer] = useState<DeshacerDiseno | null>(null);
+  // HU-0607 · Historial de la sesión (SUP-46), lo que falta guardar y el indicador «Guardando… / Guardado».
+  const [historial, setHistorial] = useState<Historial>(HISTORIAL_VACIO);
+  const [pendientes, setPendientes] = useState<Record<string, Pendiente>>({});
+  const [guardado, setGuardado] = useState<'guardando' | 'guardado' | null>(null);
+  const historialRef = useRef(historial);
+  const pendientesRef = useRef(pendientes);
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ponerHistorial = (h: Historial) => {
+    historialRef.current = h;
+    setHistorial(h);
+  };
+  const ponerPendientes = (p: Record<string, Pendiente>) => {
+    pendientesRef.current = p;
+    setPendientes(p);
+  };
   const panelDisenos = useRef<HTMLDivElement>(null);
   const [pestana, setPestana] = useState<PestanaIzquierda>('disenos');
   const lienzo = useRef<HTMLDivElement>(null);
@@ -74,7 +94,13 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const reenfocar = useRef<string | null>(null);
   const editan = EDITAN_PANTALLAS.includes(rol);
 
-  const recargar = useCallback(async () => setCurso(await api.curso(proyectoId)), [proyectoId]);
+  /** El último curso leído, para guardar con su versión aunque el estado de React aún no se haya actualizado. */
+  const cursoRef = useRef<Curso | null>(null);
+  const recargar = useCallback(async () => {
+    const c = await api.curso(proyectoId);
+    cursoRef.current = c;
+    setCurso(c);
+  }, [proyectoId]);
 
   useEffect(() => {
     api.proyecto(proyectoId).then(
@@ -90,31 +116,78 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     );
   }, [proyectoId, alCargar, recargar]);
 
-  const documento = curso ? (curso.documento as unknown as CursoDoc) : null;
+  // Lo que se ve: el curso guardado con las pantallas que esperan guardarse tras deshacer o rehacer.
+  const documento = useMemo(() => {
+    const doc = curso ? (curso.documento as unknown as CursoDoc) : null;
+    if (!doc || !Object.keys(pendientes).length) return doc;
+    return {
+      ...doc,
+      modulos: doc.modulos.map((m) => ({
+        ...m, capsulas: m.capsulas.map((c) => ({ ...c, pantallas: c.pantallas.map((p) => (pendientes[p.id] ? conFoto(p, pendientes[p.id]!.foto) : p)) })),
+      })),
+    } as CursoDoc;
+  }, [curso, pendientes]);
   const pantallas = documento ? pantallasDe(documento) : [];
   const actual = pantallas.find((p) => p.id === pantallaId) ?? pantallas[0];
 
-  /** Envía un cambio de la pantalla con la versión leída; devuelve si quedó guardado. */
+  /** Si otra persona guardó antes (409), se trae la última versión y el historial se vacía: sus fotos ya no valen. */
+  const fallo = async (e: unknown, otro: string) => {
+    ponerPendientes({});
+    setGuardado(null);
+    if (e instanceof ErrorApi && e.estado === 409) {
+      await recargar().catch(() => undefined);
+      ponerHistorial(HISTORIAL_VACIO);
+      setError('Otra persona cambió el curso mientras editabas. Se cargó la última versión; vuelve a hacer tu cambio.');
+    } else {
+      setError(mensajeDe(e, otro));
+    }
+  };
+  /** HU-0607 · Guarda lo deshecho o rehecho: un PATCH por pantalla, de lo guardado a la foto elegida. */
+  const guardarPendientes = async () => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = null;
+    const lista = Object.entries(pendientesRef.current);
+    if (!lista.length) return true;
+    setOcupado(true);
+    setGuardado('guardando');
+    try {
+      for (const [id, { foto, motivo }] of lista) {
+        const c = cursoRef.current!;
+        const guardada = pantallasDe(c.documento as unknown as CursoDoc).find((p) => p.id === id);
+        const cambio = guardada ? cambioHacia(guardada, foto) : null;
+        if (!cambio) continue;
+        await api.editarPantalla(c.id, id, { version: c.version, ...cambio, motivo });
+        await recargar();
+      }
+      ponerPendientes({});
+      setGuardado('guardado');
+      return true;
+    } catch (e) {
+      await fallo(e, 'No se pudo guardar lo deshecho');
+      if (!(e instanceof ErrorApi && e.estado === 409)) ponerHistorial(HISTORIAL_VACIO);
+      return false;
+    } finally {
+      setOcupado(false);
+    }
+  };
+  /** Envía un cambio de la pantalla con la versión leída; devuelve si quedó guardado. Antes guarda lo deshecho. */
   const enviar = async (pantalla: PantallaDoc, cambio: CambioPantalla, listo: string) => {
-    if (!curso) return false;
+    if (!curso || !(await guardarPendientes())) return false;
     setError('');
     setAviso('');
-    setDeshacer(null);
     setOcupado(true);
+    setGuardado('guardando');
     try {
       const estaba = pantalla.estado;
-      await api.editarPantalla(curso.id, pantalla.id, { version: curso.version, ...cambio });
+      const antes = fotoDe(pantalla);
+      await api.editarPantalla(curso.id, pantalla.id, { version: cursoRef.current!.version, ...cambio });
       await recargar();
+      ponerHistorial(registrar(historialRef.current, { pantallaId: pantalla.id, foto: antes }));
+      setGuardado('guardado');
       setAviso(estaba === 'aprobado' ? `${listo} La pantalla volvió a borrador: apruébala de nuevo en Revisión.` : listo);
       return true;
     } catch (e) {
-      if (e instanceof ErrorApi && e.estado === 409) {
-        // Otra persona guardó antes: se trae la última versión para no pisarla.
-        await recargar().catch(() => undefined);
-        setError('Otra persona cambió el curso mientras editabas. Se cargó la última versión; vuelve a hacer tu cambio.');
-      } else {
-        setError(mensajeDe(e, 'No se pudo guardar el cambio'));
-      }
+      await fallo(e, 'No se pudo guardar el cambio');
       return false;
     } finally {
       setOcupado(false);
@@ -142,16 +215,66 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     setElegido(null);
     return enviar(pantalla, { extras: sinExtra(pantalla as PantallaConExtras, id) }, 'Elemento eliminado.');
   };
+  /** HU-0607 · Deshacer o rehacer: se ve al instante y se guarda 1 s después de la última pulsación. */
+  const paso = (hacia: 'deshacer' | 'rehacer') => {
+    if (ocupado || escribiendo || !cursoRef.current) return;
+    // Con refs y no con lo dibujado: varias pulsaciones seguidas pueden llegar antes de que React vuelva a dibujar.
+    const guardadas = pantallasDe(cursoRef.current.documento as unknown as CursoDoc);
+    const ahora = (id: string) => pendientesRef.current[id]?.foto ?? fotoDe(guardadas.find((p) => p.id === id)!);
+    const destino = historialRef.current[hacia].at(-1);
+    const pantalla = destino && guardadas.find((p) => p.id === destino.pantallaId);
+    if (!pantalla) return;
+    const r = moverHistorial(historialRef.current, hacia, ahora);
+    if (!r) return;
+    ponerHistorial(r.historial);
+    ponerPendientes({ ...pendientesRef.current, [pantalla.id]: { foto: r.entrada.foto, motivo: hacia } });
+    setError('');
+    setAviso(hacia === 'deshacer' ? 'Se deshizo el último cambio.' : 'Se rehízo el cambio.');
+    setGuardado('guardando');
+    const sigue = elegido && (pantalla.bloques.some((b) => b.id === elegido.bloqueId) || r.entrada.foto.extras.some((e) => e.id === elegido.bloqueId));
+    if (!sigue) setElegido(null);
+    if (pantalla.id !== actual?.id) navegar(`/proyectos/${proyectoId}/editor?pantalla=${pantalla.id}`);
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = setTimeout(() => void guardarPendientesRef.current(), ESPERA_GUARDADO_MS);
+  };
   const guardarRef = useRef(guardar);
   const moverRef = useRef(mover);
   const quitarRef = useRef(quitar);
   const modoRef = useRef(modo);
+  const pasoRef = useRef(paso);
+  const guardarPendientesRef = useRef(guardarPendientes);
   useEffect(() => {
     guardarRef.current = guardar;
     moverRef.current = mover;
     quitarRef.current = quitar;
     modoRef.current = modo;
+    pasoRef.current = paso;
+    guardarPendientesRef.current = guardarPendientes;
   });
+
+  // HU-0607 · Atajos: Ctrl+Z deshace; Ctrl+Shift+Z o Ctrl+Y rehacen. En un campo o mientras se escribe, son los del texto.
+  // Al salir del editor se guarda lo que esperaba; si se cierra la página antes, el navegador pregunta.
+  useEffect(() => {
+    const alTecla = (k: KeyboardEvent) => {
+      if (!(k.ctrlKey || k.metaKey) || k.altKey) return;
+      const tecla = k.key.toLowerCase();
+      if (tecla !== 'z' && tecla !== 'y') return;
+      const el = k.composedPath()[0];
+      if (el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName))) return;
+      k.preventDefault();
+      pasoRef.current(tecla === 'y' || k.shiftKey ? 'rehacer' : 'deshacer');
+    };
+    const alCerrar = (ev: BeforeUnloadEvent) => {
+      if (Object.keys(pendientesRef.current).length) ev.preventDefault();
+    };
+    document.addEventListener('keydown', alTecla);
+    window.addEventListener('beforeunload', alCerrar);
+    return () => {
+      document.removeEventListener('keydown', alTecla);
+      window.removeEventListener('beforeunload', alCerrar);
+      if (temporizador.current) void guardarPendientesRef.current();
+    };
+  }, []);
 
   // Una sola pantalla, como la verá el participante, con sus textos editables.
   useEffect(() => {
@@ -449,25 +572,26 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       if (extraElegido) void quitar(actual, extraElegido.id);
     },
   };
-  /** HU-0605 · Aplica otro diseño y deja a mano cómo deshacerlo. */
-  const cambiarDiseno = async (disposicion: string) => {
-    const antes: DeshacerDiseno = { pantallaId: actual.id, disposicion: actual.disposicion ?? 'idea', ajustes: (actual as PantallaConAjustes).ajustes };
+  /** HU-0605 · Aplica otro diseño; se deshace con el historial (HU-0607), que devuelve también sus ajustes. */
+  const cambiarDiseno = (disposicion: string) => {
     setElegido(null);
-    if (await enviar(actual, { disposicion }, `Diseño aplicado: ${nombreDiseno(disposicion)}.`)) setDeshacer(antes);
+    void enviar(actual, { disposicion }, `Diseño aplicado: ${nombreDiseno(disposicion)}. Ctrl+Z lo deshace.`);
   };
-  const deshacerDiseno = () => {
-    const d = deshacer;
-    const pantalla = d && pantallas.find((p) => p.id === d.pantallaId);
-    if (!d || !pantalla) return;
-    void enviar(pantalla, { disposicion: d.disposicion, ...(d.ajustes ? { ajustes: d.ajustes } : {}) }, 'Se deshizo el cambio de diseño.');
-  };
+  const guardando = ocupado || guardado === 'guardando';
   const irA = (id: string) => navegar(`/proyectos/${proyectoId}/editor?pantalla=${id}`);
   return (
     <div className="editor">
       <div className="editor-barra">
         {volver}
+        <div className="editor-historial" role="group" aria-label="Deshacer y rehacer">
+          <button type="button" className="boton" aria-label="Deshacer" title="Deshacer (Ctrl+Z)"
+            disabled={!historial.deshacer.length || ocupado || escribiendo} onClick={() => paso('deshacer')}>↶ Deshacer</button>
+          <button type="button" className="boton" aria-label="Rehacer" title="Rehacer (Ctrl+Shift+Z o Ctrl+Y)"
+            disabled={!historial.rehacer.length || ocupado || escribiendo} onClick={() => paso('rehacer')}>↷</button>
+        </div>
         <span className="num sec">{String(indice + 1).padStart(2, '0')} / {pantallas.length}</span>
         <h1>{actual.titulo.es ?? actual.titulo.en}</h1>
+        <span className="sec editor-guardado" aria-live="polite">{guardando ? 'Guardando…' : guardado === 'guardado' ? '✓ Guardado' : ''}</span>
         <span className={`chip ${actual.estado === 'aprobado' ? 'validado' : actual.estado === 'propuesta-ia' ? 'ia' : ''}`}>{NOMBRE_ESTADO[actual.estado] ?? actual.estado}</span>
         <div className="opciones" role="group" aria-label="Modo de edición">
           <button type="button" className="opcion" aria-pressed={modo === 'auto'} title="La disposición acomoda los elementos" onClick={() => setModo('auto')}>Automático</button>
@@ -478,14 +602,13 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       {aviso ? (
         <div className="nota fila-aviso" role="status">
           <span>{aviso}</span>
-          {deshacer && deshacer.pantallaId === actual.id ? <button type="button" className="boton" disabled={ocupado} onClick={deshacerDiseno}>Deshacer</button> : null}
         </div>
       ) : null}
       <div className="editor-cuerpo">
         <div ref={panelDisenos} className="editor-col-disenos" tabIndex={-1}>
           <PanelIzquierdo pestana={pestana} alCambiarPestana={setPestana} capas={capasDe(actual as PantallaConExtras)} elegidoId={elegidoId} ocupado={ocupado}
             alAgregar={(t) => void agregar(t)} alElegirCapa={elegirCapa} alAlternarOculto={alternarOculto}
-            disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={(d) => void cambiarDiseno(d)} />} />
+            disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={cambiarDiseno} />} />
         </div>
         <section className="editor-lienzo" aria-label={`Lienzo de la pantalla ${actual.id}`}>
           {datosElegido && !escribiendo ? (

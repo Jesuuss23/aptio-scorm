@@ -32,6 +32,11 @@ export class PantallaCambioDto {
     description: 'HU-0606 · Elementos agregados en el editor: la lista completa de la pantalla (RN-06-1). 422 EXTRA_NO_VALIDO si un id se repite o es el de un bloque; quitar uno borra su ajuste.',
   })
   @IsOptional() @IsArray() extras?: Record<string, unknown>[];
+  @ApiPropertyOptional({
+    enum: ['deshacer', 'rehacer'],
+    description: 'HU-0607 · Rótulo de la versión cuando el cambio viene de deshacer o rehacer en el editor (SUP-46). Sin él, la versión dice «edición».',
+  })
+  @IsOptional() @IsIn(['deshacer', 'rehacer']) motivo?: 'deshacer' | 'rehacer';
 }
 
 /** HU-0502 · Aprobar varias: las indicadas o, con soloSinObservaciones, todas las que no tienen observaciones abiertas. */

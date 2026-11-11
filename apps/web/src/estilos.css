@@ -1173,6 +1173,15 @@ ul.fila-chips {
   margin: 0;
   font-size: var(--titulo-pagina);
 }
+/* HU-0607 · Deshacer y rehacer, y el indicador de guardado. */
+.editor-historial {
+  display: flex;
+  gap: 4px;
+}
+.editor-guardado {
+  min-width: 9ch;
+  font-size: var(--texto-sm);
+}
 .editor-lienzo {
   display: flex;
   flex-direction: column;
