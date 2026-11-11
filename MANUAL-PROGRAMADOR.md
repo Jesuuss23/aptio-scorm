@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.15 · actualizado con la cuarta entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.16 · actualizado con la quinta entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -221,6 +221,12 @@ Los retoques (HU-0602):
 - `propiedades.tsx` tiene `BarraElemento` y `PanelPropiedades`, que comparten `AccionesRetoque`.
 - `CursosService.editar` mezcla `dto.ajustes` en `pantalla.ajustes`, revisa los roles de color y deja el resto a `erroresCurso`.
 
+El modo Libre (HU-0603):
+- `estiloAjuste` agrega `--ap-dx`/`--ap-dy` en cqw y la clase `ap-desp`, `ap-desp-escritorio` o `ap-desp-celular`; las reglas `translate` (con `@container`) están en `estilos.ts`.
+- En `EditorVista`, `pointerdown`/`pointermove`/`pointerup` en la sombra arrastran, con un umbral de `UMBRAL_ARRASTRE_PX`; durante el arrastre se ve con `el.style.translate`.
+- Las flechas acumulan en `flechas` y guardan con un `setTimeout` de 1 s. `modoRef` y `moverRef` evitan montar el lienzo de nuevo.
+- `ajustes-elemento.ts` tiene `pxAPorcentaje`, `desplazado` (tope ±100) y `cambioDesplazamiento`.
+
 En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`, `mostrarPose`, `animarBoca` (un `requestAnimationFrame` sobre un `RelojAudio`), `parpadear` y `svgEnLinea` (SVG en línea, sin comentarios, scripts ni `on*`, y con los colores marcadores reemplazados por el kit). Muestra las capas con `style.display = 'inline' | 'none'`, porque la plantilla trae `display="none"`. `montar()` acepta `cargarSvg` y `cargarSubtitulos`; la vista previa usa `urlsRecursos`, `svgPersonajes` y `subtitulos` de `GET /proyectos/{id}/curso`. `packages/player/src/subtitulos.ts` tiene `leerVtt` (texto plano, sin HTML) y `cueEn(cues, ms)`; mientras suena el audio, un `requestAnimationFrame` actualiza la línea de «CC». La preferencia vive en `localStorage['aptio-subtitulos']`, dentro de un try/catch.
 
 ### 7.2 Agregar un proveedor
@@ -296,6 +302,7 @@ Ninguna clave real va al repositorio.
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.16 | 2026-11-11 | Modo Libre (HU-0603): `translate` en cqw en el reproductor, arrastre y flechas en `EditorVista`. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |

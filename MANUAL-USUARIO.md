@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.15 · actualizado con la cuarta entrega del Sprint 5 (10 de noviembre de 2026)**
+**Versión 0.16 · actualizado con la quinta entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -332,7 +332,13 @@ Cada texto guardado vuelve la pantalla a **Borrador**; si estaba aprobada, apru�
 
 A la derecha, el panel **Propiedades** tiene las mismas opciones, un deslizador de tamaño y **▶ Ver animación** para ver la entrada de nuevo. Pulsa **Esc** para soltar el elemento. Los textos cambian todo; las imágenes y el personaje, el tamaño y la animación. Cada cambio se guarda al momento y vuelve la pantalla a **Borrador**. Se ve igual en la vista previa y en el paquete. «Auto» entra sin movimiento por ahora; el orden y los tiempos de entrada llegarán con la línea de tiempo.
 
-Las actividades y la narración se cambian desde Revisión. Mover y agregar elementos, deshacer y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
+**Mover elementos (modo Libre).** Arriba a la derecha está el selector **Automático / Libre**. En **Automático** (el modo con que abre el editor), la disposición acomoda los elementos sola. En **Libre** puedes:
+- **Arrastrar** un texto, una imagen o el personaje adonde quieras. Se guarda al soltar.
+- **Elegir** el elemento y moverlo con las **flechas** del teclado, de a 0,5 % del ancho por pulsación. Se guarda un segundo después de la última flecha.
+
+La posición se guarda en proporción al ancho de la pantalla, así que se ve en el mismo lugar en un celular, una tableta o una computadora. En **Propiedades** ves la posición y el botón **Volver a su lugar**, que deshace solo el movimiento sin tocar el tamaño ni el color. Las actividades no se mueven.
+
+Las actividades y la narración se cambian desde Revisión. Agregar elementos, deshacer y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
 
 ---
 
@@ -378,7 +384,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
 - Otra ilustración desde la revisión y comentarios del cliente.
-- En el editor: mover y agregar elementos; deshacer y guardado automático; línea de tiempo.
+- En el editor: agregar elementos; deshacer y guardado automático; línea de tiempo.
 
 ---
 
@@ -386,6 +392,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
+| 0.16 | 2026-11-11 | Editor: modo Libre para mover elementos con el mouse o las flechas. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
