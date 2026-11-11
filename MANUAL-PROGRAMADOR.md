@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.20 · actualizado con la novena entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.21 · actualizado con la décima entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -233,6 +233,13 @@ Deshacer, rehacer y guardado automático (HU-0607):
 - Los atajos van en `document` (`keydown`) y se ignoran si `composedPath()[0]` es un campo o un texto en edición.
 - La API acepta `motivo` (`deshacer` o `rehacer`) en `PantallaCambioDto` y lo pasa a `guardar` para la `CursoVersion`.
 
+Línea de tiempo (HU-0608, PR 1):
+- `packages/schema/src/tiempos.ts` (exportado como `@aptio/schema/tiempos`, con Vitest): `marcasPalabra(texto, duracionMs)` reparte la voz por letras (SUP-47), `palabraEn`, `imantar(s, marcas, libre)` (palabra a menos de `IMAN_PALABRA_S` 0,25 s o décimas, con `anclaPalabra`), `tiemposElementos` y `duracionPantalla` (RN-06-7).
+- `packages/player/src/tiempos.ts` repite esas reglas sin dependencias (el reproductor va solo en el paquete): `tiemposDe` (bloques y luego extras, escalonado de `ESCALONADO_S` 0,3 s sin `retardoS`), `activoEn`, `duracionDe` y `ultimoCambio`. Las dos copias tienen pruebas; si cambia una regla, cambia en las dos.
+- El reproductor aplica los tiempos con el reloj del audio (o del sistema si no suena): `ap-fuera` oculta lo que está fuera de su rango y `ap-entra` anima la entrada escalonada. `montar(…, { sinTiempos: true })` desactiva el reloj (lo usa el lienzo del editor). Nuevos métodos: `irA(s)` deja la pantalla quieta en ese segundo (visibilidad, boca y subtítulo), `reproducir(desde, alTiempo)` corre el reloj y llama a `alTiempo(s, terminado)`, `pausar`, `verTodo` y `duracion`.
+- En la web, `vistas/linea-tiempo.ts` (lógica pura, con Vitest) tiene el zoom, `tramosBoca`, `tramosSubtitulos`, `arrastrar(x, borde, dS, marcas, duracion, libre)` (devuelve el `CambioTiempo` de cuerpo, inicio o fin), `marcasRegla` y `formatoS`. El componente es `LineaTiempo.tsx` (no `linea-tiempo.tsx`: dos archivos con el mismo nombre rompen la resolución de módulos).
+- `EditorVista` guarda la aguja por pantalla (`aguja`), maneja `irTiempo`, `reproducirTiempo`, `pausarTiempo` y `detenerTiempo`, y `cambiarTiempo` manda el ajuste con `enviar`, así que pasa por el historial. Espacio reproduce si el foco está en la página o en la línea de tiempo. `propiedades.tsx` suma Aparece, Sale y el ancla a una palabra.
+
 Agregar elementos y capas (HU-0606):
 - El reproductor dibuja `pantalla.extras` en `.ap-extras` con `dibujarExtra` (`pantalla.ts`); cada extra lleva `data-bloque` y `data-extra`, la posición base de `posicionExtra` (`left/top/width` en %) y pasa por `aplicarAjuste`, que ahora suma al estilo en vez de reemplazarlo. `TIPO_AJUSTE` reusa los ajustes de texto o de imagen; `a.oculto` agrega `ap-oculto-el`. El botón usa `accionBoton` y `ContextoPantalla.alSiguiente`; `montar(…, { sinAcciones: true })` lo deja inerte en el editor.
 - `CursosService.editar` procesa `dto.extras` entre la disposición y los ajustes: valida ids (422 EXTRA_NO_VALIDO), purga los ajustes de los extras quitados y deja `extras` o lo borra si queda vacío. Los ajustes aceptan ids de extras.
@@ -330,6 +337,7 @@ Ninguna clave real va al repositorio.
 | 0.18 | 2026-11-11 | Cambiar diseño (HU-0605): `disposicion` en el PATCH, catálogo en `@aptio/schema/marca`, `PanelDisenos`. |
 | 0.19 | 2026-11-11 | Agregar elementos y capas (HU-0606): `extras` en el reproductor y en el PATCH, `extras.ts`, `panel-izquierdo.tsx`. |
 | 0.20 | 2026-11-11 | Deshacer, rehacer y guardado automático (HU-0607): `historial.ts`, `motivo` en el PATCH. |
+| 0.21 | 2026-11-11 | Línea de tiempo (HU-0608, PR 1): `@aptio/schema/tiempos`, tiempos e `irA` en el reproductor, `LineaTiempo`. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.20 · actualizado con la novena entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.21 · actualizado con la décima entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -332,7 +332,7 @@ Cada texto guardado vuelve la pantalla a **Borrador**; si estaba aprobada, apru�
 - **Animación**: cambia cómo entra el elemento (Auto, Ninguna, Aparecer, Deslizar, Zoom o Rebotar).
 - **Restablecer**: lo deja como lo armó la aplicación.
 
-A la derecha, el panel **Propiedades** tiene las mismas opciones, un deslizador de tamaño y **▶ Ver animación** para ver la entrada de nuevo. Pulsa **Esc** para soltar el elemento. Los textos cambian todo; las imágenes y el personaje, el tamaño y la animación. Cada cambio se guarda al momento y vuelve la pantalla a **Borrador**. Se ve igual en la vista previa y en el paquete. «Auto» entra sin movimiento por ahora; el orden y los tiempos de entrada llegarán con la línea de tiempo.
+A la derecha, el panel **Propiedades** tiene las mismas opciones, un deslizador de tamaño y **▶ Ver animación** para ver la entrada de nuevo. Pulsa **Esc** para soltar el elemento. Los textos cambian todo; las imágenes y el personaje, el tamaño y la animación. Cada cambio se guarda al momento y vuelve la pantalla a **Borrador**. Se ve igual en la vista previa y en el paquete. «Auto» entra sin movimiento; si el elemento no tiene tiempo, entra escalonado, uno cada 0,3 s.
 
 **Mover elementos (modo Libre).** Arriba a la derecha está el selector **Automático / Libre**. En **Automático** (el modo con que abre el editor), la disposición acomoda los elementos sola. En **Libre** puedes:
 - **Arrastrar** un texto, una imagen o el personaje adonde quieras. Se guarda al soltar.
@@ -344,11 +344,19 @@ La posición se guarda en proporción al ancho de la pantalla, así que se ve en
 
 **Deshacer, rehacer y guardado.** Todo lo que cambias se guarda solo: arriba, junto al título, ves «Guardando…» y luego «✓ Guardado», y al recargar la página los cambios siguen ahí. **↶ Deshacer** (o Ctrl+Z) vuelve atrás un cambio, y puedes pulsarlo muchas veces seguidas (hasta 60 cambios). **↷** (o Ctrl+Shift+Z, o Ctrl+Y) lo rehace. Lo deshecho se ve al instante y se guarda un segundo después de la última pulsación. Si el cambio era de otra pantalla, el editor te lleva a ella. Mientras escribes en un texto, Ctrl+Z deshace lo que escribes, no el historial. El historial es de esta sesión: al recargar empieza vacío; para volver a una versión anterior del curso usa el historial de versiones. Si otra persona guardó cambios mientras tanto, el editor carga la última versión, te avisa y el historial se vacía.
 
+**Línea de tiempo.** Debajo del lienzo está la línea de tiempo de la pantalla. Arriba va la regla en segundos; debajo, lo que dice Ana palabra por palabra, los subtítulos, la boca (si la pantalla tiene personaje) y una barra por cada elemento, que va desde que aparece hasta que sale. La línea vertical (la aguja) marca el segundo que muestra el lienzo: haz clic en la regla o en una palabra para llevarla ahí, y el lienzo muestra solo lo que se ve en ese momento, con la boca y el subtítulo de ese segundo.
+- **Cuándo aparece:** arrastra la barra (o su borde izquierdo). Si la sueltas cerca de una palabra, se pega a ella y el elemento aparece cuando Ana la dice; si no, va a décimas de segundo. Mantén **Alt** para que no se pegue. Con la barra elegida, las flechas la mueven 0,1 s (con Shift, 1 s).
+- **Cuándo sale:** arrastra el borde derecho. Si la llevas más allá del final, la pantalla dura hasta ahí.
+- En **Propiedades** también puedes escribir **Aparece** y **Sale** en segundos, o elegir en «Que aparezca cuando Ana dice…» la palabra exacta.
+- **▶ Reproducir** (o la barra espaciadora) reproduce la pantalla con la voz; **❚❚ Pausa** la detiene, y **■** vuelve al inicio y muestra todo para seguir editando. El reloj dice dónde estás y cuánto dura la pantalla.
+- Con **−**, **Ajustar** y **+** cambias el zoom. La marca «Termina la voz → se habilita Siguiente» muestra cuándo el participante puede avanzar. **Ocultar** pliega la línea de tiempo.
+Cada cambio se guarda solo y se puede deshacer. La vista previa y el paquete muestran los elementos en los mismos segundos.
+
 **Agregar elementos.** El panel de la izquierda tiene tres pestañas: **Diseños**, **Agregar** y **Capas**. En **Agregar** eliges qué poner en la pantalla: título, texto, dato, botón, imagen, insignia, forma o personaje. El elemento aparece ya elegido y el editor pasa a **Libre**, así que lo arrastras de inmediato adonde quieras. Su texto se escribe con doble clic, como cualquier otro. En **Propiedades**, el botón tiene «Al hacer clic»: **Siguiente pantalla** o **Nada**; la imagen se elige entre las del curso y lleva su texto alternativo para quien no la ve. En la vista previa y en el paquete, el botón «Siguiente» lleva a la pantalla que sigue.
 
 **Capas, ocultar y eliminar.** En **Capas** ves todos los elementos de la pantalla, los del contenido y los que agregaste («· agregado»). Clic en un nombre lo elige; el ojo lo oculta o lo muestra. En el editor lo oculto se ve tenue y con borde punteado para que puedas elegirlo otra vez; en la vista previa y en el paquete no aparece. También puedes usar **Ocultar** y **Mostrar** en la barra o en Propiedades. **Eliminar** (o la tecla Supr) solo está para lo que agregaste: lo que puso la IA no se borra, se oculta.
 
-Las actividades y la narración se cambian desde Revisión. Agregar elementos, el deshacer general y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
+Las actividades y la narración se cambian desde Revisión. Volver a ajustar los tiempos cuando se regenera la voz y «Sincronizar con la voz» llegarán en la próxima entrega. El revisor del cliente no entra al editor.
 
 ---
 
@@ -394,7 +402,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Versión en inglés.
 - Control de calidad y paquete SCORM para subir a la plataforma del cliente.
 - Otra ilustración desde la revisión y comentarios del cliente.
-- En el editor: agregar elementos; deshacer y guardado automático; línea de tiempo.
+- En el editor: tiempos que se reacomodan al regenerar la voz y «Sincronizar con la voz».
 
 ---
 
@@ -407,6 +415,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.18 | 2026-11-11 | Editor: panel Diseños para ver la pantalla en otra composición y Deshacer. |
 | 0.19 | 2026-11-11 | Editor: pestañas Agregar y Capas; ocultar, mostrar y eliminar elementos. |
 | 0.20 | 2026-11-11 | Editor: deshacer y rehacer (Ctrl+Z), guardado automático con indicador. |
+| 0.21 | 2026-11-11 | Editor: línea de tiempo para decidir cuándo aparece y sale cada elemento. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
