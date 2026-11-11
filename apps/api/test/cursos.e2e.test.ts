@@ -327,4 +327,37 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await como('revisor').patch(ruta, { version: v, disposicion: 'dato' })).status).toBe(403);
     expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);
   });
+
+  it('HU-0606 · agregar un botón, retocarlo y ocultarlo; quitarlo borra su ajuste; ids repetidos no', async () => {
+    type Pd = { id: string; extras?: { id: string }[]; ajustes?: Record<string, unknown> };
+    const p01De = (d: Doc) => pantallas(d).find((x) => x.id === 'p01') as unknown as Pd;
+    const ruta = `/cursos/${cursoId}/pantallas/p01`;
+    let v = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    const boton = { id: 'x-boton-1', tipo: 'boton', texto: { es: 'Continuar' }, x: 40, y: 80, ancho: 14, alClic: 'siguiente' };
+
+    // El extra y su ajuste pueden ir en el mismo cambio.
+    const r = await como('grafico').patch(ruta, { version: v, extras: [boton], ajustes: { 'x-boton-1': { color: 'primario', oculto: true } } });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ estado: 'borrador' });
+    let p01 = p01De(await documento());
+    expect(p01.extras).toEqual([boton]);
+    expect(p01.ajustes).toMatchObject({ 'x-boton-1': { color: 'primario', oculto: true } });
+    v = r.body.version;
+
+    // Un id repetido, el id de un bloque o un extra fuera del esquema: 422 sin guardar.
+    expect((await como('grafico').patch(ruta, { version: v, extras: [boton, boton] })).body).toMatchObject({ codigo: 'EXTRA_NO_VALIDO' });
+    expect((await como('grafico').patch(ruta, { version: v, extras: [{ ...boton, id: 'p01-titulo' }] })).body).toMatchObject({ codigo: 'EXTRA_NO_VALIDO', mensaje: 'El id «p01-titulo» ya está en la pantalla' });
+    expect((await como('grafico').patch(ruta, { version: v, extras: [{ ...boton, x: 140 }] })).body).toMatchObject({ codigo: 'CURSO_NO_VALIDO' });
+    expect((await como('grafico').patch(ruta, { version: v, extras: [{ ...boton, tipo: 'video' }] })).body).toMatchObject({ codigo: 'CURSO_NO_VALIDO' });
+    expect((await como('revisor').patch(ruta, { version: v, extras: [] })).status).toBe(403);
+    expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);
+
+    // Quitar el extra borra su ajuste y deja los de los bloques.
+    expect((await como('grafico').patch(ruta, { version: v, ajustes: { 'p01-titulo': { color: 'acento' } } })).status).toBe(200);
+    expect((await como('grafico').patch(ruta, { version: v + 1, extras: [] })).status).toBe(200);
+    p01 = p01De(await documento());
+    expect(p01.extras).toBeUndefined();
+    expect(p01.ajustes).toEqual({ 'p01-titulo': { color: 'acento' } });
+    expect((await como('grafico').patch(ruta, { version: v + 2, ajustes: { 'x-boton-1': { color: 'acento' } } })).body).toMatchObject({ codigo: 'BLOQUE_NO_EXISTE' });
+  });
 });

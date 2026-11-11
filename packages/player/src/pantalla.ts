@@ -1,10 +1,10 @@
 // Dibujo de una pantalla desde sus bloques (capa de contenido) con la disposición elegida por el generador (capa de
 // presentación). Modo guiado: la disposición acomoda los bloques sola y se adapta al ancho, sin lienzo fijo.
-import { aplicarAjuste } from './ajustes.ts';
+import { accionBoton, aplicarAjuste, posicionExtra } from './ajustes.ts';
 import { mostrarBoca, mostrarPose, svgEnLinea } from './boca.ts';
 import { h } from './dom.ts';
 import { t, type Textos } from './textos.ts';
-import type { Bloque, BloqueInteraccion, Idioma, Pantalla, RolColor } from './tipos.ts';
+import type { Bloque, BloqueInteraccion, ElementoExtra, Idioma, Pantalla, RolColor } from './tipos.ts';
 
 export interface ContextoPantalla {
   idioma: Idioma;
@@ -16,6 +16,8 @@ export interface ContextoPantalla {
   actividad: (b: BloqueInteraccion, p: Pantalla) => HTMLElement;
   /** HU-0702 · El SVG del personaje como texto, para dibujarlo en línea y mover sus capas (boca, ojos y pose). */
   cargarSvg?: (recursoId: string) => Promise<string | undefined>;
+  /** HU-0606 · Lo que hace un botón agregado con «Siguiente». */
+  alSiguiente?: (() => void) | undefined;
 }
 
 /** Luminancia relativa (WCAG) de un color #RRGGBB. */
@@ -42,6 +44,56 @@ function silueta(): SVGSVGElement {
     svg.append(el);
   }
   return svg;
+}
+
+/** Insignia propia del reproductor (no necesita recurso): una medalla con los colores del kit. */
+function insignia(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const [tag, attrs] of [
+    ['circle', { cx: '50', cy: '50', r: '46', class: 'ap-insignia-fondo' }],
+    ['polygon', { points: '50,18 59,40 83,41 64,56 71,80 50,66 29,80 36,56 17,41 41,40', class: 'ap-insignia-estrella' }],
+  ] as const) {
+    const el = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    svg.append(el);
+  }
+  return svg;
+}
+
+/** HU-0606 · Un extra en su lugar (x, y y ancho en %), con los mismos ajustes que un bloque (SUP-45). */
+function dibujarExtra(e: ElementoExtra, p: Pantalla, ctx: ContextoPantalla): HTMLElement {
+  const texto = t(e.texto, ctx.idioma);
+  const base = { 'data-bloque': e.id, 'data-extra': e.tipo, style: posicionExtra(e) };
+  let el: HTMLElement;
+  if (e.tipo === 'titulo') el = h('p', { ...base, class: 'ap-extra ap-extra-titulo' }, texto);
+  else if (e.tipo === 'texto') el = h('p', { ...base, class: 'ap-extra ap-extra-texto' }, texto);
+  else if (e.tipo === 'dato') el = h('p', { ...base, class: 'ap-extra ap-extra-dato' }, texto);
+  else if (e.tipo === 'boton') {
+    const accion = accionBoton(e.alClic);
+    el = h('button', { ...base, type: 'button', class: 'ap-extra ap-extra-boton', onclick: () => { if (accion === 'siguiente') ctx.alSiguiente?.(); } }, texto);
+  } else if (e.tipo === 'imagen') {
+    const url = e.recursoId ? ctx.urlRecurso(e.recursoId) : undefined;
+    el = h('figure', { ...base, class: 'ap-extra ap-extra-imagen' },
+      url ? h('img', { src: url, alt: texto }) : h('span', { class: 'ap-sin-imagen', role: 'img', 'aria-label': texto || ctx.tx.imagenPendiente }, texto || ctx.tx.imagenPendiente));
+  } else if (e.tipo === 'insignia') el = h('figure', { ...base, class: 'ap-extra ap-extra-insignia', role: texto ? 'img' : null, 'aria-label': texto || null, 'aria-hidden': texto ? null : 'true' }, insignia());
+  else if (e.tipo === 'forma') el = h('div', { ...base, class: 'ap-extra ap-extra-forma', 'aria-hidden': 'true' });
+  else {
+    const figura = h('figure', { ...base, class: 'ap-extra ap-personaje ap-extra-personaje', 'aria-hidden': 'true' }, silueta());
+    if (e.recursoId && ctx.cargarSvg) {
+      void ctx.cargarSvg(e.recursoId).then((marcado) => {
+        const svg = marcado ? svgEnLinea(marcado, document, { primario: ctx.paleta.primario, secundario: ctx.paleta.secundario, acento: ctx.paleta.acento }) : null;
+        if (!svg) return;
+        mostrarPose(svg, 'neutral');
+        mostrarBoca(svg, 'X');
+        figura.replaceChildren(svg);
+      }, () => undefined);
+    }
+    el = figura;
+  }
+  return aplicarAjuste(el, p.ajustes?.[e.id], e.tipo);
 }
 
 export function dibujarPantalla(p: Pantalla, ctx: ContextoPantalla): HTMLElement {
@@ -121,5 +173,6 @@ export function dibujarPantalla(p: Pantalla, ctx: ContextoPantalla): HTMLElement
   },
   ctx.revision ? h('span', { class: 'ap-id ap-id-pantalla' }, p.id) : null,
   h('div', { class: 'ap-contenido' }, h('div', { class: 'ap-texto' }, texto), medios.length ? h('div', { class: 'ap-medios' }, medios) : null),
-  actividades);
+  actividades,
+  p.extras?.length ? h('div', { class: 'ap-extras' }, p.extras.map((e) => dibujarExtra(e, p, ctx))) : null);
 }

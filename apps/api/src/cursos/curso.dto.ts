@@ -27,6 +27,11 @@ export class PantallaCambioDto {
     description: 'HU-0605 · Otra composición de contenido (idea, personaje, dato o lista; o volver a portada, objetivos, sección, resumen o cierre) con los mismos bloques: cambia la plantilla, reinicia los ajustes y conserva los extras (RN-06-3). Los `ajustes` del mismo cambio se aplican después (Deshacer). 422 DISENO_NO_PERMITIDO en una pantalla con actividad o con otro valor.',
   })
   @IsOptional() @IsString() disposicion?: string;
+  @ApiPropertyOptional({
+    type: 'array', items: { $ref: '#/components/schemas/ElementoExtra' },
+    description: 'HU-0606 · Elementos agregados en el editor: la lista completa de la pantalla (RN-06-1). 422 EXTRA_NO_VALIDO si un id se repite o es el de un bloque; quitar uno borra su ajuste.',
+  })
+  @IsOptional() @IsArray() extras?: Record<string, unknown>[];
 }
 
 /** HU-0502 · Aprobar varias: las indicadas o, con soloSinObservaciones, todas las que no tienen observaciones abiertas. */
