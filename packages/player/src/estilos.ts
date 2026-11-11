@@ -178,6 +178,8 @@ button:disabled{cursor:not-allowed}
 .ap-insignia-estrella{fill:var(--ap-acento)}
 .ap-extra-forma{aspect-ratio:3/1;border-radius:10px;background:var(--ap-acento)}
 .ap-oculto-el{display:none!important}
+.ap-fuera{display:none!important}
+.ap-entra{animation:ap-aparecer .4s ease-out both}
 /* HU-0603 · Desplazamiento del modo Libre, en % del ancho del reproductor y por dispositivo. */
 .ap-desp{translate:var(--ap-dx) var(--ap-dy)}
 @container (min-width:640px){.ap-desp-escritorio{translate:var(--ap-dx) var(--ap-dy)}}

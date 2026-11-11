@@ -5,6 +5,7 @@
 // HU-0605 · Diseños: la misma pantalla en otra composición, con el mismo contenido y Deshacer (CP-060).
 // HU-0606 · Agregar elementos (CP-061), capas para ocultar y mostrar, y eliminar extras.
 // HU-0607 · Todo se guarda solo y sigue al recargar (CP-062); 20 Ctrl+Z vuelven al inicio en un solo guardado (CP-063).
+// HU-0608 · Línea de tiempo: arrastrar la entrada a una palabra (CP-064), la salida a los 4 s (CP-065) y la aguja (CP-066).
 import { expect, type Page, test } from '@playwright/test';
 import { RETOQUES_P05, simularApi } from './api-simulada';
 
@@ -551,5 +552,144 @@ test.describe('HU-0607 · deshacer, rehacer y guardado automático', () => {
     expect(ediciones).toEqual([expect.objectContaining({ ajustes: { 'p01-titulo': { color: 'acento' } } }), expect.objectContaining({ motivo: 'deshacer' })]);
     await expect(deshacer(page)).toBeDisabled();
     await expect(rehacer(page)).toBeDisabled();
+  });
+});
+
+test.describe('HU-0608 · línea de tiempo', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'PRODUCTOR' });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
+  const linea = (page: Page) => page.getByRole('region', { name: 'Línea de tiempo' });
+  const barra = (page: Page, id: string) => linea(page).locator(`[data-elemento="${id}"]`);
+  const aguja = (page: Page) => linea(page).locator('.lt-aguja');
+  const segundoAguja = async (page: Page) => Number(await aguja(page).getAttribute('data-segundo'));
+  /** La x de un segundo en la regla: las marcas enteras van cada 1 s desde 0. Antes, la línea de tiempo a la vista. */
+  const xDe = async (page: Page, s: number) => {
+    await linea(page).scrollIntoViewIfNeeded();
+    const t0 = (await linea(page).locator('.lt-regla .lt-tick-entero').nth(0).boundingBox())!;
+    const t1 = (await linea(page).locator('.lt-regla .lt-tick-entero').nth(1).boundingBox())!;
+    return t0.x + (t1.x - t0.x) * s;
+  };
+  /** Arrastra con el ratón desde el centro de `desde` hasta la x pedida. */
+  const arrastrarHasta = async (page: Page, desde: { x: number; y: number; width: number; height: number }, x: number, dx = desde.width / 2) => {
+    const y = desde.y + desde.height / 2;
+    await page.mouse.move(desde.x + dx, y);
+    await page.mouse.down();
+    await page.mouse.move((desde.x + dx + x) / 2, y, { steps: 4 });
+    await page.mouse.move(x, y, { steps: 4 });
+    await page.mouse.up();
+  };
+  /** La vista previa en modo Revisión, en la pantalla pedida. */
+  const vistaPreviaEn = async (page: Page, id: string) => {
+    await page.goto(`/proyectos/${PROYECTO}/vista-previa`);
+    await page.getByRole('group', { name: 'Modo' }).getByRole('button', { name: 'Revisión' }).click();
+    await page.getByLabel('Ir a la pantalla').selectOption(id);
+    return page.locator('.vista-previa-reproductor');
+  };
+
+  test('CP-064 · arrastro la barra del dato hasta «residual»: se imanta, guarda retardoS y anclaPalabra, y la vista previa lo respeta', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p08`);
+    await page.waitForLoadState('networkidle');
+    const palabra = linea(page).getByRole('button', { name: 'residual:', exact: true });
+    await linea(page).scrollIntoViewIfNeeded();
+    await expect(palabra).toBeVisible();
+    const caja = (await barra(page, 'p08-dato').boundingBox())!;
+    const destino = (await palabra.boundingBox())!;
+    // Se suelta un poco después del comienzo de la palabra: el imán la lleva a su inicio.
+    await arrastrarHasta(page, caja, destino.x + 6 + caja.width / 2 - 10, caja.width / 2 - 10);
+    await expect(page.getByRole('status').filter({ hasText: 'Tiempo guardado.' })).toBeVisible();
+    const texto = 'Después de apagar puede quedar energía residual: presión, carga o un resorte tenso.';
+    const inicio = Math.round(((texto.indexOf('residual') * 5395) / texto.length / 1000) * 100) / 100;
+    expect(ediciones).toEqual([{ version: expect.any(Number), ajustes: { 'p08-dato': { retardoS: inicio, anclaPalabra: 6 } } }]);
+    await expect(barra(page, 'p08-dato')).toHaveAttribute('aria-valuenow', String(inicio));
+    // En Propiedades, la palabra elegida.
+    await barra(page, 'p08-dato').click();
+    await expect(page.getByLabel('Que aparezca cuando Ana dice…')).toHaveValue('6');
+
+    // Vista previa: el dato no está al empezar la pantalla y aparece a los ~2,5 s.
+    const previa = await vistaPreviaEn(page, 'p08');
+    const dato = previa.locator('[data-bloque="p08-dato"]');
+    await expect(dato).toBeHidden();
+    await expect(previa.locator('[data-bloque="p08-titulo"]')).toBeVisible();
+    await expect(dato).toBeVisible({ timeout: 8000 });
+  });
+
+  test('CP-065 · arrastro el borde derecho del título a los 4 s: finS = 4 y en la vista previa sale a los 4 s', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p08`);
+    await page.waitForLoadState('networkidle');
+    const x4 = await xDe(page, 4);
+    const borde = (await barra(page, 'p08-titulo').locator('[data-borde="fin"]').boundingBox())!;
+    await arrastrarHasta(page, borde, x4);
+    await expect(page.getByRole('status').filter({ hasText: 'Tiempo guardado.' })).toBeVisible();
+    expect(ediciones).toEqual([{ version: expect.any(Number), ajustes: { 'p08-titulo': { finS: 4 } } }]);
+    await expect(barra(page, 'p08-titulo')).toHaveAccessibleName(/sale a los 4,0 s/);
+    // Propiedades muestra Sale (s) = 4.
+    await barra(page, 'p08-titulo').click();
+    await expect(page.getByLabel('Sale (s)')).toHaveValue('4');
+
+    const previa = await vistaPreviaEn(page, 'p08');
+    const titulo = previa.locator('[data-bloque="p08-titulo"]');
+    await expect(titulo).toBeVisible();
+    await expect(titulo).toBeHidden({ timeout: 8000 });
+    await expect(previa.locator('[data-bloque="p08-texto"]')).toBeVisible();
+  });
+
+  test('CP-066 · clic en la regla a los 2 s: la aguja, la palabra, el subtítulo, la boca y solo lo activo coinciden; Reproducir avanza', async ({ page }) => {
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p05`);
+    await page.waitForLoadState('networkidle');
+    const enLienzo = (id: string) => lienzo(page).locator(`[data-bloque="${id}"]`);
+    // En el segundo 0 solo está el título: lo demás entra escalonado de a 0,3 s (RN-06-9).
+    await linea(page).getByRole('button', { name: 'Es', exact: true }).click();
+    await expect(enLienzo('p05-titulo')).toBeVisible();
+    await expect(enLienzo('p05-texto')).toBeHidden();
+    await expect(enLienzo('p05-imagen')).toBeHidden();
+
+    const x2 = await xDe(page, 2);
+    const regla = (await linea(page).locator('[data-pista="regla"]').boundingBox())!;
+    await page.mouse.click(x2, regla.y + regla.height - 4);
+    await expect.poll(() => segundoAguja(page)).toBeCloseTo(2, 1);
+    await expect(linea(page).locator('.lt-reloj')).toHaveText('2,0 s / 6,3 s');
+    // «Es cualquier energía que puede…» con 65 ms por letra: a los 2 s suena «puede».
+    await expect(linea(page).locator('.lt-palabra[aria-current="true"]')).toHaveText('puede');
+    await expect(linea(page).locator('.lt-sub[aria-current="true"]')).toHaveText('Es cualquier energía que puede mover, calentar o liberar algo de forma inesperada.');
+    for (const id of ['p05-titulo', 'p05-texto', 'p05-dato', 'p05-imagen']) await expect(enLienzo(id)).toBeVisible();
+
+    // Reproducir: la aguja avanza; Pausa la detiene; ■ vuelve a mostrar todo.
+    await linea(page).getByRole('button', { name: '▶ Reproducir' }).click();
+    await expect.poll(() => segundoAguja(page)).toBeGreaterThan(2.3);
+    await linea(page).getByRole('button', { name: '❚❚ Pausa' }).click();
+    const quieto = await segundoAguja(page);
+    await page.waitForTimeout(300);
+    expect(await segundoAguja(page)).toBeCloseTo(quieto, 1);
+    await linea(page).getByRole('button', { name: 'Detener y ver todo' }).click();
+    await expect(aguja(page)).toHaveClass(/quieta/);
+    await expect(linea(page).locator('.lt-reloj')).toHaveText('0,0 s / 6,3 s');
+  });
+
+  test('CP-066 · en la pantalla de Ana, la boca del lienzo y la de la pista coinciden en el segundo elegido', async ({ page }) => {
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p03`);
+    await page.waitForLoadState('networkidle');
+    const x2 = await xDe(page, 2);
+    const regla = (await linea(page).locator('[data-pista="regla"]').boundingBox())!;
+    await page.mouse.click(x2, regla.y + regla.height - 4);
+    // Marcas de p03: B a los 1820 ms y D a los 2015 ms.
+    await expect(linea(page).locator('.lt-boca[aria-current="true"]')).toHaveClass(/lt-boca-B/);
+    await expect(lienzo(page).locator('.ap-personaje svg')).toHaveAttribute('data-boca', 'B');
+    await expect(linea(page).locator('.lt-sub[aria-current="true"]')).toHaveText('Soy Ana, supervisora de seguridad.');
+  });
+
+  test('con teclado, la barra elegida se mueve de a 0,1 s; ocultar la línea la pliega', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(`/proyectos/${PROYECTO}/editor?pantalla=p05`);
+    await barra(page, 'p05-dato').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('status').filter({ hasText: 'Tiempo guardado.' })).toBeVisible();
+    expect(ediciones).toEqual([{ version: expect.any(Number), ajustes: { 'p05-dato': { retardoS: 0.7 } } }]);
+    await linea(page).getByRole('button', { name: 'Ocultar', exact: true }).click();
+    await expect(linea(page).getByRole('button', { name: 'Mostrar' })).toBeVisible();
+    await expect(linea(page).locator('[data-elemento]')).toHaveCount(0);
   });
 });
