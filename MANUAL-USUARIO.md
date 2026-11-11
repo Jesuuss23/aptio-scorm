@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.16 · actualizado con la quinta entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.17 · actualizado con la sexta entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -290,6 +290,8 @@ Si la pantalla ya estaba aprobada, al guardar vuelve a «Borrador» para que alg
 
 En unos segundos aparece una franja naranja sobre la pantalla con lo que propone la IA. La pantalla no cambia hasta que decidas:
 - **Aplicar:** la pantalla cambia y vuelve a «Borrador». Junto al aviso aparece **Deshacer**, que la deja como estaba.
+
+**Tus retoques se conservan.** La IA solo cambia el contenido. Si en el editor moviste, agrandaste o cambiaste de color un elemento, o agregaste un botón, eso se mantiene al aplicar una propuesta, al usar **Deshacer** y al **Generar de nuevo** el curso. Mover un elemento mientras hay una propuesta pendiente no la deja vencida. La única excepción: si la propuesta cambia el diseño de la pantalla (por ejemplo, una variante con otra composición), el tamaño, el color y la posición vuelven a como los dibuja el kit, y los elementos que agregaste se quedan. La franja te lo avisa antes de aplicar.
 - **Descartar:** la propuesta desaparece sin cambiar nada.
 - Con **Ver 3 variantes**, pulsa cada variante para verla en la pantalla y luego **Aplicar esta variante**.
 
@@ -393,6 +395,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | Versión | Fecha | Cambios |
 | --- | --- | --- |
 | 0.16 | 2026-11-11 | Editor: modo Libre para mover elementos con el mouse o las flechas. |
+| 0.17 | 2026-11-11 | Los retoques del editor se conservan al aplicar propuestas de la IA, al deshacer y al generar de nuevo. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
