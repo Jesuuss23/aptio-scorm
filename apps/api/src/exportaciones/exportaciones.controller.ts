@@ -1,10 +1,10 @@
-// HU-1202 · Rutas de la entrega (M12): exportar, historial y descarga.
+// HU-1202 · Rutas de la entrega (M12): exportar, historial y descarga. HU-1201: validar antes de exportar.
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiCookieAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { EQUIPO } from '../comun/organizacion.js';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
-import { ExportacionDto, ExportacionEntradaDto } from './exportacion.dto.js';
+import { ExportacionDto, ExportacionEntradaDto, ValidacionDto } from './exportacion.dto.js';
 import { ExportacionesService } from './exportaciones.service.js';
 
 /** Exportan administración, diseño instruccional y producción; el revisor del cliente no (403). */
@@ -16,6 +16,13 @@ const EXPORTAN = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'] as co
 @Roles(...EQUIPO)
 export class ExportacionesController {
   constructor(private readonly exportaciones: ExportacionesService) {}
+
+  @Post('cursos/:cursoId/validar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: ValidacionDto, description: 'Nunca bloquea por tamaño (RN-12-2). Los errores de esquema vienen en `errores`. 422 FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE' })
+  validar(@UsuarioActual() u: UsuarioSesion, @Param('cursoId', ParseUUIDPipe) id: string, @Body() dto: ExportacionEntradaDto): Promise<ValidacionDto> {
+    return this.exportaciones.validar(u, id, dto);
+  }
 
   @Post('cursos/:cursoId/exportaciones')
   @Roles(...EXPORTAN)

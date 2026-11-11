@@ -2625,7 +2625,7 @@ paths:
       - Entrega
       summary: Validar antes de exportar
       operationId: post_cursos_cursoId_validar
-      description: Nunca bloquea por tamaño
+      description: 'HU-1201. Nunca bloquea por tamaño (RN-12-2): responde 200 con errores (esquema) y advertencias. 422 FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE; 403 al revisor del cliente.'
       parameters:
       - name: cursoId
         in: path
@@ -5485,22 +5485,78 @@ components:
       required:
       - errores
       - advertencias
+      - pesoEstimadoMb
+      - pesoEstimadoBytes
+      - limiteMb
+      - origenLimite
+      - superaLimite
+      - alternativas
+      - recursosPesados
+      - suspendDataCaracteres
+      - pantallasTotal
+      - pantallasSinAprobar
+      - recursosFaltantes
       properties:
         errores:
           type: array
+          description: Impiden exportar (el curso no cumple el esquema)
           items:
             type: string
         advertencias:
           type: array
+          description: No impiden exportar (peso sobre el límite, archivos faltantes, suspend_data, pantallas sin aprobar)
           items:
             type: string
         pesoEstimadoMb:
           type: number
+          description: Peso estimado del paquete (1 MB = 1.048.576 bytes)
+        pesoEstimadoBytes:
+          type: integer
+        limiteMb:
+          type: integer
+          description: Límite de subida del destino
+        origenLimite:
+          type: string
+          enum:
+          - ficha
+          - referencia
+          description: ficha, la ficha de compatibilidad del cliente; referencia, LIMITE_SUBIDA_REFERENCIA_MB (100 por defecto)
+        superaLimite:
+          type: boolean
+        alternativas:
+          type: array
+          description: Las 5 alternativas de docs/08 cuando se pasa el límite (RN-12-2)
+          items:
+            type: string
+        recursosPesados:
+          type: array
+          description: Los 5 recursos que más pesan
+          items:
+            type: object
+            required:
+            - id
+            - nombre
+            - bytes
+            properties:
+              id:
+                type: string
+              nombre:
+                type: string
+              bytes:
+                type: integer
         suspendDataCaracteres:
+          type: integer
+          description: Peor caso de cmi.suspend_data v2 (límite 4096; si se pasa, advertencia)
+        pantallasTotal:
           type: integer
         pantallasSinAprobar:
           type: integer
-      description: Nunca bloquea por tamaño; solo advierte.
+          description: Advertencia (RN-12-3); la web pide confirmación al exportar
+        recursosFaltantes:
+          type: array
+          items:
+            type: string
+      description: Nunca bloquea por tamaño; solo advierte (RN-12-2, CP-090).
     Exportacion:
       type: object
       required:

@@ -43,3 +43,26 @@ export class ExportacionDto {
   @ApiProperty({ nullable: true, format: 'uri', description: 'Solo en COMPLETADO y en GET /exportaciones/{id}: descarga firmada por 15 minutos' }) descargaUrl: string | null;
   @ApiProperty() creadoEn: string;
 }
+
+export class RecursoPesadoDto {
+  @ApiProperty() id: string;
+  @ApiProperty() nombre: string;
+  @ApiProperty() bytes: number;
+}
+
+/** HU-1201 · Resultado de validar antes de exportar. Nunca bloquea por tamaño (RN-12-2): solo los errores impiden exportar. */
+export class ValidacionDto {
+  @ApiProperty({ type: [String], description: 'Impiden exportar (el curso no cumple el esquema)' }) errores: string[];
+  @ApiProperty({ type: [String], description: 'No impiden exportar: peso sobre el límite, archivos faltantes, suspend_data, pantallas sin aprobar' }) advertencias: string[];
+  @ApiProperty({ description: 'Peso estimado del paquete en MB (1 MB = 1.048.576 bytes)' }) pesoEstimadoMb: number;
+  @ApiProperty() pesoEstimadoBytes: number;
+  @ApiProperty({ description: 'Límite de subida del destino en MB' }) limiteMb: number;
+  @ApiProperty({ enum: ['ficha', 'referencia'], description: 'ficha: la ficha de compatibilidad del cliente; referencia: LIMITE_SUBIDA_REFERENCIA_MB' }) origenLimite: 'ficha' | 'referencia';
+  @ApiProperty() superaLimite: boolean;
+  @ApiProperty({ type: [String], description: 'Las 5 alternativas de docs/08 cuando se pasa el límite' }) alternativas: string[];
+  @ApiProperty({ type: [RecursoPesadoDto], description: 'Los 5 recursos que más pesan' }) recursosPesados: RecursoPesadoDto[];
+  @ApiProperty({ description: 'Peor caso de cmi.suspend_data v2 (límite 4096)' }) suspendDataCaracteres: number;
+  @ApiProperty() pantallasTotal: number;
+  @ApiProperty() pantallasSinAprobar: number;
+  @ApiProperty({ type: [String] }) recursosFaltantes: string[];
+}
