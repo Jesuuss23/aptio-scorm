@@ -12,6 +12,8 @@ export interface ContextoActividad {
   modo: 'formativa' | 'sumativa';
   /** Intentos de una actividad sumativa (null = sin límite). Las formativas siempre se pueden repetir. */
   intentosMaximos: number | null;
+  /** HU-1105 · Intentos que ya se usaron (en una sesión anterior, si se reanudó). */
+  intentosPrevios?: number;
   urlRecurso: (id: string) => string | undefined;
   anunciar: (texto: string) => void;
   terminar: (r: ResultadoActividad) => void;
@@ -41,7 +43,7 @@ export function visual(v: Visual | undefined, ctx: Pick<ContextoActividad, 'idio
 
 /** Cuántos intentos van y si se puede repetir. */
 export function intentos(ctx: ContextoActividad) {
-  let hechos = 0;
+  let hechos = ctx.intentosPrevios ?? 0;
   return {
     sumar: () => { hechos++; },
     quedan: () => ctx.modo === 'formativa' || ctx.intentosMaximos === null || hechos < ctx.intentosMaximos,

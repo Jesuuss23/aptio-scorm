@@ -3,7 +3,9 @@
 // cmi.suspend_data, respeta los 4096 caracteres de suspend_data y nunca rompe la navegación si el LMS responde con error.
 // Sin API (HTML abierto fuera de un LMS) no hace nada. Es igual para todos los perfiles de LMS (RN-12-1).
 import type { EstadoReproductor } from './reproductor.ts';
-import type { ResultadoActividad } from './tipos.ts';
+import { codificarSuspend, huellaCurso } from './suspend.ts';
+
+export { codificarSuspend, type DatosSuspend, huellaCurso, leerSuspend } from './suspend.ts';
 
 /** La API que un LMS SCORM 1.2 deja en `window.API`. */
 export interface ApiScorm12 {
@@ -81,69 +83,16 @@ export function tiempoScorm(ms: number): string {
   return `${dos(horas)}:${dos(Math.floor((total % 3600) / 60))}:${dos(total % 60)}`;
 }
 
-// ---------- suspend_data compacto ----------
-// Formato v1: `1|<idioma>|<vistas>|<resultados>`. Las pantallas van por su posición en el curso (el paquete queda ligado a
-// una versión del curso, RN-12-4). Vistas como rangos «0-12,15»; resultados como «posición:completada:puntaje», con «-»
-// si la actividad no califica. Ejemplo: `1|es|0-27|6:1:-,27:1:80`.
-
-export interface DatosSuspend {
-  idioma: string;
-  vistas: string[];
-  resultados: Record<string, ResultadoActividad>;
-}
-
-function rangos(posiciones: number[]): string {
-  const orden = [...new Set(posiciones)].sort((a, b) => a - b);
-  const partes: string[] = [];
-  for (let i = 0; i < orden.length; ) {
-    let j = i;
-    while (j + 1 < orden.length && orden[j + 1] === orden[j]! + 1) j++;
-    partes.push(j === i ? String(orden[i]) : `${orden[i]}-${orden[j]}`);
-    i = j + 1;
-  }
-  return partes.join(',');
-}
-
-/** Codifica avance y resultados para `cmi.suspend_data`. `orden` son los ids de pantalla en el orden del curso. */
-export function codificarSuspend(orden: readonly string[], datos: DatosSuspend): string {
-  const posicion = new Map(orden.map((id, i) => [id, i]));
-  const vistas = datos.vistas.map((id) => posicion.get(id)).filter((n): n is number => n !== undefined);
-  const resultados = Object.entries(datos.resultados)
-    .map(([id, r]) => [posicion.get(id), r] as const)
-    .filter((x): x is readonly [number, ResultadoActividad] => x[0] !== undefined)
-    .sort((a, b) => a[0] - b[0])
-    .map(([n, r]) => `${n}:${r.completada ? 1 : 0}:${r.puntaje === null ? '-' : Math.round(r.puntaje)}`);
-  return `1|${datos.idioma}|${rangos(vistas)}|${resultados.join(',')}`;
-}
-
-/** Lee lo que dejó `codificarSuspend`; devuelve null si el texto no es de este formato (otro paquete o vacío). */
-export function leerSuspend(orden: readonly string[], texto: string): DatosSuspend | null {
-  const partes = texto.split('|');
-  if (partes.length !== 4 || partes[0] !== '1') return null;
-  const [, idioma = '', textoVistas = '', textoResultados = ''] = partes;
-  const id = (n: number) => orden[n];
-  const vistas: string[] = [];
-  for (const parte of textoVistas ? textoVistas.split(',') : []) {
-    const [a, b = a] = parte.split('-').map(Number);
-    if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
-    for (let n = a!; n <= b!; n++) { const x = id(n); if (x) vistas.push(x); }
-  }
-  const resultados: Record<string, ResultadoActividad> = {};
-  for (const parte of textoResultados ? textoResultados.split(',') : []) {
-    const [n, c, p] = parte.split(':');
-    const x = id(Number(n));
-    if (!x || (c !== '0' && c !== '1') || p === undefined) return null;
-    resultados[x] = { completada: c === '1', puntaje: p === '-' ? null : Number(p) };
-  }
-  return { idioma, vistas, resultados };
-}
-
 // ---------- Conexión con el LMS ----------
 
 export interface OpcionesScorm12 {
   /** Ids de pantalla en el orden del curso, para `suspend_data`. */
   orden: readonly string[];
   idioma: string;
+  /** HU-1105 · Huella del curso para suspend_data v2 (`huellaCurso`); por defecto, la del orden de pantallas. */
+  huella?: string;
+  /** HU-1105 · true (por defecto): nunca se envía una nota menor que la que el LMS ya tenía («mejor nota»). */
+  mejorNota?: boolean;
   /** Avisos del adaptador (errores del LMS, suspend_data muy largo). Por defecto, `console.warn`. */
   avisar?: (mensaje: string) => void;
   /** Reloj en ms; se cambia en las pruebas. */
@@ -154,12 +103,17 @@ export interface ConexionScorm12 {
   /** true si encontró la API y el LMS aceptó LMSInitialize. */
   conectado: boolean;
   /** Lo que el LMS tenía guardado al entrar (lo usa la reanudación, HU-1105). */
-  inicial: { entrada: string; ubicacion: string; suspendData: string; estado: string };
+  inicial: { entrada: string; ubicacion: string; suspendData: string; estado: string; nota: string };
   /** Envía al LMS lo que cambió del estado y hace LMSCommit si hubo cambios. Devuelve true si guardó algo. */
   reportar(estado: Pick<EstadoReproductor, 'pantallaId' | 'nota' | 'leccion' | 'vistas' | 'resultados'>): boolean;
   /** Guarda el tiempo de la sesión, hace LMSCommit y LMSFinish. Solo la primera vez. */
   terminar(): void;
 }
+
+/** Orden de los estados de SCORM 1.2 para no degradar uno ya alcanzado. */
+const RANGO: Record<string, number | undefined> = {
+  'not attempted': 0, browsed: 0, incomplete: 0, failed: 1, completed: 2, passed: 3,
+};
 
 /** Inicia la comunicación con el LMS. Nunca lanza: sin API o con errores del LMS, el curso sigue funcionando. */
 export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm12): ConexionScorm12 {
@@ -205,16 +159,26 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
   const guardar = () => api && llamar('LMSCommit', () => api.LMSCommit(''));
 
   const conectado = api !== null && llamar('LMSInitialize', () => api.LMSInitialize('')) !== null;
-  const inicial = { entrada: '', ubicacion: '', suspendData: '', estado: '' };
+  const inicial = { entrada: '', ubicacion: '', suspendData: '', estado: '', nota: '' };
+  const huella = opciones.huella ?? huellaCurso('', opciones.orden);
+  const mejorNota = opciones.mejorNota !== false;
+  /** HU-1105 · El estado más alto que tuvo el LMS en este intento: nunca se envía uno menor (un «passed» no vuelve a «incomplete»). */
+  let piso = 0;
+  let notaPiso: number | null = null;
   if (conectado) {
     inicial.entrada = leer('cmi.core.entry');
     inicial.ubicacion = leer('cmi.core.lesson_location');
     inicial.suspendData = leer('cmi.suspend_data');
     inicial.estado = leer('cmi.core.lesson_status');
+    inicial.nota = leer('cmi.core.score.raw');
+    piso = RANGO[inicial.estado] ?? 0;
+    const n = Number(inicial.nota);
+    if (mejorNota && inicial.nota.trim() !== '' && Number.isFinite(n)) notaPiso = n;
     // «not attempted» (o vacío) pasa a «incomplete» al entrar; un estado ya cerrado no se toca hasta que cambie.
+    // No se hace LMSCommit al entrar: lo guardado no cambia hasta el primer avance (y, si hay que preguntar si se
+    // reanuda, hasta que el participante elige, HU-1105).
     if (inicial.estado === '' || inicial.estado === 'not attempted') escribir('cmi.core.lesson_status', 'incomplete');
     escribir('cmi.core.exit', 'suspend');
-    guardar();
   }
 
   return {
@@ -224,13 +188,19 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
       if (!conectado || terminado) return false;
       let cambio = false;
       cambio = escribir('cmi.core.lesson_location', estado.pantallaId) || cambio;
-      cambio = escribir('cmi.core.lesson_status', estado.leccion) || cambio;
-      if (estado.nota !== null) {
+      const rango = RANGO[estado.leccion] ?? 0;
+      if (rango >= piso) {
+        piso = rango;
+        cambio = escribir('cmi.core.lesson_status', estado.leccion) || cambio;
+      }
+      const nota = estado.nota === null ? null : Math.round(estado.nota);
+      if (nota !== null && (notaPiso === null || nota >= notaPiso)) {
+        if (mejorNota) notaPiso = nota;
         cambio = escribir('cmi.core.score.min', '0') || cambio;
         cambio = escribir('cmi.core.score.max', '100') || cambio;
-        cambio = escribir('cmi.core.score.raw', String(Math.round(estado.nota))) || cambio;
+        cambio = escribir('cmi.core.score.raw', String(nota)) || cambio;
       }
-      const suspend = codificarSuspend(opciones.orden, { idioma: opciones.idioma, vistas: estado.vistas, resultados: estado.resultados });
+      const suspend = codificarSuspend(opciones.orden, { idioma: opciones.idioma, vistas: estado.vistas, resultados: estado.resultados }, huella);
       if (suspend.length <= LIMITE_SUSPEND) cambio = escribir('cmi.suspend_data', suspend) || cambio;
       else if (!avisoLargo) {
         avisoLargo = true;

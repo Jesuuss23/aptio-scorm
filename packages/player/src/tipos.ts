@@ -98,6 +98,8 @@ export interface Navegacion {
   siguienteSeHabilita?: 'siempre' | 'narracion' | 'actividad';
   mostrar?: string[];
   atajosTeclado?: boolean;
+  /** HU-1105 · Al volver al paquete: preguntar (por defecto), reanudar sin preguntar o empezar siempre de cero. */
+  reanudar?: 'preguntar' | 'automatica' | 'no';
 }
 
 export interface Seguimiento {
@@ -134,6 +136,8 @@ export interface KitReproductor {
 export interface ResultadoActividad {
   completada: boolean;
   puntaje: number | null;
+  /** HU-1105 · Intentos usados (las sumativas con límite no se pueden repetir al volver). */
+  intentos?: number;
 }
 
 /** Lo que se reportaría al LMS (SCORM 1.2: cmi.core.lesson_status y cmi.core.score.raw). */

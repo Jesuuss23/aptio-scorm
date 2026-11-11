@@ -55,6 +55,8 @@ const TEXTOS = {
     pareja: 'Pareja encontrada',
     noPareja: 'No forman pareja',
     elige: 'Elige una opción',
+    reanudarPregunta: '¿Continuar donde lo dejaste?',
+    empezarDeNuevo: 'Empezar de nuevo',
   },
   en: {
     anterior: 'Previous',
@@ -106,6 +108,8 @@ const TEXTOS = {
     pareja: 'Match found',
     noPareja: 'Not a match',
     elige: 'Choose an option',
+    reanudarPregunta: 'Continue where you left off?',
+    empezarDeNuevo: 'Start over',
   },
 } satisfies Record<Idioma, unknown>;
 
