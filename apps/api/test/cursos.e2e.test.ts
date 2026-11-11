@@ -188,13 +188,24 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
   it('CP-051 · cinco guardados seguidos de la narración dejan un solo trabajo de cascada, que corre 1 s después del último', async () => {
     const voz = crearCola('voz');
     try {
+      // SUP-38: solo se regenera una pantalla que ya tenía voz. La prueba la deja así ella misma, para correr sola (-t).
+      await prisma.narracion.upsert({
+        where: { cursoId_pantallaId_idioma: { cursoId, pantallaId: 'p03', idioma: 'es' } },
+        create: { cursoId, pantallaId: 'p03', idioma: 'es', textoHash: 'c', origen: 'tts', estado: 'ACTUALIZADA' },
+        update: { estado: 'ACTUALIZADA' },
+      });
+      // Sin restos de otra corrida con el mismo id.
+      for (const id of [`cascada-${cursoId}-p03`, `cascada-${cursoId}-p03-tras`]) await (await voz.getJob(id))?.remove();
       let version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
       for (let i = 1; i <= 5; i++) {
         const r = await como('grafico').patch(`/cursos/${cursoId}/pantallas/p03`, { version, narracion: { es: `Soy Ana, supervisora. Versión ${i}.` } });
-        expect(r.status).toBe(200);
+        // Si falla, el cuerpo dice por qué (409, 422 o 500).
+        expect({ status: r.status, body: r.body }).toMatchObject({ status: 200 });
+        expect(r.body.regenerando).toEqual(['voz-es', 'boca', 'subtitulos-es']);
         version = r.body.version;
       }
-      const trabajos = (await voz.getJobs(['delayed', 'waiting', 'active'])).filter((t) => t.data.trabajoId === cursoId);
+      // Con cualquier estado: si el trabajo ya corrió o se completó, igual cuenta (y la prueba de abajo dice en cuál está).
+      const trabajos = (await voz.getJobs(['delayed', 'waiting', 'active', 'completed'])).filter((t) => t.data.trabajoId === cursoId);
       expect(trabajos).toHaveLength(1);
       expect(trabajos[0]).toMatchObject({ id: `cascada-${cursoId}-p03`, data: { tarea: 'CASCADA', pantallaId: 'p03', organizacionId: orgId }, delay: 1000 });
       expect(await trabajos[0]!.getState()).toBe('delayed');
