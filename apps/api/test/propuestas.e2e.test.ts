@@ -167,4 +167,37 @@ describe.skipIf(!hayBase && !process.env.CI)('propuestas de la IA (HU-0504)', ()
     expect((await prisma.propuesta.findUniqueOrThrow({ where: { id: q.id } })).estado).toBe('DESCARTADA');
     expect((await como('productor').post(`/propuestas/${q.id}/aplicar`, {})).body).toMatchObject({ codigo: 'PROPUESTA_RESUELTA', mensaje: 'Esta propuesta se descartó' });
   });
+
+  it('HU-0604 · CP-059: «Menos texto» y Deshacer conservan los retoques; mover un elemento no vence la propuesta', async () => {
+    // p05 vuelve al caso LOTO con la imagen desplazada y un botón agregado en el editor.
+    const ajustes = { 'p05-imagen': { desplazamiento: { x: 12.5, y: -3, dispositivo: 'todos' } }, 'p05-texto': { color: 'acento' } };
+    const extras = [{ id: 'p05-boton', tipo: 'boton', texto: { es: 'Ver ejemplo' }, x: 70, y: 80, ancho: 20, alClic: 'retroalimentacion' }];
+    const doc = loto();
+    Object.assign(pantalla(doc, 'p05'), { ajustes, extras });
+    const base = await curso();
+    await prisma.curso.update({ where: { id: cursoId }, data: { documento: doc, version: base.version + 1 } });
+    await prisma.cursoVersion.create({ data: { cursoId, version: base.version + 1, documento: doc, motivo: 'edición' } });
+    const p = await propuesta('menos-texto');
+
+    // Mover la imagen después de calcular la propuesta no la vence: la huella no mira los retoques.
+    const movida = await como('productor').patch(`/cursos/${cursoId}/pantallas/p05`, { version: base.version + 1, ajustes: { 'p05-imagen': { desplazamiento: { x: 20, y: -3, dispositivo: 'todos' } } } });
+    expect(movida.status).toBe(200);
+    const antes = await curso();
+
+    const r = await como('productor').post(`/propuestas/${p.id}/aplicar`, {});
+    expect(r.status).toBe(200);
+    const despues = pantalla((await curso()).documento, 'p05') as P & { ajustes?: object; extras?: object[] };
+    expect(despues.bloques[1]!.contenido!.es).toBe('Energía que puede mover, calentar o liberar algo sin aviso.');
+    expect(despues.ajustes).toEqual({ ...ajustes, 'p05-imagen': { desplazamiento: { x: 20, y: -3, dispositivo: 'todos' } } });
+    expect(despues.extras).toEqual(extras);
+
+    // Deshacer revierte el texto y deja los retoques como están ahora (aunque la versión vieja no tuviera estos).
+    const conColor = await como('productor').patch(`/cursos/${cursoId}/pantallas/p05`, { version: r.body.version, ajustes: { 'p05-texto': { color: 'primario' } } });
+    expect(conColor.status).toBe(200);
+    expect((await como('productor').post(`/cursos/${cursoId}/versiones/${base.version + 1}/restaurar`)).status).toBe(200);
+    const restaurada = pantalla((await curso()).documento, 'p05') as P & { ajustes?: Record<string, unknown>; extras?: object[] };
+    expect(restaurada.bloques).toEqual(pantalla(antes.documento, 'p05').bloques);
+    expect(restaurada.ajustes).toMatchObject({ 'p05-texto': { color: 'primario' }, 'p05-imagen': { desplazamiento: { x: 20 } } });
+    expect(restaurada.extras).toEqual(extras);
+  });
 });

@@ -4,7 +4,7 @@ import { type CursoDoc, observacionesRegla } from '@aptio/schema/revision';
 import { type ProveedorTexto, proveedorSimulado } from '@aptio/ai';
 import { prisma } from '@aptio/db';
 import { esCursoValido } from '@aptio/schema';
-import { type PantallaCompuesta, type PantallasCurso, repeticionesSeguidas } from '@aptio/schema/generacion';
+import { ETAPAS, type PantallaCompuesta, type PantallasCurso, repeticionesSeguidas } from '@aptio/schema/generacion';
 import { DISPOSICIONES } from '@aptio/schema/marca';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { EJECUTORES } from '../src/etapas/index.js';
@@ -111,6 +111,38 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 4 en el generador', () => 
     // HU-0501: las observaciones por reglas quedan guardadas con el curso.
     const reglas = observacionesRegla(curso.documento as unknown as CursoDoc);
     expect(await prisma.observacion.count({ where: { cursoId: curso.id, origen: 'regla' } })).toBe(reglas.length);
+  });
+
+  it('HU-0604 · Generar de nuevo conserva los retoques: extras siempre y ajustes si la disposición sigue igual', async () => {
+    const { generacionId, proyectoId } = await e.preparar();
+    expect(await e.correr(generacionId, proveedorSimulado(), hasta4)).toEqual({ estado: 'COMPLETADO' });
+    type Pd = { id: string; disposicion: string; ajustes?: object; extras?: object[] };
+    const pantallasDe = (d: unknown) => (d as { modulos: { capsulas: { pantallas: Pd[] }[] }[] }).modulos[0]!.capsulas[0]!.pantallas;
+    const curso = await prisma.curso.findUniqueOrThrow({ where: { proyectoId } });
+    const doc = structuredClone(curso.documento) as object;
+    const extras = [{ id: 'p05-boton', tipo: 'boton', texto: { es: 'Ver ejemplo' }, x: 70, y: 80, ancho: 20, alClic: 'retroalimentacion' }];
+    const p05 = pantallasDe(doc).find((p) => p.id === 'p05')!;
+    Object.assign(p05, { ajustes: { 'p05-texto': { desplazamiento: { x: 12.5, y: -3, dispositivo: 'todos' } }, 'p05-boton': { color: 'acento' }, 'ya-no-existe': { escala: 2 } }, extras });
+    // p06 se retocó con otra disposición: al volver la del generador, sus ajustes se reinician y el extra queda.
+    const p06 = pantallasDe(doc).find((p) => p.id === 'p06')!;
+    Object.assign(p06, { disposicion: 'idea', ajustes: { 'p06-titulo': { color: 'acento' } }, extras: [{ ...extras[0], id: 'p06-boton' }] });
+    await prisma.curso.update({ where: { id: curso.id }, data: { documento: doc } });
+
+    const otra = await prisma.generacion.create({
+      data: { organizacionId: e.ids.orgId, proyectoId, iniciadoPorId: e.ids.usuarioId, parametros: { pantallas: 30, publico: 'Operarios de planta', porcentajeActividades: 40 }, etapas: { create: ETAPAS.map((etapa, i) => ({ etapa, orden: i + 1 })) } },
+    });
+    expect(await e.correr(otra.id, proveedorSimulado(), hasta4)).toEqual({ estado: 'COMPLETADO' });
+    const nuevo = await prisma.curso.findUniqueOrThrow({ where: { proyectoId } });
+    expect(nuevo.version).toBe(curso.version + 1);
+    expect(esCursoValido(nuevo.documento)).toBe(true);
+    const n05 = pantallasDe(nuevo.documento).find((p) => p.id === 'p05')!;
+    expect(n05.ajustes).toEqual({ 'p05-texto': { desplazamiento: { x: 12.5, y: -3, dispositivo: 'todos' } }, 'p05-boton': { color: 'acento' } });
+    expect(n05.extras).toEqual(extras);
+    const n06 = pantallasDe(nuevo.documento).find((p) => p.id === 'p06')!;
+    expect(n06.disposicion).toBe('lista');
+    expect(n06.ajustes).toBeUndefined();
+    expect(n06.extras).toEqual([{ ...extras[0], id: 'p06-boton' }]);
+    expect(pantallasDe(nuevo.documento).filter((p) => p.ajustes || p.extras).map((p) => p.id)).toEqual(['p05', 'p06']);
   });
 
   it('CP-043 · cada pantalla lista se guarda mientras la etapa corre; con proveedor real se reintenta la que rompe una regla', async () => {
