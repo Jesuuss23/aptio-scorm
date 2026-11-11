@@ -156,5 +156,14 @@ button:disabled{cursor:not-allowed}
   .ap-grupos{flex:0 0 55%}
   .ap-rejilla{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+/* HU-0602 · Animaciones de entrada elegidas en el editor; «reducir movimiento» las quita (abajo). */
+.ap-anim-aparecer{animation:ap-aparecer .5s ease-out both}
+.ap-anim-deslizar{animation:ap-deslizar .5s ease-out both}
+.ap-anim-zoom{animation:ap-zoom .5s ease-out both}
+.ap-anim-rebotar{animation:ap-rebotar .7s cubic-bezier(.3,1.4,.5,1) both}
+@keyframes ap-aparecer{from{opacity:0}to{opacity:1}}
+@keyframes ap-deslizar{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes ap-zoom{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+@keyframes ap-rebotar{0%{opacity:0;transform:translateY(-24px)}60%{opacity:1;transform:translateY(6px)}100%{transform:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 `;

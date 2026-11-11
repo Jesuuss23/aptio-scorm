@@ -1792,6 +1792,9 @@ paths:
         voz, se encola un trabajo CASCADA (cola voz) que regenera su voz, boca y subtítulos 1 s después del último
         guardado (varios guardados seguidos dejan un solo trabajo, CP-051) y espera a que termine una generación en
         curso. `regenerando` lista lo que se regenera; el avance se sigue en `GET /cursos/{cursoId}/narraciones`.
+        HU-0602 · `ajustes` guarda los retoques del editor por elemento, aparte del contenido (RN-06-1); 422 BLOQUE_NO_EXISTE
+        si el elemento no está en la pantalla, COLOR_FUERA_DEL_KIT si un color no es un rol del kit (RN-06-4) y
+        CURSO_NO_VALIDO si un valor sale del esquema.
       parameters:
       - name: cursoId
         in: path
@@ -3597,7 +3600,7 @@ components:
           enum: [inicio, centro, fin]
     RolColor:
       type: string
-      enum: [primario, secundario, acento, fondo, texto]
+      enum: [primario, secundario, acento, texto, blanco, alerta, fondo]
     GlosarioTermino:
       type: object
       required:
@@ -4795,9 +4798,9 @@ components:
         escala:
           type: number
         color:
-          type: string
+          $ref: '#/components/schemas/RolColor'
         relleno:
-          type: string
+          $ref: '#/components/schemas/RolColor'
         alineacion:
           type: string
           enum:
@@ -4855,8 +4858,12 @@ components:
           type: string
         ajustes:
           type: object
+          description: HU-0602 · Clave = id del bloque. Cada clave reemplaza el ajuste de ese elemento; null lo restablece.
           additionalProperties:
-            $ref: '#/components/schemas/AjusteElemento'
+            type: object
+            nullable: true
+            allOf:
+            - $ref: '#/components/schemas/AjusteElemento'
         extras:
           type: array
           items:

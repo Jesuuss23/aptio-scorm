@@ -1,5 +1,6 @@
 // HU-0601 · Editor (PNT-21): edición en el lugar (CP-056). Doble clic, escribir y Enter guarda; Esc cancela;
 // con teclado se entra con Tab y Enter; si otra persona guardó antes, se recarga y se avisa.
+// HU-0602 · Barra contextual y propiedades: tamaño, color del kit (CP-057), alineación y animación.
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
 
@@ -60,7 +61,9 @@ test.describe('con el productor', () => {
     await page.keyboard.type('Otro texto');
     await page.keyboard.press('Escape');
     await expect(lienzo(page).getByText('Cápsula de seguridad · 15 min · 3 retos')).toBeVisible();
-    await expect(page.getByText('Doble clic en un texto para escribir (o Tab hasta el texto y Enter).')).toBeVisible();
+    // Deja de escribir; el texto sigue elegido para retocarlo (HU-0602).
+    await expect(page.getByText('Escribiendo… Enter para terminar · Esc para cancelar')).toHaveCount(0);
+    await expect(page.getByRole('toolbar', { name: 'Opciones del elemento' })).toContainText('Subtítulo · Cápsula de seguridad');
     expect(ediciones).toEqual([]);
   });
 
@@ -105,7 +108,7 @@ test.describe('con el productor', () => {
     await titulo(page).dblclick();
     await page.keyboard.type('Mi cambio');
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('alert')).toHaveText('Otra persona cambió el curso mientras escribías. Se cargó la última versión; vuelve a escribir tu cambio.');
+    await expect(page.getByRole('alert')).toHaveText('Otra persona cambió el curso mientras editabas. Se cargó la última versión; vuelve a hacer tu cambio.');
     await expect(titulo(page)).toHaveText('Bloqueo y etiquetado');
   });
 });
@@ -119,3 +122,71 @@ test('el revisor del cliente no ve «Editar pantalla» ni puede escribir en el e
   await expect(page.getByText('El editor es del equipo de producción. Puedes ver y comentar las pantallas en Revisión.')).toBeVisible();
   await expect(lienzo(page)).toHaveCount(0);
 });
+
+test.describe('HU-0602 · retoques del elemento elegido', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_GRAFICO' });
+  });
+  const barra = (page: Page) => page.getByRole('toolbar', { name: 'Opciones del elemento' });
+  const propiedades = (page: Page) => page.getByRole('complementary', { name: 'Propiedades' });
+  const estilo = (page: Page, prop: string) => titulo(page).evaluate((el, p) => getComputedStyle(el).getPropertyValue(p), prop);
+
+  test('CP-057 · elijo un texto y el color Acento: cambia, y solo se ofrecen los colores del kit', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_EDITOR);
+    await expect(propiedades(page)).toContainText('Elige un elemento en el lienzo para cambiarlo');
+    await titulo(page).click();
+    await expect(barra(page)).toContainText('Título · Bloqueo y etiquetado');
+    const colores = barra(page).getByRole('group', { name: 'Colores del kit' }).getByRole('button');
+    await expect(colores).toHaveText(['', '', '', '', '', '']);
+    expect(await colores.evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')))).toEqual(['Primario', 'Secundario', 'Acento', 'Texto', 'Blanco', 'Alerta']);
+    // Cada muestra tiene el color real del kit; no hay selector de color libre.
+    await expect(colores.nth(2)).toHaveCSS('background-color', 'rgb(242, 169, 0)');
+    await expect(page.locator('input[type="color"]')).toHaveCount(0);
+    await barra(page).getByRole('button', { name: 'Acento' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Cambio guardado.' })).toBeVisible();
+    expect(ediciones).toEqual([expect.objectContaining({ ajustes: { 'p01-titulo': { color: 'acento' } } })]);
+    await expect(titulo(page)).toHaveCSS('color', 'rgb(242, 169, 0)');
+    await expect(barra(page).getByRole('button', { name: 'Acento' })).toHaveAttribute('aria-pressed', 'true');
+    // El contenido no cambia y el retoque sigue tras recargar.
+    await page.reload();
+    await expect(titulo(page)).toHaveText('Bloqueo y etiquetado');
+    await expect(titulo(page)).toHaveCSS('color', 'rgb(242, 169, 0)');
+  });
+
+  test('A+ agranda el texto, Centro lo centra, la animación se guarda y Restablecer quita el ajuste', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_EDITOR);
+    await titulo(page).click();
+    const antes = parseFloat(await estilo(page, 'font-size'));
+    await barra(page).getByRole('button', { name: 'Más grande' }).click();
+    await expect.poll(async () => parseFloat(await estilo(page, 'font-size'))).toBeGreaterThan(antes);
+    // RN-06-2: el tamaño se guarda en % del ancho de la pantalla, nunca en píxeles.
+    expect((ediciones[0] as { ajustes: Record<string, { tamanoCqw: number }> }).ajustes['p01-titulo']!.tamanoCqw).toBeGreaterThan(0);
+    await barra(page).getByRole('group', { name: 'Alineación' }).getByRole('button', { name: 'Centro' }).click();
+    await expect.poll(() => estilo(page, 'text-align')).toBe('center');
+    await propiedades(page).getByRole('group', { name: 'Animación de entrada' }).getByRole('button', { name: 'Rebotar' }).click();
+    await expect(titulo(page)).toHaveClass(/ap-anim-rebotar/);
+    expect(ediciones.at(-1)).toEqual(expect.objectContaining({ ajustes: { 'p01-titulo': expect.objectContaining({ alineacion: 'centro', animacion: 'rebotar' }) } }));
+    await propiedades(page).getByRole('button', { name: '▶ Ver animación' }).click();
+    await expect(titulo(page)).toHaveClass(/ap-anim-rebotar/);
+    await barra(page).getByRole('button', { name: 'Restablecer' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Se restableció el elemento.' })).toBeVisible();
+    expect(ediciones.at(-1)).toEqual(expect.objectContaining({ ajustes: { 'p01-titulo': null } }));
+    await expect.poll(async () => parseFloat(await estilo(page, 'font-size'))).toBeCloseTo(antes, 0);
+    await expect(titulo(page)).not.toHaveClass(/ap-anim-/);
+  });
+
+  test('con teclado: Tab hasta el elemento y Espacio lo elige; Esc lo suelta', async ({ page }) => {
+    await page.goto(URL_EDITOR);
+    await titulo(page).waitFor();
+    for (let i = 0; i < 40 && !(await titulo(page).evaluate((el) => el.matches(':focus'))); i++) await page.keyboard.press('Tab');
+    await expect(titulo(page)).toBeFocused();
+    await page.keyboard.press(' ');
+    await expect(barra(page)).toBeVisible();
+    await expect(propiedades(page).getByRole('heading', { level: 2 })).toHaveText('Título · Bloqueo y etiquetado');
+    await page.keyboard.press('Escape');
+    await expect(barra(page)).toHaveCount(0);
+  });
+});
+

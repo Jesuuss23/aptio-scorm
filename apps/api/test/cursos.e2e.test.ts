@@ -243,4 +243,34 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).toMatchObject({ regenerarVoz: { pantallaIds: ['p04'], forzar: true } });
     await prisma.generacion.delete({ where: { id: g.id } });
   });
+
+  it('HU-0602 · guarda los retoques del elemento aparte del contenido y los restablece; solo colores del kit', async () => {
+    const version = async () => (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    const ruta = `/cursos/${cursoId}/pantallas/p02`;
+    const p02De = (d: Doc) => d.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas)).find((x) => x.id === 'p02')!;
+    const antes = await documento();
+    const textoAntes = p02De(antes).bloques;
+    const v = await version();
+    const r = await como('productor').patch(ruta, { version: v, ajustes: { 'p02-titulo': { tamanoCqw: 5.5, color: 'acento', alineacion: 'centro', animacion: 'rebotar' } } });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ version: v + 1, regenerando: [], estado: 'borrador' });
+    let p02 = p02De(await documento()) as unknown as { ajustes?: Record<string, unknown>; bloques: unknown };
+    expect(p02.ajustes).toEqual({ 'p02-titulo': { tamanoCqw: 5.5, color: 'acento', alineacion: 'centro', animacion: 'rebotar' } });
+    // RN-06-1: el contenido no cambia con un retoque.
+    expect(p02.bloques).toEqual(textoAntes);
+
+    // RN-06-4: un color que no es un rol del kit, un elemento que no existe o un valor fuera del esquema: 422 sin guardar.
+    expect((await como('productor').patch(ruta, { version: v + 1, ajustes: { 'p02-titulo': { color: '#ff0000' } } })).body).toMatchObject({ codigo: 'COLOR_FUERA_DEL_KIT' });
+    expect((await como('productor').patch(ruta, { version: v + 1, ajustes: { 'p02-nada': { color: 'acento' } } })).body).toMatchObject({ codigo: 'BLOQUE_NO_EXISTE' });
+    expect((await como('productor').patch(ruta, { version: v + 1, ajustes: { 'p02-titulo': { tamanoCqw: 80 } } })).body).toMatchObject({ codigo: 'CURSO_NO_VALIDO' });
+    // Con una versión vieja, 409; el revisor del cliente no retoca.
+    expect((await como('productor').patch(ruta, { version: v, ajustes: { 'p02-titulo': null } })).status).toBe(409);
+    expect((await como('revisor').patch(ruta, { version: v + 1, ajustes: { 'p02-titulo': null } })).status).toBe(403);
+    expect(await version()).toBe(v + 1);
+
+    // null restablece el elemento; sin ajustes, la pantalla no guarda la clave.
+    expect((await como('productor').patch(ruta, { version: v + 1, ajustes: { 'p02-titulo': null } })).status).toBe(200);
+    p02 = p02De(await documento()) as unknown as { ajustes?: Record<string, unknown>; bloques: unknown };
+    expect(p02.ajustes).toBeUndefined();
+  });
 });
