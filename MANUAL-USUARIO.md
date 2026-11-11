@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.18 · actualizado con la séptima entrega del Sprint 5 (11 de noviembre de 2026)**
+**Versión 0.19 · actualizado con la octava entrega del Sprint 5 (11 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -342,6 +342,10 @@ La posición se guarda en proporción al ancho de la pantalla, así que se ve en
 
 **Cambiar el diseño.** A la izquierda del lienzo está el panel **Diseños** (en el celular, debajo). Muestra la misma pantalla en cuatro composiciones: **Idea + ilustración**, **Personaje habla**, **Dato grande** y **Tarjetas con íconos**. La actual dice «· actual». Al elegir otra, la pantalla cambia de composición con el mismo contenido y aparece **Deshacer**, que la deja como estaba, con sus retoques. Al cambiar de diseño, el tamaño, el color y la posición que retocaste vuelven a como los dibuja el kit; los elementos que agregaste se quedan. En **Propiedades**, sin un elemento elegido, ves el diseño de la pantalla y el botón **Cambiar**. Las pantallas con una actividad o un video no cambian de diseño aquí: usa «✦ Convertir en actividad» o «✦ Ver 3 variantes» en Revisión.
 
+**Agregar elementos.** El panel de la izquierda tiene tres pestañas: **Diseños**, **Agregar** y **Capas**. En **Agregar** eliges qué poner en la pantalla: título, texto, dato, botón, imagen, insignia, forma o personaje. El elemento aparece ya elegido y el editor pasa a **Libre**, así que lo arrastras de inmediato adonde quieras. Su texto se escribe con doble clic, como cualquier otro. En **Propiedades**, el botón tiene «Al hacer clic»: **Siguiente pantalla** o **Nada**; la imagen se elige entre las del curso y lleva su texto alternativo para quien no la ve. En la vista previa y en el paquete, el botón «Siguiente» lleva a la pantalla que sigue.
+
+**Capas, ocultar y eliminar.** En **Capas** ves todos los elementos de la pantalla, los del contenido y los que agregaste («· agregado»). Clic en un nombre lo elige; el ojo lo oculta o lo muestra. En el editor lo oculto se ve tenue y con borde punteado para que puedas elegirlo otra vez; en la vista previa y en el paquete no aparece. También puedes usar **Ocultar** y **Mostrar** en la barra o en Propiedades. **Eliminar** (o la tecla Supr) solo está para lo que agregaste: lo que puso la IA no se borra, se oculta.
+
 Las actividades y la narración se cambian desde Revisión. Agregar elementos, el deshacer general y la línea de tiempo llegarán en las próximas entregas. El revisor del cliente no entra al editor.
 
 ---
@@ -399,6 +403,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.16 | 2026-11-11 | Editor: modo Libre para mover elementos con el mouse o las flechas. |
 | 0.17 | 2026-11-11 | Los retoques del editor se conservan al aplicar propuestas de la IA, al deshacer y al generar de nuevo. |
 | 0.18 | 2026-11-11 | Editor: panel Diseños para ver la pantalla en otra composición y Deshacer. |
+| 0.19 | 2026-11-11 | Editor: pestañas Agregar y Capas; ocultar, mostrar y eliminar elementos. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
