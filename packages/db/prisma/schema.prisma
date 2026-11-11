@@ -591,6 +591,7 @@ model Exportacion {
   estado         EstadoTrabajo      @default(EN_COLA)
   bytes          BigInt?
   informe        Json? // validaciones, advertencias, suspend_data estimado
+  motivo         String? // HU-1202: por qué terminó en ERROR
   recursoId      String?            @db.Uuid // ZIP en S3
   creadoPorId    String             @db.Uuid
   creadoEn       DateTime           @default(now())
