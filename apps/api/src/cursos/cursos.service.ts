@@ -1,6 +1,7 @@
 // HU-0501 y HU-0502 · Revisión del curso: observaciones, edición de textos y aprobación de pantallas (M05).
 // RN-05-1: aprobar exige que la pantalla no tenga observaciones que bloquean la entrega.
 // RN-05-2: una pantalla aprobada que se modifica vuelve a borrador.
+// HU-0602: los retoques del editor (tamaño, color del kit, alineación y animación) se guardan en `ajustes` (RN-06-1).
 // HU-0503: corregir la narración en español regenera su voz, boca y subtítulos en cascada (trabajo CASCADA, cola voz).
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashNarracion } from '@aptio/ai';
@@ -18,6 +19,8 @@ import type { AprobacionDto, CambioResultadoDto, FiltroNarracionesDto, FiltroObs
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 type Texto = { es?: string; en?: string };
 type Narracion = { texto: Texto; porIdioma: Record<string, { estado: string; voz: { voz: string; velocidad?: number }; hashTexto: string }> };
+/** RN-06-4: los colores de un retoque son roles del kit, nunca un color suelto. */
+const ROLES_KIT = ['primario', 'secundario', 'acento', 'texto', 'blanco', 'alerta', 'fondo'];
 type Bloque = PantallaDoc['bloques'][number] & { origen?: { tipo: string; revisado: boolean; documentoId?: string; paginas?: number[] } };
 
 /** Texto por idioma sin claves vacías; null si no queda ninguno. */
@@ -149,6 +152,28 @@ export class CursosService {
         const t = limpio(valor);
         if (!t) throw new UnprocessableEntityException({ codigo: 'TEXTO_VACIO', mensaje: 'Un texto no puede quedar vacío; quita el bloque en el editor' });
         editado(b, t);
+        cambios++;
+      }
+      if (dto.ajustes !== undefined) {
+        const pa = p as PantallaDoc & { ajustes?: Record<string, unknown> };
+        const ajustes = { ...(pa.ajustes ?? {}) };
+        for (const [id, ajuste] of Object.entries(dto.ajustes)) {
+          if (!bloques.some((x) => x.id === id)) throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
+          if (ajuste === null) {
+            delete ajustes[id];
+          } else {
+            if (typeof ajuste !== 'object' || Array.isArray(ajuste)) throw new UnprocessableEntityException({ codigo: 'AJUSTE_NO_VALIDO', mensaje: `El ajuste de «${id}» no es válido` });
+            for (const k of ['color', 'relleno'] as const) {
+              if (ajuste[k] !== undefined && !ROLES_KIT.includes(ajuste[k] as string)) {
+                throw new UnprocessableEntityException({ codigo: 'COLOR_FUERA_DEL_KIT', mensaje: 'Solo se pueden usar los colores del kit' });
+              }
+            }
+            ajustes[id] = ajuste;
+          }
+        }
+        // Lo demás (rangos, alineación, animación) lo valida el esquema del curso al guardar.
+        if (Object.keys(ajustes).length) pa.ajustes = ajustes;
+        else delete pa.ajustes;
         cambios++;
       }
       if (dto.narracion !== undefined) {

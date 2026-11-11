@@ -608,7 +608,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
-      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string } };
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown> };
       historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
@@ -619,6 +619,17 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         p.titulo = { es: datos.titulo.es.trim() };
         const b = bloques.find((x) => x.tipo === 'texto' && x.rol === 'titulo');
         if (b) b.contenido = { es: datos.titulo.es.trim() };
+      }
+      // HU-0602: los retoques van en `ajustes`, aparte del contenido; solo colores del kit.
+      const pa = p as unknown as { ajustes?: Record<string, unknown> };
+      for (const [id, ajuste] of Object.entries(datos.ajustes ?? {})) {
+        if (!bloques.some((x) => x.id === id)) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
+        const color = (ajuste as { color?: string } | null)?.color;
+        if (color && !['primario', 'secundario', 'acento', 'texto', 'blanco', 'alerta', 'fondo'].includes(color)) return responder(422, { codigo: 'COLOR_FUERA_DEL_KIT', mensaje: 'Solo se pueden usar los colores del kit' });
+        pa.ajustes = { ...pa.ajustes };
+        if (ajuste === null) delete pa.ajustes[id];
+        else pa.ajustes[id] = ajuste;
+        if (!Object.keys(pa.ajustes).length) delete pa.ajustes;
       }
       for (const [id, valor] of Object.entries(datos.textos ?? {})) {
         const b = bloques.find((x) => x.id === id && x.tipo === 'texto');
