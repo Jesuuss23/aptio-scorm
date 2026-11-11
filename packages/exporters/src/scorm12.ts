@@ -23,6 +23,8 @@ export interface EntradaScorm12 {
   recursos: RecursoPaquete[];
   /** El reproductor empaquetado (`aptio-reproductor.js`), ver `codigoReproductor`. */
   reproductor: string;
+  /** HU-1204 · Modo diagnóstico en el paquete (Ctrl+Alt+Shift+D o ?diagnostico=1). Por defecto, true. */
+  incluirDiagnostico?: boolean;
 }
 
 export interface PaqueteScorm12 {
@@ -94,7 +96,7 @@ export async function construirScorm12(entrada: EntradaScorm12): Promise<Paquete
     if (esVtt(r, archivo.nombre)) subtitulos[r.id] = comoTexto(archivo.datos);
   }
 
-  const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos };
+  const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos, ...(entrada.incluirDiagnostico === false ? { diagnostico: false } : {}) };
   contenido.set('index.html', indexHtml(titulo, idioma));
   contenido.set('aptio-reproductor.js', entrada.reproductor);
   contenido.set('datos.js', `window.APTIO_DATOS = ${JSON.stringify(datos)};\n`);

@@ -11,3 +11,4 @@ export { buscarApi, conectarScorm12, LIMITE_SUSPEND, NIVELES_ADL, tiempoScorm, t
 export { codificarSuspend, type DatosSuspend, huellaCurso, leerSuspend } from './suspend.ts';
 export { decidirReanudacion, estadoReanudado, type GuardadoLms, type Reanudacion } from './reanudacion.ts';
 export { iniciarPaquete, type DatosPaquete, type Paquete } from './paquete.ts';
+export { ELEMENTOS_PRIVADOS, informeDiagnostico, type InformeDiagnostico, type LlamadaLms, MAXIMO_LLAMADAS, MAXIMO_VALOR, navegadorResumido, type PasoBusqueda, RegistroDiagnostico, VERSION_REPRODUCTOR } from './diagnostico.ts';

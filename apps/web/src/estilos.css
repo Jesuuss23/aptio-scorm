@@ -1727,3 +1727,20 @@ ul.fila-chips {
 .confirmar-exportar h2 {
   margin-top: 0;
 }
+
+/* HU-1204 · Fichas de compatibilidad LMS. */
+.fichas-cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.dialogo-ficha {
+  width: min(560px, calc(100vw - 32px));
+  max-width: none;
+}
+.informe-diagnostico {
+  font-family: var(--fuente-num, monospace);
+  font-size: var(--texto-xs);
+}

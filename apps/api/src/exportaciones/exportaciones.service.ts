@@ -82,7 +82,7 @@ export class ExportacionesService {
       throw new UnprocessableEntityException({ codigo: 'ESQUEMA_NO_VALIDO', mensaje: 'El curso no cumple el esquema: corrígelo antes de exportar', detalles: errores.slice(0, 10).map((e) => ({ mensaje: e })) });
     }
     const exp = await this.bd.exportacion.create({
-      data: { organizacionId: c.organizacionId, cursoId: c.id, versionCurso: c.version, formato: 'SCORM12', perfilLms: dto.perfilLms ?? 'generico', modoIdioma, creadoPorId: u.id },
+      data: { organizacionId: c.organizacionId, cursoId: c.id, versionCurso: c.version, formato: 'SCORM12', perfilLms: dto.perfilLms ?? 'generico', modoIdioma, incluirDiagnostico: dto.incluirDiagnostico ?? true, creadoPorId: u.id },
     });
     await this.colas.encolar('export', { trabajoId: exp.id, organizacionId: c.organizacionId, tarea: TAREA_EXPORTAR });
     return this.dto(exp, null, null);

@@ -581,20 +581,21 @@ enum FormatoExportacion {
 }
 
 model Exportacion {
-  id             String             @id @default(uuid()) @db.Uuid
-  organizacionId String             @db.Uuid
-  cursoId        String             @db.Uuid
-  versionCurso   Int
-  formato        FormatoExportacion
-  perfilLms      String             @default("generico") // generico | moodle | blackboard | chamilo | canvas
-  modoIdioma     String
-  estado         EstadoTrabajo      @default(EN_COLA)
-  bytes          BigInt?
-  informe        Json? // validaciones, advertencias, suspend_data estimado
-  motivo         String? // HU-1202: por qué terminó en ERROR
-  recursoId      String?            @db.Uuid // ZIP en S3
-  creadoPorId    String             @db.Uuid
-  creadoEn       DateTime           @default(now())
+  id                 String             @id @default(uuid()) @db.Uuid
+  organizacionId     String             @db.Uuid
+  cursoId            String             @db.Uuid
+  versionCurso       Int
+  formato            FormatoExportacion
+  perfilLms          String             @default("generico") // generico | moodle | blackboard | chamilo | canvas
+  modoIdioma         String
+  estado             EstadoTrabajo      @default(EN_COLA)
+  bytes              BigInt?
+  informe            Json? // validaciones, advertencias, suspend_data estimado
+  motivo             String? // HU-1202: por qué terminó en ERROR
+  incluirDiagnostico Boolean            @default(true) // HU-1204: modo diagnóstico dentro del paquete
+  recursoId          String?            @db.Uuid // ZIP en S3
+  creadoPorId        String             @db.Uuid
+  creadoEn           DateTime           @default(now())
 
   curso        Curso        @relation(fields: [cursoId], references: [id], onDelete: Cascade)
   creadoPor    Usuario      @relation(fields: [creadoPorId], references: [id])

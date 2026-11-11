@@ -370,6 +370,17 @@ export interface Validacion {
   pantallasSinAprobar: number;
   recursosFaltantes: string[];
 }
+/** HU-1204 · Ficha de compatibilidad del LMS de un cliente, con el informe del modo diagnóstico si se pegó. */
+export interface FichaCompatibilidad {
+  id: string;
+  lmsNombre: string;
+  lmsVersion: string | null;
+  limiteSubidaMb: number | null;
+  notas: string | null;
+  resultadoDiagnostico: Record<string, unknown> | null;
+  actualizadoEn: string;
+}
+export type FichaCompatibilidadEntrada = { lmsNombre: string; lmsVersion?: string; limiteSubidaMb?: number; notas?: string; resultadoDiagnostico?: Record<string, unknown> };
 /** Exportan administración, diseño instruccional y producción (HU-1202). */
 export const EXPORTAN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
 
@@ -430,6 +441,8 @@ export const api = {
   etapaGeneracion: <T = unknown>(id: string, etapa: Etapa) => pedir<EtapaGeneracion & { datos: T | null }>(`/generaciones/${id}/etapas/${etapa}`),
   cancelarGeneracion: (id: string) => pedir<Generacion>(`/generaciones/${id}/cancelar`, { method: 'POST' }),
   continuarGeneracion: (id: string) => pedir<Generacion>(`/generaciones/${id}/continuar`, { method: 'POST' }),
+  fichasLms: (clienteId: string) => pedir<FichaCompatibilidad[]>(`/clientes/${clienteId}/fichas-lms`),
+  crearFichaLms: (clienteId: string, datos: FichaCompatibilidadEntrada) => pedir<FichaCompatibilidad>(`/clientes/${clienteId}/fichas-lms`, json(datos)),
   glosario: (clienteId: string) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`),
   guardarGlosario: (clienteId: string, terminos: TerminoGlosario[]) => pedir<TerminoGlosario[]>(`/clientes/${clienteId}/glosario`, json(terminos, 'PUT')),
   pronunciacion: (clienteId: string) => pedir<TerminoPronunciacion[]>(`/clientes/${clienteId}/pronunciacion`),

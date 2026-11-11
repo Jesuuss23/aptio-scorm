@@ -2,6 +2,7 @@
 // busca la API con el algoritmo de ADL (ventanas padre y luego `opener`), usa solo elementos obligatorios de cmi.core y
 // cmi.suspend_data, respeta los 4096 caracteres de suspend_data y nunca rompe la navegación si el LMS responde con error.
 // Sin API (HTML abierto fuera de un LMS) no hace nada. Es igual para todos los perfiles de LMS (RN-12-1).
+import type { MetodoLms, OrigenVentana, RegistroDiagnostico } from './diagnostico.ts';
 import type { EstadoReproductor } from './reproductor.ts';
 import { codificarSuspend, huellaCurso } from './suspend.ts';
 
@@ -35,11 +36,11 @@ const esApi = (x: unknown): x is ApiScorm12 =>
   typeof x === 'object' && x !== null && typeof (x as ApiScorm12).LMSInitialize === 'function' && typeof (x as ApiScorm12).LMSSetValue === 'function';
 
 /** Lee `ventana.API` sin fallar cuando la ventana es de otro origen (el navegador lanza al tocarla). */
-function apiDe(ventana: VentanaLms | null | undefined): ApiScorm12 | null {
+function inspeccionar(ventana: VentanaLms): { api: ApiScorm12 | null; otroOrigen: boolean } {
   try {
-    return ventana && esApi(ventana.API) ? ventana.API : null;
+    return { api: esApi(ventana.API) ? ventana.API : null, otroOrigen: false };
   } catch {
-    return null;
+    return { api: null, otroOrigen: true };
   }
 }
 
@@ -52,19 +53,24 @@ function padreDe(ventana: VentanaLms): VentanaLms | null {
 }
 
 /** Sube por las ventanas padre desde `ventana` (ella incluida) hasta encontrar la API o pasar los niveles de ADL. */
-function subir(ventana: VentanaLms | null): ApiScorm12 | null {
+function subir(ventana: VentanaLms | null, origen: 'propia' | 'opener', registro?: RegistroDiagnostico): ApiScorm12 | null {
   let actual = ventana;
   for (let nivel = 0; actual && nivel <= NIVELES_ADL; nivel++) {
-    const api = apiDe(actual);
+    const { api, otroOrigen } = inspeccionar(actual);
+    const donde: OrigenVentana = nivel === 0 ? origen : 'padre';
+    registro?.anotarBusqueda({ nivel, origen: donde, resultado: api ? 'api' : otroOrigen ? 'otro-origen' : 'sin-api' });
     if (api) return api;
     actual = padreDe(actual);
   }
   return null;
 }
 
-/** Algoritmo de búsqueda de ADL: primero la propia ventana y sus padres; si no está, la ventana que abrió esta y sus padres. */
-export function buscarApi(ventana: VentanaLms): ApiScorm12 | null {
-  const propia = subir(ventana);
+/**
+ * Algoritmo de búsqueda de ADL: primero la propia ventana y sus padres; si no está, la ventana que abrió esta y sus
+ * padres. Con `registro` (HU-1204) anota cada ventana revisada.
+ */
+export function buscarApi(ventana: VentanaLms, registro?: RegistroDiagnostico): ApiScorm12 | null {
+  const propia = subir(ventana, 'propia', registro);
   if (propia) return propia;
   let abridora: VentanaLms | null = null;
   try {
@@ -72,7 +78,7 @@ export function buscarApi(ventana: VentanaLms): ApiScorm12 | null {
   } catch {
     abridora = null;
   }
-  return abridora ? subir(abridora) : null;
+  return abridora ? subir(abridora, 'opener', registro) : null;
 }
 
 /** CMITimespan de SCORM 1.2: HHHH:MM:SS (horas de 2 a 4 dígitos). */
@@ -97,6 +103,8 @@ export interface OpcionesScorm12 {
   avisar?: (mensaje: string) => void;
   /** Reloj en ms; se cambia en las pruebas. */
   ahora?: () => number;
+  /** HU-1204 · Registro del modo diagnóstico: anota cada llamada al LMS con su respuesta y su error. */
+  registro?: RegistroDiagnostico;
 }
 
 export interface ConexionScorm12 {
@@ -124,10 +132,12 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
   let terminado = false;
   let avisoLargo = false;
 
+  const registro = opciones.registro;
   /** Revisa el último error del LMS después de una llamada; avisa y sigue. Las escrituras deben responder "true". */
-  const revisar = (llamada: string, respuesta: unknown, lectura: boolean): boolean => {
+  const revisar = (llamada: string, respuesta: unknown, lectura: boolean, nota?: { metodo: MetodoLms; elemento?: string; valor?: string }): boolean => {
     let codigo = '0';
     try { codigo = String(api?.LMSGetLastError() ?? '0'); } catch { codigo = '0'; }
+    if (nota) registro?.anotarLlamada(nota.metodo, String(respuesta ?? ''), codigo, nota.elemento, nota.valor);
     if (codigo !== '0' && codigo !== '') {
       let detalle = '';
       try { detalle = String(api?.LMSGetErrorString(codigo) ?? ''); } catch { detalle = ''; }
@@ -140,25 +150,27 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
     }
     return true;
   };
-  const llamar = (llamada: string, f: () => string, lectura = false): string | null => {
+  const llamar = (llamada: string, f: () => string, lectura = false, nota?: { metodo: MetodoLms; elemento?: string; valor?: string }): string | null => {
     try {
       const r = f();
-      return revisar(llamada, r, lectura) ? String(r ?? '') : null;
+      return revisar(llamada, r, lectura, nota) ? String(r ?? '') : null;
     } catch (e) {
-      avisar(`${llamada} falló: ${e instanceof Error ? e.message : String(e)}.`);
+      const mensaje = e instanceof Error ? e.message : String(e);
+      if (nota) registro?.anotarLlamada(nota.metodo, `(excepción) ${mensaje}`, '', nota.elemento, nota.valor);
+      avisar(`${llamada} falló: ${mensaje}.`);
       return null;
     }
   };
-  const leer = (elemento: string): string => (api ? llamar(`LMSGetValue("${elemento}")`, () => api.LMSGetValue(elemento), true) ?? '' : '');
+  const leer = (elemento: string): string => (api ? llamar(`LMSGetValue("${elemento}")`, () => api.LMSGetValue(elemento), true, { metodo: 'LMSGetValue', elemento }) ?? '' : '');
   const escribir = (elemento: string, valor: string): boolean => {
     if (!api || enviados.get(elemento) === valor) return false;
-    if (llamar(`LMSSetValue("${elemento}")`, () => api.LMSSetValue(elemento, valor)) === null) return false;
+    if (llamar(`LMSSetValue("${elemento}")`, () => api.LMSSetValue(elemento, valor), false, { metodo: 'LMSSetValue', elemento, valor }) === null) return false;
     enviados.set(elemento, valor);
     return true;
   };
-  const guardar = () => api && llamar('LMSCommit', () => api.LMSCommit(''));
+  const guardar = () => api && llamar('LMSCommit', () => api.LMSCommit(''), false, { metodo: 'LMSCommit' });
 
-  const conectado = api !== null && llamar('LMSInitialize', () => api.LMSInitialize('')) !== null;
+  const conectado = api !== null && llamar('LMSInitialize', () => api.LMSInitialize(''), false, { metodo: 'LMSInitialize' }) !== null;
   const inicial = { entrada: '', ubicacion: '', suspendData: '', estado: '', nota: '' };
   const huella = opciones.huella ?? huellaCurso('', opciones.orden);
   const mejorNota = opciones.mejorNota !== false;
@@ -217,7 +229,7 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
       terminado = true;
       escribir('cmi.core.session_time', tiempoScorm(ahora() - inicio));
       guardar();
-      llamar('LMSFinish', () => api!.LMSFinish(''));
+      llamar('LMSFinish', () => api!.LMSFinish(''), false, { metodo: 'LMSFinish' });
     },
   };
 }

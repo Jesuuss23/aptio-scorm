@@ -37,6 +37,24 @@ button:disabled{cursor:not-allowed}
 .ap-centro{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;text-align:center;font-size:13px}
 .ap-motivo{color:var(--ap-alerta);font-weight:700;font-size:13px}
 .ap-motivo:empty{display:none}
+.ap-r:has(>.ap-diagnostico){position:relative}
+.ap-diagnostico{position:absolute;inset:0;z-index:30;display:grid;place-items:center;padding:12px;background:rgba(16,32,51,.6);font-size:13px}
+.ap-diag-caja{width:min(860px,100%);max-height:100%;overflow:auto;background:#fff;color:#102033;border-radius:12px;padding:16px;box-shadow:0 12px 32px rgba(0,0,0,.3)}
+.ap-diag-titulo{margin:0 0 8px;font-size:20px}
+.ap-diag-caja h3{margin:14px 0 6px;font-size:15px}
+.ap-diag-caja p{margin:0 0 6px}
+.ap-diag-hallazgo{padding:8px 10px;border-radius:8px;background:#e7f5ee;color:#14532d;font-weight:700}
+.ap-diag-sin-api{background:#fde8e6;color:#8a1c12}
+.ap-diag-busqueda{margin:0;padding-left:20px}
+.ap-diag-datos{display:grid;grid-template-columns:max-content 1fr;gap:2px 12px;margin:0}
+.ap-diag-datos dd{margin:0;word-break:break-all}
+.ap-diag-tabla{max-height:240px;overflow:auto;border:1px solid #d0d7e2;border-radius:8px}
+.ap-diag-tabla table{border-collapse:collapse;width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.ap-diag-tabla th,.ap-diag-tabla td{padding:3px 6px;text-align:left;border-bottom:1px solid #e5e9f0;vertical-align:top;word-break:break-all}
+.ap-diag-tabla th{position:sticky;top:0;background:#f5f7fa}
+.ap-diag-error td{color:#8a1c12;font-weight:700}
+.ap-diag-respaldo{width:100%;min-height:120px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.ap-diag-botones{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .ap-r:has(>.ap-reanudar){position:relative}
 .ap-reanudar{position:absolute;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:rgba(16,32,51,.55)}
 .ap-reanudar-caja{width:min(420px,100%);background:var(--ap-blanco);color:var(--ap-texto);border-radius:14px;padding:20px;box-shadow:0 12px 32px rgba(0,0,0,.25)}

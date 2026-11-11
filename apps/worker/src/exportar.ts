@@ -65,7 +65,7 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
       const kit: KitReproductor | undefined = k
         ? { paleta: k.paleta as KitReproductor['paleta'] & object, tipografias: k.tipografias as KitReproductor['tipografias'] & object, personaje: (k.personaje as { nombre?: string } | null)?.nombre ?? null }
         : undefined;
-      const paquete = await construirScorm12({ curso, recursos, reproductor: await reproductor(), ...(kit ? { kit } : {}) });
+      const paquete = await construirScorm12({ curso, recursos, reproductor: await reproductor(), incluirDiagnostico: exp.incluirDiagnostico, ...(kit ? { kit } : {}) });
 
       const proyecto = exp.curso.proyecto;
       const recursoId = randomUUID();
