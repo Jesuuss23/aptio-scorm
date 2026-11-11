@@ -273,4 +273,16 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     p02 = p02De(await documento()) as unknown as { ajustes?: Record<string, unknown>; bloques: unknown };
     expect(p02.ajustes).toBeUndefined();
   });
+
+  it('HU-0603 · guarda el desplazamiento del modo Libre en % del ancho; un dispositivo que no existe no valida', async () => {
+    const v = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    const ruta = `/cursos/${cursoId}/pantallas/p05`;
+    const r = await como('grafico').patch(ruta, { version: v, ajustes: { 'p05-imagen': { desplazamiento: { x: 12.5, y: -4, dispositivo: 'todos' } } } });
+    expect(r.status).toBe(200);
+    const p05 = (await documento()).modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas)).find((x) => x.id === 'p05') as unknown as { ajustes?: Record<string, unknown> };
+    expect(p05.ajustes).toEqual({ 'p05-imagen': { desplazamiento: { x: 12.5, y: -4, dispositivo: 'todos' } } });
+    const mala = await como('grafico').patch(ruta, { version: v + 1, ajustes: { 'p05-imagen': { desplazamiento: { x: 1, y: 1, dispositivo: 'tableta' } } } });
+    expect(mala.status).toBe(422);
+    expect(mala.body).toMatchObject({ codigo: 'CURSO_NO_VALIDO' });
+  });
 });

@@ -1,6 +1,7 @@
 // HU-0601 · Editor (PNT-21): edición en el lugar (CP-056). Doble clic, escribir y Enter guarda; Esc cancela;
 // con teclado se entra con Tab y Enter; si otra persona guardó antes, se recarga y se avisa.
 // HU-0602 · Barra contextual y propiedades: tamaño, color del kit (CP-057), alineación y animación.
+// HU-0603 · Modo Libre: arrastrar y flechas guardan un desplazamiento en % del ancho (CP-058).
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
 
@@ -187,6 +188,89 @@ test.describe('HU-0602 · retoques del elemento elegido', () => {
     await expect(propiedades(page).getByRole('heading', { level: 2 })).toHaveText('Título · Bloqueo y etiquetado');
     await page.keyboard.press('Escape');
     await expect(barra(page)).toHaveCount(0);
+  });
+});
+
+test.describe('HU-0603 · modo Libre', () => {
+  test.beforeEach(async ({ page }) => {
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_GRAFICO' });
+  });
+  const URL_P05 = `/proyectos/${PROYECTO}/editor?pantalla=p05`;
+  const propiedades = (page: Page) => page.getByRole('complementary', { name: 'Propiedades' });
+  const imagen = (page: Page) => lienzo(page).locator('[data-bloque="p05-imagen"]');
+  const modo = (page: Page, nombre: string) => page.getByRole('group', { name: 'Modo de edición' }).getByRole('button', { name: nombre }).click();
+  /** Corrimiento horizontal y vertical del elemento como fracción del ancho del reproductor. */
+  const corrimiento = (page: Page) => imagen(page).evaluate((el) => {
+    // Mientras el lienzo se vuelve a montar, el elemento viejo ya no está en la sombra.
+    const ancho = (el.getRootNode() as ShadowRoot).querySelector?.<HTMLElement>('.ap-r')?.clientWidth ?? Number.NaN;
+    const t = getComputedStyle(el).translate;
+    const [x = '0px', y = '0px'] = t === 'none' ? [] : t.split(' ');
+    return { x: parseFloat(x) / ancho, y: parseFloat(y) / ancho, ancho };
+  });
+  async function arrastrar(page: Page, dx: number, dy: number) {
+    await imagen(page).waitFor();
+    const caja = (await imagen(page).boundingBox())!;
+    await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(caja.x + caja.width / 2 + dx / 2, caja.y + caja.height / 2 + dy / 2, { steps: 4 });
+    await page.mouse.move(caja.x + caja.width / 2 + dx, caja.y + caja.height / 2 + dy, { steps: 4 });
+    await page.mouse.up();
+  }
+
+  test('CP-058 · arrastro la imagen: se guarda un desplazamiento en % del ancho y se ve igual en otra resolución', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(URL_P05);
+    await expect(page.getByText('Modo Automático: la disposición acomoda los elementos. Cambia a Libre para moverlos.')).toBeVisible();
+    await modo(page, 'Libre');
+    const { ancho } = await corrimiento(page);
+    await arrastrar(page, 100, 0);
+    await expect(page.getByRole('status').filter({ hasText: 'Posición guardada.' })).toBeVisible();
+    const guardado = (ediciones[0] as { ajustes: Record<string, { desplazamiento: { x: number; y: number; dispositivo: string } }> }).ajustes['p05-imagen']!.desplazamiento;
+    // 100 px sobre el ancho del reproductor, en %, para todos los dispositivos.
+    expect(guardado.x).toBeCloseTo((100 / ancho) * 100, 1);
+    expect(guardado.y).toBeCloseTo(0, 1);
+    expect(guardado.dispositivo).toBe('todos');
+    const grande = await corrimiento(page);
+    expect(grande.x).toBeCloseTo(guardado.x / 100, 3);
+    // En otra resolución el reproductor es más angosto, pero el corrimiento sigue siendo la misma fracción del ancho.
+    await page.setViewportSize({ width: 820, height: 900 });
+    await expect.poll(async () => (await corrimiento(page)).ancho).toBeLessThan(ancho);
+    const chico = await corrimiento(page);
+    expect(chico.x).toBeCloseTo(grande.x, 3);
+    await expect(propiedades(page).getByLabel('Desplazamiento')).toContainText('% del ancho');
+  });
+
+  test('con el elemento elegido, las flechas lo mueven de a 0,5 % y se guarda una vez', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_P05);
+    await modo(page, 'Libre');
+    await imagen(page).click();
+    await imagen(page).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('status').filter({ hasText: 'Posición guardada.' })).toBeVisible();
+    expect(ediciones).toEqual([expect.objectContaining({ ajustes: { 'p05-imagen': { desplazamiento: { x: 1, y: 0.5, dispositivo: 'todos' } } } })]);
+    await expect(propiedades(page).getByLabel('Desplazamiento')).toHaveText('1 / 0,5 % del ancho');
+    // «Volver a su lugar» quita solo el desplazamiento.
+    await propiedades(page).getByRole('button', { name: 'Volver a su lugar' }).click();
+    await expect.poll(() => ediciones.length).toBe(2);
+    expect(ediciones[1]).toEqual(expect.objectContaining({ ajustes: { 'p05-imagen': null } }));
+    await expect.poll(async () => (await corrimiento(page)).x).toBe(0);
+  });
+
+  test('en modo Automático arrastrar no mueve nada', async ({ page }) => {
+    const ediciones = contarEdiciones(page);
+    await page.goto(URL_P05);
+    await arrastrar(page, 120, 40);
+    await imagen(page).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(1200);
+    expect(ediciones).toEqual([]);
+    expect((await corrimiento(page)).x).toBe(0);
+    await imagen(page).click();
+    await expect(propiedades(page)).toContainText('Cambia a Libre para mover.');
   });
 });
 

@@ -156,6 +156,10 @@ button:disabled{cursor:not-allowed}
   .ap-grupos{flex:0 0 55%}
   .ap-rejilla{grid-template-columns:repeat(4,minmax(0,1fr))}
 }
+/* HU-0603 · Desplazamiento del modo Libre, en % del ancho del reproductor y por dispositivo. */
+.ap-desp{translate:var(--ap-dx) var(--ap-dy)}
+@container (min-width:640px){.ap-desp-escritorio{translate:var(--ap-dx) var(--ap-dy)}}
+@container (max-width:639.98px){.ap-desp-celular{translate:var(--ap-dx) var(--ap-dy)}}
 /* HU-0602 · Animaciones de entrada elegidas en el editor; «reducir movimiento» las quita (abajo). */
 .ap-anim-aparecer{animation:ap-aparecer .5s ease-out both}
 .ap-anim-deslizar{animation:ap-deslizar .5s ease-out both}

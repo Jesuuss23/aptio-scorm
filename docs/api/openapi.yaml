@@ -4809,6 +4809,8 @@ components:
           - derecha
         desplazamiento:
           type: object
+          description: HU-0603 · Desplazamiento del modo Libre en % del ancho de la pantalla (RN-06-2). El reproductor lo
+            aplica con `translate` en cqw según el dispositivo; el editor guarda `todos` (SUP-42).
           properties:
             x:
               type: number
