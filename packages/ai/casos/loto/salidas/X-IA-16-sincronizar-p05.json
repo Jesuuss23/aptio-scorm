@@ -1,7 +1,7 @@
 {
   "tipo": "sincronizar-voz",
   "titulo": "Sincronizar con la voz",
-  "resumen": "El dato clave aparece cuando Ana dice «energía» y la imagen con «calentar».",
+  "resumen": "El texto aparece cuando Ana dice «cualquier» y el dato clave con «puede»; la imagen no se nombra y conserva su tiempo.",
   "patch": [
     {
       "op": "add",
@@ -11,15 +11,12 @@
           "retardoS": 0
         },
         "p05-texto": {
-          "retardoS": 0.3
-        },
-        "p05-imagen": {
-          "retardoS": 1.95,
-          "anclaPalabra": 8
+          "retardoS": 0.2,
+          "anclaPalabra": 1
         },
         "p05-dato": {
-          "retardoS": 0.85,
-          "anclaPalabra": 2
+          "retardoS": 1.63,
+          "anclaPalabra": 4
         }
       }
     }

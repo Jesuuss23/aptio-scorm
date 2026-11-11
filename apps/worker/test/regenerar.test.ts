@@ -3,6 +3,7 @@
 import { type CalculadorBocas, calculadorSimulado, type PedidoVoz, proveedorSimulado, type Sintetizador, vozSimulada } from '@aptio/ai';
 import { prisma } from '@aptio/db';
 import { esCursoValido } from '@aptio/schema';
+import { marcasPalabra, retardoDeAncla } from '@aptio/schema/tiempos';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { crearEtapaBoca } from '../src/etapas/boca.js';
 import { EJECUTORES } from '../src/etapas/index.js';
@@ -94,5 +95,31 @@ describe.skipIf(!baseLista && !process.env.CI)('regenerar narraciones (HU-0703)'
     expect(pedidosVoz).toHaveLength(1);
     expect(pedidosBoca).toHaveLength(1);
     expect((await prisma.narracion.findFirstOrThrow({ where: { cursoId, pantallaId: 'p01' } })).audioRecursoId).not.toBe(antes);
+  });
+  it('HU-0608 · CP-067: con la voz nueva, cada elemento anclado toma el segundo de su palabra; sin ella, «Revisar tiempo»', async () => {
+    type Pd = { id: string; narracion: { texto: { es: string } }; ajustes?: Record<string, Record<string, unknown>> };
+    type Doc = { modulos: { capsulas: { pantallas: Pd[] }[] }[] };
+    const p05De = (d: unknown) => (d as Doc).modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas)).find((p) => p.id === 'p05')!;
+    const texto = 'Cualquier energía puede mover o liberar algo sin aviso.';
+    // Lo que deja la API al corregir la narración: el dato ya apunta a «puede» (2); el texto, a una palabra que la voz no tiene.
+    const c = await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } });
+    const doc = structuredClone(c.documento) as unknown as Doc;
+    const p05 = p05De(doc);
+    p05.narracion.texto.es = texto;
+    p05.ajustes = { 'p05-dato': { retardoS: 1.63, anclaPalabra: 2, color: 'acento' }, 'p05-texto': { retardoS: 2.47, anclaPalabra: 40 }, 'p05-imagen': { retardoS: 1 } };
+    await prisma.curso.update({ where: { id: cursoId }, data: { documento: doc as object, version: c.version + 1 } });
+    await prisma.narracion.updateMany({ where: { cursoId, pantallaId: 'p05' }, data: { estado: 'DESACTUALIZADA' } });
+
+    expect(await regenerar(generacionId, { pantallaIds: ['p05'] })).toEqual({ estado: 'COMPLETADO' });
+    expect(pedidosVoz).toHaveLength(1);
+    const despues = await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } });
+    const nueva = p05De(despues.documento) as Pd & { narracion: { porIdioma: { es: { duracionMs: number } } } };
+    const marcas = marcasPalabra(texto, nueva.narracion.porIdioma.es.duracionMs);
+    expect(nueva.ajustes).toEqual({ 'p05-dato': { retardoS: retardoDeAncla(marcas, 2), anclaPalabra: 2, color: 'acento' }, 'p05-texto': { retardoS: 2.47 }, 'p05-imagen': { retardoS: 1 } });
+    expect(nueva.ajustes!['p05-dato']!.retardoS).not.toBe(1.63);
+    expect(esCursoValido(despues.documento)).toBe(true);
+    expect(await prisma.observacion.findMany({ where: { cursoId, pantallaId: 'p05', origen: 'tiempo' } })).toMatchObject([
+      { tipo: 'CALIDAD', severidad: 'aviso', mensaje: 'Revisar tiempo: la palabra de anclaje fue eliminada (p05-texto).' },
+    ]);
   });
 });

@@ -4,11 +4,14 @@
 // Continuar no paga otra vez: una narración ya lista con el mismo hash (texto, voz, velocidad y diccionario) se reusa.
 // HU-0703 · Regenerar (`parametros.regenerarVoz`) decide por el hash (RN-07-1): una marcada «Por regenerar» que en
 // realidad no cambió vuelve a «Lista» sin costo; `pantallaIds` limita a esas pantallas y `forzar` pide una toma nueva.
+// HU-0608 · Con un audio nuevo, cada elemento anclado a una palabra toma el segundo de esa palabra en la voz nueva
+// (RN-06-8, CP-067); si la voz no la tiene, conserva su segundo y queda la observación «Revisar tiempo».
 import { createHash, randomUUID } from 'node:crypto';
 import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, type Sintetizador, VozNoDisponible } from '@aptio/ai';
 import { Prisma } from '@aptio/db';
 import { validarCurso } from '@aptio/schema';
 import { duracionLegible, type NarracionLista, type VozCurso } from '@aptio/schema/generacion';
+import { marcasPalabra, mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, recalcularAnclas } from '@aptio/schema/tiempos';
 import { aplicarPronunciacion, type TerminoPronunciacion } from '@aptio/schema/voz';
 import { type ContextoEtapa, type EjecutorEtapa, GeneracionCancelada } from '../generar.js';
 
@@ -21,7 +24,10 @@ const PROVEEDORES = ['google'];
 
 type VozDoc = { proveedor: string; voz: string; velocidad?: number };
 type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown; subtitulosId?: string };
-type PantallaDoc = { id: string; titulo: { es?: string }; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } } };
+type PantallaDoc = {
+  id: string; titulo: { es?: string }; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } };
+  ajustes?: Record<string, { retardoS?: number; anclaPalabra?: number }>;
+};
 type RecursoDoc = { id: string; tipo: string; idioma?: string };
 type CursoDoc = { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[]; recursos: RecursoDoc[] };
 
@@ -179,6 +185,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       const actual = await ctx.bd.curso.findUniqueOrThrow({ where: { id: curso.id } });
       const doc = structuredClone(actual.documento) as unknown as CursoDoc;
       const usados = new Set<string>();
+      const sinAncla: { pantallaId: string; id: string }[] = [];
       for (const p of pantallasDe(doc)) {
         const n = listas.get(p.id);
         const es = p.narracion?.porIdioma.es;
@@ -189,6 +196,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
           delete es.bocas;
           delete es.subtitulosId;
           es.estado = 'pendiente';
+          for (const id of recalcularAnclas(p.ajustes, marcasPalabra(n.texto, n.duracionMs))) sinAncla.push({ pantallaId: p.id, id });
         }
         es.recursoAudioId = n.recursoId;
         es.duracionMs = n.duracionMs;
@@ -208,6 +216,11 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         const r = await tx.curso.updateMany({ where: { id: curso.id, version: actual.version }, data: { documento: doc as unknown as Prisma.InputJsonValue, version: actual.version + 1 } });
         if (!r.count) return false;
         await tx.cursoVersion.create({ data: { cursoId: curso.id, version: actual.version + 1, documento: doc as unknown as Prisma.InputJsonValue, motivo: 'voz' } });
+        if (sinAncla.length) {
+          await tx.observacion.createMany({
+            data: sinAncla.map((x) => ({ cursoId: curso.id, pantallaId: x.pantallaId, tipo: 'CALIDAD' as const, severidad: 'aviso', mensaje: mensajeRevisarTiempo(x.id), origen: ORIGEN_REVISAR_TIEMPO })),
+          });
+        }
         return true;
       });
       if (guardado) break;

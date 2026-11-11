@@ -3,12 +3,14 @@
 // derecho, la salida (CP-064, CP-065). La aguja roja marca el segundo: ▶ Reproducir / ❚❚ Pausa (también Espacio),
 // ■ vuelve al inicio y muestra todo, y un clic en la regla o en una palabra va a ese momento (CP-066). Con teclado,
 // las flechas mueven la barra elegida de a 0,1 s (Mayús: 1 s). En pantallas angostas se ve plegada: aguja y narración.
+// PR 2 · «✦ Sincronizar con la voz» muestra la propuesta en la franja morada, con las barras donde quedarían (CP-068);
+// «⚠ revisar tiempo» marca el elemento que perdió su palabra al cambiar la narración (CP-067).
 import type { MarcaPalabra } from '@aptio/schema/tiempos';
 import { palabraEn } from '@aptio/schema/tiempos';
 import { type KeyboardEvent, type MouseEvent, type PointerEvent, useEffect, useRef, useState } from 'react';
 import { arrastrar, type Borde, type CambioTiempo, formatoS, marcasRegla, pxAS, zoomAjustado, zoomSiguiente } from './linea-tiempo';
 
-export type BarraTiempo = { id: string; nombre: string; inicioS: number; finS: number | null; oculto: boolean };
+export type BarraTiempo = { id: string; nombre: string; inicioS: number; finS: number | null; oculto: boolean; revisar?: boolean; propuesta?: boolean };
 type Tramo = { inicioS: number; finS: number };
 
 const UMBRAL_PX = 3;
@@ -16,11 +18,15 @@ const UMBRAL_PX = 3;
 export function LineaTiempo({
   barras, marcas, subtitulos, boca, vozS, duracion, tiempo, reproduciendo, elegidoId, ocupado,
   alIr, alReproducir, alPausar, alDetener, alCambiar, alElegir, alAlternarOculto, alOcultar,
+  sincronizacion, alSincronizar, alAplicarSincronizacion, alDescartarSincronizacion,
 }: {
   barras: BarraTiempo[]; marcas: MarcaPalabra[]; subtitulos: (Tramo & { texto: string })[]; boca: (Tramo & { boca: string })[] | null;
   vozS: number; duracion: number; tiempo: number | null; reproduciendo: boolean; elegidoId: string | null; ocupado: boolean;
   alIr: (s: number) => void; alReproducir: () => void; alPausar: () => void; alDetener: () => void;
   alCambiar: (id: string, cambio: CambioTiempo) => void; alElegir: (id: string) => void; alAlternarOculto: (id: string) => void; alOcultar: () => void;
+  /** La propuesta de «Sincronizar con la voz» que se está viendo. */
+  sincronizacion: { encontrados: number; total: number } | null;
+  alSincronizar: () => void; alAplicarSincronizacion: () => void; alDescartarSincronizacion: () => void;
 }) {
   const scroll = useRef<HTMLDivElement>(null);
   const [pps, setPps] = useState<number | null>(null);
@@ -94,8 +100,25 @@ export function LineaTiempo({
           <button type="button" className="opcion" title="Ajustar al ancho" onClick={ajustar}>Ajustar</button>
           <button type="button" className="opcion" aria-label="Acercar" onClick={() => setPps(zoomSiguiente(z, 1))}>+</button>
         </span>
+        <button type="button" className="boton ia" title="Cada elemento aparece cuando Ana lo nombra" disabled={ocupado || !marcas.length || sincronizacion !== null}
+          onClick={alSincronizar}>✦ Sincronizar con la voz</button>
         <button type="button" className="boton" onClick={alOcultar}>Ocultar</button>
       </div>
+      {sincronizacion ? (
+        <div className="franja-ia lt-franja" role="region" aria-label="Propuesta: sincronizar con la voz">
+          <div className="franja-ia-texto">
+            <b>✦ Sincronizar con la voz</b>
+            <span>
+              Cada elemento aparece cuando Ana lo nombra ({sincronizacion.encontrados} de {sincronizacion.total} encontrados en la narración); el título y el personaje
+              entran al inicio y el resto conserva su tiempo. Las barras muestran dónde quedarían.
+            </span>
+          </div>
+          <div className="acciones-form">
+            <button type="button" className="boton ia" disabled={ocupado} onClick={alAplicarSincronizacion}>Aplicar</button>
+            <button type="button" className="boton" disabled={ocupado} onClick={alDescartarSincronizacion}>Descartar</button>
+          </div>
+        </div>
+      ) : null}
       <div ref={scroll} className="lt-scroll">
         <div className="lt-grilla" style={{ ['--lt-ancho' as string]: `${ancho}px` }}>
           <div className="lt-cab lt-regla-cab"><b>Tiempo</b></div>
@@ -143,9 +166,10 @@ export function LineaTiempo({
                 <button type="button" className="lt-ojo" aria-pressed={!b.oculto} disabled={ocupado} aria-label={`${b.oculto ? 'Mostrar' : 'Ocultar'} ${b.nombre}`}
                   onClick={() => alAlternarOculto(b.id)}>{b.oculto ? '◌' : '●'}</button>
                 <button type="button" className="lt-nombre" onClick={() => alElegir(b.id)}>{b.nombre}</button>
+                {b.revisar ? <span className="lt-revisar" title="La palabra a la que estaba anclado ya no está en la narración: revisa cuándo aparece">⚠ revisar tiempo</span> : null}
               </div>,
               <div key={`${b.id}-pista`} className="lt-pista lt-detalle" onClick={irAlClic}>
-                <div className={`lt-elemento${b.id === elegidoId ? ' elegida' : ''}${b.oculto ? ' oculta' : ''}${arrastre?.id === b.id ? ' arrastrando' : ''}`}
+                <div className={`lt-elemento${b.id === elegidoId ? ' elegida' : ''}${b.oculto ? ' oculta' : ''}${arrastre?.id === b.id ? ' arrastrando' : ''}${b.revisar ? ' revisar' : ''}${b.propuesta ? ' propuesta' : ''}`}
                   data-elemento={b.id} role="slider" tabIndex={0} aria-label={`${b.nombre}: aparece a los ${formatoS(v.inicioS)}${v.finS === null ? '' : ` y sale a los ${formatoS(v.finS)}`}`}
                   aria-valuemin={0} aria-valuemax={duracion} aria-valuenow={v.inicioS} aria-valuetext={formatoS(v.inicioS)}
                   style={{ left: x(v.inicioS), width: largo(v.inicioS, fin) }}

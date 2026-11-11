@@ -3,6 +3,8 @@
 // RN-05-2: una pantalla aprobada que se modifica vuelve a borrador.
 // HU-0602: los retoques del editor (tamaño, color del kit, alineación y animación) se guardan en `ajustes` (RN-06-1).
 // HU-0503: corregir la narración en español regenera su voz, boca y subtítulos en cascada (trabajo CASCADA, cola voz).
+// HU-0608: al corregirla, los elementos anclados siguen a su palabra; si la palabra ya no está, conservan su segundo y
+// queda la observación «Revisar tiempo» (RN-06-8, CP-067). Mover o anclar de nuevo el elemento la quita.
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashNarracion } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
@@ -10,6 +12,7 @@ import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
 import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
 import { type CursoDoc, observacionesRegla, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
+import { mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, reanclarAjustes } from '@aptio/schema/tiempos';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { AlmacenService } from '../recursos/almacen.service.js';
 import { ColasService } from '../trabajos/colas.service.js';
@@ -130,6 +133,9 @@ export class CursosService {
   async editar(u: UsuarioSesion, cursoId: string, pantallaId: string, dto: PantallaCambioDto): Promise<CambioResultadoDto> {
     /** Idiomas cuya narración cambió de verdad: su audio queda «Por regenerar» (HU-0703, RN-07-1). */
     const narracionCambiada: string[] = [];
+    /** HU-0608 · Elementos que perdieron su palabra de anclaje y elementos cuyo tiempo se volvió a fijar. */
+    const sinAncla: string[] = [];
+    const tiempoFijado: string[] = [];
     const r = await this.guardar(u, cursoId, dto.version, dto.motivo ?? 'edición', (doc) => {
       const p = this.pantalla(doc, pantallaId);
       const bloques = p.bloques as Bloque[];
@@ -198,6 +204,10 @@ export class CursosService {
           if (!bloques.some((x) => x.id === id) && !extras.some((x) => x.id === id)) {
             throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });
           }
+          // HU-0608 · El tiempo se fija si cambia la entrada o el ancla (otro retoque manda el ajuste entero).
+          const previo = (ajustes[id] ?? {}) as { retardoS?: unknown; anclaPalabra?: unknown };
+          const nuevo = (ajuste ?? {}) as { retardoS?: unknown; anclaPalabra?: unknown };
+          if (previo.retardoS !== nuevo.retardoS || previo.anclaPalabra !== nuevo.anclaPalabra) tiempoFijado.push(id);
           if (ajuste === null) {
             delete ajustes[id];
           } else {
@@ -225,6 +235,10 @@ export class CursosService {
           const texto = t[idioma as 'es' | 'en'];
           if (!texto) continue;
           if (texto !== antes[idioma as 'es' | 'en']) narracionCambiada.push(idioma);
+          // RN-06-8: los tiempos siguen la narración en español (SUP-47).
+          if (idioma === 'es' && antes.es && texto !== antes.es) {
+            sinAncla.push(...reanclarAjustes((p as { ajustes?: Record<string, { anclaPalabra?: number }> }).ajustes, antes.es, texto));
+          }
           // El hash liga el audio al texto: si cambia, el audio queda desactualizado hasta regenerarlo (HU-0703).
           audio.hashTexto = hashNarracion(texto, audio.voz.voz, audio.voz.velocidad ?? 1);
           if (audio.estado === 'generado') audio.estado = 'desactualizado';
@@ -235,6 +249,7 @@ export class CursosService {
       p.estado = 'borrador';
       return { regenerando: [] as string[], estado: p.estado };
     });
+    if (tiempoFijado.length || sinAncla.length) await this.revisarTiempo(cursoId, pantallaId, tiempoFijado, sinAncla);
     if (narracionCambiada.length) {
       await this.bd.narracion.updateMany({ where: { cursoId, pantallaId, idioma: { in: narracionCambiada }, estado: { in: ['ACTUALIZADA', 'ERROR'] } }, data: { estado: 'DESACTUALIZADA' } });
     }
@@ -245,6 +260,18 @@ export class CursosService {
       return { ...r, regenerando: [...CASCADA_ES] };
     }
     return r;
+  }
+
+  /** HU-0608 · Quita «Revisar tiempo» de los elementos cuyo tiempo se fijó y la crea para los que perdieron su ancla. */
+  private async revisarTiempo(cursoId: string, pantallaId: string, fijados: string[], perdidos: string[]) {
+    const ids = [...new Set([...fijados, ...perdidos])];
+    await this.bd.observacion.deleteMany({ where: { cursoId, pantallaId, origen: ORIGEN_REVISAR_TIEMPO, mensaje: { in: ids.map(mensajeRevisarTiempo) } } });
+    const nuevos = perdidos.filter((id) => !fijados.includes(id));
+    if (nuevos.length) {
+      await this.bd.observacion.createMany({
+        data: nuevos.map((id) => ({ cursoId, pantallaId, tipo: 'CALIDAD' as const, severidad: 'aviso', mensaje: mensajeRevisarTiempo(id), origen: ORIGEN_REVISAR_TIEMPO })),
+      });
+    }
   }
 
   /** Abiertas que bloquean la entrega, por pantalla. */
