@@ -13,8 +13,13 @@
 // HU-0607 · Deshacer y rehacer (↶ ↷, Ctrl+Z, Ctrl+Shift+Z o Ctrl+Y): cada cambio guarda antes una foto de la pantalla
 // (hasta 60). Deshacer se ve al instante y se guarda 1 s después de la última pulsación, en un solo PATCH (RN-06-5,
 // SUP-46); si la foto es de otra pantalla, el editor va a ella. Si otra persona guardó antes (409), se recarga y se
-// vacía el historial. Mientras se escribe, Ctrl+Z es el del texto. La línea de tiempo llega con la HU-0608.
-import { type AjusteElemento, type CursoReproductor, montar, PALETA_BASE, type RolColor } from '@aptio/player';
+// vacía el historial. Mientras se escribe, Ctrl+Z es el del texto.
+// HU-0608 · Línea de tiempo bajo el lienzo: narración palabra por palabra, subtítulos, boca y una barra por elemento que
+// se arrastra (CP-064, CP-065); la aguja deja el lienzo en ese segundo, con solo lo activo (CP-066). El lienzo se monta
+// con `sinTiempos` (todo a la vista) hasta que se mueve la aguja; ■ vuelve a mostrar todo. Los tiempos van en `ajustes`
+// y pasan por el historial como cualquier retoque.
+import { type AjusteElemento, type CursoReproductor, duracionDe, leerVtt, montar, PALETA_BASE, type Pantalla, type Reproductor, type RolColor, tiemposDe } from '@aptio/player';
+import { marcasPalabra } from '@aptio/schema/tiempos';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Rol } from '../api';
@@ -26,6 +31,8 @@ import {
 import { type CambioTexto, edicionDe, esEditable } from './edicion-texto';
 import { capasDe, extraNuevo, nombreExtra, type PantallaConExtras, sinExtra, TIPOS_EXTRA, type TipoExtra } from './extras';
 import { cambioHacia, conFoto, type Foto, fotoDe, type Historial, HISTORIAL_VACIO, mover as moverHistorial, registrar } from './historial';
+import { LineaTiempo } from './LineaTiempo';
+import { type CambioTiempo, tramosBoca, tramosSubtitulos } from './linea-tiempo';
 import { PanelIzquierdo, type PestanaIzquierda } from './panel-izquierdo';
 import { PanelDisenos } from './disenos';
 import { nombreDiseno } from './disenos-pantalla';
@@ -89,6 +96,13 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   };
   const panelDisenos = useRef<HTMLDivElement>(null);
   const [pestana, setPestana] = useState<PestanaIzquierda>('disenos');
+  // HU-0608 · La aguja (null: se ve todo), si está corriendo y si la línea de tiempo se ve.
+  // Van con el id de la pantalla: otra pantalla empieza con todo a la vista.
+  const [aguja, setAguja] = useState<{ pantallaId: string; s: number } | null>(null);
+  const [corriendo, setCorriendo] = useState<string | null>(null);
+  const [conLinea, setConLinea] = useState(true);
+  const agujaRef = useRef<{ pantallaId: string; s: number } | null>(null);
+  const reproductor = useRef<Reproductor | null>(null);
   const lienzo = useRef<HTMLDivElement>(null);
   /** Texto que recupera el foco cuando el lienzo se redibuja tras guardar con Enter (teclado). */
   const reenfocar = useRef<string | null>(null);
@@ -241,6 +255,45 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const moverRef = useRef(mover);
   const quitarRef = useRef(quitar);
   const modoRef = useRef(modo);
+  // HU-0608 · La aguja de la línea de tiempo: ir a un segundo, reproducir, pausar y ■ (ver todo).
+  const tiempo = aguja && aguja.pantallaId === actual?.id ? aguja.s : null;
+  const reproduciendo = corriendo !== null && corriendo === actual?.id;
+  const ponerTiempo = (s: number | null) => {
+    const a = s === null || !actual ? null : { pantallaId: actual.id, s };
+    agujaRef.current = a;
+    setAguja(a);
+  };
+  const irTiempo = (s: number) => {
+    setCorriendo(null);
+    ponerTiempo(s);
+    reproductor.current?.irA(s);
+  };
+  const pausarTiempo = () => {
+    reproductor.current?.pausar();
+    setCorriendo(null);
+  };
+  const detenerTiempo = () => {
+    reproductor.current?.verTodo();
+    setCorriendo(null);
+    ponerTiempo(null);
+  };
+  const reproducirTiempo = () => {
+    const r = reproductor.current;
+    if (!r || !actual) return;
+    const desde = tiempo !== null && tiempo < r.duracion() - 0.05 ? tiempo : 0;
+    setCorriendo(actual.id);
+    let ultimo = -1;
+    r.reproducir(desde, (s, fin) => {
+      agujaRef.current = { pantallaId: actual.id, s };
+      // La aguja se redibuja cada 50 ms: React no necesita cada cuadro.
+      if (fin || Math.abs(s - ultimo) >= 0.05) {
+        ultimo = s;
+        setAguja({ pantallaId: actual.id, s });
+      }
+      if (fin) setCorriendo(null);
+    });
+  };
+  const espacioRef = useRef(() => {});
   const pasoRef = useRef(paso);
   const guardarPendientesRef = useRef(guardarPendientes);
   useEffect(() => {
@@ -250,12 +303,22 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
     modoRef.current = modo;
     pasoRef.current = paso;
     guardarPendientesRef.current = guardarPendientes;
+    espacioRef.current = () => (reproduciendo ? pausarTiempo() : reproducirTiempo());
   });
 
   // HU-0607 · Atajos: Ctrl+Z deshace; Ctrl+Shift+Z o Ctrl+Y rehacen. En un campo o mientras se escribe, son los del texto.
   // Al salir del editor se guarda lo que esperaba; si se cierra la página antes, el navegador pregunta.
   useEffect(() => {
     const alTecla = (k: KeyboardEvent) => {
+      // HU-0608 · Espacio reproduce o pausa la línea de tiempo (en la página o en sus barras, no en un botón o campo).
+      if (k.key === ' ' && !k.ctrlKey && !k.metaKey && !k.altKey) {
+        const el = k.composedPath()[0];
+        if (el === document.body || (el instanceof HTMLElement && el.closest('.linea-tiempo') && !el.closest('button, input, select, textarea'))) {
+          k.preventDefault();
+          espacioRef.current();
+        }
+        return;
+      }
       if (!(k.ctrlKey || k.metaKey) || k.altKey) return;
       const tecla = k.key.toLowerCase();
       if (tecla !== 'z' && tecla !== 'y') return;
@@ -285,7 +348,14 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       marco: false,
       inicio: actual.id,
       sinAcciones: true,
+      sinTiempos: true,
+      urlRecurso: (id) => cursoRef.current?.urlsRecursos?.[id],
+      cargarSvg: async (id) => cursoRef.current?.svgPersonajes?.[id],
+      cargarSubtitulos: async (id) => cursoRef.current?.subtitulos?.[id],
     });
+    reproductor.current = r;
+    // Tras guardar, el lienzo nuevo queda en el mismo segundo de la aguja.
+    if (agujaRef.current?.pantallaId === actual.id) r.irA(agujaRef.current.s);
     const sombra = lienzo.current.shadowRoot;
     if (!sombra || !editan) return () => r.destruir();
     const estilo = document.createElement('style');
@@ -463,6 +533,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       sombra.removeEventListener('keydown', alTecla);
       sombra.removeEventListener('focusout', alSalir);
       edicion = null;
+      if (reproductor.current === r) reproductor.current = null;
       r.destruir();
     };
     // Se vuelve a montar con cada versión del curso (documento nuevo), al cambiar de pantalla o de kit y con «Ver animación».
@@ -503,6 +574,22 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const indice = pantallas.indexOf(actual);
   const paleta: Record<RolColor, string> = { ...PALETA_BASE, ...kit?.paleta };
   const extras = (actual as PantallaConExtras).extras ?? [];
+  // HU-0608 · Pistas de la línea de tiempo, con la voz en español (SUP-47).
+  const narracion = (actual as unknown as Pantalla).narracion;
+  const vozEs = narracion?.porIdioma?.es;
+  const marcas = vozEs?.duracionMs ? marcasPalabra(narracion?.texto.es ?? '', vozEs.duracionMs) : [];
+  const vtt = vozEs?.subtitulosId ? curso.subtitulos?.[vozEs.subtitulosId] : undefined;
+  const subtitulosLinea = vtt ? tramosSubtitulos(leerVtt(vtt)) : [];
+  const conPersonaje = actual.bloques.some((b) => b.tipo === 'personaje') || extras.some((e) => e.tipo === 'personaje');
+  const bocaLinea = conPersonaje && vozEs?.bocas?.length ? tramosBoca(vozEs.bocas, vozEs.duracionMs ?? 0) : null;
+  const capas = capasDe(actual as PantallaConExtras);
+  const tiempos = new Map(tiemposDe(actual as unknown as Pantalla).map((x) => [x.id, x]));
+  const barras = capas.map((c) => ({ id: c.id, nombre: c.nombre, inicioS: tiempos.get(c.id)?.inicioS ?? 0, finS: tiempos.get(c.id)?.finS ?? null, oculto: c.oculto }));
+  const duracion = duracionDe(actual as unknown as Pantalla, 'es');
+  const cambiarTiempo = (id: string, c: CambioTiempo) => {
+    const previo = (actual as PantallaConAjustes).ajustes?.[id];
+    void enviar(actual, { ajustes: { [id]: ajusteCon(previo, c) } }, 'Tiempo guardado.');
+  };
   const bloqueElegido = elegidoId ? actual.bloques.find((b) => b.id === elegidoId) : undefined;
   const extraElegido = elegidoId ? extras.find((e) => e.id === elegidoId) : undefined;
   const bloque = bloqueElegido ?? extraElegido;
@@ -606,7 +693,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       ) : null}
       <div className="editor-cuerpo">
         <div ref={panelDisenos} className="editor-col-disenos" tabIndex={-1}>
-          <PanelIzquierdo pestana={pestana} alCambiarPestana={setPestana} capas={capasDe(actual as PantallaConExtras)} elegidoId={elegidoId} ocupado={ocupado}
+          <PanelIzquierdo pestana={pestana} alCambiarPestana={setPestana} capas={capas} elegidoId={elegidoId} ocupado={ocupado}
             alAgregar={(t) => void agregar(t)} alElegirCapa={elegirCapa} alAlternarOculto={alternarOculto}
             disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={cambiarDiseno} />} />
         </div>
@@ -627,6 +714,10 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         </section>
         <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones}
           imagenes={imagenes} alCambiarExtra={cambiarExtra}
+          tiempo={bloque && tiempos.get(bloque.id) ? {
+            inicioS: tiempos.get(bloque.id)!.inicioS, finS: tiempos.get(bloque.id)!.finS, anclaPalabra: ajuste?.anclaPalabra, palabras: marcas,
+            alCambiar: (c) => cambiarTiempo(bloque.id, c),
+          } : null}
           diseno={nombreDiseno(actual.disposicion)} alCambiarDiseno={() => {
             setPestana('disenos');
             setTimeout(() => {
@@ -635,6 +726,18 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
             }, 0);
           }} />
       </div>
+      {conLinea ? (
+        <LineaTiempo key={actual.id} barras={barras} marcas={marcas} subtitulos={subtitulosLinea} boca={bocaLinea} vozS={(vozEs?.duracionMs ?? 0) / 1000}
+          duracion={duracion} tiempo={tiempo} reproduciendo={reproduciendo} elegidoId={elegidoId} ocupado={ocupado}
+          alIr={irTiempo} alReproducir={reproducirTiempo} alPausar={pausarTiempo} alDetener={detenerTiempo} alCambiar={cambiarTiempo}
+          alElegir={elegirCapa} alAlternarOculto={alternarOculto} alOcultar={() => { detenerTiempo(); setConLinea(false); }} />
+      ) : (
+        <section className="tarjeta linea-tiempo linea-tiempo-plegada" aria-label="Línea de tiempo">
+          <b>Línea de tiempo</b>
+          <span className="sec">Voz, subtítulos, boca y cuándo aparece cada elemento</span>
+          <button type="button" className="boton" onClick={() => setConLinea(true)}>Mostrar</button>
+        </section>
+      )}
       <nav className="editor-tira" aria-label="Pantallas">
         <ol>
           {pantallas.map((p, i) => (
