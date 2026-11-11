@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-Última actualización: 2026-11-11 · Fase actual: **Sprint S6 en curso** (entrega SCORM y piloto): HU-1202 (paquete SCORM 1.2, adaptador, API, cola `export` y vista Entrega) y HU-1105 (reanudación) hechas en código; falta subir el paquete a SCORM Cloud y a Moodle. El S5 (editor y regeneración en cascada) está cerrado en código y falta su demo. El S4 (voz, boca y subtítulos) también está cerrado en código y falta su demo. S0 a S3 están cerrados (la demo del S3 se aprobó); siguen pendientes la prueba en Edge, Safari y un celular real, y el despliegue en el entorno de pruebas; `main` está protegida con CI. Los manuales de usuario, programador y sistema viven en la rama `docs/manuales` (PR #24, no se fusiona) y se actualizan tras cada entrega.
+Última actualización: 2026-11-11 · Fase actual: **Sprint S6 en curso** (entrega SCORM y piloto): HU-1202 (paquete SCORM 1.2, adaptador, API, cola `export` y vista Entrega) HU-1105 (reanudación) y HU-1201 (validar antes de exportar) hechas en código; falta subir el paquete a SCORM Cloud y a Moodle. El S5 (editor y regeneración en cascada) está cerrado en código y falta su demo. El S4 (voz, boca y subtítulos) también está cerrado en código y falta su demo. S0 a S3 están cerrados (la demo del S3 se aprobó); siguen pendientes la prueba en Edge, Safari y un celular real, y el despliegue en el entorno de pruebas; `main` está protegida con CI. Los manuales de usuario, programador y sistema viven en la rama `docs/manuales` (PR #24, no se fusiona) y se actualizan tras cada entrega.
 
 ## Decisiones aprobadas
 
@@ -10,6 +10,8 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 | ID | Supuesto | Quién lo valida |
 | --- | --- | --- |
+| SUP-56 | El peso que muestra la validación (HU-1201) es una estimación: suma los recursos tal cual (MP3, WebP y MP4 casi no se comprimen en el ZIP), el reproductor empaquetado, `datos.js` (con el texto de SVG y WebVTT) y los archivos fijos. Con recursos de texto queda por encima del ZIP real. El peso real sigue en el historial. 1 MB = 1.048.576 bytes. El peor caso de `suspend_data` supone todo visto y todas las actividades con nota 100 y, si el curso no limita los intentos, 99 intentos. | Ingeniero a cargo |
+| SUP-55 | El límite de subida contra el que se valida (HU-1201) es `limiteSubidaMb` de la ficha de compatibilidad más reciente del cliente; sin ficha, `LIMITE_SUBIDA_REFERENCIA_MB` (100 MB por defecto), solo para advertir. No se usan límites «conocidos» por LMS: los fija cada administrador y no están verificados. La pantalla para editar la ficha queda pendiente. Las pantallas sin aprobar siguen sin bloquear, pero la web pide confirmación al exportar (RN-12-3); la API no cambia (SUP-51). | Diseñador instruccional líder |
 | SUP-54 | «Empezar de nuevo» (HU-1105) borra también los intentos usados de las actividades: una sumativa con `intentosMaximos` vuelve a tener todos sus intentos. Lo que ya se informó al LMS no baja: un `lesson_status` cerrado (`passed`, `completed`, `failed`) nunca vuelve a uno menor y, con «mejor nota», `score.raw` no baja de lo que el LMS tenía. Si un cliente necesita que los intentos sobrevivan al reinicio, se guarda aparte en suspend_data. | Diseñador instruccional líder |
 | SUP-53 | El paquete reanuda (HU-1105) cuando `cmi.core.entry` es `resume` o viene vacío (hay LMS que no lo informan) y lo guardado es válido: suspend_data v1, o v2 con la huella de este curso, y una `lesson_location` que existe y no es la primera pantalla. Con `ab-initio` (intento nuevo) empieza de cero. Respeta `navegacion.reanudar` del curso: «preguntar» (por defecto), «automatica» (vuelve sin preguntar) o «no» (siempre desde p01). La vista previa del editor nunca reanuda. | Diseñador instruccional líder |
 | SUP-52 | El paquete exportado (HU-1202) nunca lleva los recursos de tipo `documento` (el material fuente del cliente que el curso guarda por trazabilidad), aunque estén en `curso.recursos`. | Diseñador instruccional líder |
@@ -67,6 +69,13 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Cambios recientes
 
+- **HU-1201 · Validar antes de exportar (2026-11-11):** `validarScorm12` (función pura en `@aptio/exporters`) y `POST /cursos/{id}/validar`, que responde 200 aunque haya errores de esquema y nunca bloquea por tamaño (RN-12-2). Calcula:
+  - el peso estimado contra el límite del destino (ficha del cliente o 100 MB de referencia, SUP-55); si se pasa, advierte con las 5 alternativas de `docs/08` y los 5 recursos que más pesan;
+  - el peor caso de `suspend_data` v2 (advertencia sobre 4096 caracteres);
+  - los archivos que faltan, en una sola advertencia con sus nombres;
+  - las pantallas sin aprobar (RN-12-3).
+  - **Web:** la vista Entrega suma «Verificación automática» con el peso, las pantallas aprobadas y una lista con ✓ o !. Vuelve a validar al cambiar el LMS. Los errores de esquema deshabilitan Exportar. Con pantallas sin aprobar se confirma en un diálogo con el foco en Cancelar. El revisor del cliente no ve la verificación.
+  - **Pruebas:** Vitest con 7 casos (CP-090 con 300 MB, la ficha, el peso cerca del ZIP real, documentos y faltantes, pantallas, suspend_data, esquema roto). En la API contra PostgreSQL, CP-090: 300 MB dan 200 con advertencia y alternativas, exportar sigue en 202 y la ficha de 512 MB manda; también errores en 200, 422, 403 y 404. Playwright suma 3 casos en `entrega.spec.ts`: alerta de 300 MB con alternativas y tabla, Exportar deshabilitado por esquema, y exportar sin confirmar cuando todo está aprobado. El flujo de CP-091 ahora pasa por la confirmación.
 - **HU-1105 · Reanudación (2026-11-11):** al volver al paquete, si el LMS guardó avance válido lejos de la primera pantalla, el reproductor muestra dentro de su Shadow DOM el aviso «¿Continuar donde lo dejaste?» con «Pantalla X de Y» y el título de la pantalla. Es un diálogo con nombre y descripción, el foco empieza en Continuar, Tab no sale del aviso, Escape equivale a Continuar y el fondo queda inerte. Hasta que se elige, el paquete no escribe `lesson_location` ni `suspend_data` ni hace `LMSCommit`, y al entrar ya no hay commit. Continuar restaura vistas, resultados, puntos e intentos y abre la pantalla guardada; Empezar de nuevo vuelve a p01 sin avance (SUP-53, SUP-54).
   - **Detalles:**
     - `suspend_data` pasa a v2 en `src/suspend.ts`: `2|<huella>|<idioma>|<vistas>|<pos:completada:puntaje[:intentos]>`. La huella (FNV-1a del id del curso y el orden de pantallas) descarta el avance de otro curso o versión. v1 se sigue leyendo, y un texto truncado o corrupto se descarta sin lanzar.
@@ -205,7 +214,7 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 
 ## Pendientes
 
-- Entrega (S6): probar el worker de exportación contra S3 real con un curso generado de punta a punta; las tipografías del kit aún no van dentro del paquete (el reproductor usa las del sistema); subir el paquete LOTO a SCORM Cloud y a Moodle 4.5 de pruebas (CP-091, CP-092); comprobar en Moodle 4.5 que la reanudación (HU-1105) recibe `cmi.core.entry=resume` y lo guardado. Agregar los XSD de control cuando se verifique su licencia (SUP-50). Probar Moodle en Docker en el CI más adelante.
+- Entrega (S6): probar el worker de exportación contra S3 real con un curso generado de punta a punta; las tipografías del kit aún no van dentro del paquete (el reproductor usa las del sistema); subir el paquete LOTO a SCORM Cloud y a Moodle 4.5 de pruebas (CP-091, CP-092); comprobar en Moodle 4.5 que la reanudación (HU-1105) recibe `cmi.core.entry=resume` y lo guardado. La pantalla para editar la ficha de compatibilidad del cliente (límite de subida, HU-1201 usa la que exista). Agregar los XSD de control cuando se verifique su licencia (SUP-50). Probar Moodle en Docker en el CI más adelante.
 - Del S3: probar en Edge, Safari y un celular real, y desplegar en el entorno de pruebas cuando exista (HU-1405).
 - Voz: probar la etapa 6 con una clave real de Google Text-to-Speech y confirmar la tarifa con la factura; voces de Azure y ElevenLabs (SUP-34).
 - Subtítulos: probar tiempos exactos con marcas SSML de Google cuando haya clave real; subtítulos en inglés y selector de idioma (S7) (SUP-37).
@@ -233,7 +242,7 @@ Las de `CLAUDE.md` (stack Node.js, Claude como IA de texto, reproductor único, 
 ## Siguiente paso
 
 1. Demos del S4 y del S5 con el guion de cada documento de cierre. Del S5: cambiar una narración y ver la cascada, «Más visual» con aplicar y deshacer, mover una imagen en modo Libre y agregar un botón, y la línea de tiempo. El responsable completa la tabla de cada demo en `docs/18-plan-sprints.md`.
-2. S6: HU-1201 (validar antes de exportar), luego HU-1204, HU-1203, HU-1401 y HU-1406. En la demo del S6, subir el paquete a SCORM Cloud y a Moodle 4.5 y salir y volver para ver la reanudación (CP-089, CP-091, CP-092).
+2. S6: HU-1204 (modo diagnóstico), luego HU-1203, HU-1401 y HU-1406. En la demo del S6, subir el paquete a SCORM Cloud y a Moodle 4.5 y salir y volver para ver la reanudación (CP-089, CP-091, CP-092).
 3. Probar las vistas del S3 al S5 en Edge, Safari y un celular real, la voz con una clave real de Google y PT-01 con el personaje definitivo.
 4. En paralelo, el responsable del producto mide 2 proyectos con la tabla de `docs/11-medicion-y-piloto.md`.
 5. Al cerrar cada sprint, demo en el entorno de pruebas y observaciones en Jira. Piloto al cerrar S6.

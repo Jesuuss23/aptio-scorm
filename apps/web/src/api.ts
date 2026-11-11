@@ -354,6 +354,22 @@ export interface Exportacion {
   creadoEn: string;
 }
 export type PerfilExportacion = 'generico' | 'moodle' | 'blackboard' | 'chamilo' | 'canvas';
+/** HU-1201 · Validar antes de exportar: solo `errores` impiden exportar; el peso nunca bloquea (RN-12-2). */
+export interface Validacion {
+  errores: string[];
+  advertencias: string[];
+  pesoEstimadoMb: number;
+  pesoEstimadoBytes: number;
+  limiteMb: number;
+  origenLimite: 'ficha' | 'referencia';
+  superaLimite: boolean;
+  alternativas: string[];
+  recursosPesados: { id: string; nombre: string; bytes: number }[];
+  suspendDataCaracteres: number;
+  pantallasTotal: number;
+  pantallasSinAprobar: number;
+  recursosFaltantes: string[];
+}
 /** Exportan administración, diseño instruccional y producción (HU-1202). */
 export const EXPORTAN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
 
@@ -385,6 +401,7 @@ export const api = {
   aprobarSinObservaciones: (cursoId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/aprobar`, json({ soloSinObservaciones: true })),
   curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
   exportar: (cursoId: string, datos: { formato: 'SCORM12'; perfilLms: PerfilExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
+  validar: (cursoId: string, datos: { formato: 'SCORM12'; perfilLms: PerfilExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
   exportaciones: (cursoId: string) => pedir<Exportacion[]>(`/cursos/${cursoId}/exportaciones`),
   exportacion: (id: string) => pedir<Exportacion>(`/exportaciones/${id}`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),

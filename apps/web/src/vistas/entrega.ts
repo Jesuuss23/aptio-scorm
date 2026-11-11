@@ -1,4 +1,5 @@
 // HU-1202 · Datos de la vista Entrega (PNT-13): perfiles de LMS con sus recomendaciones y el peso legible.
+// HU-1201 · El límite de suspend_data de SCORM 1.2 y los MB con un decimal para la verificación automática.
 import type { PerfilExportacion } from '../api';
 
 /** Recomendaciones de docs/08-entregas-y-lms.md. La compatibilidad con cada LMS se declara solo después de probarla. */
@@ -16,3 +17,9 @@ export function megas(bytes: number | null): string {
   return `${(bytes / 1024 / 1024).toLocaleString('es-PE', { maximumFractionDigits: 1 })} MB`;
 }
 
+
+/** Límite de `cmi.suspend_data` en SCORM 1.2 (CMIString4096). */
+export const LIMITE_SUSPEND = 4096;
+
+/** MB con un decimal como máximo, en el formato de es-PE. */
+export const mb = (n: number): string => n.toLocaleString('es-PE', { maximumFractionDigits: 1 });

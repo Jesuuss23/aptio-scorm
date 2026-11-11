@@ -1633,3 +1633,97 @@ ul.fila-chips {
   vertical-align: top;
   border-bottom: 1px solid var(--color-borde);
 }
+
+/* ---- HU-1201 · Entrega: verificación automática ---- */
+.verificacion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cifras-entrega {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cifras-entrega > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 150px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  font-size: var(--texto-sm);
+}
+.cifras-entrega b {
+  font-family: var(--fuente-num);
+  font-size: var(--titulo-panel);
+}
+.cifras-entrega small {
+  font-size: var(--texto-xs);
+  color: var(--color-texto-sec);
+}
+.cifras-entrega .aviso b {
+  color: var(--color-aviso);
+}
+.comprobaciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--texto-sm);
+}
+.comprobaciones > li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.comprobaciones .icono {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-validado);
+  color: #fff;
+  font-size: var(--texto-xs);
+  font-weight: 700;
+}
+.comprobaciones .aviso .icono {
+  background: var(--color-aviso);
+}
+.comprobaciones .error .icono {
+  background: var(--color-error);
+}
+.comprobaciones .error {
+  color: var(--color-error);
+}
+.alternativas-peso ol {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+.alternativas-peso table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.alternativas-peso th,
+.alternativas-peso td {
+  padding: 4px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-borde);
+}
+.confirmar-exportar {
+  max-width: min(440px, calc(100vw - 32px));
+  border: 0;
+  border-radius: var(--radio-tarjeta);
+  padding: 20px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+.confirmar-exportar::backdrop {
+  background: rgba(16, 32, 51, 0.5);
+}
+.confirmar-exportar h2 {
+  margin-top: 0;
+}
