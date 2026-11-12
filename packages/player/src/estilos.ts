@@ -9,7 +9,7 @@ button{font:inherit;cursor:pointer}
 button:disabled{cursor:not-allowed}
 /* HU-1401 · Foco visible en todo control: 3 px del acento legible (3:1) con un halo blanco que lo separa de fondos oscuros. */
 :focus-visible{outline:3px solid var(--ap-foco,var(--ap-acento));outline-offset:2px;box-shadow:0 0 0 2px var(--ap-blanco)}
-.ap-sin-marco .ap-barra,.ap-sin-marco .ap-pie,.ap-sin-marco .ap-subtitulos{display:none}
+.ap-sin-marco .ap-barra,.ap-sin-marco .ap-pie,.ap-sin-marco .ap-subtitulos,.ap-sin-marco .ap-zona,.ap-sin-marco .ap-fab,.ap-sin-marco .ap-hud,.ap-sin-marco .ap-motivo-flotante{display:none}
 .ap-sin-marco{min-height:0}
 .ap-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .ap-barra{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--ap-primario);color:var(--ap-blanco);flex:0 0 auto}
@@ -230,4 +230,41 @@ button:disabled{cursor:not-allowed}
 @keyframes ap-zoom{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
 @keyframes ap-rebotar{0%{opacity:0;transform:translateY(-24px)}60%{opacity:1;transform:translateY(6px)}100%{transform:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* HU-1103 · Patrones de navegación. */
+.ap-puntos{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ap-barra-historias{flex-direction:column;align-items:stretch;gap:6px}
+.ap-barra-fila{display:flex;align-items:center;gap:8px;min-width:0}
+.ap-barra-fila .ap-titulo-curso{flex:1 1 auto}
+.ap-segmentos{display:flex;gap:3px}
+.ap-segmentos i{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.35)}
+.ap-segmentos i.ap-visto{background:var(--ap-acento)}
+.ap-zona{position:absolute;top:0;bottom:0;z-index:3;width:44px;display:flex;align-items:center;justify-content:center;border:0;background:linear-gradient(to var(--ap-lado,right),rgba(16,32,51,.18),transparent);color:var(--ap-blanco);font-size:30px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* Las zonas, el motivo, el marcador y los botones flotantes nunca tapan el contenido ni el foco (WCAG 2.4.11). */
+.ap-r:not(.ap-sin-marco)[data-patron="historias"] .ap-escena{padding:0 44px 52px;scroll-padding:0 44px 52px}
+.ap-r:not(.ap-sin-marco)[data-patron="inmersivo"] .ap-escena{padding:64px 0 76px;scroll-padding:64px 0 76px}
+.ap-zona-izq{left:0;--ap-lado:right}
+.ap-zona-der{right:0;--ap-lado:left}
+.ap-zona:disabled{opacity:.25}
+.ap-motivo-flotante{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:4;max-width:calc(100% - 120px);padding:6px 12px;border-radius:999px;background:var(--ap-blanco);box-shadow:0 2px 10px rgba(0,0,0,.18);text-align:center}
+.ap-hud{position:absolute;top:10px;right:10px;z-index:4;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border-radius:12px;background:var(--ap-primario);color:var(--ap-blanco);box-shadow:0 2px 10px rgba(0,0,0,.2)}
+.ap-fab{position:absolute;bottom:12px;z-index:4;width:48px;height:48px;border-radius:50%;border:2px solid var(--ap-blanco);background:var(--ap-primario);color:var(--ap-blanco);font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.ap-fab-izq{left:12px}
+.ap-fab-der{right:12px}
+.ap-fab:disabled{opacity:.4}
+.ap-zona[hidden],.ap-fab[hidden],.ap-hud[hidden],.ap-pie[hidden],.ap-volver-mapa[hidden]{display:none}
+.ap-mapa{flex:1;display:flex;flex-direction:column;gap:16px;padding:20px 16px;overflow:auto}
+.ap-mapa-titulo{margin:0;font-family:var(--ap-f-titulos),system-ui,sans-serif;font-size:24px;color:var(--ap-primario)}
+.ap-estaciones,.ap-temas{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.ap-estaciones{grid-template-columns:1fr;position:relative}
+.ap-temas{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.ap-estacion{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:10px 14px;text-align:left;border:2px solid var(--ap-primario);border-radius:14px;background:var(--ap-blanco);color:var(--ap-texto)}
+.ap-estacion:disabled{opacity:.55;border-style:dashed}
+.ap-estacion.ap-completa{border-color:var(--ap-secundario)}
+.ap-estacion-num{flex:0 0 40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--ap-primario);color:var(--ap-blanco);font-weight:700}
+.ap-completa .ap-estacion-num{background:var(--ap-secundario)}
+.ap-estacion-texto{display:flex;flex-direction:column;min-width:0}
+.ap-estacion-texto small{opacity:.8}
+.ap-temas .ap-estacion{flex-direction:column;align-items:flex-start;min-height:120px}
+@container (min-width:640px){.ap-estaciones{grid-template-columns:repeat(3,1fr)}.ap-estaciones .ap-estacion{flex-direction:column;text-align:center;min-height:140px;justify-content:center}.ap-estaciones .ap-estacion-texto{align-items:center}}
 `;

@@ -1,6 +1,8 @@
 // HU-1102 · Vista previa (PNT-12): recorrer la cápsula como el participante, en celular, tableta o escritorio, con el
 // mismo reproductor que va dentro del paquete (HU-1101). El panel de seguimiento muestra lo que se reportaría al LMS.
 // HU-0804 · Si el curso ya tiene algún texto en inglés, la vista previa ofrece el botón EN / ES del paquete bilingüe.
+// HU-1103 · Muestra el patrón de navegación del curso; desde Navegación («▶ Probar este patrón») llega con `?patron=` y
+// `?modo=` para probar uno sin guardarlo.
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, type EstadoReproductor, montar, type Reproductor } from '@aptio/player';
 import { textosDe } from '@aptio/schema/traduccion';
@@ -8,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type Curso, ErrorApi, type Kit, type Proyecto } from '../api';
 import { navegar } from '../ruta';
 import './fuentes-kit';
+import { esModo, esPatron, NOMBRE_MODO, NOMBRE_PATRON } from './patrones-navegacion';
 
 const DISPOSITIVOS = [
   { id: 'celular', nombre: 'Celular' },
@@ -17,14 +20,13 @@ const DISPOSITIVOS = [
 type Dispositivo = (typeof DISPOSITIVOS)[number]['id'];
 const AMBOS: ('es' | 'en')[] = ['es', 'en'];
 
-const NOMBRE_PATRON: Record<string, string> = {
-  clasico: 'Clásico', historias: 'Historias', vertical: 'Desplazamiento vertical', mapa: 'Mapa de misiones',
-  hub: 'Menú de temas', ramificado: 'Ramificado', inmersivo: 'Inmersivo', personalizado: 'Personalizado',
-};
-const NOMBRE_MODO = { libre: 'libre', condiciones: 'actividades obligatorias', secuencial: 'secuencial' } as const;
 const NOMBRE_LECCION = { incomplete: 'Incompleto', completed: 'Completado', passed: 'Aprobado', failed: 'No aprobado' } as const;
 
-export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCargar: (nombre: string) => void }) {
+export function VistaPrevia({ proyectoId, alCargar, prueba }: { proyectoId: string; alCargar: (nombre: string) => void; prueba?: URLSearchParams }) {
+  const patronPrueba = prueba?.get('patron');
+  const modoPrueba = prueba?.get('modo');
+  const probando = esPatron(patronPrueba) ? patronPrueba : null;
+  const modoProbado = esModo(modoPrueba) ? modoPrueba : null;
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [curso, setCurso] = useState<Curso | null>(null);
   const [kit, setKit] = useState<Kit | null>(null);
@@ -56,7 +58,11 @@ export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCa
 
   useEffect(() => {
     if (!curso || !contenedor.current) return;
-    const r = montar(contenedor.current, curso.documento as unknown as CursoReproductor, {
+    const doc = curso.documento as unknown as CursoReproductor;
+    const conPrueba: CursoReproductor = probando || modoProbado
+      ? { ...doc, navegacion: { ...doc.navegacion, ...(probando ? { patron: probando } : {}), ...(modoProbado ? { modo: modoProbado } : {}) } }
+      : doc;
+    const r = montar(contenedor.current, conPrueba, {
       kit: kit ? { paleta: kit.paleta, tipografias: kit.tipografias, personaje: kit.personaje?.nombre ?? null } : {},
       revision,
       urlRecurso: (id) => curso.urlsRecursos?.[id],
@@ -74,7 +80,7 @@ export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCa
       r.destruir();
       reproductor.current = null;
     };
-  }, [curso, kit, revision, vuelta]);
+  }, [curso, kit, revision, vuelta, probando, modoProbado]);
 
   const volver = (
     <a className="boton" href={`/proyectos/${proyectoId}`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}`); }}>Volver al proyecto</a>
@@ -91,19 +97,24 @@ export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCa
   if (!curso) return <p className="sec" role="status">Cargando vista previa…</p>;
 
   const documento = curso.documento as unknown as CursoReproductor;
-  const patron = documento.navegacion?.patron ?? 'clasico';
-  const modo = documento.navegacion?.modo ?? 'condiciones';
+  const guardado = esPatron(documento.navegacion?.patron) ? documento.navegacion!.patron as keyof typeof NOMBRE_PATRON : 'clasico';
+  const patron = probando ?? guardado;
+  const modo = modoProbado ?? (esModo(documento.navegacion?.modo) ? documento.navegacion!.modo as keyof typeof NOMBRE_MODO : 'condiciones');
+  const navegacion = `/proyectos/${proyectoId}/navegacion`;
   const pantallas = documento.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
 
   return (
     <>
       <Cabecera
         titulo="Vista previa"
-        subtitulo={`Así se verá en el LMS con el patrón «Clásico» y la regla «${NOMBRE_MODO[modo]}».`}
+        subtitulo={`Así se verá en el LMS con el patrón «${NOMBRE_PATRON[patron]}» y la regla «${NOMBRE_MODO[modo]}».`}
         accion={volver}
       />
-      {patron !== 'clasico' ? (
-        <p className="nota">El curso pide el patrón «{NOMBRE_PATRON[patron] ?? patron}». Por ahora la vista previa y el paquete usan el patrón Clásico; los demás patrones llegan con la configuración de Navegación.</p>
+      {probando || modoProbado ? (
+        <p className="nota">
+          Probando sin guardar. El curso usa el patrón «{NOMBRE_PATRON[guardado]}».{' '}
+          <a href={navegacion} onClick={(e) => { e.preventDefault(); navegar(navegacion); }}>Volver a Navegación</a>
+        </p>
       ) : null}
       <div className="kit-fila vista-previa-controles">
         <div className="opciones" role="group" aria-label="Dispositivo">

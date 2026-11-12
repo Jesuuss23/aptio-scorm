@@ -113,16 +113,17 @@ model Cliente {
 }
 
 model KitMarca {
-  id            String   @id @default(uuid()) @db.Uuid
-  clienteId     String   @unique @db.Uuid
-  estilo        String // Industrial, Corporativo, Institucional, Infantil aula, Salud…
-  paleta        Json // { primario, secundario, acento, fondo, texto } en hex
-  tipografias   Json // { titulos, textos } con licencia
-  logoRecursoId String?  @db.Uuid
-  personaje     Json? // { recursoId, nombre, capas[], bocasDisponibles[] }
-  voces         Json // { es: { proveedor, voz, velocidad }, en: {...} }
-  version       Int      @default(1)
-  actualizadoEn DateTime @updatedAt
+  id              String   @id @default(uuid()) @db.Uuid
+  clienteId       String   @unique @db.Uuid
+  estilo          String // Industrial, Corporativo, Institucional, Infantil aula, Salud…
+  paleta          Json // { primario, secundario, acento, fondo, texto } en hex
+  tipografias     Json // { titulos, textos } con licencia
+  logoRecursoId   String?  @db.Uuid
+  personaje       Json? // { recursoId, nombre, capas[], bocasDisponibles[] }
+  voces           Json // { es: { proveedor, voz, velocidad }, en: {...} }
+  patronPreferido String? // HU-1103 · patrón de navegación preferido del cliente (clasico, historias, mapa…)
+  version         Int      @default(1)
+  actualizadoEn   DateTime @updatedAt
 
   cliente         Cliente          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
   pantallasModelo PantallaModelo[]

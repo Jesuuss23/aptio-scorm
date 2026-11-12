@@ -13,6 +13,11 @@
 // HU-0804 · Bilingüe (RN-08-4, CP-079): si el curso trae español e inglés, la barra suma el botón de idioma. Cambiar de
 // idioma vuelve a montar el reproductor en la misma pantalla con lo visto, los resultados y los puntos (como la
 // reanudación de la HU-1105); una actividad a medio hacer vuelve a empezar. El foco queda en el botón de idioma.
+// HU-1103 · Patrones de navegación (RN-11-1, RN-11-2): el mismo núcleo (reglas de avance, seguimiento, reanudación y
+// teclado) con 7 marcos. Clásico; Historias (segmentos arriba, zonas ‹ › a los lados, deslizar y flechas, sin pie);
+// Vertical («↑ Volver» y «Continuar ↓»); Mapa de misiones y Menú de temas (se elige una estación o un tema y «← Mapa» o
+// «← Temas» vuelve); Ramificado (marco clásico sin temario: las ramas están dentro de cada decisión); Inmersivo (sin
+// barras, con marcador y botones flotantes). El personalizado usa su patrón base. Siguiente bloqueado dice por qué.
 import { colorLegible } from './contraste.ts';
 import { abrirCreditos } from './creditos.ts';
 import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
@@ -20,6 +25,7 @@ import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
 import { pieResultado } from './interacciones/comun.ts';
 import { aplanar, type Motivo, modoDe, motivoBloqueo } from './navegacion.ts';
+import { conMapa, entradaEstacion, estaciones, estadoEstacion, type PatronBase, patronDe } from './patrones.ts';
 import { dibujarPantalla } from './pantalla.ts';
 import { type Cue, cueEn, leerVtt } from './subtitulos.ts';
 import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
@@ -33,6 +39,9 @@ import type { AudioNarracion, BloqueInteraccion, Creditos, CursoReproductor, Idi
 export const PALETA_BASE: Record<RolColor, string> = {
   primario: '#12355B', secundario: '#2E7D6B', acento: '#F2A900', fondo: '#F5F7FA', texto: '#102033', blanco: '#FFFFFF', alerta: '#B42318',
 };
+
+/** HU-1103 · Distancia mínima (px) para que deslizar en Historias cuente como pasar de pantalla. */
+const UMBRAL_DESLIZAR = 50;
 
 /** Lo que se ve por defecto en el patrón Clásico si el curso no dice otra cosa. */
 const MOSTRAR_BASE = ['temario', 'progreso', 'contador', 'botones'];
@@ -78,9 +87,11 @@ export interface EstadoReproductor extends EstadoSeguimiento {
   total: number;
   puedeSiguiente: boolean;
   motivo: string | null;
-  /** Patrón pedido por el curso y el que se está usando (por ahora siempre clásico). */
+  /** Patrón pedido por el curso y el que se dibuja (HU-1103: el personalizado usa su base). */
   patron: string;
-  patronAplicado: 'clasico';
+  patronAplicado: PatronBase;
+  /** HU-1103 · En Mapa de misiones o Menú de temas, true mientras se ve el mapa (no una pantalla). */
+  enMapa: boolean;
   modo: ModoNavegacion;
   /** Actividades hechas, por id de pantalla. */
   resultados: Record<string, ResultadoActividad>;
@@ -150,6 +161,11 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   const modo: ModoNavegacion = revision ? 'libre' : modoDe(curso);
   const mostrar = new Set(curso.navegacion?.mostrar?.length ? [...curso.navegacion.mostrar, 'botones'] : MOSTRAR_BASE);
   const conMarco = opciones.marco !== false;
+  const patron = patronDe(curso.navegacion);
+  const esMapa = conMapa(patron) && conMarco;
+  const tramos = esMapa ? estaciones(curso, pantallas) : [];
+  /** Mapa de misiones o Menú de temas: true mientras se ve el mapa. */
+  let enMapa = false;
   const atajos = conMarco && curso.navegacion?.atajosTeclado !== false;
   const mejor = curso.seguimiento.notaReportada !== 'ultima';
 
@@ -294,32 +310,79 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   const temario = h('nav', { class: 'ap-temario', 'aria-label': tx.temario, hidden: true });
   const escena = h('div', { class: 'ap-escena' });
   const subtitulos = h('p', { class: 'ap-subtitulos', lang: idioma, hidden: true });
-  const anterior = h('button', { type: 'button', class: 'ap-nav', onclick: () => irA(actual - 1, true) }, h('span', { 'aria-hidden': 'true' }, '◀ '), tx.anterior);
-  const siguiente = h('button', { type: 'button', class: 'ap-nav ap-primario', 'aria-describedby': 'ap-motivo', onclick: () => irA(actual + 1, true) }, tx.siguiente, h('span', { 'aria-hidden': 'true' }, ' ▶'));
+  // HU-1103 · Anterior y Siguiente cambian de forma con el patrón; el nombre accesible sigue siendo el mismo.
+  const glifo = (x: string) => h('span', { 'aria-hidden': 'true' }, x);
+  const oculto = (x: string) => h('span', { class: 'ap-oculto' }, x);
+  const [claseAnterior, claseSiguiente, contenidoAnterior, contenidoSiguiente] =
+    patron === 'historias' ? ['ap-zona ap-zona-izq', 'ap-zona ap-zona-der', [glifo('‹'), oculto(tx.anterior)], [glifo('›'), oculto(tx.siguiente)]]
+    : patron === 'inmersivo' ? ['ap-fab ap-fab-izq', 'ap-fab ap-fab-der', [glifo('◀'), oculto(tx.anterior)], [glifo('▶'), oculto(tx.siguiente)]]
+    : patron === 'vertical' ? ['ap-nav', 'ap-nav ap-primario', [glifo('↑ '), tx.volver], [tx.continuar, glifo(' ↓')]]
+    : ['ap-nav', 'ap-nav ap-primario', [glifo('◀ '), tx.anterior], [tx.siguiente, glifo(' ▶')]];
+  const anterior = h('button', { type: 'button', class: claseAnterior, onclick: () => irA(actual - 1, true) }, ...contenidoAnterior);
+  const siguiente = h('button', { type: 'button', class: claseSiguiente, 'aria-describedby': 'ap-motivo', onclick: () => irA(actual + 1, true) }, ...contenidoSiguiente);
   const contador = h('span', { class: 'ap-contador' });
-  const motivo = h('span', { class: 'ap-motivo', id: 'ap-motivo', role: 'status' });
+  const motivo = h('span', { class: patron === 'historias' || patron === 'inmersivo' ? 'ap-motivo ap-motivo-flotante' : 'ap-motivo', id: 'ap-motivo', role: 'status' });
+  const puntos = mostrar.has('puntos') ? h('span', { class: 'ap-puntos' }) : null;
+  // Historias: un segmento por pantalla (las vistas se pintan); el valor accesible es el avance, como la barra.
+  const segmentos = h('div', { class: 'ap-segmentos', role: 'progressbar', 'aria-label': tx.progreso, 'aria-valuemin': 0, 'aria-valuemax': 100 }, pantallas.map(() => h('i')));
+  const tituloPantalla = h('span', { class: 'ap-titulo-curso' });
+  // Mapa de misiones y Menú de temas: «← Mapa» o «← Temas» vuelve a elegir estación.
+  const botonMapa = h('button', { type: 'button', class: 'ap-boton-barra ap-volver-mapa', onclick: () => verMapa(true) }, glifo('← '), patron === 'hub' ? tx.temas : tx.mapa);
+  const conTemario = mostrar.has('temario') && patron !== 'ramificado' && !esMapa;
+  const herramientas = [botonSubtitulos, botonIdioma, botonCreditos];
 
-  const raiz = h('div', { class: conMarco ? 'ap-r' : 'ap-r ap-sin-marco', lang: idioma, style: variables, 'data-patron': 'clasico', 'data-modo': modo },
-    h('header', { class: 'ap-barra' },
-      mostrar.has('temario') ? botonTemario : null,
-      h('span', { class: 'ap-titulo-curso' }, titulo),
-      mostrar.has('progreso') ? [barraAvance, porcentaje] : h('span', { class: 'ap-espacio' }),
-      botonSubtitulos,
-      botonIdioma,
-      botonCreditos),
-    h('div', { class: 'ap-cuerpo' }, temario, escena),
+  const barra = patron === 'inmersivo' ? null
+    : patron === 'historias'
+      ? h('header', { class: 'ap-barra ap-barra-historias' },
+        mostrar.has('progreso') ? segmentos : null,
+        h('div', { class: 'ap-barra-fila' }, conTemario ? botonTemario : null, tituloPantalla, puntos, ...herramientas))
+      : h('header', { class: 'ap-barra' },
+        esMapa ? botonMapa : conTemario ? botonTemario : null,
+        h('span', { class: 'ap-titulo-curso' }, titulo),
+        mostrar.has('progreso') ? [barraAvance, porcentaje] : h('span', { class: 'ap-espacio' }),
+        puntos,
+        ...herramientas);
+  const flotantes = patron === 'historias' ? [anterior, siguiente, motivo]
+    : patron === 'inmersivo' ? [h('div', { class: 'ap-hud' }, conTemario ? botonTemario : null, mostrar.has('progreso') ? porcentaje : null, puntos, ...herramientas), anterior, siguiente, motivo]
+    : [];
+  const pie = flotantes.length ? null : h('footer', { class: patron === 'vertical' ? 'ap-pie ap-pie-vertical' : 'ap-pie' }, anterior, h('span', { class: 'ap-centro' }, mostrar.has('contador') ? contador : null, motivo), siguiente);
+  const cuerpo = h('div', { class: 'ap-cuerpo' }, temario, escena, ...flotantes);
+  const raiz = h('div', { class: conMarco ? 'ap-r' : 'ap-r ap-sin-marco', lang: idioma, style: variables, 'data-patron': patron, 'data-modo': modo },
+    barra,
+    cuerpo,
     barraNarracion,
     audio,
     subtitulos,
-    h('footer', { class: 'ap-pie' }, anterior, h('span', { class: 'ap-centro' }, mostrar.has('contador') ? contador : null, motivo), siguiente));
+    pie);
 
   if (atajos) {
     raiz.addEventListener('keydown', (e) => {
       const destino = e.target as HTMLElement;
-      if (pendiente || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar, .ap-creditos') || e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.key === 'ArrowRight') irA(actual + 1, true);
-      else if (e.key === 'ArrowLeft') irA(actual - 1, true);
+      if (pendiente || enMapa || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar, .ap-creditos') || e.altKey || e.ctrlKey || e.metaKey) return;
+      // Vertical también con ↓ y ↑ (sin quitarle al navegador el desplazamiento dentro de la pantalla: solo en los botones).
+      const vertical = patron === 'vertical' && destino.closest('.ap-pie');
+      if (e.key === 'ArrowRight' || (vertical && e.key === 'ArrowDown')) { e.preventDefault(); irA(actual + 1, true); }
+      else if (e.key === 'ArrowLeft' || (vertical && e.key === 'ArrowUp')) { e.preventDefault(); irA(actual - 1, true); }
     });
+  }
+  // HU-1103 · Historias: deslizar el dedo (o el puntero) a la izquierda avanza y a la derecha vuelve; las zonas ‹ › y las
+  // flechas hacen lo mismo. Dentro de una actividad no se desliza, para no pelear con sus controles.
+  if (patron === 'historias' && conMarco) {
+    let inicio: { x: number; y: number } | null = null;
+    cuerpo.addEventListener('pointerdown', (ev) => {
+      const e = ev as PointerEvent;
+      inicio = (e.target as HTMLElement).closest('.ap-actividad, .ap-temario') ? null : { x: e.clientX, y: e.clientY };
+    });
+    cuerpo.addEventListener('pointerup', (ev) => {
+      const e = ev as PointerEvent;
+      if (!inicio || pendiente) return;
+      const dx = e.clientX - inicio.x;
+      const dy = e.clientY - inicio.y;
+      inicio = null;
+      if (Math.abs(dx) < UMBRAL_DESLIZAR || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      irA(actual + (dx < 0 ? 1 : -1), true);
+    });
+    cuerpo.addEventListener('pointercancel', () => { inicio = null; });
   }
   vaciar(sombra, h('style', {}, ESTILOS), raiz);
   const dejarDeParpadear = parpadear(personaje);
@@ -460,7 +523,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
       ...seguimiento(pantallas, vistas, resultados, curso.seguimiento),
       pantallaId: pantallas[actual]?.pantalla.id ?? '', indice: actual, total: pantallas.length,
       puedeSiguiente: !ultima && m === null, motivo: ultima ? null : textoMotivo(m),
-      patron: curso.navegacion?.patron ?? 'clasico', patronAplicado: 'clasico', modo,
+      patron: curso.navegacion?.patron ?? 'clasico', patronAplicado: patron, enMapa, modo,
       resultados: Object.fromEntries(resultados),
       vistas: pantallas.filter((x) => vistas.has(x.pantalla.id)).map((x) => x.pantalla.id),
     };
@@ -472,8 +535,18 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     barraAvance.setAttribute('aria-valuenow', String(e.progreso));
     (barraAvance.firstChild as HTMLElement).style.width = `${e.progreso}%`;
     porcentaje.textContent = `${e.progreso} %`;
+    segmentos.setAttribute('aria-valuenow', String(e.progreso));
+    pantallas.forEach((x, i) => segmentos.children[i]?.classList.toggle('ap-visto', vistas.has(x.pantalla.id)));
+    tituloPantalla.textContent = t(pantallas[actual]?.pantalla.titulo, idioma);
+    if (puntos) {
+      vaciar(puntos, glifo('★ '), tx.puntos(e.puntos));
+    }
+    botonMapa.hidden = enMapa;
+    if (pie) pie.hidden = enMapa;
+    for (const x of flotantes) x.hidden = enMapa && x !== motivo;
+    if (enMapa) dibujarMapa();
     contador.textContent = tx.pantalla(actual + 1, pantallas.length);
-    motivo.textContent = e.motivo ?? '';
+    motivo.textContent = enMapa ? '' : e.motivo ?? '';
     anterior.disabled = actual === 0;
     siguiente.disabled = !e.puedeSiguiente;
     siguiente.title = e.motivo ?? '';
@@ -481,7 +554,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     botonNarracion.setAttribute('aria-pressed', String(sonando));
     botonNarracion.textContent = sonando ? tx.pausar : tx.escuchar;
     botonSubtitulos.setAttribute('aria-pressed', String(conSubtitulos));
-    subtitulos.hidden = !conSubtitulos;
+    subtitulos.hidden = !conSubtitulos || enMapa;
     subtitulos.textContent = textoSubtitulos();
     botonTemario.setAttribute('aria-expanded', String(temarioAbierto));
     temario.hidden = !temarioAbierto;
@@ -506,11 +579,43 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     vaciar(temario, h('div', { class: 'ap-temario-cabeza' }, h('b', {}, tx.temario), h('button', { type: 'button', class: 'ap-boton', onclick: () => { temarioAbierto = false; refrescar(); botonTemario.focus(); } }, tx.cerrar)), ...grupos);
   }
 
-  function irA(destino: number, enfocar: boolean): boolean {
-    if (!vivo || destino === actual || motivoBloqueo(pantallas, avance(), modo, destino) !== null) {
+  /** HU-1103 · Mapa de misiones o Menú de temas: las estaciones con su avance; se entra a las que deja la regla. */
+  function dibujarMapa() {
+    const a = avance();
+    const hub = patron === 'hub';
+    const titulo = h('h2', { class: 'ap-mapa-titulo', tabindex: '-1' }, hub ? tx.temasTitulo : tx.mapaTitulo);
+    const lista = h('ol', { class: hub ? 'ap-temas' : 'ap-estaciones' }, tramos.map((e, i) => {
+      const x = estadoEstacion(e, pantallas, a, modo, vistas);
+      const nombre = t(e.titulo, idioma);
+      // El nombre accesible sale del texto visible (WCAG 2.5.3) con el número y el estado como texto oculto:
+      // «Misión 1: Bloqueo y etiquetado, 0 de 11 pantallas, bloqueada».
+      const prefijo = hub ? tx.tema(i + 1, '') : tx.mision(i + 1, '');
+      const estado = x.completa ? `, ${tx.hecha}` : x.abierta ? '' : `, ${tx.bloqueada}`;
+      return h('li', {}, h('button', {
+        type: 'button', class: `ap-estacion${x.completa ? ' ap-completa' : ''}`, disabled: !x.abierta,
+        onclick: () => irA(entradaEstacion(e, pantallas, avance(), modo, vistas), true, true),
+      }, h('span', { class: 'ap-estacion-num', 'aria-hidden': 'true' }, x.completa ? '✓' : x.abierta ? String(i + 1) : '🔒'),
+      h('span', { class: 'ap-estacion-texto' }, h('b', {}, oculto(prefijo), nombre), oculto(', '), h('small', {}, tx.hechasDe(x.hechas, x.total)), estado ? oculto(estado) : null)));
+    }));
+    vaciar(escena, h('section', { class: 'ap-mapa', 'aria-labelledby': 'ap-mapa-titulo' }, Object.assign(titulo, { id: 'ap-mapa-titulo' }), lista));
+  }
+
+  function verMapa(enfocar: boolean) {
+    if (!esMapa) return;
+    enMapa = true;
+    audio.pause();
+    callar();
+    barraNarracion.hidden = true;
+    refrescar();
+    if (enfocar) escena.querySelector<HTMLElement>('.ap-mapa-titulo')?.focus();
+  }
+
+  function irA(destino: number, enfocar: boolean, desdeMapa = false): boolean {
+    if (!vivo || (destino === actual && !(enMapa && desdeMapa)) || motivoBloqueo(pantallas, avance(), modo, destino) !== null) {
       if (destino === actual) refrescar();
       return false;
     }
+    enMapa = false;
     actual = destino;
     maxima = Math.max(maxima, destino);
     vistas.add(pantallas[destino]!.pantalla.id);
@@ -530,18 +635,23 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     dibujadas.clear();
     escuchadas.clear();
     temarioAbierto = false;
+    // HU-1103 · Mapa de misiones y Menú de temas empiezan eligiendo estación (en revisión se va directo a la pantalla);
+    // la primera pantalla cuenta como vista solo al entrar a ella.
+    enMapa = esMapa && !(revision && inicio > 0);
     if (pantallas[inicio]) {
-      vistas.add(pantallas[inicio].pantalla.id);
+      if (!enMapa) vistas.add(pantallas[inicio].pantalla.id);
       vaciar(escena, pantallaDe(inicio));
     }
     cargarNarracion();
     empezarReloj();
+    if (enMapa) barraNarracion.hidden = true;
     refrescar();
   };
   const indiceDe = (d: string | number) => (typeof d === 'number' ? d : pantallas.findIndex((x) => x.pantalla.id === d));
 
   // ---------- Reanudación (HU-1105) ----------
   const mostrarActual = () => {
+    enMapa = false;
     if (pantallas[actual]) vaciar(escena, pantallaDe(actual));
     cargarNarracion();
     empezarReloj();

@@ -76,7 +76,8 @@ describe('botón de idioma (HU-0804)', () => {
     expect(despues.resultados).toEqual(RESULTADOS);
     expect(tituloPantalla(c)).toBe(`[EN] ${tituloEs}`);
     expect(c.shadowRoot!.querySelector('.ap-r')?.getAttribute('lang')).toBe('en');
-    expect(c.shadowRoot!.querySelector('.ap-nav.ap-primario')?.textContent).toContain('Next');
+    // LOTO usa Historias (HU-1103): Siguiente es la zona de la derecha, con su nombre en el idioma nuevo.
+    expect(c.shadowRoot!.querySelector('button[aria-describedby="ap-motivo"]')?.textContent).toContain('Next');
     expect(avisos).toEqual([['en', 'p08', 100]]);
     // El foco vuelve al botón, que ahora ofrece español.
     expect(c.shadowRoot!.activeElement).toBe(botonIdioma(c));

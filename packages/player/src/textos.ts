@@ -67,6 +67,16 @@ const TEXTOS = {
     elige: 'Elige una opción',
     reanudarPregunta: '¿Continuar donde lo dejaste?',
     empezarDeNuevo: 'Empezar de nuevo',
+    // HU-1103 · Patrones de navegación.
+    volver: 'Volver',
+    mapa: 'Mapa',
+    temas: 'Temas',
+    mapaTitulo: 'Tu ruta de misiones',
+    temasTitulo: 'Elige un tema',
+    mision: (i: number, nombre: string) => `Misión ${i}: ${nombre}`,
+    tema: (i: number, nombre: string) => `Tema ${i}: ${nombre}`,
+    hechasDe: (a: number, n: number) => `${a} de ${n} pantallas`,
+    puntos: (n: number) => `${n} puntos`,
   },
   en: {
     anterior: 'Previous',
@@ -130,6 +140,15 @@ const TEXTOS = {
     elige: 'Choose an option',
     reanudarPregunta: 'Continue where you left off?',
     empezarDeNuevo: 'Start over',
+    volver: 'Back',
+    mapa: 'Map',
+    temas: 'Topics',
+    mapaTitulo: 'Your mission route',
+    temasTitulo: 'Choose a topic',
+    mision: (i: number, nombre: string) => `Mission ${i}: ${nombre}`,
+    tema: (i: number, nombre: string) => `Topic ${i}: ${nombre}`,
+    hechasDe: (a: number, n: number) => `${a} of ${n} screens`,
+    puntos: (n: number) => `${n} points`,
   },
 } satisfies Record<Idioma, unknown>;
 

@@ -15,6 +15,7 @@ import { VistaPrevia } from './vistas/VistaPrevia';
 import { EntregaVista } from './vistas/EntregaVista';
 import { IdiomasVista } from './vistas/IdiomasVista';
 import { AlineacionVista } from './vistas/AlineacionVista';
+import { NavegacionVista } from './vistas/NavegacionVista';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -70,13 +71,15 @@ export function App() {
       alSalir={salir}
     >
       {vista?.sub === 'vista-previa' ? (
-        <VistaPrevia key={vista.id} proyectoId={vista.id!} alCargar={alCargar} />
+        <VistaPrevia key={vista.id + busqueda} proyectoId={vista.id!} alCargar={alCargar} prueba={new URLSearchParams(busqueda)} />
       ) : vista?.sub === 'entrega' ? (
         <EntregaVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'idiomas' ? (
         <IdiomasVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'alineacion' ? (
         <AlineacionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
+      ) : vista?.sub === 'navegacion' ? (
+        <NavegacionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'revision' ? (
         <RevisionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} pantallaId={new URLSearchParams(busqueda).get('pantalla')} />
       ) : vista?.sub === 'editor' ? (
