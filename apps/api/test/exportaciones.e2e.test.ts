@@ -2,6 +2,7 @@
 // `export`, 422 si el curso no cumple el esquema o el formato no está disponible, 403 al revisor del cliente, historial
 // y descarga firmada solo cuando terminó. Se salta sin DATABASE_URL o sin S3, salvo en CI.
 // HU-1201 · CP-090 · Validar antes de exportar: un paquete de 300 MB advierte con alternativas y se exporta igual (202).
+// HU-1203 · CP-093 · HTML se exporta (202) y se valida sin límite de subida; SCORM 2004 sigue en 422.
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -87,10 +88,18 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     expect(otra.body.id).not.toBe(r.body.id);
   });
 
+  it('HU-1203 · CP-093 · exportar HTML responde 202 en la cola export, con perfil generico y sin modo diagnóstico', async () => {
+    const r = await como('productor').post(`/cursos/${cursoId}/exportaciones`, { formato: 'HTML', perfilLms: 'moodle', incluirDiagnostico: true });
+    expect({ status: r.status, body: r.body }).toMatchObject({ status: 202, body: { cursoId, formato: 'HTML', perfilLms: 'generico', versionCurso: 7, estado: 'EN_COLA' } });
+    expect((await crearCola('export').getJob(r.body.id))?.data).toEqual({ trabajoId: r.body.id, organizacionId: orgId, tarea: TAREA_EXPORTAR });
+    expect(await prisma.exportacion.findUniqueOrThrow({ where: { id: r.body.id } })).toMatchObject({ formato: 'HTML', perfilLms: 'generico', incluirDiagnostico: false });
+    expect((await como('grafico').post(`/cursos/${cursoId}/exportaciones`, { formato: 'HTML' })).status).toBe(403);
+  });
+
   it('422 si el formato no está disponible, si se pide otro modo de idioma o si el curso no cumple el esquema', async () => {
-    const html = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'HTML' });
-    expect(html.status).toBe(422);
-    expect(html.body.codigo).toBe('FORMATO_NO_DISPONIBLE');
+    const scorm2004 = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'SCORM2004' });
+    expect(scorm2004.status).toBe(422);
+    expect(scorm2004.body.codigo).toBe('FORMATO_NO_DISPONIBLE');
     expect((await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'ZIP' })).status).toBe(422);
     const bilingue = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'SCORM12', modoIdioma: 'mismo-paquete' });
     expect(bilingue.body.codigo).toBe('IDIOMA_NO_DISPONIBLE');
@@ -166,6 +175,13 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     await prisma.fichaCompatibilidad.create({ data: { clienteId, lmsNombre: 'Moodle 4.5', limiteSubidaMb: 512 } });
     const conFicha = await como('grafico').post(`/cursos/${curso.id}/validar`, { formato: 'SCORM12' });
     expect(conFicha.body).toMatchObject({ limiteMb: 512, origenLimite: 'ficha', superaLimite: false, alternativas: [] });
+
+    // HU-1203 · En HTML no hay LMS: ni límite de subida (aunque haya ficha) ni suspend_data; el peso queda como dato.
+    const html = await como('instruccional').post(`/cursos/${curso.id}/validar`, { formato: 'HTML' });
+    expect(html.status).toBe(200);
+    expect(html.body).toMatchObject({ formato: 'HTML', errores: [], limiteMb: null, origenLimite: null, superaLimite: false, alternativas: [], suspendDataCaracteres: null, pantallasSinAprobar: 30 });
+    expect(html.body.pesoEstimadoMb).toBeGreaterThanOrEqual(300);
+    expect(html.body.advertencias.some((a: string) => a.includes('límite de subida'))).toBe(false);
     await prisma.fichaCompatibilidad.deleteMany({ where: { clienteId } });
   });
 
@@ -178,7 +194,7 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     const r = await como('instruccional').post(`/cursos/${malo.id}/validar`, { formato: 'SCORM12' });
     expect(r.status).toBe(200);
     expect(r.body.errores.length).toBeGreaterThan(0);
-    expect((await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'HTML' })).body.codigo).toBe('FORMATO_NO_DISPONIBLE');
+    expect((await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM2004' })).body.codigo).toBe('FORMATO_NO_DISPONIBLE');
     expect((await como('revisor').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM12' })).status).toBe(403);
     expect((await como('instruccional').post(`/cursos/${randomUUID()}/validar`, { formato: 'SCORM12' })).status).toBe(404);
   });

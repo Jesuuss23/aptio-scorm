@@ -3,8 +3,10 @@
 // (`advertencias`). Nunca bloquea por tamaño (RN-12-2): si el paquete pasa el límite, advierte con las alternativas de
 // docs/08-entregas-y-lms.md. Las pantallas sin aprobar son advertencia (RN-12-3); la confirmación la pide la web.
 // El peso es una estimación: los recursos (MP3, WebP, MP4) casi no se comprimen en el ZIP, así que se suman tal cual.
+// HU-1203 · Para HTML no hay LMS: no hay límite de subida ni suspend_data; el peso queda solo como dato.
 import { aplanar, codificarSuspend, huellaCurso, LIMITE_SUSPEND, type CursoReproductor, type ResultadoActividad } from '@aptio/player';
 import { erroresCurso } from '@aptio/schema';
+import { LEEME_HTML } from './html.ts';
 import { indexHtml, INICIAR_JS } from './scorm12.ts';
 import { manifiestoScorm12 } from './manifiesto.ts';
 
@@ -21,20 +23,24 @@ export interface RecursoPesado {
   bytes: number;
 }
 
+export type FormatoValidable = 'SCORM12' | 'HTML';
+
 export interface ValidacionScorm12 {
+  formato: FormatoValidable;
   errores: string[];
   advertencias: string[];
   /** Peso estimado del ZIP. */
   pesoEstimadoBytes: number;
   pesoEstimadoMb: number;
-  limiteMb: number;
+  /** Límite de subida del destino; null en HTML (no hay LMS). */
+  limiteMb: number | null;
   superaLimite: boolean;
   /** Las 5 alternativas de docs/08 cuando se pasa el límite; vacío si no. */
   alternativas: string[];
   /** Los 5 recursos que más pesan, del más pesado al más liviano. */
   recursosPesados: RecursoPesado[];
-  /** Peor caso de `cmi.suspend_data` v2: todo visto y todas las actividades con nota e intentos. */
-  suspendDataCaracteres: number;
+  /** Peor caso de `cmi.suspend_data` v2: todo visto y todas las actividades con nota e intentos. null en HTML. */
+  suspendDataCaracteres: number | null;
   pantallasTotal: number;
   pantallasSinAprobar: number;
   /** Ids de los recursos del paquete que no tienen archivo. */
@@ -62,10 +68,7 @@ const redondear = (mb: number) => Math.round(mb * 10) / 10;
 const mbTexto = (mb: number) => redondear(mb).toLocaleString('es-PE', { maximumFractionDigits: 1 });
 const esTexto = (r: RecursoCurso, nombre: string) => r.tipo === 'svg' || r.tipo === 'subtitulos' || /\.(svg|vtt)$/i.test(nombre);
 
-/**
- * Valida el curso para SCORM 1.2. `limiteMb` es el límite de subida del destino (la ficha del cliente o el valor de
- * referencia); `origenLimite` solo cambia el texto de la advertencia.
- */
+/** Valida el curso para SCORM 1.2 (atajo de `validarExportacion('SCORM12', …)`). */
 export function validarScorm12(
   curso: unknown,
   pesosRecursos: readonly PesoRecurso[],
@@ -73,11 +76,27 @@ export function validarScorm12(
   limiteMb: number,
   opciones: { origenLimite?: 'ficha' | 'referencia'; idioma?: string } = {},
 ): ValidacionScorm12 {
+  return validarExportacion('SCORM12', curso, pesosRecursos, pesoReproductor, limiteMb, opciones);
+}
+
+/**
+ * Valida el curso para el formato pedido. En SCORM 1.2, `limiteMb` es el límite de subida del destino (la ficha del
+ * cliente o el valor de referencia) y `origenLimite` solo cambia el texto de la advertencia. En HTML se ignora el límite.
+ */
+export function validarExportacion(
+  formato: FormatoValidable,
+  curso: unknown,
+  pesosRecursos: readonly PesoRecurso[],
+  pesoReproductor: number,
+  limiteMb: number | null,
+  opciones: { origenLimite?: 'ficha' | 'referencia'; idioma?: string } = {},
+): ValidacionScorm12 {
+  const html = formato === 'HTML';
   const errores = erroresCurso(curso);
   const advertencias: string[] = [];
   const resultado: ValidacionScorm12 = {
-    errores, advertencias, pesoEstimadoBytes: 0, pesoEstimadoMb: 0, limiteMb, superaLimite: false, alternativas: [],
-    recursosPesados: [], suspendDataCaracteres: 0, pantallasTotal: 0, pantallasSinAprobar: 0, recursosFaltantes: [],
+    formato, errores, advertencias, pesoEstimadoBytes: 0, pesoEstimadoMb: 0, limiteMb: html ? null : limiteMb, superaLimite: false, alternativas: [],
+    recursosPesados: [], suspendDataCaracteres: html ? null : 0, pantallasTotal: 0, pantallasSinAprobar: 0, recursosFaltantes: [],
   };
   // Con errores de esquema se calcula lo que se pueda; si el documento no tiene ni la forma básica, solo los errores.
   let c: CursoReproductor;
@@ -111,26 +130,31 @@ export function validarScorm12(
   }
   const datosJs = 40 + Buffer.byteLength(JSON.stringify(curso)) + bytesEnDatos;
   const fijos = Buffer.byteLength(indexHtml(String(c.id ?? ''), idioma)) + INICIAR_JS.length
-    + Buffer.byteLength(manifiestoScorm12({ cursoId: String(c.id ?? 'curso'), titulo: '', masteryscore: null, archivos: conArchivo.map((r) => `recursos/${r.id}.xxxx`) }));
+    + (html
+      ? Buffer.byteLength(LEEME_HTML(String(c.id ?? '')))
+      : Buffer.byteLength(manifiestoScorm12({ cursoId: String(c.id ?? 'curso'), titulo: '', masteryscore: null, archivos: conArchivo.map((r) => `recursos/${r.id}.xxxx`) })));
   resultado.pesoEstimadoBytes = bytesRecursos + datosJs + pesoReproductor + fijos;
   resultado.pesoEstimadoMb = redondear(resultado.pesoEstimadoBytes / MB);
   resultado.recursosPesados = conArchivo.sort((a, b) => b.bytes - a.bytes).slice(0, 5);
-  resultado.superaLimite = resultado.pesoEstimadoBytes > limiteMb * MB;
+  resultado.superaLimite = !html && limiteMb !== null && resultado.pesoEstimadoBytes > limiteMb * MB;
   if (resultado.superaLimite) {
     resultado.alternativas = [...ALTERNATIVAS_PESO];
     const origen = opciones.origenLimite === 'ficha' ? 'según la ficha de compatibilidad del cliente' : 'valor de referencia, el LMS del cliente puede aceptar más';
     advertencias.push(`El paquete pesaría unos ${mbTexto(resultado.pesoEstimadoBytes / MB)} MB y el límite de subida del destino es ${limiteMb} MB (${origen}). Puedes exportar igual; revisa las alternativas.`);
   }
 
-  // ---------- suspend_data en el peor caso ----------
-  const orden = pantallas.map((x) => x.pantalla.id);
-  const intentos = c.seguimiento?.intentosMaximos ?? INTENTOS_PEOR_CASO;
-  const resultados: Record<string, ResultadoActividad> = Object.fromEntries(
-    pantallas.filter((x) => x.pantalla.bloques?.some((b) => b.tipo === 'interaccion')).map((x) => [x.pantalla.id, { completada: true, puntaje: 100, intentos }]),
-  );
-  resultado.suspendDataCaracteres = codificarSuspend(orden, { idioma, vistas: orden, resultados }, huellaCurso(String(c.id ?? ''), orden)).length;
-  if (resultado.suspendDataCaracteres > LIMITE_SUSPEND) {
-    advertencias.push(`El avance completo ocuparía ${resultado.suspendDataCaracteres} caracteres de suspend_data y SCORM 1.2 admite ${LIMITE_SUSPEND}: el LMS guardará la pantalla, la nota y el estado, pero no el avance detallado para reanudar.`);
+  // ---------- suspend_data en el peor caso (solo SCORM: en HTML no hay LMS que lo guarde) ----------
+  if (!html) {
+    const orden = pantallas.map((x) => x.pantalla.id);
+    const intentos = c.seguimiento?.intentosMaximos ?? INTENTOS_PEOR_CASO;
+    const resultados: Record<string, ResultadoActividad> = Object.fromEntries(
+      pantallas.filter((x) => x.pantalla.bloques?.some((b) => b.tipo === 'interaccion')).map((x) => [x.pantalla.id, { completada: true, puntaje: 100, intentos }]),
+    );
+    const caracteres = codificarSuspend(orden, { idioma, vistas: orden, resultados }, huellaCurso(String(c.id ?? ''), orden)).length;
+    resultado.suspendDataCaracteres = caracteres;
+    if (caracteres > LIMITE_SUSPEND) {
+      advertencias.push(`El avance completo ocuparía ${caracteres} caracteres de suspend_data y SCORM 1.2 admite ${LIMITE_SUSPEND}: el LMS guardará la pantalla, la nota y el estado, pero no el avance detallado para reanudar.`);
+    }
   }
 
   // ---------- Recursos sin archivo ----------

@@ -71,7 +71,18 @@ export function indexHtml(titulo: string, idioma: string): string {
 /** Arranque separado del HTML (sin script en línea) por si el LMS aplica una política de contenido estricta. */
 export const INICIAR_JS = `window.AptioPaquete = window.AptioReproductor.iniciarPaquete(document.getElementById('curso'), window.APTIO_DATOS);\n`;
 
-export async function construirScorm12(entrada: EntradaScorm12): Promise<PaqueteScorm12> {
+/** Lo que comparten SCORM 1.2 y HTML (HU-1203): los mismos archivos, con las mismas reglas de qué recursos entran. */
+export interface ContenidoPaquete {
+  contenido: Map<string, Uint8Array | string>;
+  /** Las rutas de `contenido`, con index.html primero y el resto en orden. */
+  lista: string[];
+  faltantes: string[];
+  idioma: Idioma;
+  titulo: string;
+}
+
+/** Arma index.html, el reproductor, datos.js, iniciar.js y `recursos/`. `extra` se agrega a `datos.js`. */
+export function armarContenido(entrada: EntradaScorm12, extra: Record<string, unknown> = {}): ContenidoPaquete {
   const { curso } = entrada;
   const idioma: Idioma = entrada.idioma ?? curso.idiomas[0] ?? 'es';
   const titulo = textoDe(curso.metadatos.titulo, idioma) || curso.id;
@@ -96,20 +107,29 @@ export async function construirScorm12(entrada: EntradaScorm12): Promise<Paquete
     if (esVtt(r, archivo.nombre)) subtitulos[r.id] = comoTexto(archivo.datos);
   }
 
-  const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos, ...(entrada.incluirDiagnostico === false ? { diagnostico: false } : {}) };
+  const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos, ...(entrada.incluirDiagnostico === false ? { diagnostico: false } : {}), ...extra };
   contenido.set('index.html', indexHtml(titulo, idioma));
   contenido.set('aptio-reproductor.js', entrada.reproductor);
   contenido.set('datos.js', `window.APTIO_DATOS = ${JSON.stringify(datos)};\n`);
   contenido.set('iniciar.js', INICIAR_JS);
 
   const lista = [...contenido.keys()].sort((a, b) => (a === 'index.html' ? -1 : b === 'index.html' ? 1 : a < b ? -1 : a > b ? 1 : 0));
-  const sumativa = curso.seguimiento.criterioCompletado === 'sumativa';
-  const manifiesto = manifiestoScorm12({ cursoId: curso.id, titulo, masteryscore: sumativa ? curso.seguimiento.notaMinima : null, archivos: lista });
+  return { contenido, lista, faltantes, idioma, titulo };
+}
 
+/** ZIP determinista: orden dado, fecha fija y compresión fija. */
+export async function comprimir(archivos: [string, Uint8Array | string][]): Promise<Uint8Array> {
   const zip = new JSZip();
   const opciones = { date: FECHA_ZIP, createFolders: false } as const;
-  zip.file('imsmanifest.xml', manifiesto, opciones);
-  for (const ruta of lista) zip.file(ruta, contenido.get(ruta)!, opciones);
-  const bytes = await zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 }, platform: 'UNIX' });
-  return { zip: bytes, archivos: ['imsmanifest.xml', ...lista], faltantes, idioma };
+  for (const [ruta, datos] of archivos) zip.file(ruta, datos, opciones);
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', compressionOptions: { level: 6 }, platform: 'UNIX' });
+}
+
+export async function construirScorm12(entrada: EntradaScorm12): Promise<PaqueteScorm12> {
+  const { curso } = entrada;
+  const { contenido, lista, faltantes, idioma, titulo } = armarContenido(entrada);
+  const sumativa = curso.seguimiento.criterioCompletado === 'sumativa';
+  const manifiesto = manifiestoScorm12({ cursoId: curso.id, titulo, masteryscore: sumativa ? curso.seguimiento.notaMinima : null, archivos: lista });
+  const zip = await comprimir([['imsmanifest.xml', manifiesto], ...lista.map((r) => [r, contenido.get(r)!] as [string, Uint8Array | string])]);
+  return { zip, archivos: ['imsmanifest.xml', ...lista], faltantes, idioma };
 }

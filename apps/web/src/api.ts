@@ -355,17 +355,21 @@ export interface Exportacion {
 }
 export type PerfilExportacion = 'generico' | 'moodle' | 'blackboard' | 'chamilo' | 'canvas';
 /** HU-1201 · Validar antes de exportar: solo `errores` impiden exportar; el peso nunca bloquea (RN-12-2). */
+/** HU-1203 · Formatos que se exportan hoy: SCORM 1.2 y HTML autocontenido. */
+export type FormatoExportacion = 'SCORM12' | 'HTML';
 export interface Validacion {
+  formato: FormatoExportacion;
   errores: string[];
   advertencias: string[];
   pesoEstimadoMb: number;
   pesoEstimadoBytes: number;
-  limiteMb: number;
-  origenLimite: 'ficha' | 'referencia';
+  /** null en HTML: no hay LMS. */
+  limiteMb: number | null;
+  origenLimite: 'ficha' | 'referencia' | null;
   superaLimite: boolean;
   alternativas: string[];
   recursosPesados: { id: string; nombre: string; bytes: number }[];
-  suspendDataCaracteres: number;
+  suspendDataCaracteres: number | null;
   pantallasTotal: number;
   pantallasSinAprobar: number;
   recursosFaltantes: string[];
@@ -411,8 +415,8 @@ export const api = {
   trabajo: (id: string) => pedir<TrabajoEstado>(`/trabajos/${id}`),
   aprobarSinObservaciones: (cursoId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/aprobar`, json({ soloSinObservaciones: true })),
   curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
-  exportar: (cursoId: string, datos: { formato: 'SCORM12'; perfilLms: PerfilExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
-  validar: (cursoId: string, datos: { formato: 'SCORM12'; perfilLms: PerfilExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
+  exportar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
+  validar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
   exportaciones: (cursoId: string) => pedir<Exportacion[]>(`/cursos/${cursoId}/exportaciones`),
   exportacion: (id: string) => pedir<Exportacion>(`/exportaciones/${id}`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),

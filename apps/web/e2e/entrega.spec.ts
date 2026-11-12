@@ -3,6 +3,7 @@
 // La API se simula; el ZIP es el paquete real que arma @aptio/exporters.
 // HU-1201 · CP-090 · Verificación automática: un paquete de 300 MB advierte con alternativas y se exporta igual; un error
 // de esquema deshabilita Exportar; con pantallas sin aprobar se confirma antes (RN-12-3); cambiar el LMS vuelve a validar.
+// HU-1203 · Formato HTML autocontenido: sin LMS destino ni límite de subida, con la misma confirmación y el formato en el historial.
 import { codigoReproductor, construirScorm12 } from '@aptio/exporters';
 import { expect, type Page, test } from '@playwright/test';
 import JSZip from 'jszip';
@@ -17,10 +18,12 @@ const DESCARGA = 'https://s3-descarga.prueba/paquete.zip?X-Amz-Expires=900';
 
 type Validacion = Record<string, unknown> & { errores: string[]; advertencias: string[] };
 const VALIDACION: Validacion = {
-  errores: [], advertencias: ['18 de 30 pantallas sin aprobar: revísalas antes de entregar al cliente.'], pesoEstimadoMb: 14.8, pesoEstimadoBytes: 15_518_924,
+  formato: 'SCORM12', errores: [], advertencias: ['18 de 30 pantallas sin aprobar: revísalas antes de entregar al cliente.'], pesoEstimadoMb: 14.8, pesoEstimadoBytes: 15_518_924,
   limiteMb: 100, origenLimite: 'referencia', superaLimite: false, alternativas: [], recursosPesados: [], suspendDataCaracteres: 162,
   pantallasTotal: 30, pantallasSinAprobar: 18, recursosFaltantes: [],
 };
+/** Lo que responde la API para HTML: sin límite de subida ni suspend_data (HU-1203). */
+const VALIDACION_HTML: Validacion = { ...VALIDACION, formato: 'HTML', limiteMb: null, origenLimite: null, suspendDataCaracteres: null, pesoEstimadoMb: 14.7 };
 const ALTERNATIVAS = [
   'Exportar igual, con la recomendación de que el administrador del LMS amplíe el límite de subida.',
   'Comprimir más el video y las imágenes.',
@@ -45,8 +48,9 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
   const pedidos: Record<string, unknown>[] = [];
   const validaciones: Record<string, unknown>[] = [];
   await page.route(`**/api/v1/cursos/${CURSO}/validar`, (r) => {
-    validaciones.push(r.request().postDataJSON() as Record<string, unknown>);
-    return r.fulfill({ json: opciones.validacion ?? VALIDACION });
+    const pedido = r.request().postDataJSON() as Record<string, unknown>;
+    validaciones.push(pedido);
+    return r.fulfill({ json: pedido.formato === 'HTML' ? VALIDACION_HTML : (opciones.validacion ?? VALIDACION) });
   });
   const consultas = new Map<string, number>();
   const avanzar = (e: Exp) => {
@@ -62,7 +66,7 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
   await page.route(`**/api/v1/cursos/${CURSO}/exportaciones`, async (r) => {
     if (r.request().method() === 'POST') {
       pedidos.push(r.request().postDataJSON() as Record<string, unknown>);
-      const nueva: Exp = { ...lista[0]!, id: `00000000-0000-4000-8000-00000000e${String(100 + pedidos.length)}`, perfilLms: String(pedidos.at(-1)!.perfilLms), versionCurso: 3, estado: 'EN_COLA', bytes: null, informe: null, nombreArchivo: null, creadoEn: new Date().toISOString() };
+      const nueva: Exp = { ...lista[0]!, id: `00000000-0000-4000-8000-00000000e${String(100 + pedidos.length)}`, formato: String(pedidos.at(-1)!.formato), perfilLms: String(pedidos.at(-1)!.perfilLms), versionCurso: 3, estado: 'EN_COLA', bytes: null, informe: null, nombreArchivo: null, creadoEn: new Date().toISOString() };
       lista.unshift(nueva);
       return r.fulfill({ status: 202, json: nueva });
     }
@@ -211,4 +215,35 @@ test('con todas las pantallas aprobadas se exporta sin confirmar', async ({ page
   await expect(page.getByRole('status').filter({ hasText: 'versión 3 del curso' })).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(pedidos).toHaveLength(1);
+});
+
+test('HU-1203 · con HTML autocontenido no hay LMS destino ni límite de subida, se confirma igual y el historial muestra el formato', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const { pedidos, validaciones } = await simularExportaciones(page, zip);
+  await page.goto(URL_ENTREGA);
+  const formato = page.getByRole('group', { name: 'Formato' });
+  await expect(formato.getByRole('button', { name: 'SCORM 1.2 · un solo SCO' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('El peso cabe en el límite de subida del destino (100 MB)')).toBeVisible();
+
+  await formato.getByRole('button', { name: 'HTML autocontenido · para presentar sin LMS' }).click();
+  await expect(formato.getByRole('button', { name: 'HTML autocontenido · para presentar sin LMS' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('group', { name: 'LMS destino' })).toHaveCount(0);
+  await expect(page.getByText('No guarda el avance ni la nota: para el seguimiento, exporta SCORM 1.2.', { exact: false })).toBeVisible();
+  const verificacion = page.getByRole('region', { name: 'Verificación automática' });
+  await expect(verificacion.getByText('sin límite de subida: no hay LMS')).toBeVisible();
+  await expect(verificacion.getByText('Carpeta HTML autocontenida: abre sin internet y sin LMS', { exact: false })).toBeVisible();
+  await expect(verificacion.getByText('límite de subida del destino')).toHaveCount(0);
+  await expect(verificacion.getByText('suspend_data')).toHaveCount(0);
+  expect(validaciones.at(-1)).toEqual({ formato: 'HTML', perfilLms: 'generico' });
+
+  // Con pantallas sin aprobar se confirma también en HTML (RN-12-3).
+  await page.getByRole('button', { name: 'Exportar HTML' }).click();
+  const dialogo = page.getByRole('dialog', { name: '¿Exportar con pantallas sin aprobar?' });
+  await expect(dialogo).toContainText('La carpeta HTML saldrá con su contenido actual');
+  await dialogo.getByRole('button', { name: 'Exportar igual' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'se arma la carpeta HTML con la versión 3 del curso' })).toBeVisible();
+  expect(pedidos).toEqual([{ formato: 'HTML', perfilLms: 'generico' }]);
+  const fila = page.getByRole('region', { name: 'Historial de exportaciones' }).locator('tbody tr').first();
+  await expect(fila.locator('td').nth(1)).toHaveText('HTML');
+  await expect(fila.locator('td').nth(3)).toHaveText('—');
 });
