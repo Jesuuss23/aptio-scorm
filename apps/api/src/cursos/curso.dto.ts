@@ -44,6 +44,11 @@ export class PantallaCambioDto {
   })
   @IsOptional() @IsObject() marcadores?: Record<string, unknown[]>;
   @ApiPropertyOptional({
+    type: 'object', additionalProperties: { $ref: '#/components/schemas/ReglasVideo' },
+    description: 'HU-0902 · Reglas del video por id del bloque de video. `impedirAdelantar` (sí o no) impide ir más allá de una pregunta sin responder; `porcentajeMinimo` (0 a 100) se conserva si no se manda. 422 BLOQUE_NO_EXISTE si el bloque no es un video de la pantalla y REGLA_VIDEO_NO_VALIDA si no.',
+  })
+  @IsOptional() @IsObject() reglasVideo?: Record<string, unknown>;
+  @ApiPropertyOptional({
     enum: ['deshacer', 'rehacer'],
     description: 'HU-0607 · Rótulo de la versión cuando el cambio viene de deshacer o rehacer en el editor (SUP-46). Sin él, la versión dice «edición».',
   })

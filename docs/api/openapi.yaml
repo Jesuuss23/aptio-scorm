@@ -1806,7 +1806,9 @@ paths:
         borra los disparadores que lo muestran u ocultan. HU-0901 · `marcadores` reemplaza, por id del bloque de video, sus
         marcadores (CP-080); 422 MARCADOR_NO_VALIDO con `detalles` si un tiempo es negativo o pasa la duración conocida del
         video, un id se repite o una pregunta no tiene enunciado, 2 opciones y exactamente 1 correcta; BLOQUE_NO_EXISTE si el
-        bloque no es un video de la pantalla.
+        bloque no es un video de la pantalla. HU-0902 · `reglasVideo` fija, por id del bloque de video, «impedir adelantar»
+        (CP-081) y conserva `porcentajeMinimo` si no se manda; 422 REGLA_VIDEO_NO_VALIDA si `impedirAdelantar` no es sí o
+        no, el porcentaje sale de 0 a 100 o trae otros campos; BLOQUE_NO_EXISTE si el bloque no es un video de la pantalla.
       parameters:
       - name: cursoId
         in: path
@@ -4948,6 +4950,20 @@ components:
         creadoEn:
           type: string
           format: date-time
+    ReglasVideo:
+      type: object
+      description: HU-0902 · Reglas del bloque de video (RN-09-2). Con `impedirAdelantar`, ir más allá de una pregunta sin
+        responder ni saltar no se permite y se explica por qué. `porcentajeMinimo` todavía no se aplica en el reproductor.
+      additionalProperties: false
+      required:
+      - impedirAdelantar
+      properties:
+        impedirAdelantar:
+          type: boolean
+        porcentajeMinimo:
+          type: number
+          minimum: 0
+          maximum: 100
     MarcadorVideo:
       type: object
       description: HU-0901 · Marcador del bloque de video (RN-09-1). Una `pregunta` pausa el video en `tiempoMs` y se muestra
@@ -5182,6 +5198,11 @@ components:
             type: array
             items:
               $ref: '#/components/schemas/MarcadorVideo'
+        reglasVideo:
+          type: object
+          description: HU-0902 · Por id del bloque de video, sus reglas de reproducción.
+          additionalProperties:
+            $ref: '#/components/schemas/ReglasVideo'
         motivo:
           type: string
           enum:

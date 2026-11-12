@@ -511,7 +511,7 @@ export const api = {
   /** HU-1103 · Patrón y reglas de navegación; guardar crea una versión del curso (409 si otra persona guardó antes). */
   navegacion: (cursoId: string) => pedir<Navegacion>(`/cursos/${cursoId}/navegacion`),
   guardarNavegacion: (cursoId: string, datos: NavegacionCambio) => pedir<Navegacion>(`/cursos/${cursoId}/navegacion`, json(datos, 'PUT')),
-  editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string; extras?: ElementoExtra[]; disparadores?: Disparador[]; marcadores?: Record<string, unknown[]>; motivo?: 'deshacer' | 'rehacer' }) =>
+  editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string; extras?: ElementoExtra[]; disparadores?: Disparador[]; marcadores?: Record<string, unknown[]>; reglasVideo?: Record<string, { impedirAdelantar: boolean; porcentajeMinimo?: number }>; motivo?: 'deshacer' | 'rehacer' }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
   aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),
   // HU-0504 · Propuestas de la IA y Deshacer.

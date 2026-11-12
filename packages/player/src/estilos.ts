@@ -123,6 +123,8 @@ button:disabled{cursor:not-allowed}
 .ap-video-pregunta{background:var(--ap-blanco);color:var(--ap-texto);border-radius:12px;padding:14px 16px;width:min(100%,520px);display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .ap-video-tiempo{margin:0;font-size:.85em;font-weight:700}
 .ap-video-aviso{margin:8px 0 0;font-size:.9em}
+.ap-video-bloqueo{margin:8px 0 0;font-weight:700;color:var(--ap-texto)}
+.ap-video-bloqueo:empty{display:none}
 .ap-video-enunciado{margin:0;font-size:1.05em}
 .ap-opcion[aria-disabled=true]{cursor:default}
 .ap-actividad{display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--ap-blanco) 70%,transparent);color:var(--ap-texto);border-radius:12px;padding:12px}

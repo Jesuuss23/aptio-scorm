@@ -506,6 +506,33 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect((await videoDe()).marcadores).toEqual(previos);
   });
 
+  it('HU-0902 · CP-081: guarda «impedir adelantar» del video (conserva el porcentaje); 422 REGLA_VIDEO_NO_VALIDA y BLOQUE_NO_EXISTE; el revisor, 403', async () => {
+    type Pv = { id: string; bloques: { id: string; tipo: string; reglas?: { impedirAdelantar: boolean; porcentajeMinimo: number } }[] };
+    const reglasDe = async () => (pantallas(await documento()).find((x) => x.id === 'p18') as unknown as Pv).bloques.find((b) => b.tipo === 'video')!.reglas;
+    const ruta = `/cursos/${cursoId}/pantallas/p18`;
+    let v = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    expect(await reglasDe()).toEqual({ impedirAdelantar: true, porcentajeMinimo: 90 });
+
+    const r = await como('productor').patch(ruta, { version: v, reglasVideo: { 'p18-video': { impedirAdelantar: false } } });
+    expect(r.status).toBe(200);
+    expect(await reglasDe()).toEqual({ impedirAdelantar: false, porcentajeMinimo: 90 });
+    const version = await prisma.cursoVersion.findFirstOrThrow({ where: { cursoId }, orderBy: { version: 'desc' } });
+    expect(version.version).toBe(r.body.version);
+    v = r.body.version;
+
+    const malos = [{ impedirAdelantar: 'sí' }, {}, { impedirAdelantar: true, porcentajeMinimo: 120 }, { impedirAdelantar: true, otra: 1 }, null];
+    const codigos = await Promise.all(malos.map(async (m) => (await como('productor').patch(ruta, { version: v, reglasVideo: { 'p18-video': m } })).body.codigo));
+    expect(codigos).toEqual(Array.from({ length: 5 }, () => 'REGLA_VIDEO_NO_VALIDA'));
+    expect((await como('productor').patch(ruta, { version: v, reglasVideo: { 'p18-titulo': { impedirAdelantar: true } } })).body.codigo).toBe('BLOQUE_NO_EXISTE');
+    expect((await como('revisor').patch(ruta, { version: v, reglasVideo: { 'p18-video': { impedirAdelantar: true } } })).status).toBe(403);
+    expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);
+
+    // Deshacer vuelve a la regla anterior con su motivo.
+    const deshacer = await como('productor').patch(ruta, { version: v, reglasVideo: { 'p18-video': { impedirAdelantar: true } }, motivo: 'deshacer' });
+    expect(deshacer.status).toBe(200);
+    expect(await reglasDe()).toEqual({ impedirAdelantar: true, porcentajeMinimo: 90 });
+  });
+
   it('HU-0608 · CP-067: al corregir la narración, el ancla sigue a su palabra; si ya no está, queda el segundo y «Revisar tiempo»', async () => {
     type Pa = { id: string; ajustes?: Record<string, Record<string, unknown>> };
     const p05De = (d: Doc) => pantallas(d).find((x) => x.id === 'p05') as unknown as Pa;

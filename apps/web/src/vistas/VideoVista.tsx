@@ -91,6 +91,9 @@ export function VideoVista({ proyectoId, pantallaId, rol, alCargar }: { proyecto
   );
 }
 
+/** Lo que se guarda y se deshace: las preguntas (`m`) y «impedir adelantar» (`i`). */
+interface Version { m: MarcadorVideo[]; i: boolean }
+
 function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoId, alConflicto }: {
   video: PantallaVideo;
   url: string | undefined;
@@ -101,8 +104,10 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
   alConflicto: () => void;
 }) {
   const [borrador, setBorrador] = useState<MarcadorVideo[]>(() => ordenar(video.marcadores));
-  const [guardada, setGuardada] = useState(() => JSON.stringify(ordenar(video.marcadores)));
-  const [pila, setPila] = useState<MarcadorVideo[][]>([]);
+  // HU-0902 · «Impedir adelantar» se guarda y se deshace junto con las preguntas.
+  const [impedir, setImpedir] = useState(video.impedirAdelantar);
+  const [guardada, setGuardada] = useState(() => JSON.stringify({ m: ordenar(video.marcadores), i: video.impedirAdelantar }));
+  const [pila, setPila] = useState<Version[]>([]);
   const [elegido, setElegido] = useState<string | null>(null);
   const [tiempoMs, setTiempoMs] = useState(0);
   const [duracionVideo, setDuracionVideo] = useState<number | undefined>(undefined);
@@ -112,22 +117,23 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
 
   const duracion = duracionConocida ?? duracionVideo;
   const errores = erroresPorMarcador(borrador, duracion);
-  const pendiente = JSON.stringify(borrador) !== guardada;
+  const pendiente = JSON.stringify({ m: borrador, i: impedir }) !== guardada;
   const largo = duracion ?? Math.max(60_000, ...borrador.map((m) => m.tiempoMs + 10_000));
   const pregunta = borrador.find((m) => m.id === elegido && m.tipo === 'pregunta') ?? null;
 
-  const guardar = async (lista: MarcadorVideo[], motivo?: 'deshacer') => {
+  const guardar = async (v: Version, motivo?: 'deshacer') => {
     const c = cursoRef.current;
     if (!c) return;
-    const anterior = JSON.parse(guardada) as MarcadorVideo[];
-    const texto = JSON.stringify(lista);
-    setGuardada(texto);
+    const anterior = JSON.parse(guardada) as Version;
+    setGuardada(JSON.stringify(v));
     setError('');
     try {
-      const r = await api.editarPantalla(c.id, video.pantallaId, { version: c.version, marcadores: { [video.bloqueId]: lista }, ...(motivo ? { motivo } : {}) });
+      const r = await api.editarPantalla(c.id, video.pantallaId, {
+        version: c.version, marcadores: { [video.bloqueId]: v.m }, reglasVideo: { [video.bloqueId]: { impedirAdelantar: v.i } }, ...(motivo ? { motivo } : {}),
+      });
       cursoRef.current = { ...c, version: r.version };
       if (!motivo) setPila((p) => [...p, anterior].slice(-30));
-      setAviso(motivo ? 'Cambio deshecho.' : 'Preguntas del video guardadas.');
+      setAviso(motivo ? 'Cambio deshecho.' : v.i !== anterior.i ? (v.i ? 'Guardado: no se podrá adelantar sin responder.' : 'Guardado: se podrá adelantar libremente.') : 'Preguntas del video guardadas.');
     } catch (e) {
       setGuardada(JSON.stringify(anterior));
       setError(mensajeDe(e, 'No se pudieron guardar las preguntas'));
@@ -139,9 +145,9 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
 
   useEffect(() => {
     if (!editan || !pendiente || errores.size) return;
-    const t = setTimeout(() => { void guardarRef.current(borrador); }, ESPERA_GUARDAR_MS);
+    const t = setTimeout(() => { void guardarRef.current({ m: borrador, i: impedir }); }, ESPERA_GUARDAR_MS);
     return () => clearTimeout(t);
-  }, [borrador, editan, pendiente, errores.size]);
+  }, [borrador, impedir, editan, pendiente, errores.size]);
 
   const cambiar = (id: string, f: (m: MarcadorVideo) => void) => {
     setAviso('');
@@ -164,8 +170,9 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
     const previa = pila.at(-1);
     if (!previa) return;
     setPila((p) => p.slice(0, -1));
-    setBorrador(previa);
-    if (elegido && !previa.some((m) => m.id === elegido)) setElegido(null);
+    setBorrador(previa.m);
+    setImpedir(previa.i);
+    if (elegido && !previa.m.some((m) => m.id === elegido)) setElegido(null);
     void guardar(previa, 'deshacer');
   };
 
@@ -217,7 +224,11 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
           {editan ? <button type="button" className="boton" onClick={deshacer} disabled={!pila.length}>↶ Deshacer</button> : null}
           <a className="boton" href={vistaPrevia} onClick={(e) => { e.preventDefault(); navegar(vistaPrevia); }}>▶ Probar en la vista previa</a>
         </div>
-        <p className="sec">Impedir adelantar y el porcentaje mínimo visto llegan en la próxima entrega.</p>
+        <label className="video-obligatoria">
+          <input type="checkbox" checked={impedir} disabled={!editan} aria-describedby="video-impedir-ayuda" onChange={(e) => { setAviso(''); setImpedir(e.target.checked); }} />
+          Impedir adelantar hasta responder
+        </label>
+        <p className="sec" id="video-impedir-ayuda">El participante no podrá ir más allá de una pregunta sin responderla o saltarla; retroceder siempre se puede. El porcentaje mínimo visto llega más adelante.</p>
       </section>
 
       <aside className="tarjeta video-panel" aria-label="Marcadores">
