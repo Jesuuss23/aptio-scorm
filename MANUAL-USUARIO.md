@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.27 · actualizado con la quinta entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.28 · actualizado con la sexta entrega del Sprint 6 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -372,7 +372,7 @@ Las actividades y la narración se cambian desde Revisión. Con esto el editor d
 
 ### 8.9 Entrega: validar, exportar y descargar
 
-Desde el proyecto, **Exportar SCORM** abre **Entrega**. Ahí eliges el **LMS destino** (Genérico, Moodle 4.5+, Blackboard, Chamilo o Canvas). El paquete es el mismo para todos: el LMS solo cambia la recomendación que ves debajo.
+Desde el proyecto, **Exportar SCORM** abre **Entrega**. Primero eliges el **formato**: **SCORM 1.2** (el de siempre, para subir al LMS) o **HTML autocontenido**, para presentar sin LMS (ver 8.11). Con SCORM 1.2 eliges el **LMS destino** (Genérico, Moodle 4.5+, Blackboard, Chamilo o Canvas). El paquete es el mismo para todos: el LMS solo cambia la recomendación que ves debajo.
 
 **Verificación automática.** Antes de exportar, Entrega revisa el curso para ese LMS y lo vuelve a revisar si cambias de LMS:
 - **Peso estimado** frente al límite de subida del destino. El límite sale de la ficha de compatibilidad del cliente; si no la tiene, se usa un valor de referencia de 100 MB, que el LMS del cliente puede superar. Si el paquete pesa más, ves las alternativas (pedir al administrador que amplíe el límite, comprimir, dividir el curso, alojar el video fuera o el paquete de distribución) y los recursos que más pesan. **Puedes exportar igual**: el peso nunca bloquea.
@@ -380,6 +380,15 @@ Desde el proyecto, **Exportar SCORM** abre **Entrega**. Ahí eliges el **LMS des
 - **Avance y reanudación** (si caben en lo que guarda el LMS), **archivos que faltan** (el paquete muestra su texto alternativo) y **esquema del curso**. Si el curso no cumple el esquema, el botón Exportar queda deshabilitado y ves qué corregir.
 
 Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**.
+
+### 8.11 HTML autocontenido: presentar sin LMS ni internet
+
+Cuando el cliente quiere mostrar la cápsula en una sala, en una feria o en una computadora sin plataforma, elige en Entrega **HTML autocontenido · para presentar sin LMS** y pulsa **Exportar HTML**.
+
+- Se descarga un ZIP con una carpeta. **Descomprímelo y abre `index.html` con doble clic**: funciona sin internet y sin LMS, con imágenes, personaje, video, subtítulos y todas las actividades. Dentro va un `LEEME.txt` con esa misma instrucción.
+- **No guarda el avance ni la nota.** Si se cierra, empieza de nuevo. Para registrar el seguimiento de los participantes, exporta SCORM 1.2 y súbelo al LMS.
+- La verificación no muestra el límite de subida ni `suspend_data`, porque no hay LMS. El peso aparece solo como dato. Si quedan pantallas sin aprobar, se pide la misma confirmación que en SCORM.
+- En el historial, la columna **Formato** dice «HTML» y el archivo se llama `<proyecto>-html-v<versión>.zip`.
 
 ### 8.10 Modo diagnóstico del paquete (para el soporte)
 
@@ -435,7 +444,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Subtítulos en inglés y elegir el idioma de los subtítulos.
 - Voz en inglés y voces de otros proveedores.
 - Versión en inglés.
-- Control de calidad y otros formatos de entrega (HTML, SCORM 2004).
+- Control de calidad y otros formatos de entrega (SCORM 2004).
 - Otra ilustración desde la revisión y comentarios del cliente.
 
 ---
@@ -456,6 +465,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.25 | 2026-11-11 | Reanudación: al volver al curso en el LMS, el participante elige continuar donde lo dejó o empezar de nuevo. |
 | 0.26 | 2026-11-11 | Entrega: verificación automática antes de exportar (peso contra el límite con alternativas, pantallas sin aprobar con confirmación, errores que deshabilitan Exportar). |
 | 0.27 | 2026-11-11 | Modo diagnóstico del paquete (Ctrl+Alt+Shift+D o `?diagnostico=1`, Copiar informe) y fichas de compatibilidad LMS en el detalle del cliente. |
+| 0.28 | 2026-11-12 | Entrega: formato HTML autocontenido para presentar sin LMS ni internet (8.11). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

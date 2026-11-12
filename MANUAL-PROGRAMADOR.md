@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.27 · actualizado con la quinta entrega del Sprint 6 (11 de noviembre de 2026)**
+**Versión 0.28 · actualizado con la sexta entrega del Sprint 6 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -127,11 +127,13 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - Cada interacción es una función `(datos, ctx) => HTMLElement` en `src/interacciones/` que llama `ctx.terminar({ completada, puntaje })`. Todo con botones; el orden barajado usa `barajar(lista, clave)` con el id de la pantalla para que vista previa y paquete coincidan.
 - Reanudación (HU-1105): `montar(..., { reanudar: { pantallaId, vistas, resultados, preguntar }, alReanudar })` restaura el avance y, con `preguntar`, muestra el aviso «¿Continuar donde lo dejaste?» dentro del Shadow DOM. La decisión y la restauración son funciones puras en `src/reanudacion.ts`. `suspend_data` v2 vive en `src/suspend.ts` (`2|<huella>|<idioma>|<vistas>|<pos:c:p[:intentos]>`; la huella sale de `huellaCurso(curso.id, orden)`) y se sigue leyendo v1. `leerSuspend` nunca lanza: lo inválido devuelve `null`. `conectarScorm12` no hace commit al entrar, no degrada un `lesson_status` cerrado y, con `mejorNota`, no baja `score.raw`. `iniciarPaquete` no reporta nada hasta que el participante elige. Si cambias el formato, súbele la versión y conserva la lectura de las anteriores.
 - Modo diagnóstico (HU-1204): `src/diagnostico.ts` (`RegistroDiagnostico`, `informeDiagnostico`, `navegadorResumido`) es lógica sin DOM; `src/panel-diagnostico.ts` es el panel. `buscarApi(ventana, registro)` y `conectarScorm12(api, { registro })` anotan solos: si agregas una llamada al LMS, pásala por `llamar(..., nota)` para que quede en el registro. Nunca leas datos del participante; si hiciera falta, agrégalos a `ELEMENTOS_PRIVADOS`. Si cambias la forma del informe, súbele `version` (lo guardan las fichas de los clientes). `DatosPaquete.diagnostico: false` lo desactiva (lo pone `construirScorm12` con `incluirDiagnostico: false`).
+- HTML (HU-1203): con `DatosPaquete.modo: 'html'`, `conectarPaquete` no toca `API`, `parent` ni `opener` y no avisa; tampoco hay modo diagnóstico. No agregues `fetch` al camino del paquete: en `file://` no funciona. Los SVG y los WebVTT van en `datos.js`.
 - Para el paquete: `pnpm --filter @aptio/player construir` deja `packages/player/dist/aptio-reproductor.js` con `window.AptioReproductor.montar`.
 
 ### 6.5.1 Entrega (`@aptio/exporters`)
 
-- `construirScorm12` arma el ZIP (HU-1202) y `validarScorm12(curso, pesosRecursos, pesoReproductor, limiteMb, { origenLimite })` valida antes de exportar (HU-1201). Las dos aplican las mismas reglas de qué recursos entran: nunca `documento` (SUP-52) ni recursos de otro idioma (SUP-49). Si cambias una, cambia la otra.
+- `construirScorm12` arma el ZIP (HU-1202) y `construirHtml` la carpeta autocontenida (HU-1203). Las dos parten de `armarContenido` y `comprimir` (ZIP determinista), así que comparten las reglas de qué recursos entran: nunca `documento` (SUP-52) ni recursos de otro idioma (SUP-49).
+- `validarExportacion(formato, curso, pesosRecursos, pesoReproductor, limiteMb, { origenLimite })` valida antes de exportar (HU-1201); `validarScorm12` es su atajo para SCORM. En HTML devuelve `limiteMb`, `suspendDataCaracteres` (y en la API `origenLimite`) en `null`. Si cambias qué recursos entran en `armarContenido`, cambia también la estimación de peso.
 - La validación es pura y no lanza con un documento roto: devuelve los errores de esquema y lo que se pueda calcular. Solo `errores` impide exportar; el peso nunca (RN-12-2). Los textos de las alternativas están en `ALTERNATIVAS_PESO` y siguen a `docs/08-entregas-y-lms.md`.
 - La API (`ExportacionesService.validar`) pide las filas de `Recurso` solo para ids con forma de UUID: los ids de ejemplo del caso LOTO no son filas y salen como faltantes.
 
@@ -358,6 +360,7 @@ Ninguna clave real va al repositorio.
 | 0.25 | 2026-11-11 | HU-1105: `src/suspend.ts` (v2 con huella e intentos), `src/reanudacion.ts`, opción `reanudar` del reproductor y LMS de prueba compartido `e2e/lms-prueba.ts`. |
 | 0.26 | 2026-11-11 | HU-1201: `validarScorm12` en `@aptio/exporters`, `POST /cursos/{id}/validar` y la verificación automática de `EntregaVista`. |
 | 0.27 | 2026-11-11 | HU-1204: modo diagnóstico en `@aptio/player`, `incluirDiagnostico`, `FichasController` y `FichasLms.tsx`; el LMS de prueba de Playwright pasa a `https://lms.prueba` (el portapapeles exige página segura). |
+| 0.28 | 2026-11-12 | HU-1203: `construirHtml`, `armarContenido`/`comprimir`, `validarExportacion` y `modo: 'html'` del reproductor; prueba CP-093 en `file://` sin red (`e2e/html.spec.ts`). |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
