@@ -1,9 +1,11 @@
 // INT-05 · Quiz con tiempo, vidas y puntaje: una pregunta a la vez; se pierde una vida por error y al acabarse el tiempo
 // cuenta como error. Con `preguntasPorIntento`, cada intento toma esa cantidad del banco. Puntaje = % de aciertos.
+// HU-1401 · WCAG 2.2.1: con tiempo, «Quitar el límite de tiempo» detiene el reloj para el resto de la actividad (también
+// al repetirla), sin quitar vidas ni puntaje. Al pasar de pregunta, el foco va al enunciado.
 import { barajar, h, vaciar } from '../dom.ts';
 import { t } from '../textos.ts';
 import type { TextoI18n, Visual } from '../tipos.ts';
-import { type Actividad, intentos, lista, marca, pieResultado, porcentaje, textoVisual, visual } from './comun.ts';
+import { type Actividad, enfocar, intentos, lista, marca, pieResultado, porcentaje, textoVisual, visual } from './comun.ts';
 
 type Opcion = { id: string; contenido: Visual; correcta: boolean };
 type Pregunta = { id: string; enunciado: TextoI18n; seleccionMultiple?: boolean; opciones: Opcion[]; retroalimentacion: { correcta: TextoI18n; incorrecta: TextoI18n } };
@@ -19,6 +21,7 @@ export const quiz: Actividad = (datos, ctx) => {
   const vidasIniciales = typeof datos.vidas === 'number' ? datos.vidas : null;
   const raiz = h('div', { class: 'ap-quiz' });
   const control = intentos(ctx);
+  let sinLimite = false;
 
   const empezar = (vuelta: number) => {
     const preguntas = porIntento < banco.length ? barajar(banco, `${ctx.id}-quiz-${vuelta}`).slice(0, porIntento) : banco;
@@ -36,7 +39,7 @@ export const quiz: Actividad = (datos, ctx) => {
       vaciar(raiz, pieResultado(ctx, puntaje, control.quedan(), () => empezar(vuelta + 1)));
     };
 
-    const mostrar = () => {
+    const mostrar = (enfocarla = false) => {
       const p = preguntas[i]!;
       const opciones = datos.barajarOpciones === true ? barajar(p.opciones, `${ctx.id}-${p.id}-${vuelta}`) : p.opciones;
       const multiple = p.seleccionMultiple === true;
@@ -51,6 +54,7 @@ export const quiz: Actividad = (datos, ctx) => {
         if (respondida) return;
         respondida = true;
         parar();
+        quitar?.remove();
         const bien = !porTiempo && acierta(p, elegidas);
         if (bien) aciertos++;
         else if (vidas !== null) vidas--;
@@ -62,7 +66,7 @@ export const quiz: Actividad = (datos, ctx) => {
         });
         vaciar(retro, marca(bien, ctx.tx), porTiempo ? ` ${ctx.tx.sinTiempo}.` : '', ` ${t(bien ? p.retroalimentacion.correcta : p.retroalimentacion.incorrecta, ctx.idioma)}`);
         const ultima = i === preguntas.length - 1 || vidas === 0;
-        vaciar(acciones, h('button', { type: 'button', class: 'ap-boton ap-primario', onclick: () => { if (ultima) fin(); else { i++; mostrar(); } } }, ultima ? ctx.tx.verResultado : ctx.tx.siguientePregunta));
+        vaciar(acciones, h('button', { type: 'button', class: 'ap-boton ap-primario', onclick: () => { if (ultima) fin(); else { i++; mostrar(true); } } }, ultima ? ctx.tx.verResultado : ctx.tx.siguientePregunta));
         acciones.querySelector('button')?.focus();
       };
 
@@ -79,18 +83,36 @@ export const quiz: Actividad = (datos, ctx) => {
           },
         }, visual(o.contenido, ctx)),
       );
+      const enunciado = h('p', { class: 'ap-enunciado', id: idEnunciado, tabindex: -1, 'data-enfocar': '' }, t(p.enunciado, ctx.idioma));
+      const conReloj = segundos !== null && !sinLimite;
+      const quitar = conReloj
+        ? h('button', {
+          type: 'button', class: 'ap-boton ap-quitar-tiempo',
+          onclick: () => {
+            sinLimite = true;
+            parar();
+            tiempo.textContent = ctx.tx.sinLimite;
+            quitar?.remove();
+            ctx.anunciar(ctx.tx.limiteQuitado);
+            enfocar(enunciado);
+          },
+        }, ctx.tx.quitarLimite)
+        : null;
       if (multiple) acciones.append(h('button', { type: 'button', class: 'ap-boton ap-primario', disabled: true, onclick: () => responder(false) }, ctx.tx.responder));
 
       vaciar(raiz,
         h('div', { class: 'ap-quiz-cabeza' },
           h('span', {}, ctx.tx.pregunta(i + 1, preguntas.length)),
           vidas !== null ? h('span', { class: 'ap-vidas', 'aria-label': ctx.tx.vidas(vidas) }, '●'.repeat(vidas) + '○'.repeat(Math.max(0, (vidasIniciales ?? 0) - vidas))) : null,
-          segundos !== null ? tiempo : null),
-        h('p', { class: 'ap-enunciado', id: idEnunciado }, t(p.enunciado, ctx.idioma)),
+          segundos !== null ? tiempo : null,
+          quitar),
+        enunciado,
         h('div', { class: 'ap-opciones', role: 'group', 'aria-labelledby': idEnunciado }, botones),
         retro, acciones);
 
-      if (segundos !== null) {
+      if (enfocarla) enfocar(enunciado);
+      if (segundos !== null && !conReloj) tiempo.textContent = ctx.tx.sinLimite;
+      if (segundos !== null && conReloj) {
         let quedan = segundos;
         tiempo.textContent = ctx.tx.segundos(quedan);
         reloj = setInterval(() => {

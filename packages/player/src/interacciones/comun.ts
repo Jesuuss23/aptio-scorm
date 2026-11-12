@@ -50,13 +50,46 @@ export function intentos(ctx: ContextoActividad) {
   };
 }
 
-/** Pie con el resultado y, si quedan intentos, el botón para repetir. */
-export function pieResultado(ctx: ContextoActividad, puntaje: number | null, puedeRepetir: boolean, repetir: () => void): HTMLElement {
+/**
+ * HU-1401 · Lleva el foco a un elemento en cuanto está en la página: si todavía no se insertó (se arma antes de
+ * `vaciar`), espera a que termine la tarea actual. Así el foco nunca queda en un botón que se quitó o se desactivó.
+ */
+export function enfocar(el: HTMLElement | null | undefined): void {
+  if (!el) return;
+  if (el.isConnected) { el.focus(); return; }
+  queueMicrotask(() => { if (el.isConnected) el.focus(); });
+}
+
+/**
+ * Lo primero que conviene enfocar dentro de una actividad: el texto marcado con `data-enfocar` (la pregunta, la
+ * situación o la afirmación, para que el lector la lea) o, si no hay, el primer botón disponible.
+ */
+export const inicioDe = (raiz: Element | null | undefined): HTMLElement | null =>
+  raiz?.querySelector<HTMLElement>('[data-enfocar]') ?? raiz?.querySelector<HTMLElement>('button:not([disabled]):not([aria-disabled=true])') ?? null;
+
+/**
+ * Pie con el resultado y, si quedan intentos, el botón para repetir. HU-1401 · El resultado se anuncia y recibe el
+ * foco (`tabindex=-1`): el control que se usó para terminar (Comprobar, la última carta) se quita o se desactiva.
+ * Al repetir, el foco pasa al inicio de la actividad nueva. `enfocarlo: false` cuando se dibuja sin que nadie actúe
+ * (una sumativa sin intentos al volver a la pantalla).
+ */
+export function pieResultado(ctx: ContextoActividad, puntaje: number | null, puedeRepetir: boolean, repetir: () => void, enfocarlo = true): HTMLElement {
   const texto = puntaje === null ? ctx.tx.completada : ctx.tx.resultado(puntaje);
   ctx.anunciar(texto);
+  const resultado = h('p', { class: 'ap-resultado-texto', tabindex: -1 }, h('span', { 'aria-hidden': 'true' }, '★ '), texto);
+  if (enfocarlo) enfocar(resultado);
   return h('div', { class: 'ap-resultado' },
-    h('p', { class: 'ap-resultado-texto' }, h('span', { 'aria-hidden': 'true' }, '★ '), texto),
-    puedeRepetir ? h('button', { type: 'button', class: 'ap-boton', onclick: repetir }, ctx.tx.reintentar) : h('p', { class: 'ap-nota' }, ctx.modo === 'sumativa' ? ctx.tx.sinIntentos : ''),
+    resultado,
+    puedeRepetir
+      ? h('button', {
+        type: 'button', class: 'ap-boton',
+        onclick: (ev: Event) => {
+          const juego = (ev.currentTarget as HTMLElement).closest('.ap-juego');
+          repetir();
+          enfocar(inicioDe(juego));
+        },
+      }, ctx.tx.reintentar)
+      : h('p', { class: 'ap-nota' }, ctx.modo === 'sumativa' ? ctx.tx.sinIntentos : ''),
   );
 }
 

@@ -51,9 +51,10 @@ export const memoria: Actividad = (datos, ctx) => {
       const [x, y] = abiertas as [number, number];
       if (cartas[x]!.par === cartas[y]!.par) {
         halladas.add(c.par);
+        // HU-1401 · aria-disabled y no disabled: la carta enfocada sigue con el foco (un botón desactivado lo pierde).
         for (const j of [x, y]) {
           botones[j]!.classList.add('ap-pareja');
-          botones[j]!.disabled = true;
+          botones[j]!.setAttribute('aria-disabled', 'true');
         }
         abiertas = [];
         ctx.anunciar(ctx.tx.pareja);
