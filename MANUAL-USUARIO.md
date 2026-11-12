@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.33 · actualizado con la tercera entrega del Sprint 7 (12 de noviembre de 2026)**
+**Versión 0.34 · actualizado con la cuarta entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -444,20 +444,24 @@ En el detalle del proyecto, **Idiomas** muestra cada texto del curso con su ingl
 
 Los Desbordes aparecen en **Por revisar** y se cuentan en el resumen. Si la IA no logró una versión corta, **✦ Traducir pendientes** la vuelve a pedir.
 
-El revisor del cliente ve el inglés y los estados, pero no traduce ni edita. La voz, la boca y los subtítulos en inglés llegan en la próxima entrega.
+El revisor del cliente ve el inglés y los estados, pero no traduce ni edita.
 
 ### 8.15 Español e inglés en el mismo paquete
 
 En **Entrega**, el grupo **Idioma** tiene dos opciones: **Español** (el paquete de siempre) y **ES + EN en el mismo paquete**. Con la segunda, la verificación automática muestra **Textos en inglés N / Total**:
 
 - si falta algún texto en inglés, dice cuántos faltan, ofrece **Ir a Idiomas** y no deja exportar;
-- los textos en **Desborde** sin revisar y la falta de voz en inglés se avisan, pero no impiden exportar. Sin voz en inglés, la pantalla en inglés muestra la narración como texto.
+- los textos en **Desborde** sin revisar y las pantallas sin voz en inglés se avisan, pero no impiden exportar. Sin voz en inglés, la pantalla en inglés muestra la narración como texto.
 
 Funciona con **SCORM 1.2** y con **HTML autocontenido**, y en el historial la exportación dice **· ES + EN**.
 
 **En la cápsula.** El paquete abre en español la primera vez. En la barra aparece el botón **EN** (o **ES**, si ya está en inglés): al pulsarlo, la cápsula cambia de idioma en la misma pantalla, con lo visto y los puntos. Si estabas a mitad de una actividad, esa actividad vuelve a empezar. El LMS guarda el idioma elegido: al volver, la cápsula abre en ese idioma. El botón se usa con dedo, ratón o teclado.
 
 **En la vista previa.** Si el curso ya tiene textos en inglés, la vista previa también muestra el botón para revisar el inglés antes de exportar.
+
+**Voz en inglés.** En **Idiomas**, el bloque **Voz en inglés** dice cuántas narraciones ya tienen su voz en inglés («5 de 30 narraciones con voz en inglés») y cuántas hay que regenerar porque cambió su inglés. **✦ Generar voz en inglés** hace, para cada narración que ya tiene su inglés, el audio, la boca del personaje y los subtítulos en inglés; una barra muestra el avance (voz, boca y subtítulos). Lo que no cambió no se vuelve a generar ni a pagar, y el español no se toca. Se usa la voz en inglés del kit del cliente y, si el kit no tiene una, una voz femenina de Google en inglés con la misma velocidad que la voz en español; la pronunciación usa solo los términos en inglés del diccionario del cliente. Debajo, **pantallas narradas aún no tienen su inglés** lista las que faltan: tradúcelas primero. El revisor del cliente ve la cifra pero no genera la voz.
+
+En el paquete ES + EN, al cambiar a inglés, cada pantalla con voz en inglés suena en inglés, con la boca y los subtítulos (**CC**) en inglés. Las que aún no tienen voz en inglés muestran la narración como texto, y **Entrega** avisa «Sin voz en inglés en N pantallas».
 
 ## 9. Preguntas frecuentes
 
@@ -530,6 +534,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.31 | 2026-11-12 | Idiomas: traducir al inglés con el glosario del cliente y revisar cada texto (8.14). |
 | 0.32 | 2026-11-12 | Desbordes en Idiomas: contador de caracteres, chip «Desborde» y «Usar versión corta» (8.14). |
 | 0.33 | 2026-11-12 | Español e inglés en el mismo paquete: opción «Idioma» en Entrega y botón EN / ES en la cápsula y en la vista previa (8.15). |
+| 0.34 | 2026-11-12 | Voz en inglés: bloque «Voz en inglés» en Idiomas con «Generar voz en inglés» y la cápsula que suena en inglés (8.15). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

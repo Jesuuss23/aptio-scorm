@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.33 · actualizado con la tercera entrega del Sprint 7 (12 de noviembre de 2026)**
+**Versión 0.34 · actualizado con la cuarta entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -149,6 +149,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - Web: `IdiomasVista.tsx` (PNT-11) sigue el patrón de Entrega para el avance (SSE `trabajo` más consulta de `/trabajos/{id}` cada 2 s).
 - Desbordes (HU-0803): `limiteDe(doc, ruta)` clasifica la ruta con `componenteDe` (un bloque de texto por su `rol`; el resto por la forma de la ruta con `#` en lugar de las posiciones, en `COMPONENTES`) y devuelve el límite de `LIMITE_CARACTERES`. Un componente nuevo del esquema suma su forma en `COMPONENTES`; la prueba «el componente de cada forma de ruta de LOTO» falla si una forma cambia de tipo. En el worker, `guardarLote` devuelve los textos largos y `proponerCortas` pide su versión corta (con `erroresLimite` como validación extra) sin pedir dos veces la misma ruta en un trabajo. `sincronizarFilas` devuelve también `desbordar`.
 - Paquete bilingüe (HU-0804): en `packages/player/src/reproductor.ts`, `montar` es un envoltorio que guarda el `Reproductor` de `montarUno` y lo reemplaza al cambiar de idioma (`destruir` y montar de nuevo con `reanudar` y `inicio` de la pantalla actual); el objeto devuelto delega en el actual, así quien lo guardó sigue mandando. El botón `.ap-idioma` sale con `es` y `en` en `opciones.idiomas ?? curso.idiomas`; `alCambiarIdioma(idioma, estado)` avisa. En el paquete, `iniciarPaquete` elige el idioma con `idiomaInicial` (lo guardado en suspend_data si el curso lo trae) y `ConexionScorm12.cambiarIdioma` cambia el idioma que se codifica. El exportador tiene `bilingue.ts` (`cursoBilingue`, `textosEnIngles`, `pantallasSinVozIngles`); `armarContenido` recibe `modoIdioma` y filtra los recursos por `idiomas`. `OpcionesValidacion` suma `modoIdioma` y `desbordes`. En las pruebas, `traducirLoto` (`packages/exporters/test/loto.ts`) da el LOTO con «[EN] …» y `simularApi({ cursoTraducido: true })` lo usa en la web.
+- Voz en inglés (HU-0804 parte 2): las etapas `voz.ts`, `boca.ts` y `subtitulos.ts` del worker leen el idioma con `idiomaDe(ctx)` (`parametros.regenerarVoz.idioma`, `es` por defecto) y todo lo que escriben va por idioma: `porIdioma[idioma]`, la fila `Narracion`, los nombres `${pantalla}-${idioma}.mp3|vtt` y los recursos filtrados por `idioma`. `VOZ_INGLES_PREDETERMINADA` es la voz si el kit no trae `voces.en`; las `anclas` solo se recalculan en español. La API rechaza dos idiomas a la vez y `en` sin traducciones (`narracionesTraducidas`). En la web, `VozIngles.tsx` sigue la generación por SSE y consulta cada 2 s. En las pruebas: `simularApi({ cursoTraducido: true, sinIngles: [...] })` deja pantallas sin inglés y `abrirEnLms(..., { recursosExtra })` suma audios y VTT al paquete.
 
 ### 6.6 Cambios al documento del curso (M05)
 
@@ -381,6 +382,7 @@ Ninguna clave real va al repositorio.
 | 0.31 | 2026-11-12 | HU-0802: `@aptio/schema/traduccion`, IA-10 v2 con modo simulado, worker `traducir.ts` por lotes, API de traducciones y vista Idiomas. |
 | 0.32 | 2026-11-12 | HU-0803: `LIMITE_CARACTERES`, `componenteDe`, `limiteDe`, `desborda`, `erroresLimite`; `Traduccion.propuesta`; versión corta en el worker; contador y «Usar versión corta» en Idiomas. |
 | 0.33 | 2026-11-12 | HU-0804 parte 1: `montar` y `montarUno`, botón `.ap-idioma`, `cambiarIdioma` en la conexión SCORM, `bilingue.ts` en el exportador, `traducirLoto` y `cursoTraducido` en las pruebas. |
+| 0.34 | 2026-11-12 | HU-0804 parte 2: `idiomaDe` en las etapas 6 a 8, `VOZ_INGLES_PREDETERMINADA`, `VozIngles.tsx`, `sinIngles` y `recursosExtra` en las pruebas. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
