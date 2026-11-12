@@ -1744,3 +1744,35 @@ ul.fila-chips {
   font-family: var(--fuente-num, monospace);
   font-size: var(--texto-xs);
 }
+
+/* HU-1406 · Créditos y licencias (Entrega). */
+.creditos-licencias {
+  margin-top: 24px;
+}
+.creditos-vista table,
+.ficha-recurso {
+  width: 100%;
+}
+.creditos-vista th,
+.creditos-vista td {
+  text-align: left;
+  padding: 4px 8px 4px 0;
+  vertical-align: top;
+}
+.creditos-aviso {
+  margin: 4px 0 8px;
+}
+.dialogo-recurso {
+  width: min(520px, calc(100vw - 32px));
+  max-width: none;
+}
+.ficha-recurso {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0 0 16px;
+}
+.ficha-recurso dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

@@ -13,6 +13,7 @@ import { validarCurso } from '@aptio/schema';
 import { duracionLegible, type NarracionLista, type VozCurso } from '@aptio/schema/generacion';
 import { marcasPalabra, mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, recalcularAnclas } from '@aptio/schema/tiempos';
 import { aplicarPronunciacion, type TerminoPronunciacion } from '@aptio/schema/voz';
+import { conProcedencia } from '../procedencia.js';
 import { type ContextoEtapa, type EjecutorEtapa, GeneracionCancelada } from '../generar.js';
 
 /** Narraciones que se sintetizan a la vez. */
@@ -160,12 +161,12 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       await subir(claveS3, audio.audio, audio.mime);
       await ctx.bd.$transaction([
         ctx.bd.recurso.create({
-          data: {
+          data: conProcedencia({
             id: recursoId, organizacionId: ctx.organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'AUDIO', origen: 'GENERADO',
             claveS3, mime: audio.mime, bytes: BigInt(audio.audio.byteLength), duracionMs, hash: createHash('sha256').update(audio.audio).digest('hex'),
             nombre: `${p.id}-es.${extension(audio.mime)}`, proveedor: audio.proveedor, modelo: audio.modelo,
             licencia: audio.simulada ? 'Audio simulado de prueba' : 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)',
-          },
+          }),
         }),
         ctx.bd.narracion.upsert({
           where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma: 'es' } },

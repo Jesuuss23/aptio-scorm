@@ -34,6 +34,9 @@ export class RecursoDto {
   @ApiProperty({ description: 'sha256 del contenido' }) hash: string;
   @ApiProperty({ format: 'uuid', nullable: true }) clienteId: string | null;
   @ApiProperty({ format: 'uuid', nullable: true }) proyectoId: string | null;
+  @ApiProperty({ nullable: true, description: 'HU-1406 · Proveedor que lo generó (google, recraft, …; `aptio` si lo armó la plataforma sin IA). Solo en recursos GENERADO' }) proveedor: string | null;
+  @ApiProperty({ nullable: true, description: 'HU-1406 · Modelo y versión usados (la voz, el modelo de imagen)' }) modelo: string | null;
+  @ApiProperty({ nullable: true, description: 'HU-1406 · Condición de uso del proveedor (ADR-010)' }) licencia: string | null;
   @ApiProperty({ nullable: true, description: 'Borrado programado de un documento del cliente' }) eliminarEn: string | null;
   @ApiProperty() creadoEn: string;
   @ApiPropertyOptional({ type: [String], description: 'Solo SVG: lo que se quitó al sanearlo (scripts, atributos on*, …)' }) eliminadosAlSanear?: string[];

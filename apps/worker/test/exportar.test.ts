@@ -1,5 +1,7 @@
 // HU-1202 · CP-091 · La cola `export` arma el paquete SCORM 1.2 del caso LOTO con la versión ligada a la exportación,
 // lo guarda como recurso PAQUETE e informa los recursos que faltan; si un recurso no se puede leer, queda en ERROR.
+// HU-1406 · CP-107 · Con voz de Google y una ilustración generada, `datos.js` lleva los créditos con la frase exacta;
+// el paquete se registra con proveedor `aptio` (REQ-062).
 // PostgreSQL real; el almacenamiento es un mapa en memoria (la API e2e usa S3 de LocalStack).
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -28,16 +30,21 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
 
   let cursoId = '';
   let proyectoId = '';
-  const ids = { ana: randomUUID(), vtt: randomUUID(), doc: randomUUID() };
+  const ids = { ana: randomUUID(), vtt: randomUUID(), doc: randomUUID(), voz: randomUUID(), img: randomUUID() };
 
-  /** El curso LOTO con tres recursos que son filas de Recurso: Ana, el VTT de p03 y el manual del cliente. */
+  /**
+   * El curso LOTO con recursos que son filas de Recurso: Ana, el VTT de p03, el manual del cliente, la voz de p02
+   * (Google) y la ilustración de p20 (generada con IA).
+   */
   const documento = () => JSON.parse(readFileSync(`${AI}/casos/loto/curso-esperado-es.json`, 'utf8')
-    .replaceAll('"svg-ana"', `"${ids.ana}"`).replaceAll('"vtt-p03-es"', `"${ids.vtt}"`).replaceAll('"doc-pets-seg-014"', `"${ids.doc}"`));
+    .replaceAll('"svg-ana"', `"${ids.ana}"`).replaceAll('"vtt-p03-es"', `"${ids.vtt}"`).replaceAll('"doc-pets-seg-014"', `"${ids.doc}"`)
+    .replaceAll('"aud-p02-es"', `"${ids.voz}"`).replaceAll('"img-p20-faja"', `"${ids.img}"`));
 
-  const recurso = async (id: string, tipo: 'SVG' | 'SUBTITULO' | 'DOCUMENTO', nombre: string, mime: string, cuerpo?: Uint8Array) => {
+  type Procedencia = { proveedor: string; modelo: string; licencia: string };
+  const recurso = async (id: string, tipo: 'SVG' | 'SUBTITULO' | 'DOCUMENTO' | 'AUDIO' | 'IMAGEN', nombre: string, mime: string, cuerpo?: Uint8Array, procedencia?: Procedencia) => {
     const claveS3 = `org/${e.ids.orgId}/${e.ids.clienteId}/${id}`;
     if (cuerpo) almacen.set(claveS3, cuerpo);
-    await prisma.recurso.create({ data: { id, organizacionId: e.ids.orgId, clienteId: e.ids.clienteId, proyectoId, tipo, origen: 'GENERADO', claveS3, mime, bytes: BigInt(cuerpo?.byteLength ?? 1), hash: 'x', nombre } });
+    await prisma.recurso.create({ data: { id, organizacionId: e.ids.orgId, clienteId: e.ids.clienteId, proyectoId, tipo, origen: 'GENERADO', claveS3, mime, bytes: BigInt(cuerpo?.byteLength ?? 1), hash: 'x', nombre, ...procedencia } });
   };
 
   /** Lo que hace la API al exportar: la Exportacion en cola, ligada a la versión del curso. */
@@ -58,6 +65,12 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     await recurso(ids.vtt, 'SUBTITULO', 'p03-es.vtt', 'text/vtt', new TextEncoder().encode('WEBVTT\n\n00:00.000 --> 00:02.300\nHola, soy Ana.\n'));
     // El manual del cliente no está en el almacenamiento: si el exportador lo leyera, fallaría.
     await recurso(ids.doc, 'DOCUMENTO', 'PETS-SEG-014.pdf', 'application/pdf');
+    await recurso(ids.voz, 'AUDIO', 'p02-es.mp3', 'audio/mpeg', new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0]),
+      { proveedor: 'google', modelo: 'es-US-Neural2-A', licencia: 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)' });
+    await recurso(ids.img, 'IMAGEN', 'p20-faja.png', 'image/png', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      { proveedor: 'recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)' });
+    // Quien revisa es la organización: su nombre va en los créditos.
+    await prisma.organizacion.update({ where: { id: e.ids.orgId }, data: { nombre: 'AulasEducativas' } });
   });
   afterAll(async () => {
     if (cursoId) await prisma.exportacion.deleteMany({ where: { cursoId } });
@@ -79,6 +92,8 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     const r = await prisma.recurso.findUniqueOrThrow({ where: { id: recursoId } });
     const zip = almacen.get(r.claveS3)!;
     expect(r).toMatchObject({ tipo: 'PAQUETE', origen: 'GENERADO', mime: MIME_ZIP, proyectoId, nombre: 'bloqueo-y-etiquetado-scorm12-v3.zip', bytes: BigInt(zip.byteLength) });
+    // REQ-062 · El paquete también tiene procedencia: lo armó la plataforma, sin IA.
+    expect(r).toMatchObject({ proveedor: 'aptio', modelo: 'exportador-scorm12 v1', licencia: 'Paquete generado por Aptio SCORM' });
     expect(r.hash).toBe(createHash('sha256').update(zip).digest('hex'));
     expect(r.claveS3).toBe(`org/${e.ids.orgId}/${e.ids.clienteId}/${recursoId}`);
 
@@ -103,18 +118,29 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     const datos = await contenido.file('datos.js')!.async('string');
     expect(datos).toContain('"titulos":"Montserrat"');
     expect(datos).toContain('Hola, soy Ana.');
+
+    // CP-107 · Los créditos de IA: voz de Google e ilustración de Recraft, revisadas por la organización. Ana (sin
+    // proveedor de IA) y los subtítulos (aptio) no salen.
+    const { creditos } = JSON.parse(datos.replace(/^window\.APTIO_DATOS = /, '').replace(/;\n?$/, '')) as { creditos: { aviso: string; filas: { que: string; proveedor: string; modelo: string; licencia: string }[] } };
+    expect(creditos.aviso).toBe('Voz e ilustraciones generadas con IA y revisadas por AulasEducativas');
+    expect(creditos.filas).toEqual([
+      { que: 'Voz', proveedor: 'Google', modelo: 'es-US-Neural2-A', licencia: 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)' },
+      { que: 'Ilustraciones', proveedor: 'Recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)' },
+    ]);
   }, 60_000);
 
   it('HU-1203 · con formato HTML arma la carpeta sin manifiesto, con LEEME.txt y modo html, y la nombra -html-v<n>', async () => {
     const exp = await exportacion(3, 'HTML');
     const { recursoId } = await correr(exp.id);
     const r = await prisma.recurso.findUniqueOrThrow({ where: { id: recursoId } });
-    expect(r).toMatchObject({ tipo: 'PAQUETE', mime: MIME_ZIP, nombre: 'bloqueo-y-etiquetado-html-v3.zip' });
+    expect(r).toMatchObject({ tipo: 'PAQUETE', mime: MIME_ZIP, nombre: 'bloqueo-y-etiquetado-html-v3.zip', proveedor: 'aptio', modelo: 'exportador-html v1' });
     expect(await prisma.exportacion.findUniqueOrThrow({ where: { id: exp.id } })).toMatchObject({ estado: 'COMPLETADO', formato: 'HTML', recursoId });
     const contenido = await JSZip.loadAsync(almacen.get(r.claveS3)!);
     expect(contenido.file('imsmanifest.xml')).toBeNull();
     expect(await contenido.file('LEEME.txt')!.async('string')).toContain('Descomprime y abre index.html con doble clic.');
     expect(await contenido.file('datos.js')!.async('string')).toContain('"modo":"html"');
+    // CP-107 · La carpeta HTML lleva los mismos créditos.
+    expect(await contenido.file('datos.js')!.async('string')).toContain('"aviso":"Voz e ilustraciones generadas con IA y revisadas por AulasEducativas"');
     expect(contenido.file(`recursos/${ids.ana}.svg`)).not.toBeNull();
     expect(Object.keys(contenido.files).some((n) => n.endsWith('.pdf'))).toBe(false);
   }, 60_000);

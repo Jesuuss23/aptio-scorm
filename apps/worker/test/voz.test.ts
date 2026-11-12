@@ -70,6 +70,8 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 6 en el generador', () => 
     expect(filas).toHaveLength(narradas.length);
     expect(filas.every((n) => n.estado === 'ACTUALIZADA' && n.idioma === 'es' && n.origen === 'tts' && n.audioRecursoId)).toBe(true);
     const audios = await prisma.recurso.findMany({ where: { id: { in: filas.map((n) => n.audioRecursoId!) } } });
+    // HU-1406 · REQ-062: cada audio generado guarda proveedor, modelo (la voz) y licencia.
+    expect(audios.every((r) => r.origen === 'GENERADO' && r.proveedor && r.modelo && r.licencia)).toBe(true);
     expect(audios).toHaveLength(narradas.length);
     expect(audios.every((r) => r.tipo === 'AUDIO' && r.origen === 'GENERADO' && r.mime === 'audio/wav' && (r.duracionMs ?? 0) >= 500 && subidos.has(r.claveS3))).toBe(true);
 

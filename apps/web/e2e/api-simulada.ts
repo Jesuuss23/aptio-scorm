@@ -353,6 +353,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       clientes.push(nuevo);
       return responder(201, nuevo);
     }
+    // HU-1406 · Sin recursos generados por defecto; entrega.spec simula los del curso.
+    if (ruta === '/recursos' && req.method() === 'GET') return responder(200, []);
     if (ruta === '/recursos/subidas' && req.method() === 'POST') {
       const datos = req.postDataJSON() as { nombre: string; mime: string };
       const subidaId = `00000000-0000-4000-8000-${String(subidas.size + 1).padStart(12, '0')}`;

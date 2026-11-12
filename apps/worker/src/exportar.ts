@@ -3,12 +3,15 @@
 // arma el ZIP con @aptio/exporters y lo guarda cifrado como recurso PAQUETE. El informe lista los recursos que faltan
 // (advertencias, no bloquean). Si algo falla, la exportación queda en ERROR con el motivo.
 // HU-1203 · Con formato HTML arma la carpeta autocontenida (sin manifiesto ni LMS) y la nombra `<proyecto>-html-v<n>.zip`.
+// HU-1406 · Los créditos de IA salen de la procedencia de los recursos que lleva el paquete y del nombre de la
+// organización que los revisó; el paquete mismo se registra con proveedor `aptio` (REQ-062, SUP-64).
 import { createHash, randomUUID } from 'node:crypto';
 import { type EventoTrabajo, publicarEvento } from '@aptio/colas';
 import type { Prisma, PrismaClient } from '@aptio/db';
-import { codigoReproductor, construirHtml, construirScorm12 } from '@aptio/exporters';
+import { armarCreditos, codigoReproductor, construirHtml, construirScorm12 } from '@aptio/exporters';
 import type { CursoReproductor, KitReproductor } from '@aptio/player';
 import type { Redis } from 'ioredis';
+import { conProcedencia, procedenciaPaquete } from './procedencia.js';
 import type { TrabajoEnCola } from './procesar.js';
 
 export const MIME_ZIP = 'application/zip';
@@ -52,7 +55,7 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
 
       // Los recursos del curso son filas de Recurso (uuid); el material del cliente (documento) nunca va en el paquete.
       const ids = curso.recursos.filter((r) => r.tipo !== 'documento' && UUID.test(r.id)).map((r) => r.id);
-      const filas = await bd.recurso.findMany({ where: { id: { in: ids }, organizacionId }, select: { id: true, nombre: true, claveS3: true } });
+      const filas = await bd.recurso.findMany({ where: { id: { in: ids }, organizacionId }, select: { id: true, nombre: true, claveS3: true, tipo: true, proveedor: true, modelo: true, licencia: true } });
       const recursos = await Promise.all(filas.map(async (f) => {
         try {
           return { id: f.id, nombre: f.nombre, datos: await leer(f.claveS3) };
@@ -66,7 +69,12 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
       const kit: KitReproductor | undefined = k
         ? { paleta: k.paleta as KitReproductor['paleta'] & object, tipografias: k.tipografias as KitReproductor['tipografias'] & object, personaje: (k.personaje as { nombre?: string } | null)?.nombre ?? null }
         : undefined;
-      const comun = { curso, recursos, reproductor: await reproductor(), ...(kit ? { kit } : {}) };
+      // Créditos con los recursos del idioma que va en el paquete (los de otro idioma no entran, SUP-49).
+      const idioma = curso.idiomas[0] ?? 'es';
+      const delIdioma = new Set(curso.recursos.filter((r) => !(r as { idioma?: string }).idioma || (r as { idioma?: string }).idioma === idioma).map((r) => r.id));
+      const organizacion = await bd.organizacion.findUnique({ where: { id: organizacionId }, select: { nombre: true } });
+      const creditos = armarCreditos(filas.filter((f) => delIdioma.has(f.id)), organizacion?.nombre ?? '', idioma);
+      const comun = { curso, recursos, reproductor: await reproductor(), creditos, ...(kit ? { kit } : {}) };
       const paquete = exp.formato === 'HTML' ? await construirHtml(comun) : await construirScorm12({ ...comun, incluirDiagnostico: exp.incluirDiagnostico });
 
       const proyecto = exp.curso.proyecto;
@@ -83,11 +91,11 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
       };
       await bd.$transaction([
         bd.recurso.create({
-          data: {
+          data: conProcedencia({
             id: recursoId, organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'PAQUETE', origen: 'GENERADO',
             claveS3, mime: MIME_ZIP, bytes: BigInt(paquete.zip.byteLength), hash: createHash('sha256').update(paquete.zip).digest('hex'),
-            nombre: nombrePaquete(proyecto.nombre, exp.versionCurso, exp.formato), licencia: 'Paquete generado por Aptio SCORM',
-          },
+            nombre: nombrePaquete(proyecto.nombre, exp.versionCurso, exp.formato), ...procedenciaPaquete(exp.formato),
+          }),
         }),
         bd.exportacion.update({
           where: { id: exp.id },

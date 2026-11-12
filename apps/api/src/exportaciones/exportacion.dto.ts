@@ -51,6 +51,20 @@ export class RecursoPesadoDto {
 }
 
 /** HU-1201 · Resultado de validar antes de exportar. Nunca bloquea por tamaño (RN-12-2): solo los errores impiden exportar. */
+/** HU-1406 · Una fila de los créditos de IA del paquete. */
+export class FilaCreditosDto {
+  @ApiProperty({ example: 'Voz' }) que: string;
+  @ApiProperty({ example: 'Google' }) proveedor: string;
+  @ApiProperty({ example: 'es-US-Neural2-A' }) modelo: string;
+  @ApiProperty() licencia: string;
+}
+
+/** HU-1406 · Créditos de IA que llevará el paquete (CP-107). */
+export class CreditosDto {
+  @ApiProperty({ example: 'Voz e ilustraciones generadas con IA y revisadas por AulasEducativas' }) aviso: string;
+  @ApiProperty({ type: [FilaCreditosDto] }) filas: FilaCreditosDto[];
+}
+
 export class ValidacionDto {
   @ApiProperty({ enum: ['SCORM12', 'HTML'] }) formato: 'SCORM12' | 'HTML';
   @ApiProperty({ type: [String], description: 'Impiden exportar (el curso no cumple el esquema)' }) errores: string[];
@@ -66,4 +80,5 @@ export class ValidacionDto {
   @ApiProperty() pantallasTotal: number;
   @ApiProperty() pantallasSinAprobar: number;
   @ApiProperty({ type: [String] }) recursosFaltantes: string[];
+  @ApiProperty({ type: CreditosDto, nullable: true, description: 'HU-1406 · Créditos de IA tal como saldrán en el paquete; null si ningún recurso es de IA' }) creditos: CreditosDto | null;
 }

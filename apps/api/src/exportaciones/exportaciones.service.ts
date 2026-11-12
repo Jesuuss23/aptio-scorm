@@ -6,7 +6,7 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { TAREA_EXPORTAR } from '@aptio/colas';
 import type { Exportacion } from '@aptio/db';
-import { codigoReproductor, validarExportacion } from '@aptio/exporters';
+import { armarCreditos, codigoReproductor, validarExportacion } from '@aptio/exporters';
 import { erroresCurso } from '@aptio/schema';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
@@ -58,11 +58,12 @@ export class ExportacionesService {
   async validar(u: UsuarioSesion, cursoId: string, dto: ExportacionEntradaDto): Promise<ValidacionDto> {
     const c = await this.curso(u, cursoId);
     const { formato } = this.formatoDisponible(dto);
-    const doc = c.documento as { recursos?: { id?: unknown }[] } | null;
+    const doc = c.documento as { recursos?: { id?: unknown; tipo?: unknown; idioma?: unknown }[]; idiomas?: unknown[] } | null;
     const ids = (Array.isArray(doc?.recursos) ? doc.recursos : []).map((r) => r?.id).filter((id): id is string => typeof id === 'string' && UUID.test(id));
-    const [filas, proyecto] = await Promise.all([
-      ids.length ? this.bd.recurso.findMany({ where: { id: { in: ids }, organizacionId: c.organizacionId }, select: { id: true, nombre: true, bytes: true } }) : [],
+    const [filas, proyecto, organizacion] = await Promise.all([
+      ids.length ? this.bd.recurso.findMany({ where: { id: { in: ids }, organizacionId: c.organizacionId }, select: { id: true, nombre: true, bytes: true, tipo: true, proveedor: true, modelo: true, licencia: true } }) : [],
       this.bd.proyecto.findFirst({ where: { id: c.proyectoId }, select: { clienteId: true } }),
+      this.bd.organizacion.findUnique({ where: { id: c.organizacionId }, select: { nombre: true } }),
     ]);
     const ficha = proyecto && formato === 'SCORM12'
       ? await this.bd.fichaCompatibilidad.findFirst({ where: { clienteId: proyecto.clienteId, limiteSubidaMb: { not: null } }, orderBy: { actualizadoEn: 'desc' }, select: { limiteSubidaMb: true } })
@@ -72,7 +73,12 @@ export class ExportacionesService {
     const origenLimite = ficha?.limiteSubidaMb ? 'ficha' : 'referencia';
     const pesos = filas.map((r) => ({ id: r.id, nombre: r.nombre, bytes: Number(r.bytes) }));
     const v = validarExportacion(formato, c.documento, pesos, await medirReproductor(), limiteMb, { origenLimite });
-    return { ...v, origenLimite: formato === 'HTML' ? null : origenLimite };
+    // HU-1406 · Los créditos con las mismas reglas que el worker: recursos del idioma del paquete, sin documentos del cliente.
+    const idioma = doc?.idiomas?.[0] === 'en' ? 'en' : 'es';
+    const delPaquete = new Set((Array.isArray(doc?.recursos) ? doc.recursos : [])
+      .filter((r) => r?.tipo !== 'documento' && (!r?.idioma || r.idioma === idioma)).map((r) => r?.id));
+    const creditos = armarCreditos(filas.filter((f) => delPaquete.has(f.id)), organizacion?.nombre ?? '', idioma);
+    return { ...v, origenLimite: formato === 'HTML' ? null : origenLimite, creditos };
   }
 
   async exportar(u: UsuarioSesion, cursoId: string, dto: ExportacionEntradaDto): Promise<ExportacionDto> {

@@ -12,7 +12,7 @@ import { montar, type Reproductor } from './reproductor.ts';
 import { decidirReanudacion } from './reanudacion.ts';
 import { buscarApi, type ConexionScorm12, conectarScorm12, type VentanaLms } from './scorm12.ts';
 import { huellaCurso } from './suspend.ts';
-import type { CursoReproductor, Idioma, KitReproductor } from './tipos.ts';
+import type { Creditos, CursoReproductor, Idioma, KitReproductor } from './tipos.ts';
 
 export interface DatosPaquete {
   curso: CursoReproductor;
@@ -26,6 +26,8 @@ export interface DatosPaquete {
   subtitulos?: Record<string, string>;
   /** HU-1204 · false: el paquete se exportó sin modo diagnóstico (no responde al atajo ni a ?diagnostico=1). */
   diagnostico?: boolean;
+  /** HU-1406 · Créditos de IA; sin recursos de IA no hay créditos ni botón. */
+  creditos?: Creditos | null;
   /** HU-1203 · 'html': la carpeta se abre sin LMS (no se busca la API de SCORM). Por defecto, 'scorm12'. */
   modo?: 'scorm12' | 'html';
 }
@@ -73,6 +75,7 @@ export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ven
     urlRecurso: (id) => datos.rutas[id],
     cargarSvg: async (id) => datos.svgs?.[id],
     cargarSubtitulos: async (id) => datos.subtitulos?.[id],
+    ...(datos.creditos ? { creditos: datos.creditos } : {}),
     ...(guardado ? { reanudar: { ...guardado, preguntar } } : {}),
     alReanudar: () => { listo = true; },
     alCambiar: (e) => { if (listo) lms.reportar(e); },
