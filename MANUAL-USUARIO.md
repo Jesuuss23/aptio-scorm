@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.29 · actualizado con la séptima entrega del Sprint 6 (12 de noviembre de 2026)**
+**Versión 0.30 · actualizado con la octava entrega del Sprint 6 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -413,6 +413,17 @@ La cápsula exportada (SCORM o HTML) y la vista previa se usan completas sin rat
 
 Se verificó con un recorrido completo solo con teclado y con la revisión automática WCAG 2.2 AA (axe), en Chromium. Falta probar con NVDA, VoiceOver y en Firefox y Safari.
 
+### 8.13 Créditos y licencias
+
+Cada recurso que genera la plataforma guarda **con qué proveedor, con qué modelo y con qué licencia** se hizo. En **Entrega**, la sección **Créditos y licencias** lo muestra:
+
+- **Así saldrán los créditos en el paquete:** la frase de revisión y la tabla que verá el participante. La frase depende de lo que se generó con IA: «Voz e ilustraciones generadas con IA y revisadas por AulasEducativas», «Voz generada con IA…», «Ilustraciones generadas con IA…» o, si solo hay video u otro contenido, «Contenido generado con IA…». Si nada se generó con IA, el paquete no lleva créditos.
+- **Recursos generados del curso:** la voz, las ilustraciones y los subtítulos que usa el curso, lo de IA primero. **Abrir** muestra el tipo, el proveedor, el modelo, la licencia, si sale en los créditos y el archivo.
+
+Los subtítulos y el paquete los arma la propia plataforma sin IA: se registran con proveedor `aptio` y no salen en los créditos. El revisor del cliente ve la lista de sus recursos, sin la vista previa de los créditos.
+
+**En la cápsula.** Si el curso tiene algo generado con IA, la barra superior suma el botón **Créditos**. Abre un cuadro con la frase de revisión y la tabla Qué, Proveedor, Modelo y Licencia. Se usa con teclado y lector de pantalla: **Escape** o **Cerrar** lo cierran y el foco vuelve al botón.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -479,6 +490,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.27 | 2026-11-11 | Modo diagnóstico del paquete (Ctrl+Alt+Shift+D o `?diagnostico=1`, Copiar informe) y fichas de compatibilidad LMS en el detalle del cliente. |
 | 0.28 | 2026-11-12 | Entrega: formato HTML autocontenido para presentar sin LMS ni internet (8.11). |
 | 0.29 | 2026-11-12 | Accesibilidad de la cápsula: uso con teclado, anuncios para lector de pantalla y quitar el límite de tiempo del reto (8.12). |
+| 0.30 | 2026-11-12 | Créditos y licencias en Entrega y botón «Créditos» en la cápsula (8.13). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.29 · actualizado con la séptima entrega del Sprint 6 (12 de noviembre de 2026)**
+**Versión 0.30 · actualizado con la octava entrega del Sprint 6 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -129,6 +129,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - Modo diagnóstico (HU-1204): `src/diagnostico.ts` (`RegistroDiagnostico`, `informeDiagnostico`, `navegadorResumido`) es lógica sin DOM; `src/panel-diagnostico.ts` es el panel. `buscarApi(ventana, registro)` y `conectarScorm12(api, { registro })` anotan solos: si agregas una llamada al LMS, pásala por `llamar(..., nota)` para que quede en el registro. Nunca leas datos del participante; si hiciera falta, agrégalos a `ELEMENTOS_PRIVADOS`. Si cambias la forma del informe, súbele `version` (lo guardan las fichas de los clientes). `DatosPaquete.diagnostico: false` lo desactiva (lo pone `construirScorm12` con `incluirDiagnostico: false`).
 - HTML (HU-1203): con `DatosPaquete.modo: 'html'`, `conectarPaquete` no toca `API`, `parent` ni `opener` y no avisa; tampoco hay modo diagnóstico. No agregues `fetch` al camino del paquete: en `file://` no funciona. Los SVG y los WebVTT van en `datos.js`.
 - Accesibilidad (HU-1401): no uses `disabled` en un control que puede tener el foco en ese momento (una carta emparejada usa `aria-disabled`); si una acción quita o desactiva el control enfocado, mueve el foco con `enfocar(el)` de `interacciones/comun.ts` (espera a que el elemento esté en la página). `pieResultado` ya enfoca el resultado; el texto que debe leerse al empezar o al pasar de paso lleva `tabindex=-1` y `data-enfocar` (`inicioDe` lo busca al repetir). Los colores del kit que se usan como texto pasan por `colorLegible` (`src/contraste.ts`) y se exponen como `--ap-bien-texto`, `--ap-mal-texto` y `--ap-foco`; no pongas `var(--ap-secundario)` como color de texto.
+- Créditos (HU-1406): `montar(..., { creditos })` suma el botón «Créditos» a la barra (solo con marco); `src/creditos.ts` (`abrirCreditos`) dibuja el diálogo modal, deja `inert` el resto de la raíz y devuelve el foco al botón. `DatosPaquete.creditos` lo pasa desde `datos.js`. Si agregas controles al diálogo, cambia el manejo de Tab, que hoy deja el foco en «Cerrar».
 - Para el paquete: `pnpm --filter @aptio/player construir` deja `packages/player/dist/aptio-reproductor.js` con `window.AptioReproductor.montar`.
 
 ### 6.5.1 Entrega (`@aptio/exporters`)
@@ -136,6 +137,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - `construirScorm12` arma el ZIP (HU-1202) y `construirHtml` la carpeta autocontenida (HU-1203). Las dos parten de `armarContenido` y `comprimir` (ZIP determinista), así que comparten las reglas de qué recursos entran: nunca `documento` (SUP-52) ni recursos de otro idioma (SUP-49).
 - `validarExportacion(formato, curso, pesosRecursos, pesoReproductor, limiteMb, { origenLimite })` valida antes de exportar (HU-1201); `validarScorm12` es su atajo para SCORM. En HTML devuelve `limiteMb`, `suspendDataCaracteres` (y en la API `origenLimite`) en `null`. Si cambias qué recursos entran en `armarContenido`, cambia también la estimación de peso.
 - La validación es pura y no lanza con un documento roto: devuelve los errores de esquema y lo que se pueda calcular. Solo `errores` impide exportar; el peso nunca (RN-12-2). Los textos de las alternativas están en `ALTERNATIVAS_PESO` y siguen a `docs/08-entregas-y-lms.md`.
+- Créditos (HU-1406): `armarCreditos(recursos, organizacion, idioma)` de `src/creditos.ts` arma `{ aviso, filas }` o `null`; `construirScorm12` y `construirHtml` lo reciben como `creditos`. `esDeIa` deja fuera el proveedor `aptio` (`PROVEEDOR_APTIO`). Un proveedor nuevo suma su nombre comercial en `NOMBRE_PROVEEDOR`.
 - La API (`ExportacionesService.validar`) pide las filas de `Recurso` solo para ids con forma de UUID: los ids de ejemplo del caso LOTO no son filas y salen como faltantes.
 
 ### 6.6 Cambios al documento del curso (M05)
@@ -281,6 +283,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 - **Texto:** implementa `ProveedorTexto` (`nombre`, `modeloPara`, `completar`) y elígelo en `proveedorDesdeEntorno`.
 - **Transcripción:** implementa `ProveedorTranscripcion` (`packages/ai/src/transcripcion.ts`) y elígelo en `transcriptorDesdeEntorno`. En modo real sin clave, el proveedor debe fallar con un motivo y no inventar texto.
 - Registra la tarifa y la licencia (`docs/19-proveedores-y-licencias.md`, ADR-010). Si no está verificada, déjala como supuesto.
+- Todo recurso GENERADO pasa por `conProcedencia` (`apps/worker/src/procedencia.ts`) con el proveedor, el modelo que respondió y la licencia; sin alguno de los tres no se guarda (REQ-062). Lo que hace la plataforma sin IA usa `PROVEEDOR_APTIO` y no sale en los créditos.
 
 ### 7.3 Agregar un tipo de material
 
@@ -364,6 +367,7 @@ Ninguna clave real va al repositorio.
 | 0.27 | 2026-11-11 | HU-1204: modo diagnóstico en `@aptio/player`, `incluirDiagnostico`, `FichasController` y `FichasLms.tsx`; el LMS de prueba de Playwright pasa a `https://lms.prueba` (el portapapeles exige página segura). |
 | 0.28 | 2026-11-12 | HU-1203: `construirHtml`, `armarContenido`/`comprimir`, `validarExportacion` y `modo: 'html'` del reproductor; prueba CP-093 en `file://` sin red (`e2e/html.spec.ts`). |
 | 0.29 | 2026-11-12 | HU-1401: `contraste.ts` y variables legibles, `enfocar`/`inicioDe` en las interacciones, quitar el límite del quiz; pruebas con happy-dom y `accesibilidad.spec.ts` con axe. |
+| 0.30 | 2026-11-12 | HU-1406: `conProcedencia` y procedencia `aptio`, `armarCreditos` en el exportador, diálogo `abrirCreditos` en el reproductor, procedencia en la API y «Créditos y licencias» en Entrega. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
