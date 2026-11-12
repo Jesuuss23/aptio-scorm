@@ -43,12 +43,15 @@ export interface OpcionesLms {
   consulta?: string;
   /** HU-1204 · Paquete exportado con o sin modo diagnóstico (por defecto, con). */
   incluirDiagnostico?: boolean;
+  /** HU-0804 · Español e inglés en el mismo paquete. */
+  modoIdioma?: 'unico' | 'mismo-paquete';
 }
 
 export async function abrirEnLms(page: Page, curso: Curso, opciones: OpcionesLms = {}) {
   const { zip } = await construirScorm12({
     curso, recursos: recursosLoto({ sinAudio: true }), reproductor: await codigoReproductor(),
     ...(opciones.incluirDiagnostico === undefined ? {} : { incluirDiagnostico: opciones.incluirDiagnostico }),
+    ...(opciones.modoIdioma ? { modoIdioma: opciones.modoIdioma } : {}),
   });
   const consulta = opciones.consulta ? `?${opciones.consulta}` : '';
   const pagina = opciones.sinApi ? SIN_API_HTML(consulta) : LMS_HTML.replace('src="paquete/index.html"', `src="paquete/index.html${consulta}"`);

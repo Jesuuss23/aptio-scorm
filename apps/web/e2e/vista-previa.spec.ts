@@ -1,4 +1,5 @@
 // HU-1101 y HU-1102 · Vista previa con el reproductor único (CP-085) y bloqueo por actividad (CP-086).
+// HU-0804 · Con algún texto en inglés, la vista previa ofrece el botón EN / ES del paquete bilingüe.
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, type Locator, type Page, test } from '@playwright/test';
@@ -106,6 +107,27 @@ test('en revisión se salta a cualquier pantalla y se ven los ids; clasificar se
   await comprobar.click();
   await expect(r.getByText(/^Resultado: \d+ %$/)).toBeVisible();
   await expect(r.locator('.ap-elemento .ap-marca')).toHaveCount(7);
+});
+
+test('HU-0804 · sin inglés en el curso, la vista previa no muestra el botón de idioma', async ({ page }) => {
+  await page.goto(URL_VISTA);
+  const r = reproductor(page);
+  await expect(r.getByRole('heading', { level: 2, name: 'Bloqueo y etiquetado' })).toBeVisible();
+  await expect(r.locator('.ap-idioma')).toHaveCount(0);
+});
+
+test('HU-0804 · con el curso traducido, la vista previa cambia a inglés en la misma pantalla', async ({ page }) => {
+  await page.unrouteAll();
+  await simularApi(page, { conSesion: true, conProyectos: true, cursoTraducido: true });
+  await page.goto(URL_VISTA);
+  const r = reproductor(page);
+  await expect(r.getByRole('heading', { level: 2, name: 'Bloqueo y etiquetado' })).toBeVisible();
+  await r.getByRole('button', { name: 'Siguiente' }).click();
+  await enPantalla(page, 2);
+  await r.getByRole('button', { name: 'EN, ver en inglés' }).click();
+  await enPantalla(page, 2);
+  await expect(r.locator('.ap-titulo-pantalla')).toHaveText(/^\[EN\] /);
+  await expect(r.getByRole('button', { name: 'ES, view in Spanish' })).toBeFocused();
 });
 
 test('celular, tableta y escritorio: el marco cambia y el reproductor se acomoda sin desbordar', async ({ page }) => {

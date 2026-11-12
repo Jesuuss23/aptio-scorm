@@ -10,6 +10,9 @@
 // a 0,3 s (RN-06-9). El reloj de la pantalla es el audio de la narración si está sonando (o ya sonó) y, si no, el tiempo
 // desde que se mostró. El editor monta con `sinTiempos` (todo a la vista) y mueve la aguja con `irA`, `reproducir`,
 // `pausar` y `verTodo`: en ese segundo se ven solo los elementos activos, con la boca y el subtítulo de ese instante.
+// HU-0804 · Bilingüe (RN-08-4, CP-079): si el curso trae español e inglés, la barra suma el botón de idioma. Cambiar de
+// idioma vuelve a montar el reproductor en la misma pantalla con lo visto, los resultados y los puntos (como la
+// reanudación de la HU-1105); una actividad a medio hacer vuelve a empezar. El foco queda en el botón de idioma.
 import { colorLegible } from './contraste.ts';
 import { abrirCreditos } from './creditos.ts';
 import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
@@ -36,6 +39,10 @@ const MOSTRAR_BASE = ['temario', 'progreso', 'contador', 'botones'];
 
 export interface OpcionesReproductor {
   idioma?: Idioma;
+  /** HU-0804 · Idiomas que ofrece el botón de idioma; por defecto, los del curso. Con uno solo no hay botón. */
+  idiomas?: Idioma[];
+  /** HU-0804 · Se avisa después de cambiar de idioma, con el estado ya en el idioma nuevo. */
+  alCambiarIdioma?: (idioma: Idioma, estado: EstadoReproductor) => void;
   kit?: KitReproductor;
   /** URL de un recurso del curso (imagen, personaje, video). Sin URL se dibuja un marco con su texto alternativo. */
   urlRecurso?: (id: string) => string | undefined;
@@ -100,7 +107,39 @@ export interface Reproductor {
   destruir(): void;
 }
 
+/**
+ * Monta el reproductor. Con español e inglés, el botón de idioma lo vuelve a montar en el otro idioma conservando el
+ * avance; el objeto devuelto sigue sirviendo (siempre habla con el reproductor del idioma actual).
+ */
 export function montar(contenedor: HTMLElement, curso: CursoReproductor, opciones: OpcionesReproductor = {}): Reproductor {
+  let r: Reproductor;
+  const cambiar = (nuevo: Idioma) => {
+    const e = r.estado();
+    r.destruir();
+    r = montarUno(contenedor, curso, {
+      ...opciones, idioma: nuevo, inicio: e.pantallaId,
+      reanudar: { pantallaId: e.pantallaId, vistas: e.vistas, resultados: e.resultados },
+    }, cambiar);
+    contenedor.shadowRoot?.querySelector<HTMLElement>('.ap-idioma')?.focus();
+    opciones.alCambiarIdioma?.(nuevo, r.estado());
+  };
+  r = montarUno(contenedor, curso, opciones, cambiar);
+  return {
+    ir: (d) => r.ir(d),
+    siguiente: () => r.siguiente(),
+    anterior: () => r.anterior(),
+    reiniciar: () => r.reiniciar(),
+    estado: () => r.estado(),
+    irA: (s) => r.irA(s),
+    reproducir: (desde, alTiempo) => r.reproducir(desde, alTiempo),
+    pausar: () => r.pausar(),
+    verTodo: () => r.verTodo(),
+    duracion: () => r.duracion(),
+    destruir: () => r.destruir(),
+  };
+}
+
+function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: OpcionesReproductor, cambiarIdioma: (idioma: Idioma) => void): Reproductor {
   const sombra = contenedor.shadowRoot ?? contenedor.attachShadow({ mode: 'open' });
   const idioma: Idioma = opciones.idioma ?? curso.idiomas[0] ?? 'es';
   const tx = textos(idioma);
@@ -246,6 +285,12 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const botonCreditos: HTMLButtonElement | null = opciones.creditos && conMarco
     ? h('button', { type: 'button', class: 'ap-boton-barra', 'aria-haspopup': 'dialog', onclick: () => abrirCreditos({ raiz, sombra, creditos: opciones.creditos!, tx, volver: botonCreditos! }) }, tx.creditos)
     : null;
+  // HU-0804 · Botón de idioma: muestra el otro idioma y lo dice completo para el lector de pantalla.
+  const ofrecidos = opciones.idiomas ?? curso.idiomas;
+  const otro: Idioma = idioma === 'es' ? 'en' : 'es';
+  const botonIdioma = conMarco && ofrecidos.includes('es') && ofrecidos.includes('en')
+    ? h('button', { type: 'button', class: 'ap-boton-barra ap-idioma', 'aria-label': tx.cambiarIdioma, 'data-idioma': idioma, onclick: () => { if (!pendiente) cambiarIdioma(otro); } }, otro.toUpperCase())
+    : null;
   const temario = h('nav', { class: 'ap-temario', 'aria-label': tx.temario, hidden: true });
   const escena = h('div', { class: 'ap-escena' });
   const subtitulos = h('p', { class: 'ap-subtitulos', hidden: true });
@@ -260,6 +305,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       h('span', { class: 'ap-titulo-curso' }, titulo),
       mostrar.has('progreso') ? [barraAvance, porcentaje] : h('span', { class: 'ap-espacio' }),
       botonSubtitulos,
+      botonIdioma,
       botonCreditos),
     h('div', { class: 'ap-cuerpo' }, temario, escena),
     barraNarracion,

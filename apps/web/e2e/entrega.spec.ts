@@ -4,6 +4,7 @@
 // HU-1201 · CP-090 · Verificación automática: un paquete de 300 MB advierte con alternativas y se exporta igual; un error
 // de esquema deshabilita Exportar; con pantallas sin aprobar se confirma antes (RN-12-3); cambiar el LMS vuelve a validar.
 // HU-1203 · Formato HTML autocontenido: sin LMS destino ni límite de subida, con la misma confirmación y el formato en el historial.
+// HU-0804 · Idioma «ES + EN en el mismo paquete»: sin todo el inglés no se exporta; los desbordes y la voz solo advierten.
 import { codigoReproductor, construirScorm12 } from '@aptio/exporters';
 import { expect, type Page, test } from '@playwright/test';
 import JSZip from 'jszip';
@@ -40,7 +41,7 @@ const PESADA: Validacion = {
 type Exp = { id: string; cursoId: string; formato: string; perfilLms: string; modoIdioma: string; versionCurso: number; estado: string; bytes: number | null; informe: unknown; motivo: string | null; nombreArchivo: string | null; descargaUrl: string | null; creadoEn: string };
 
 /** Exportaciones simuladas: cada una pasa a EN_CURSO y a COMPLETADO en las consultas siguientes, como el worker. */
-async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { falla?: boolean; validacion?: Validacion } = {}) {
+async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { falla?: boolean; validacion?: Validacion; bilingue?: () => Validacion } = {}) {
   const lista: Exp[] = [{
     id: '00000000-0000-4000-8000-00000000e001', cursoId: CURSO, formato: 'SCORM12', perfilLms: 'generico', modoIdioma: 'unico', versionCurso: 1, estado: 'COMPLETADO',
     bytes: 2_400_000, informe: { errores: [], advertencias: [] }, motivo: null, nombreArchivo: 'bloqueo-y-etiquetado-scorm12-v1.zip', descargaUrl: null, creadoEn: '2026-11-10T09:00:00.000Z',
@@ -50,7 +51,8 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
   await page.route(`**/api/v1/cursos/${CURSO}/validar`, (r) => {
     const pedido = r.request().postDataJSON() as Record<string, unknown>;
     validaciones.push(pedido);
-    return r.fulfill({ json: pedido.formato === 'HTML' ? VALIDACION_HTML : (opciones.validacion ?? VALIDACION) });
+    if (pedido.modoIdioma === 'mismo-paquete' && opciones.bilingue) return r.fulfill({ json: opciones.bilingue() });
+    return r.fulfill({ json: { ...(pedido.formato === 'HTML' ? VALIDACION_HTML : (opciones.validacion ?? VALIDACION)), modoIdioma: 'unico', textosIngles: null } });
   });
   const consultas = new Map<string, number>();
   const avanzar = (e: Exp) => {
@@ -66,7 +68,7 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
   await page.route(`**/api/v1/cursos/${CURSO}/exportaciones`, async (r) => {
     if (r.request().method() === 'POST') {
       pedidos.push(r.request().postDataJSON() as Record<string, unknown>);
-      const nueva: Exp = { ...lista[0]!, id: `00000000-0000-4000-8000-00000000e${String(100 + pedidos.length)}`, formato: String(pedidos.at(-1)!.formato), perfilLms: String(pedidos.at(-1)!.perfilLms), versionCurso: 3, estado: 'EN_COLA', bytes: null, informe: null, nombreArchivo: null, creadoEn: new Date().toISOString() };
+      const nueva: Exp = { ...lista[0]!, id: `00000000-0000-4000-8000-00000000e${String(100 + pedidos.length)}`, formato: String(pedidos.at(-1)!.formato), perfilLms: String(pedidos.at(-1)!.perfilLms), modoIdioma: String(pedidos.at(-1)!.modoIdioma ?? 'unico'), versionCurso: 3, estado: 'EN_COLA', bytes: null, informe: null, nombreArchivo: null, creadoEn: new Date().toISOString() };
       lista.unshift(nueva);
       return r.fulfill({ status: 202, json: nueva });
     }
@@ -123,7 +125,7 @@ test('CP-091 · exportar desde Entrega: el perfil cambia las recomendaciones, se
   await expect(confirmar).toContainText('18 de 30 pantallas no están aprobadas');
   await confirmar.getByRole('button', { name: 'Exportar igual' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'versión 3 del curso' })).toBeVisible();
-  expect(pedidos).toEqual([{ formato: 'SCORM12', perfilLms: 'generico' }]);
+  expect(pedidos).toEqual([{ formato: 'SCORM12', perfilLms: 'generico', modoIdioma: 'unico' }]);
   const fila = historial.getByRole('row').nth(1);
   await expect(fila).toContainText('v3');
   await expect(fila).toContainText(/En cola|Armando el paquete…/);
@@ -234,7 +236,7 @@ test('HU-1203 · con HTML autocontenido no hay LMS destino ni límite de subida,
   await expect(verificacion.getByText('Carpeta HTML autocontenida: abre sin internet y sin LMS', { exact: false })).toBeVisible();
   await expect(verificacion.getByText('límite de subida del destino')).toHaveCount(0);
   await expect(verificacion.getByText('suspend_data')).toHaveCount(0);
-  expect(validaciones.at(-1)).toEqual({ formato: 'HTML', perfilLms: 'generico' });
+  expect(validaciones.at(-1)).toEqual({ formato: 'HTML', perfilLms: 'generico', modoIdioma: 'unico' });
 
   // Con pantallas sin aprobar se confirma también en HTML (RN-12-3).
   await page.getByRole('button', { name: 'Exportar HTML' }).click();
@@ -242,7 +244,7 @@ test('HU-1203 · con HTML autocontenido no hay LMS destino ni límite de subida,
   await expect(dialogo).toContainText('La carpeta HTML saldrá con su contenido actual');
   await dialogo.getByRole('button', { name: 'Exportar igual' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'se arma la carpeta HTML con la versión 3 del curso' })).toBeVisible();
-  expect(pedidos).toEqual([{ formato: 'HTML', perfilLms: 'generico' }]);
+  expect(pedidos).toEqual([{ formato: 'HTML', perfilLms: 'generico', modoIdioma: 'unico' }]);
   const fila = page.getByRole('region', { name: 'Historial de exportaciones' }).locator('tbody tr').first();
   await expect(fila.locator('td').nth(1)).toHaveText('HTML');
   await expect(fila.locator('td').nth(3)).toHaveText('—');
@@ -319,4 +321,41 @@ test('CP-106 · el revisor del cliente ve los recursos y su procedencia, sin la 
   await expect(seccion.getByRole('group', { name: 'Así saldrán los créditos' })).toHaveCount(0);
   await seccion.getByRole('button', { name: 'Abrir Faja de seguridad.png' }).click();
   await expect(page.getByRole('dialog', { name: 'Faja de seguridad.png' }).locator('dt:text-is("Proveedor") + dd')).toHaveText('recraft');
+});
+
+test('HU-0804 · ES + EN en el mismo paquete: sin todo el inglés no se exporta; con él, exporta con los avisos de desborde y voz', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  let traducidos = 118;
+  const FALTA = 'Faltan 2 textos en inglés: tradúcelos en Idiomas';
+  const AVISOS = ['1 texto en inglés no cabe en su espacio (Desborde): revísalos en Idiomas.', 'Sin voz en inglés: en inglés la pantalla muestra la narración como texto.'];
+  const { pedidos, validaciones } = await simularExportaciones(page, zip, {
+    bilingue: () => ({ ...VALIDACION, modoIdioma: 'mismo-paquete', textosIngles: { traducidos, total: 120 }, errores: traducidos < 120 ? [FALTA] : [], advertencias: [...AVISOS, ...VALIDACION.advertencias] }),
+  });
+  await page.goto(URL_ENTREGA);
+  const idioma = page.getByRole('group', { name: 'Idioma' });
+  await expect(idioma.getByRole('button', { name: 'Español' })).toHaveAttribute('aria-pressed', 'true');
+  const verificacion = page.getByRole('region', { name: 'Verificación automática' });
+  await expect(verificacion.getByText('Textos en inglés')).toHaveCount(0);
+
+  await idioma.getByRole('button', { name: 'ES + EN en el mismo paquete' }).click();
+  await expect(page.getByText('El paquete abre en español y lleva un botón EN / ES para cambiar sin perder el avance.')).toBeVisible();
+  await expect(verificacion.locator('[data-cifra="ingles"]')).toHaveText(/Textos en inglés\s*118 \/ 120/);
+  await expect(verificacion.getByText(FALTA)).toBeVisible();
+  await expect(verificacion.getByRole('link', { name: 'Ir a Idiomas' })).toHaveAttribute('href', `/proyectos/${PROYECTO}/idiomas`);
+  // Faltar inglés no es un error de esquema: esa línea sigue bien.
+  await expect(verificacion.getByText('el curso cumple el esquema', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Exportar SCORM 1.2' })).toBeDisabled();
+  expect(validaciones.at(-1)).toMatchObject({ formato: 'SCORM12', modoIdioma: 'mismo-paquete' });
+
+  // Con todo traducido se exporta: los desbordes y la voz en inglés solo advierten.
+  traducidos = 120;
+  await idioma.getByRole('button', { name: 'Español' }).click();
+  await idioma.getByRole('button', { name: 'ES + EN en el mismo paquete' }).click();
+  await expect(verificacion.locator('[data-cifra="ingles"]')).toHaveText(/120 \/ 120/);
+  await expect(verificacion.getByText('Todos los textos tienen su inglés')).toBeVisible();
+  for (const a of AVISOS) await expect(verificacion.getByText(a)).toBeVisible();
+  await page.getByRole('button', { name: 'Exportar SCORM 1.2' }).click();
+  await page.getByRole('dialog', { name: '¿Exportar con pantallas sin aprobar?' }).getByRole('button', { name: 'Exportar igual' }).click();
+  await expect.poll(() => pedidos.at(-1)).toMatchObject({ formato: 'SCORM12', modoIdioma: 'mismo-paquete' });
+  await expect(page.getByRole('region', { name: 'Historial de exportaciones' }).getByRole('cell', { name: 'SCORM 1.2 · ES + EN' })).toBeVisible();
 });

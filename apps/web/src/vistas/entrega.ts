@@ -1,6 +1,6 @@
 // HU-1202 · Datos de la vista Entrega (PNT-13): perfiles de LMS con sus recomendaciones y el peso legible.
 // HU-1201 · El límite de suspend_data de SCORM 1.2 y los MB con un decimal para la verificación automática.
-import type { FormatoExportacion, PerfilExportacion, Recurso } from '../api';
+import type { FormatoExportacion, ModoIdiomaExportacion, PerfilExportacion, Recurso } from '../api';
 
 /** Recomendaciones de docs/08-entregas-y-lms.md. La compatibilidad con cada LMS se declara solo después de probarla. */
 /** HU-1203 · Formatos que se exportan hoy. */
@@ -8,6 +8,14 @@ export const FORMATOS: { id: FormatoExportacion; nombre: string }[] = [
   { id: 'SCORM12', nombre: 'SCORM 1.2 · un solo SCO' },
   { id: 'HTML', nombre: 'HTML autocontenido · para presentar sin LMS' },
 ];
+/** HU-0804 · Idiomas del paquete. */
+export const MODOS_IDIOMA: { id: ModoIdiomaExportacion; nombre: string }[] = [
+  { id: 'unico', nombre: 'Español' },
+  { id: 'mismo-paquete', nombre: 'ES + EN en el mismo paquete' },
+];
+/** Errores y advertencias del paquete bilingüe que la verificación muestra en su propia línea. */
+export const esFaltaIngles = (e: string): boolean => /^Faltan \d+ textos en inglés/.test(e);
+export const esAvisoIngles = (a: string): boolean => /\(Desborde\)|^Sin voz en inglés/.test(a);
 /** Nombre del formato en el historial. */
 export const NOMBRE_FORMATO: Record<string, string> = { SCORM12: 'SCORM 1.2', HTML: 'HTML' };
 

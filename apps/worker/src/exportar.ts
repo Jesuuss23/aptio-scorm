@@ -5,6 +5,8 @@
 // HU-1203 · Con formato HTML arma la carpeta autocontenida (sin manifiesto ni LMS) y la nombra `<proyecto>-html-v<n>.zip`.
 // HU-1406 · Los créditos de IA salen de la procedencia de los recursos que lleva el paquete y del nombre de la
 // organización que los revisó; el paquete mismo se registra con proveedor `aptio` (REQ-062, SUP-64).
+// HU-0804 · Con `modoIdioma: 'mismo-paquete'` el paquete lleva español e inglés; los créditos van en español e incluyen
+// los recursos de los dos idiomas.
 import { createHash, randomUUID } from 'node:crypto';
 import { type EventoTrabajo, publicarEvento } from '@aptio/colas';
 import type { Prisma, PrismaClient } from '@aptio/db';
@@ -69,12 +71,14 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
       const kit: KitReproductor | undefined = k
         ? { paleta: k.paleta as KitReproductor['paleta'] & object, tipografias: k.tipografias as KitReproductor['tipografias'] & object, personaje: (k.personaje as { nombre?: string } | null)?.nombre ?? null }
         : undefined;
-      // Créditos con los recursos del idioma que va en el paquete (los de otro idioma no entran, SUP-49).
-      const idioma = curso.idiomas[0] ?? 'es';
-      const delIdioma = new Set(curso.recursos.filter((r) => !(r as { idioma?: string }).idioma || (r as { idioma?: string }).idioma === idioma).map((r) => r.id));
+      // Créditos con los recursos de los idiomas que van en el paquete (los de otro idioma no entran, SUP-49).
+      const bilingue = exp.modoIdioma === 'mismo-paquete';
+      const idioma = bilingue ? 'es' : curso.idiomas[0] ?? 'es';
+      const idiomas: string[] = bilingue ? ['es', 'en'] : [idioma];
+      const delIdioma = new Set(curso.recursos.filter((r) => { const i = (r as { idioma?: string }).idioma; return !i || idiomas.includes(i); }).map((r) => r.id));
       const organizacion = await bd.organizacion.findUnique({ where: { id: organizacionId }, select: { nombre: true } });
       const creditos = armarCreditos(filas.filter((f) => delIdioma.has(f.id)), organizacion?.nombre ?? '', idioma);
-      const comun = { curso, recursos, reproductor: await reproductor(), creditos, ...(kit ? { kit } : {}) };
+      const comun = { curso, recursos, reproductor: await reproductor(), creditos, modoIdioma: bilingue ? 'mismo-paquete' as const : 'unico' as const, ...(kit ? { kit } : {}) };
       const paquete = exp.formato === 'HTML' ? await construirHtml(comun) : await construirScorm12({ ...comun, incluirDiagnostico: exp.incluirDiagnostico });
 
       const proyecto = exp.curso.proyecto;
@@ -87,6 +91,7 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
         advertencias: paquete.faltantes.map((id) => `Falta el archivo de «${nombres.get(id) ?? id}»: el paquete muestra su texto alternativo.`),
         recursosFaltantes: paquete.faltantes,
         idioma: paquete.idioma,
+        idiomas: paquete.idiomas,
         archivos: paquete.archivos.length,
       };
       await bd.$transaction([

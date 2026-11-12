@@ -1,7 +1,9 @@
 // HU-1202 · Paquete SCORM 1.2 de un solo SCO: imsmanifest.xml, index.html, el reproductor único empaquetado, los datos del
 // curso y sus recursos en `recursos/`. Todas las rutas son relativas y nada se descarga de internet. El ZIP es
 // determinista: con la misma entrada sale el mismo archivo, byte a byte (orden fijo, fecha fija, compresión fija).
-// Exporta un solo idioma, el primero del curso salvo que se pida otro (SUP-49).
+// Exporta un solo idioma, el primero del curso salvo que se pida otro (SUP-49). HU-0804: con `modoIdioma: 'mismo-paquete'`
+// lleva español e inglés, con los recursos de los dos idiomas, y abre en español.
+import { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma } from './bilingue.ts';
 import type { Creditos, CursoReproductor, Idioma, KitReproductor } from '@aptio/player';
 import JSZip from 'jszip';
 import { escaparXml, manifiestoScorm12 } from './manifiesto.ts';
@@ -27,6 +29,8 @@ export interface EntradaScorm12 {
   incluirDiagnostico?: boolean;
   /** HU-1406 · Créditos de IA (`armarCreditos`); null o ausentes: el paquete no muestra «Créditos». */
   creditos?: Creditos | null;
+  /** HU-0804 · 'mismo-paquete': español e inglés con el botón de idioma. Por defecto, 'unico'. */
+  modoIdioma?: ModoIdioma;
 }
 
 export interface PaqueteScorm12 {
@@ -36,6 +40,8 @@ export interface PaqueteScorm12 {
   /** Ids de recursos del curso (del idioma exportado) que no vinieron en `recursos`. */
   faltantes: string[];
   idioma: Idioma;
+  /** HU-0804 · Idiomas que lleva el paquete. */
+  idiomas: Idioma[];
 }
 
 /** Fecha fija de todas las entradas del ZIP, para que el archivo sea determinista. */
@@ -80,13 +86,16 @@ export interface ContenidoPaquete {
   lista: string[];
   faltantes: string[];
   idioma: Idioma;
+  idiomas: Idioma[];
   titulo: string;
 }
 
 /** Arma index.html, el reproductor, datos.js, iniciar.js y `recursos/`. `extra` se agrega a `datos.js`. */
 export function armarContenido(entrada: EntradaScorm12, extra: Record<string, unknown> = {}): ContenidoPaquete {
-  const { curso } = entrada;
-  const idioma: Idioma = entrada.idioma ?? curso.idiomas[0] ?? 'es';
+  const bilingue = entrada.modoIdioma === 'mismo-paquete';
+  const curso = bilingue ? cursoBilingue(entrada.curso) : entrada.curso;
+  const idioma: Idioma = bilingue ? 'es' : entrada.idioma ?? curso.idiomas[0] ?? 'es';
+  const idiomas: Idioma[] = bilingue ? [...IDIOMAS_BILINGUE] : [idioma];
   const titulo = textoDe(curso.metadatos.titulo, idioma) || curso.id;
   const archivos = new Map(entrada.recursos.map((r) => [r.id, r]));
 
@@ -99,7 +108,7 @@ export function armarContenido(entrada: EntradaScorm12, extra: Record<string, un
   for (const r of curso.recursos as RecursoCurso[]) {
     // El material del cliente (documentos fuente de la trazabilidad) nunca va dentro del paquete (SUP-52).
     if (r.tipo === 'documento') continue;
-    if (r.idioma && r.idioma !== idioma) continue;
+    if (r.idioma && !(idiomas as string[]).includes(r.idioma)) continue;
     const archivo = archivos.get(r.id);
     if (!archivo) { faltantes.push(r.id); continue; }
     const ruta = `recursos/${seguro(r.id)}${extension(archivo.nombre) || extension(r.nombre)}`;
@@ -116,7 +125,7 @@ export function armarContenido(entrada: EntradaScorm12, extra: Record<string, un
   contenido.set('iniciar.js', INICIAR_JS);
 
   const lista = [...contenido.keys()].sort((a, b) => (a === 'index.html' ? -1 : b === 'index.html' ? 1 : a < b ? -1 : a > b ? 1 : 0));
-  return { contenido, lista, faltantes, idioma, titulo };
+  return { contenido, lista, faltantes, idioma, idiomas, titulo };
 }
 
 /** ZIP determinista: orden dado, fecha fija y compresión fija. */
@@ -129,9 +138,9 @@ export async function comprimir(archivos: [string, Uint8Array | string][]): Prom
 
 export async function construirScorm12(entrada: EntradaScorm12): Promise<PaqueteScorm12> {
   const { curso } = entrada;
-  const { contenido, lista, faltantes, idioma, titulo } = armarContenido(entrada);
+  const { contenido, lista, faltantes, idioma, idiomas, titulo } = armarContenido(entrada);
   const sumativa = curso.seguimiento.criterioCompletado === 'sumativa';
   const manifiesto = manifiestoScorm12({ cursoId: curso.id, titulo, masteryscore: sumativa ? curso.seguimiento.notaMinima : null, archivos: lista });
   const zip = await comprimir([['imsmanifest.xml', manifiesto], ...lista.map((r) => [r, contenido.get(r)!] as [string, Uint8Array | string])]);
-  return { zip, archivos: ['imsmanifest.xml', ...lista], faltantes, idioma };
+  return { zip, archivos: ['imsmanifest.xml', ...lista], faltantes, idioma, idiomas };
 }

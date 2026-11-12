@@ -116,6 +116,8 @@ export interface ConexionScorm12 {
   reportar(estado: Pick<EstadoReproductor, 'pantallaId' | 'nota' | 'leccion' | 'vistas' | 'resultados'>): boolean;
   /** Guarda el tiempo de la sesión, hace LMSCommit y LMSFinish. Solo la primera vez. */
   terminar(): void;
+  /** HU-0804 · Idioma que se guarda en suspend_data desde ahora (el siguiente `reportar` lo envía y hace LMSCommit). */
+  cambiarIdioma(idioma: string): void;
 }
 
 /** Orden de los estados de SCORM 1.2 para no degradar uno ya alcanzado. */
@@ -129,6 +131,7 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
   const ahora = opciones.ahora ?? (() => Date.now());
   const inicio = ahora();
   const enviados = new Map<string, string>();
+  let idioma = opciones.idioma;
   let terminado = false;
   let avisoLargo = false;
 
@@ -212,7 +215,7 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
         cambio = escribir('cmi.core.score.max', '100') || cambio;
         cambio = escribir('cmi.core.score.raw', String(nota)) || cambio;
       }
-      const suspend = codificarSuspend(opciones.orden, { idioma: opciones.idioma, vistas: estado.vistas, resultados: estado.resultados }, huella);
+      const suspend = codificarSuspend(opciones.orden, { idioma, vistas: estado.vistas, resultados: estado.resultados }, huella);
       if (suspend.length <= LIMITE_SUSPEND) cambio = escribir('cmi.suspend_data', suspend) || cambio;
       else if (!avisoLargo) {
         avisoLargo = true;
@@ -223,6 +226,9 @@ export function conectarScorm12(api: ApiScorm12 | null, opciones: OpcionesScorm1
         guardar();
       }
       return cambio;
+    },
+    cambiarIdioma(nuevo) {
+      idioma = nuevo;
     },
     terminar() {
       if (!conectado || terminado) return;

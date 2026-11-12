@@ -15,9 +15,9 @@ para registrar el seguimiento de los participantes, usa el paquete SCORM en el L
 `;
 
 export async function construirHtml(entrada: EntradaHtml): Promise<PaqueteScorm12> {
-  const { contenido, lista, faltantes, idioma, titulo } = armarContenido(entrada, { modo: 'html' });
+  const { contenido, lista, faltantes, idioma, idiomas, titulo } = armarContenido(entrada, { modo: 'html' });
   contenido.set('LEEME.txt', LEEME_HTML(titulo));
   const orden = [lista[0]!, 'LEEME.txt', ...lista.slice(1)];
   const zip = await comprimir(orden.map((r) => [r, contenido.get(r)!]));
-  return { zip, archivos: orden, faltantes, idioma };
+  return { zip, archivos: orden, faltantes, idioma, idiomas };
 }

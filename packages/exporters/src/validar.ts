@@ -4,8 +4,11 @@
 // docs/08-entregas-y-lms.md. Las pantallas sin aprobar son advertencia (RN-12-3); la confirmación la pide la web.
 // El peso es una estimación: los recursos (MP3, WebP, MP4) casi no se comprimen en el ZIP, así que se suman tal cual.
 // HU-1203 · Para HTML no hay LMS: no hay límite de subida ni suspend_data; el peso queda solo como dato.
+// HU-0804 · Paquete bilingüe: falta de inglés en un texto impide exportar; los desbordes y la falta de voz en inglés
+// solo advierten. El peso suma los recursos de los dos idiomas.
 import { aplanar, codificarSuspend, huellaCurso, LIMITE_SUSPEND, type CursoReproductor, type ResultadoActividad } from '@aptio/player';
 import { erroresCurso } from '@aptio/schema';
+import { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma, pantallasSinVozIngles, textosEnIngles } from './bilingue.ts';
 import { LEEME_HTML } from './html.ts';
 import { indexHtml, INICIAR_JS } from './scorm12.ts';
 import { manifiestoScorm12 } from './manifiesto.ts';
@@ -45,6 +48,18 @@ export interface ValidacionScorm12 {
   pantallasSinAprobar: number;
   /** Ids de los recursos del paquete que no tienen archivo. */
   recursosFaltantes: string[];
+  /** HU-0804 · Idiomas del paquete y, en el bilingüe, cuántos textos tienen su inglés. */
+  modoIdioma: ModoIdioma;
+  textosIngles: { traducidos: number; total: number } | null;
+}
+
+/** Opciones de la validación: el origen del límite (solo el texto), el idioma o el paquete bilingüe. */
+export interface OpcionesValidacion {
+  origenLimite?: 'ficha' | 'referencia';
+  idioma?: string;
+  modoIdioma?: ModoIdioma;
+  /** HU-0804 · Textos en Desborde sin revisar (filas de Traduccion), para advertir en el bilingüe. */
+  desbordes?: number;
 }
 
 export const MB = 1024 * 1024;
@@ -74,7 +89,7 @@ export function validarScorm12(
   pesosRecursos: readonly PesoRecurso[],
   pesoReproductor: number,
   limiteMb: number,
-  opciones: { origenLimite?: 'ficha' | 'referencia'; idioma?: string } = {},
+  opciones: OpcionesValidacion = {},
 ): ValidacionScorm12 {
   return validarExportacion('SCORM12', curso, pesosRecursos, pesoReproductor, limiteMb, opciones);
 }
@@ -89,14 +104,23 @@ export function validarExportacion(
   pesosRecursos: readonly PesoRecurso[],
   pesoReproductor: number,
   limiteMb: number | null,
-  opciones: { origenLimite?: 'ficha' | 'referencia'; idioma?: string } = {},
+  opciones: OpcionesValidacion = {},
 ): ValidacionScorm12 {
   const html = formato === 'HTML';
+  const bilingue = opciones.modoIdioma === 'mismo-paquete';
   const errores = erroresCurso(curso);
   const advertencias: string[] = [];
+  const textosIngles = bilingue ? textosEnIngles(curso) : null;
+  if (textosIngles && textosIngles.traducidos < textosIngles.total) {
+    errores.push(`Faltan ${textosIngles.total - textosIngles.traducidos} textos en inglés: tradúcelos en Idiomas`);
+  } else if (textosIngles && !errores.length) {
+    // Con todo traducido, el curso del paquete (con los dos idiomas) también debe cumplir el esquema.
+    errores.push(...erroresCurso(cursoBilingue(curso as CursoReproductor)));
+  }
   const resultado: ValidacionScorm12 = {
     formato, errores, advertencias, pesoEstimadoBytes: 0, pesoEstimadoMb: 0, limiteMb: html ? null : limiteMb, superaLimite: false, alternativas: [],
     recursosPesados: [], suspendDataCaracteres: html ? null : 0, pantallasTotal: 0, pantallasSinAprobar: 0, recursosFaltantes: [],
+    modoIdioma: bilingue ? 'mismo-paquete' : 'unico', textosIngles,
   };
   // Con errores de esquema se calcula lo que se pueda; si el documento no tiene ni la forma básica, solo los errores.
   let c: CursoReproductor;
@@ -109,14 +133,15 @@ export function validarExportacion(
   }
 
   // ---------- Peso estimado ----------
-  const idioma = opciones.idioma ?? c.idiomas?.[0] ?? 'es';
+  const idioma = bilingue ? 'es' : opciones.idioma ?? c.idiomas?.[0] ?? 'es';
+  const idiomas: string[] = bilingue ? [...IDIOMAS_BILINGUE] : [idioma];
   const pesos = new Map(pesosRecursos.map((r) => [r.id, r]));
   let bytesRecursos = 0;
   let bytesEnDatos = 0;
   const conArchivo: RecursoPesado[] = [];
   for (const r of (Array.isArray(c.recursos) ? c.recursos : []) as RecursoCurso[]) {
     // Igual que construirScorm12: sin documentos del cliente (SUP-52) ni recursos de otro idioma (SUP-49).
-    if (r.tipo === 'documento' || (r.idioma && r.idioma !== idioma)) continue;
+    if (r.tipo === 'documento' || (r.idioma && !idiomas.includes(r.idioma))) continue;
     const p = pesos.get(r.id);
     const nombre = p?.nombre ?? r.nombre ?? r.id;
     if (!p || p.bytes === null) {
@@ -162,6 +187,12 @@ export function validarExportacion(
     const nombres = resultado.recursosFaltantes.map((id) => `«${pesos.get(id)?.nombre ?? (c.recursos as RecursoCurso[]).find((r) => r.id === id)?.nombre ?? id}»`);
     const n = nombres.length;
     advertencias.push(`${n === 1 ? 'Falta el archivo de' : `Faltan ${n} archivos:`} ${nombres.slice(0, 5).join(', ')}${n > 5 ? ` y ${n - 5} más` : ''}. El paquete muestra su texto alternativo.`);
+  }
+
+  // ---------- Paquete bilingüe (HU-0804): desbordes y voz en inglés solo advierten ----------
+  if (bilingue) {
+    if (opciones.desbordes) advertencias.push(`${opciones.desbordes} ${opciones.desbordes === 1 ? 'texto en inglés no cabe' : 'textos en inglés no caben'} en su espacio (Desborde): revísalos en Idiomas.`);
+    if (pantallasSinVozIngles(c)) advertencias.push('Sin voz en inglés: en inglés la pantalla muestra la narración como texto.');
   }
 
   // ---------- Pantallas sin aprobar (RN-12-3) ----------

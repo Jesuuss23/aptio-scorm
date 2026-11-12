@@ -374,7 +374,7 @@ export interface Exportacion {
   versionCurso: number;
   estado: 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';
   bytes: number | null;
-  informe: { errores: string[]; advertencias: string[]; recursosFaltantes?: string[]; idioma?: string; archivos?: number } | null;
+  informe: { errores: string[]; advertencias: string[]; recursosFaltantes?: string[]; idioma?: string; idiomas?: string[]; archivos?: number } | null;
   motivo: string | null;
   nombreArchivo: string | null;
   /** Solo al pedir una exportación terminada: descarga firmada por 15 minutos. */
@@ -385,6 +385,8 @@ export type PerfilExportacion = 'generico' | 'moodle' | 'blackboard' | 'chamilo'
 /** HU-1201 · Validar antes de exportar: solo `errores` impiden exportar; el peso nunca bloquea (RN-12-2). */
 /** HU-1203 · Formatos que se exportan hoy: SCORM 1.2 y HTML autocontenido. */
 export type FormatoExportacion = 'SCORM12' | 'HTML';
+/** HU-0804 · Un idioma (el primero del curso) o español e inglés en el mismo paquete. */
+export type ModoIdiomaExportacion = 'unico' | 'mismo-paquete';
 export interface Validacion {
   formato: FormatoExportacion;
   errores: string[];
@@ -403,6 +405,9 @@ export interface Validacion {
   recursosFaltantes: string[];
   /** HU-1406 · null si ningún recurso es de IA (el paquete no lleva créditos). */
   creditos?: Creditos | null;
+  /** HU-0804 · Idiomas del paquete validado y, en el bilingüe, cuántos textos tienen su inglés. */
+  modoIdioma?: ModoIdiomaExportacion;
+  textosIngles?: { traducidos: number; total: number } | null;
 }
 /** HU-1204 · Ficha de compatibilidad del LMS de un cliente, con el informe del modo diagnóstico si se pegó. */
 export interface FichaCompatibilidad {
@@ -449,8 +454,8 @@ export const api = {
   traducciones: (cursoId: string, estado?: EstadoTraduccion) => pedir<Traduccion[]>(`/cursos/${cursoId}/traducciones${estado ? `?estado=${estado}` : ''}`),
   traducir: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/traducciones/traducir`, { method: 'POST' }),
   cambiarTraduccion: (id: string, datos: { en?: string; estado?: 'REVISADA' }) => pedir<Traduccion>(`/traducciones/${id}`, json(datos, 'PATCH')),
-  exportar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
-  validar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
+  exportar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion; modoIdioma?: ModoIdiomaExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
+  validar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion; modoIdioma?: ModoIdiomaExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
   exportaciones: (cursoId: string) => pedir<Exportacion[]>(`/cursos/${cursoId}/exportaciones`),
   exportacion: (id: string) => pedir<Exportacion>(`/exportaciones/${id}`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
