@@ -2633,7 +2633,7 @@ paths:
       - Entrega
       summary: Validar antes de exportar
       operationId: post_cursos_cursoId_validar
-      description: 'HU-1201. Nunca bloquea por tamaño (RN-12-2): responde 200 con errores (esquema) y advertencias. Formatos SCORM12 y HTML (HU-1203; en HTML no hay límite de subida ni suspend_data: limiteMb, origenLimite y suspendDataCaracteres vienen en null). 422 FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE; 403 al revisor del cliente.'
+      description: 'HU-1201. Nunca bloquea por tamaño (RN-12-2): responde 200 con errores (esquema) y advertencias. Formatos SCORM12 y HTML (HU-1203; en HTML no hay límite de subida ni suspend_data: limiteMb, origenLimite y suspendDataCaracteres vienen en null). HU-0804 · Con modoIdioma mismo-paquete valida español e inglés juntos: si falta un texto en inglés, el error «Faltan N textos en inglés: tradúcelos en Idiomas» (textosIngles da la cuenta); los desbordes y la falta de voz en inglés solo advierten, y el peso suma los recursos de los dos idiomas. 422 FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE (modoIdioma separados); 403 al revisor del cliente.'
       parameters:
       - name: cursoId
         in: path
@@ -2671,10 +2671,12 @@ paths:
       description: 'HU-1202 · Crea la exportación en EN_COLA ligada a la versión actual del curso (RN-12-4) y encola EXPORTAR
         en la cola `export`; el worker arma el ZIP SCORM 1.2 de un solo SCO y la deja en COMPLETADO (o ERROR con `motivo`).
         Formatos `SCORM12` y `HTML` (HU-1203: carpeta autocontenida sin manifiesto, sin LMS ni modo diagnóstico, perfil
-        `generico`) con `modoIdioma: unico` (el primer idioma del curso, SUP-49). El perfil de LMS se
+        `generico`) con `modoIdioma: unico` (el primer idioma del curso, SUP-49) o `mismo-paquete` (HU-0804, español e
+        inglés con el botón de idioma; abre en español). El perfil de LMS se
         guarda y solo cambia las recomendaciones: el paquete es el mismo (RN-12-1). Se exporta aunque haya pantallas sin
         aprobar (SUP-51). Exportan administración, diseño instruccional y producción. 422 con `codigo`: ESQUEMA_NO_VALIDO
-        (con `detalles`), FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE.'
+        (con `detalles`), FORMATO_NO_DISPONIBLE, IDIOMA_NO_DISPONIBLE (`separados`) o TRADUCCION_INCOMPLETA (bilingüe con
+        textos sin inglés).'
       parameters:
       - name: cursoId
         in: path
@@ -5554,6 +5556,8 @@ components:
           - unico
           - separados
           - mismo-paquete
+          default: unico
+          description: HU-0804 · unico es el primer idioma del curso; mismo-paquete lleva español e inglés con el botón de idioma; separados responde 422 IDIOMA_NO_DISPONIBLE
         incluirDiagnostico:
           type: boolean
           default: true
@@ -5578,6 +5582,8 @@ components:
       - pantallasTotal
       - pantallasSinAprobar
       - recursosFaltantes
+      - modoIdioma
+      - textosIngles
       properties:
         formato:
           type: string
@@ -5654,6 +5660,24 @@ components:
           nullable: true
           description: HU-1406 · Créditos de IA tal como saldrán en el paquete (botón «Créditos»); null si ningún recurso
             es de IA
+        modoIdioma:
+          type: string
+          enum:
+          - unico
+          - mismo-paquete
+          description: HU-0804 · Idiomas del paquete validado
+        textosIngles:
+          type: object
+          nullable: true
+          required:
+          - traducidos
+          - total
+          properties:
+            traducidos:
+              type: integer
+            total:
+              type: integer
+          description: HU-0804 · En el paquete bilingüe, cuántos textos tienen su inglés; null con un solo idioma
       description: Nunca bloquea por tamaño; solo advierte (RN-12-2, CP-090).
     Creditos:
       type: object

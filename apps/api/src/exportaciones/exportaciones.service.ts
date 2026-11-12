@@ -3,10 +3,12 @@
 // exportaciones: la anterior no cambia. Se exporta aunque haya pantallas sin aprobar (SUP-51); la web pide confirmación.
 // HU-1201 · `validar` estima el peso contra el límite del destino y avisa sin bloquear (RN-12-2, CP-090).
 // HU-1203 · También HTML autocontenido: sin LMS, sin límite de subida ni modo diagnóstico, y perfil siempre «generico».
+// HU-0804 · `modoIdioma: 'mismo-paquete'` arma el paquete con español e inglés; sin todo el inglés escrito no se exporta
+// (TRADUCCION_INCOMPLETA). Los paquetes separados por idioma siguen en 422 IDIOMA_NO_DISPONIBLE.
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { TAREA_EXPORTAR } from '@aptio/colas';
 import type { Exportacion } from '@aptio/db';
-import { armarCreditos, codigoReproductor, validarExportacion } from '@aptio/exporters';
+import { armarCreditos, codigoReproductor, cursoBilingue, type ModoIdioma, textosEnIngles, validarExportacion } from '@aptio/exporters';
 import { erroresCurso } from '@aptio/schema';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
@@ -43,13 +45,13 @@ export class ExportacionesService {
     return c;
   }
 
-  private formatoDisponible(dto: ExportacionEntradaDto): { formato: 'SCORM12' | 'HTML'; modoIdioma: string } {
+  private formatoDisponible(dto: ExportacionEntradaDto): { formato: 'SCORM12' | 'HTML'; modoIdioma: ModoIdioma } {
     if (dto.formato !== 'SCORM12' && dto.formato !== 'HTML') {
       throw new UnprocessableEntityException({ codigo: 'FORMATO_NO_DISPONIBLE', mensaje: `El formato ${dto.formato} todavía no está disponible: por ahora se exporta SCORM 1.2 o HTML` });
     }
     const modoIdioma = dto.modoIdioma ?? 'unico';
-    if (modoIdioma !== 'unico') {
-      throw new UnprocessableEntityException({ codigo: 'IDIOMA_NO_DISPONIBLE', mensaje: 'Por ahora se exporta un solo idioma, el primero del curso; el paquete bilingüe llega en el S7' });
+    if (modoIdioma === 'separados') {
+      throw new UnprocessableEntityException({ codigo: 'IDIOMA_NO_DISPONIBLE', mensaje: 'Los paquetes separados por idioma todavía no están disponibles: exporta un idioma o los dos en el mismo paquete' });
     }
     return { formato: dto.formato, modoIdioma };
   }
@@ -57,7 +59,7 @@ export class ExportacionesService {
   /** HU-1201 · Valida el curso actual para el formato pedido. Responde 200 aunque haya errores: la web los lista. */
   async validar(u: UsuarioSesion, cursoId: string, dto: ExportacionEntradaDto): Promise<ValidacionDto> {
     const c = await this.curso(u, cursoId);
-    const { formato } = this.formatoDisponible(dto);
+    const { formato, modoIdioma } = this.formatoDisponible(dto);
     const doc = c.documento as { recursos?: { id?: unknown; tipo?: unknown; idioma?: unknown }[]; idiomas?: unknown[] } | null;
     const ids = (Array.isArray(doc?.recursos) ? doc.recursos : []).map((r) => r?.id).filter((id): id is string => typeof id === 'string' && UUID.test(id));
     const [filas, proyecto, organizacion] = await Promise.all([
@@ -72,11 +74,15 @@ export class ExportacionesService {
     const limiteMb = ficha?.limiteSubidaMb ?? (Number.isFinite(referencia) && referencia > 0 ? referencia : LIMITE_REFERENCIA_MB);
     const origenLimite = ficha?.limiteSubidaMb ? 'ficha' : 'referencia';
     const pesos = filas.map((r) => ({ id: r.id, nombre: r.nombre, bytes: Number(r.bytes) }));
-    const v = validarExportacion(formato, c.documento, pesos, await medirReproductor(), limiteMb, { origenLimite });
-    // HU-1406 · Los créditos con las mismas reglas que el worker: recursos del idioma del paquete, sin documentos del cliente.
-    const idioma = doc?.idiomas?.[0] === 'en' ? 'en' : 'es';
+    const bilingue = modoIdioma === 'mismo-paquete';
+    const desbordes = bilingue ? await this.bd.traduccion.count({ where: { cursoId: c.id, idioma: 'en', estado: 'DESBORDE' } }) : 0;
+    const v = validarExportacion(formato, c.documento, pesos, await medirReproductor(), limiteMb, { origenLimite, modoIdioma, desbordes });
+    // HU-1406 · Los créditos con las mismas reglas que el worker: recursos de los idiomas del paquete, sin documentos del
+    // cliente. En el bilingüe van en español, el idioma con que abre (HU-0804).
+    const idioma = bilingue ? 'es' : doc?.idiomas?.[0] === 'en' ? 'en' : 'es';
+    const idiomas: unknown[] = bilingue ? ['es', 'en'] : [idioma];
     const delPaquete = new Set((Array.isArray(doc?.recursos) ? doc.recursos : [])
-      .filter((r) => r?.tipo !== 'documento' && (!r?.idioma || r.idioma === idioma)).map((r) => r?.id));
+      .filter((r) => r?.tipo !== 'documento' && (!r?.idioma || idiomas.includes(r.idioma))).map((r) => r?.id));
     const creditos = armarCreditos(filas.filter((f) => delPaquete.has(f.id)), organizacion?.nombre ?? '', idioma);
     return { ...v, origenLimite: formato === 'HTML' ? null : origenLimite, creditos };
   }
@@ -88,6 +94,16 @@ export class ExportacionesService {
     const errores = erroresCurso(c.documento);
     if (errores.length) {
       throw new UnprocessableEntityException({ codigo: 'ESQUEMA_NO_VALIDO', mensaje: 'El curso no cumple el esquema: corrígelo antes de exportar', detalles: errores.slice(0, 10).map((e) => ({ mensaje: e })) });
+    }
+    if (modoIdioma === 'mismo-paquete') {
+      const { traducidos, total } = textosEnIngles(c.documento);
+      if (traducidos < total) {
+        throw new UnprocessableEntityException({ codigo: 'TRADUCCION_INCOMPLETA', mensaje: `Faltan ${total - traducidos} textos en inglés: tradúcelos en Idiomas` });
+      }
+      const bilingues = erroresCurso(cursoBilingue(c.documento as unknown as Parameters<typeof cursoBilingue>[0]));
+      if (bilingues.length) {
+        throw new UnprocessableEntityException({ codigo: 'ESQUEMA_NO_VALIDO', mensaje: 'El curso bilingüe no cumple el esquema: corrígelo antes de exportar', detalles: bilingues.slice(0, 10).map((e) => ({ mensaje: e })) });
+      }
     }
     const exp = await this.bd.exportacion.create({
       data: { organizacionId: c.organizacionId, cursoId: c.id, versionCurso: c.version, formato, perfilLms: html ? 'generico' : (dto.perfilLms ?? 'generico'), modoIdioma, incluirDiagnostico: html ? false : (dto.incluirDiagnostico ?? true), creadoPorId: u.id },

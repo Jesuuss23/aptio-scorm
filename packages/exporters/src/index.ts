@@ -6,3 +6,4 @@ export { codigoReproductor } from './reproductor.ts';
 export { ALTERNATIVAS_PESO, INTENTOS_PEOR_CASO, MB, type PesoRecurso, type RecursoPesado, type FormatoValidable, validarExportacion, validarScorm12, type ValidacionScorm12 } from './validar.ts';
 export { construirHtml, type EntradaHtml, LEEME_HTML } from './html.ts';
 export { armarCreditos, avisoCreditos, esDeIa, nombreProveedor, type ProcedenciaRecurso, PROVEEDOR_APTIO } from './creditos.ts';
+export { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma, pantallasSinVozIngles, textosEnIngles } from './bilingue.ts';

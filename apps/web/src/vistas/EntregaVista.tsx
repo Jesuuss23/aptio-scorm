@@ -6,13 +6,15 @@
 // con pantallas sin aprobar se pide confirmación (RN-12-3). Se vuelve a validar al cambiar el LMS destino.
 // HU-1203 · Formato HTML autocontenido: sin LMS destino, sin límite de subida ni suspend_data; la confirmación sigue.
 // HU-1406 · «Créditos y licencias»: la procedencia de cada recurso generado y los créditos que llevará el paquete.
+// HU-0804 · «Idioma»: español o ES + EN en el mismo paquete. En el bilingüe la verificación cuenta los textos en inglés
+// (sin todos, no se exporta) y avisa de los desbordes y de la falta de voz en inglés, que no bloquean.
 import { Cabecera } from '@aptio/ui';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type FormatoExportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
+import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type FormatoExportacion, type ModoIdiomaExportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
 import { navegar } from '../ruta';
 import { CreditosLicencias } from './CreditosLicencias';
-import { FORMATOS, LIMITE_SUSPEND, mb, megas, NOMBRE_FORMATO, PERFILES } from './entrega';
+import { esAvisoIngles, esFaltaIngles, FORMATOS, LIMITE_SUSPEND, mb, megas, MODOS_IDIOMA, NOMBRE_FORMATO, PERFILES } from './entrega';
 
 const CONSULTA_MS = 2000;
 const ACTIVAS = new Set<Exportacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -30,6 +32,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const [lista, setLista] = useState<Exportacion[]>([]);
   const [perfil, setPerfil] = useState<PerfilExportacion>('generico');
   const [formato, setFormato] = useState<FormatoExportacion>('SCORM12');
+  const [modoIdioma, setModoIdioma] = useState<ModoIdiomaExportacion>('unico');
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
@@ -42,7 +45,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const cursoId = curso?.id;
   const html = formato === 'HTML';
   // En HTML el LMS no cambia nada: la validación es la misma para cualquier perfil.
-  const clave = html ? 'HTML' : `SCORM12|${perfil}`;
+  const clave = `${html ? 'HTML' : `SCORM12|${perfil}`}|${modoIdioma}`;
   const validacion = validada?.clave === clave ? validada.v : null;
   const validando = validada?.clave !== clave;
 
@@ -62,12 +65,12 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   useEffect(() => {
     if (!cursoId || !veHistorial) return;
     let vigente = true;
-    api.validar(cursoId, { formato: html ? 'HTML' : 'SCORM12', perfilLms: html ? 'generico' : perfil }).then(
+    api.validar(cursoId, { formato: html ? 'HTML' : 'SCORM12', perfilLms: html ? 'generico' : perfil, modoIdioma }).then(
       (v) => { if (vigente) setValidada({ clave, v }); },
       (e: unknown) => { if (vigente) setError(e instanceof ErrorApi ? e.message : 'No se pudo validar el curso'); },
     );
     return () => { vigente = false; };
-  }, [cursoId, perfil, html, clave, veHistorial]);
+  }, [cursoId, perfil, html, modoIdioma, clave, veHistorial]);
 
   const recargar = useCallback(() => {
     if (!cursoId || !veHistorial) return;
@@ -116,7 +119,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
     setError('');
     setAviso('');
     try {
-      const nueva = await api.exportar(cursoId, { formato, perfilLms: html ? 'generico' : perfil });
+      const nueva = await api.exportar(cursoId, { formato, perfilLms: html ? 'generico' : perfil, modoIdioma });
       setLista((l) => [nueva, ...l]);
       setAviso(`Exportación pedida: se arma ${html ? 'la carpeta HTML' : 'el paquete'} con la versión ${nueva.versionCurso} del curso.`);
     } catch (e) {
@@ -156,6 +159,10 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const total = v?.pantallasTotal ?? proyecto.avance.total;
   const sinAprobar = v ? v.pantallasSinAprobar : Math.max(0, proyecto.avance.total - proyecto.avance.aprobadas);
   const conErrores = Boolean(v?.errores.length);
+  const faltaIngles = v?.errores.find(esFaltaIngles);
+  const erroresEsquema = v?.errores.filter((e) => !esFaltaIngles(e)) ?? [];
+  const avisosIngles = v?.advertencias.filter(esAvisoIngles) ?? [];
+  const bilingue = v?.modoIdioma === 'mismo-paquete' && v.textosIngles;
   const otrasAdvertencias = v?.advertencias.filter((a) => /^Falta/.test(a)) ?? [];
   const irARevision = (
     <a href={`/proyectos/${proyectoId}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/revision`); }}>Ir a revisión</a>
@@ -174,7 +181,13 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
               <button key={f.id} type="button" className="opcion" aria-pressed={formato === f.id} onClick={() => setFormato(f.id)}>{f.nombre}</button>
             ))}
           </div>
-          <p className="sec">SCORM 2004 y ES + EN en el mismo paquete llegan en las próximas entregas.</p>
+          <h2>Idioma</h2>
+          <div className="opciones" role="group" aria-label="Idioma">
+            {MODOS_IDIOMA.map((m) => (
+              <button key={m.id} type="button" className="opcion" aria-pressed={modoIdioma === m.id} onClick={() => setModoIdioma(m.id)}>{m.nombre}</button>
+            ))}
+          </div>
+          <p className="sec">{modoIdioma === 'mismo-paquete' ? 'El paquete abre en español y lleva un botón EN / ES para cambiar sin perder el avance.' : 'SCORM 2004 y un paquete separado por idioma llegan en las próximas entregas.'}</p>
           {html ? (
             <p className="nota" aria-live="polite" data-formato="HTML">Una carpeta que abre con doble clic en <span className="num">index.html</span>, sin internet y sin LMS. No guarda el avance ni la nota: para el seguimiento, exporta SCORM 1.2.</p>
           ) : (
@@ -196,11 +209,20 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
                   <div className="cifras-entrega">
                     <div className={v.superaLimite ? 'aviso' : ''}><span>Peso estimado</span><b className="num">{mb(v.pesoEstimadoMb)} MB</b><small>{v.limiteMb === null ? 'sin límite de subida: no hay LMS' : `de ${v.limiteMb} MB ${v.origenLimite === 'ficha' ? 'según la ficha del cliente' : 'de referencia'}`}</small></div>
                     <div className={sinAprobar ? 'aviso' : ''}><span>Pantallas aprobadas</span><b className="num">{total - sinAprobar} / {total}</b></div>
+                    {bilingue ? (
+                      <div className={faltaIngles ? 'error' : ''} data-cifra="ingles"><span>Textos en inglés</span><b className="num">{bilingue.traducidos} / {bilingue.total}</b></div>
+                    ) : null}
                   </div>
                   <ul className="comprobaciones">
-                    <Comprobacion ok={!conErrores} grave>
-                      {conErrores ? (
-                        <>El curso no cumple el esquema: corrígelo antes de exportar.<ul>{v.errores.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></>
+                    {bilingue ? (
+                      <Comprobacion ok={!faltaIngles} grave>
+                        {faltaIngles ? <>{faltaIngles}. <a href={`/proyectos/${proyectoId}/idiomas`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/idiomas`); }}>Ir a Idiomas</a></> : 'Todos los textos tienen su inglés'}
+                      </Comprobacion>
+                    ) : null}
+                    {avisosIngles.map((a) => <Comprobacion key={a} ok={false}>{a}</Comprobacion>)}
+                    <Comprobacion ok={!erroresEsquema.length} grave>
+                      {erroresEsquema.length ? (
+                        <>El curso no cumple el esquema: corrígelo antes de exportar.<ul>{erroresEsquema.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></>
                       ) : html ? 'Carpeta HTML autocontenida: abre sin internet y sin LMS · el curso cumple el esquema' : 'Manifiesto SCORM 1.2 de un solo SCO · el curso cumple el esquema (perfil estricto)'}
                     </Comprobacion>
                     {v.limiteMb === null || v.suspendDataCaracteres === null ? null : (
@@ -259,7 +281,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
                   {lista.map((e) => (
                     <tr key={e.id} data-exportacion={e.id}>
                       <td>{fecha(e.creadoEn)}</td>
-                      <td>{NOMBRE_FORMATO[e.formato] ?? e.formato}</td>
+                      <td>{NOMBRE_FORMATO[e.formato] ?? e.formato}{e.modoIdioma === 'mismo-paquete' ? ' · ES + EN' : ''}</td>
                       <td>v{e.versionCurso}</td>
                       <td>{e.formato === 'HTML' ? '—' : (PERFILES.find((p) => p.id === e.perfilLms)?.nombre ?? e.perfilLms)}</td>
                       <td>

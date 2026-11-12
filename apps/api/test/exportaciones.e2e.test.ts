@@ -3,6 +3,7 @@
 // y descarga firmada solo cuando terminó. Se salta sin DATABASE_URL o sin S3, salvo en CI.
 // HU-1201 · CP-090 · Validar antes de exportar: un paquete de 300 MB advierte con alternativas y se exporta igual (202).
 // HU-1203 · CP-093 · HTML se exporta (202) y se valida sin límite de subida; SCORM 2004 sigue en 422.
+// HU-0804 · ES + EN en el mismo paquete: 202 con todo el inglés escrito; sin él, validar lo dice y exportar responde 422.
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -23,6 +24,19 @@ const sufijo = Math.random().toString(36).slice(2, 8);
 const correo = (n: string) => `${n}-${sufijo}@prueba.test`;
 process.env.COLAS_PREFIJO = `prueba-exportar-${sufijo}`;
 const loto = () => JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
+/** LOTO con cada texto en inglés («[EN] …»). */
+const lotoTraducido = () => {
+  const curso = loto();
+  const visitar = (v: unknown) => {
+    if (Array.isArray(v)) { v.forEach(visitar); return; }
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (typeof o.es === 'string' && Object.keys(o).every((k) => k === 'es' || k === 'en')) { o.en = `[EN] ${o.es}`; return; }
+    Object.values(o).forEach(visitar);
+  };
+  visitar(curso);
+  return curso;
+};
 
 describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', () => {
   let app: INestApplication;
@@ -101,8 +115,8 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     expect(scorm2004.status).toBe(422);
     expect(scorm2004.body.codigo).toBe('FORMATO_NO_DISPONIBLE');
     expect((await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'ZIP' })).status).toBe(422);
-    const bilingue = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'SCORM12', modoIdioma: 'mismo-paquete' });
-    expect(bilingue.body.codigo).toBe('IDIOMA_NO_DISPONIBLE');
+    const separados = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'SCORM12', modoIdioma: 'separados' });
+    expect({ status: separados.status, codigo: separados.body.codigo }).toEqual({ status: 422, codigo: 'IDIOMA_NO_DISPONIBLE' });
 
     const roto = loto();
     delete roto.seguimiento;
@@ -113,6 +127,40 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     expect(r.body.codigo).toBe('ESQUEMA_NO_VALIDO');
     expect(r.body.detalles.length).toBeGreaterThan(0);
     expect(await prisma.exportacion.count({ where: { cursoId: malo.id } })).toBe(antes);
+  });
+
+  it('HU-0804 · ES + EN: sin el inglés, validar lo cuenta en 200 y exportar responde 422 TRADUCCION_INCOMPLETA', async () => {
+    const v = await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM12', modoIdioma: 'mismo-paquete' });
+    expect(v.status).toBe(200);
+    expect(v.body.modoIdioma).toBe('mismo-paquete');
+    const { total } = v.body.textosIngles;
+    expect(v.body.textosIngles).toEqual({ traducidos: 0, total });
+    expect(total).toBeGreaterThan(0);
+    expect(v.body.errores).toContain(`Faltan ${total} textos en inglés: tradúcelos en Idiomas`);
+    const antes = await prisma.exportacion.count({ where: { cursoId } });
+    const r = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'SCORM12', modoIdioma: 'mismo-paquete' });
+    expect({ status: r.status, codigo: r.body.codigo, mensaje: r.body.mensaje }).toEqual({ status: 422, codigo: 'TRADUCCION_INCOMPLETA', mensaje: `Faltan ${total} textos en inglés: tradúcelos en Idiomas` });
+    expect(await prisma.exportacion.count({ where: { cursoId } })).toBe(antes);
+    // Con un idioma, el mismo curso valida sin errores y sin conteo de inglés.
+    const unico = await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM12' });
+    expect(unico.body).toMatchObject({ modoIdioma: 'unico', textosIngles: null, errores: [] });
+  });
+
+  it('HU-0804 · ES + EN con todo traducido: validar sin errores (los desbordes advierten) y exportar SCORM 1.2 y HTML en 202', async () => {
+    const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
+    const p = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId, nombre: 'Bilingüe', creadoPorId: di.id } });
+    const bilingue = await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: p.id, versionEsquema: '0.2.0', documento: lotoTraducido(), version: 3 } });
+    await prisma.traduccion.create({ data: { cursoId: bilingue.id, ruta: '/metadatos/titulo', idioma: 'en', textoOrigenHash: 'x', estado: 'DESBORDE' } });
+    for (const formato of ['SCORM12', 'HTML']) {
+      const v = await como('instruccional').post(`/cursos/${bilingue.id}/validar`, { formato, modoIdioma: 'mismo-paquete' });
+      expect(v.status).toBe(200);
+      expect(v.body.errores).toEqual([]);
+      expect(v.body.textosIngles.traducidos).toBe(v.body.textosIngles.total);
+      expect(v.body.advertencias).toContain('1 texto en inglés no cabe en su espacio (Desborde): revísalos en Idiomas.');
+      expect(v.body.advertencias).toContain('Sin voz en inglés: en inglés la pantalla muestra la narración como texto.');
+      const r = await como('instruccional').post(`/cursos/${bilingue.id}/exportaciones`, { formato, modoIdioma: 'mismo-paquete' });
+      expect({ status: r.status, body: r.body }).toMatchObject({ status: 202, body: { formato, modoIdioma: 'mismo-paquete', versionCurso: 3, estado: 'EN_COLA' } });
+    }
   });
 
   it('el revisor del cliente y el diseñador gráfico no exportan (403); el revisor tampoco ve el historial', async () => {

@@ -1,7 +1,9 @@
 // HU-1102 · Vista previa (PNT-12): recorrer la cápsula como el participante, en celular, tableta o escritorio, con el
 // mismo reproductor que va dentro del paquete (HU-1101). El panel de seguimiento muestra lo que se reportaría al LMS.
+// HU-0804 · Si el curso ya tiene algún texto en inglés, la vista previa ofrece el botón EN / ES del paquete bilingüe.
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, type EstadoReproductor, montar, type Reproductor } from '@aptio/player';
+import { textosDe } from '@aptio/schema/traduccion';
 import { useEffect, useRef, useState } from 'react';
 import { api, type Curso, ErrorApi, type Kit, type Proyecto } from '../api';
 import { navegar } from '../ruta';
@@ -13,6 +15,7 @@ const DISPOSITIVOS = [
   { id: 'escritorio', nombre: 'Escritorio' },
 ] as const;
 type Dispositivo = (typeof DISPOSITIVOS)[number]['id'];
+const AMBOS: ('es' | 'en')[] = ['es', 'en'];
 
 const NOMBRE_PATRON: Record<string, string> = {
   clasico: 'Clásico', historias: 'Historias', vertical: 'Desplazamiento vertical', mapa: 'Mapa de misiones',
@@ -59,6 +62,7 @@ export function VistaPrevia({ proyectoId, alCargar }: { proyectoId: string; alCa
       urlRecurso: (id) => curso.urlsRecursos?.[id],
       cargarSvg: async (id) => curso.svgPersonajes?.[id],
       cargarSubtitulos: async (id) => curso.subtitulos?.[id],
+      ...(textosDe(curso.documento).some((t) => t.en?.trim()) ? { idiomas: AMBOS } : {}),
       ...(revision && ultima.current ? { inicio: ultima.current } : {}),
       alCambiar: (e) => {
         ultima.current = e.pantallaId;

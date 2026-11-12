@@ -6,13 +6,13 @@ export const FORMATOS = ['SCORM12', 'SCORM2004', 'HTML', 'JSON', 'KIT_GAMIFICACI
 export const PERFILES_LMS = ['generico', 'moodle', 'blackboard', 'chamilo', 'canvas'] as const;
 export const MODOS_IDIOMA = ['unico', 'separados', 'mismo-paquete'] as const;
 
-/** HU-1202 · SCORM12 o HTML (HU-1203) en un idioma (SUP-49); el perfil no cambia el paquete (RN-12-1). */
+/** HU-1202 · SCORM12 o HTML (HU-1203) en un idioma (SUP-49) o en los dos (HU-0804); el perfil no cambia el paquete (RN-12-1). */
 export class ExportacionEntradaDto {
   @ApiProperty({ enum: FORMATOS, description: 'SCORM12 o HTML (HU-1203, sin LMS ni seguimiento); los demás responden 422 FORMATO_NO_DISPONIBLE' })
   @IsIn(FORMATOS) formato: (typeof FORMATOS)[number];
   @ApiPropertyOptional({ enum: PERFILES_LMS, default: 'generico', description: 'Solo agrega recomendaciones; el paquete es el mismo. En HTML se ignora y se guarda generico' })
   @IsOptional() @IsIn(PERFILES_LMS) perfilLms?: (typeof PERFILES_LMS)[number];
-  @ApiPropertyOptional({ enum: MODOS_IDIOMA, default: 'unico', description: 'Solo unico por ahora (el primer idioma del curso); los demás responden 422 IDIOMA_NO_DISPONIBLE' })
+  @ApiPropertyOptional({ enum: MODOS_IDIOMA, default: 'unico', description: 'unico: el primer idioma del curso; mismo-paquete: español e inglés con el botón de idioma (HU-0804); separados responde 422 IDIOMA_NO_DISPONIBLE' })
   @IsOptional() @IsIn(MODOS_IDIOMA) modoIdioma?: (typeof MODOS_IDIOMA)[number];
   @ApiPropertyOptional({ default: true, description: 'Modo diagnóstico en el paquete (HU-1204): con false no se abre ni con el atajo ni con ?diagnostico=1. En HTML no hay modo diagnóstico (se guarda false)' })
   @IsOptional() @IsBoolean() incluirDiagnostico?: boolean;
@@ -65,6 +65,12 @@ export class CreditosDto {
   @ApiProperty({ type: [FilaCreditosDto] }) filas: FilaCreditosDto[];
 }
 
+/** HU-0804 · Textos del curso con su inglés escrito. */
+export class TextosInglesDto {
+  @ApiProperty() traducidos: number;
+  @ApiProperty() total: number;
+}
+
 export class ValidacionDto {
   @ApiProperty({ enum: ['SCORM12', 'HTML'] }) formato: 'SCORM12' | 'HTML';
   @ApiProperty({ type: [String], description: 'Impiden exportar (el curso no cumple el esquema)' }) errores: string[];
@@ -80,5 +86,7 @@ export class ValidacionDto {
   @ApiProperty() pantallasTotal: number;
   @ApiProperty() pantallasSinAprobar: number;
   @ApiProperty({ type: [String] }) recursosFaltantes: string[];
+  @ApiProperty({ enum: ['unico', 'mismo-paquete'], description: 'HU-0804 · Idiomas del paquete validado' }) modoIdioma: 'unico' | 'mismo-paquete';
+  @ApiProperty({ type: TextosInglesDto, nullable: true, description: 'HU-0804 · En el paquete bilingüe, cuántos textos tienen su inglés; null con un solo idioma' }) textosIngles: TextosInglesDto | null;
   @ApiProperty({ type: CreditosDto, nullable: true, description: 'HU-1406 · Créditos de IA tal como saldrán en el paquete; null si ningún recurso es de IA' }) creditos: CreditosDto | null;
 }

@@ -9,6 +9,22 @@ const leer = (ruta: string) => readFileSync(new URL(ruta, raiz));
 
 export const cursoLoto = (): CursoReproductor => JSON.parse(leer('packages/ai/casos/loto/curso-esperado-es.json').toString('utf8')) as CursoReproductor;
 
+/**
+ * HU-0804 · LOTO con cada texto en inglés, como lo deja la traducción simulada: «[EN] » y el español. Los idiomas del
+ * curso no cambian: el paquete bilingüe los pone al exportar.
+ */
+export function traducirLoto<T>(curso: T): T {
+  const visitar = (v: unknown) => {
+    if (Array.isArray(v)) { v.forEach(visitar); return; }
+    if (!v || typeof v !== 'object') return;
+    const o = v as Record<string, unknown>;
+    if (typeof o.es === 'string' && Object.keys(o).every((k) => k === 'es' || k === 'en')) { o.en = `[EN] ${o.es}`; return; }
+    Object.values(o).forEach(visitar);
+  };
+  visitar(curso);
+  return curso;
+}
+
 const SVG = (texto: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><title>${texto}</title><rect width="100" height="60" fill="#e8eef9"/></svg>`;
 
 /** Recursos de LOTO por id. `sinAudio` deja fuera los audios (sin audio la narración no bloquea Siguiente, SUP-32). */

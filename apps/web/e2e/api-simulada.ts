@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
+import { traducirLoto } from '../../../packages/exporters/test/loto.ts';
 import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
 import { disenoPermitido, DISPOSICIONES, modeloBase, plantillaPara } from '@aptio/schema/marca';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
@@ -61,6 +62,8 @@ export interface OpcionesSimulacion {
   propuestaFalla?: boolean;
   /** HU-0604 · p05 llega retocada en el editor: la imagen desplazada, el párrafo en acento y un botón agregado. */
   retoquesP05?: boolean;
+  /** HU-0804 · El curso con cada texto en inglés (traducción simulada «[EN] …»). */
+  cursoTraducido?: boolean;
 }
 
 /** HU-0604 · Los retoques de p05 con `retoquesP05`. */
@@ -243,7 +246,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05 }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, cursoTraducido }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -271,7 +274,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   let pronunciacion: { idioma: string; escrito: string; pronunciado: string }[] = [];
   const materiales = new Map<string, Record<string, unknown>[]>();
   // El curso del proyecto con pantallas: CP-047 lo muestra tomado del «Manual» del cliente y 3 pantallas tienen observaciones.
-  const revision = { version: 1, documento: cursoLoto(), observaciones: OBSERVACIONES.map((o) => ({ ...o })) };
+  const revision = { version: 1, documento: cursoTraducido ? traducirLoto(cursoLoto()) : cursoLoto(), observaciones: OBSERVACIONES.map((o) => ({ ...o })) };
   if (retoquesP05) {
     const p05 = pantallasDe(revision.documento as unknown as CursoDoc).find((x) => x.id === 'p05')!;
     Object.assign(p05, structuredClone(RETOQUES_P05));

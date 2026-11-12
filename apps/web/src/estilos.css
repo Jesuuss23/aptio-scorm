@@ -1665,6 +1665,9 @@ ul.fila-chips {
 .cifras-entrega .aviso b {
   color: var(--color-aviso);
 }
+.cifras-entrega .error b {
+  color: var(--color-error);
+}
 .comprobaciones {
   display: flex;
   flex-direction: column;

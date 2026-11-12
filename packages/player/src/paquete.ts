@@ -5,13 +5,15 @@
 // HU-1204 · Modo diagnóstico: Ctrl+Alt+Shift+D o ?diagnostico=1 abren el panel para el soporte (nunca se abre solo).
 // HU-1203 · Con `modo: 'html'` (HTML autocontenido) no hay LMS: no se busca la API, no se avisa en la consola y no hay
 // modo diagnóstico. El curso funciona completo, sin seguimiento.
+// HU-0804 · Paquete bilingüe: abre en el idioma que el participante eligió la última vez (guardado en suspend_data) o en
+// el del paquete; cambiar de idioma lo guarda en suspend_data y hace LMSCommit enseguida.
 import { informeDiagnostico, type InformeDiagnostico, RegistroDiagnostico } from './diagnostico.ts';
 import { aplanar } from './navegacion.ts';
 import { abrirPanelDiagnostico } from './panel-diagnostico.ts';
 import { montar, type Reproductor } from './reproductor.ts';
 import { decidirReanudacion } from './reanudacion.ts';
 import { buscarApi, type ConexionScorm12, conectarScorm12, type VentanaLms } from './scorm12.ts';
-import { huellaCurso } from './suspend.ts';
+import { huellaCurso, leerSuspend } from './suspend.ts';
 import type { Creditos, CursoReproductor, Idioma, KitReproductor } from './tipos.ts';
 
 export interface DatosPaquete {
@@ -69,8 +71,10 @@ export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ven
   const guardado = lms.conectado && politica !== 'no' ? decidirReanudacion(lms.inicial, orden, huella) : null;
   const preguntar = politica === 'preguntar';
   let listo = guardado === null || !preguntar;
+  const idioma = idiomaInicial(datos, lms, orden, huella);
+  if (idioma !== datos.idioma) lms.cambiarIdioma(idioma);
   const reproductor = montar(contenedor, datos.curso, {
-    idioma: datos.idioma,
+    idioma,
     ...(datos.kit ? { kit: datos.kit } : {}),
     urlRecurso: (id) => datos.rutas[id],
     cargarSvg: async (id) => datos.svgs?.[id],
@@ -79,6 +83,11 @@ export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ven
     ...(guardado ? { reanudar: { ...guardado, preguntar } } : {}),
     alReanudar: () => { listo = true; },
     alCambiar: (e) => { if (listo) lms.reportar(e); },
+    alCambiarIdioma: (nuevo, e) => {
+      lms.cambiarIdioma(nuevo);
+      listo = true;
+      lms.reportar(e);
+    },
   });
   // No se depende de LMSFinish al cerrar la pestaña (cada avance ya hizo LMSCommit), pero se intenta.
   const cerrar = () => lms.terminar();
@@ -102,6 +111,13 @@ export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ven
     if (pideDiagnostico(ventana)) diagnostico();
   }
   return { reproductor, lms, diagnostico, informe };
+}
+
+/** El idioma guardado en suspend_data si el paquete lo trae (y no es un intento nuevo); si no, el del paquete. */
+function idiomaInicial(datos: DatosPaquete, lms: ConexionScorm12, orden: readonly string[], huella: string): Idioma {
+  if (!lms.conectado || lms.inicial.entrada === 'ab-initio') return datos.idioma;
+  const guardado = leerSuspend(orden, lms.inicial.suspendData, huella)?.idioma;
+  return guardado && (datos.curso.idiomas as string[]).includes(guardado) ? guardado as Idioma : datos.idioma;
 }
 
 function enIframe(ventana: Window): boolean {

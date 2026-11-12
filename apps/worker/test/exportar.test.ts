@@ -2,6 +2,7 @@
 // lo guarda como recurso PAQUETE e informa los recursos que faltan; si un recurso no se puede leer, queda en ERROR.
 // HU-1406 · CP-107 · Con voz de Google y una ilustración generada, `datos.js` lleva los créditos con la frase exacta;
 // el paquete se registra con proveedor `aptio` (REQ-062).
+// HU-0804 · ES + EN en el mismo paquete: entran los recursos de los dos idiomas y los créditos van en español.
 // PostgreSQL real; el almacenamiento es un mapa en memoria (la API e2e usa S3 de LocalStack).
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -48,8 +49,8 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
   };
 
   /** Lo que hace la API al exportar: la Exportacion en cola, ligada a la versión del curso. */
-  const exportacion = (versionCurso: number, formato: 'SCORM12' | 'HTML' = 'SCORM12') => prisma.exportacion.create({
-    data: { organizacionId: e.ids.orgId, cursoId, versionCurso, formato, perfilLms: formato === 'HTML' ? 'generico' : 'moodle', modoIdioma: 'unico', creadoPorId: e.ids.usuarioId },
+  const exportacion = (versionCurso: number, formato: 'SCORM12' | 'HTML' = 'SCORM12', modoIdioma = 'unico') => prisma.exportacion.create({
+    data: { organizacionId: e.ids.orgId, cursoId, versionCurso, formato, perfilLms: formato === 'HTML' ? 'generico' : 'moodle', modoIdioma, creadoPorId: e.ids.usuarioId },
   });
   const correr = (id: string, r: Redis = redis) => crearExportador({ bd: prisma, redis: r, leer, subir })({
     data: { trabajoId: id, organizacionId: e.ids.orgId, tarea: TAREA_EXPORTAR }, queueName: 'export', updateProgress: async () => undefined,
@@ -143,6 +144,37 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     expect(await contenido.file('datos.js')!.async('string')).toContain('"aviso":"Voz e ilustraciones generadas con IA y revisadas por AulasEducativas"');
     expect(contenido.file(`recursos/${ids.ana}.svg`)).not.toBeNull();
     expect(Object.keys(contenido.files).some((n) => n.endsWith('.pdf'))).toBe(false);
+  }, 60_000);
+
+  it('HU-0804 · ES + EN en el mismo paquete: lleva la voz en inglés, abre en español y los créditos la incluyen', async () => {
+    const vozEn = randomUUID();
+    await recurso(vozEn, 'AUDIO', 'p01-en.mp3', 'audio/mpeg', new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 1]),
+      { proveedor: 'google', modelo: 'en-US-Neural2-F', licencia: 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)' });
+    const doc = documento();
+    const visitar = (v: unknown) => {
+      if (Array.isArray(v)) { v.forEach(visitar); return; }
+      if (!v || typeof v !== 'object') return;
+      const o = v as Record<string, unknown>;
+      if (typeof o.es === 'string' && Object.keys(o).every((k) => k === 'es' || k === 'en')) { o.en = `[EN] ${o.es}`; return; }
+      Object.values(o).forEach(visitar);
+    };
+    visitar(doc);
+    doc.recursos.push({ id: vozEn, tipo: 'audio', origen: 'generado', nombre: 'p01-en.mp3', mime: 'audio/mpeg', idioma: 'en' });
+    const n = doc.modulos[0].capsulas[0].pantallas[0].narracion;
+    n.porIdioma.en = { ...structuredClone(n.porIdioma.es), recursoAudioId: vozEn };
+    await prisma.cursoVersion.create({ data: { cursoId, version: 9, documento: doc, motivo: 'traducción' } });
+
+    const exp = await exportacion(9, 'SCORM12', 'mismo-paquete');
+    const { recursoId } = await correr(exp.id);
+    const final = await prisma.exportacion.findUniqueOrThrow({ where: { id: exp.id } });
+    expect(final.informe).toMatchObject({ idioma: 'es', idiomas: ['es', 'en'] });
+    const contenido = await JSZip.loadAsync(almacen.get((await prisma.recurso.findUniqueOrThrow({ where: { id: recursoId } })).claveS3)!);
+    expect(contenido.file(`recursos/${vozEn}.mp3`)).not.toBeNull();
+    const datos = JSON.parse((await contenido.file('datos.js')!.async('string')).replace(/^window\.APTIO_DATOS = /, '').replace(/;\n?$/, '')) as
+      { idioma: string; curso: { idiomas: string[]; modoIdioma: string }; creditos: { aviso: string; filas: { modelo: string }[] } };
+    expect(datos).toMatchObject({ idioma: 'es', curso: { idiomas: ['es', 'en'], modoIdioma: 'mismo-paquete' } });
+    expect(datos.creditos.aviso).toBe('Voz e ilustraciones generadas con IA y revisadas por AulasEducativas');
+    expect(datos.creditos.filas.map((f) => f.modelo)).toContain('en-US-Neural2-F');
   }, 60_000);
 
   it('si un recurso no se puede leer, la exportación queda en ERROR con el motivo', async () => {
