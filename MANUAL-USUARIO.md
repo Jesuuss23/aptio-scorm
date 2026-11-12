@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.41 · actualizado con la primera entrega del Sprint 9 (12 de noviembre de 2026)**
+**Versión 0.42 · actualizado con la segunda entrega del Sprint 9 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -567,7 +567,9 @@ La pregunta se guarda sola un segundo después de tu último cambio. Si algo fal
 
 En la vista previa y en el paquete, al llegar a ese segundo el video se detiene y la pregunta aparece encima. Si el participante acierta, el video sigue solo; si falla, ve la retroalimentación y vuelve a intentar. Si la pantalla del video es obligatoria, el participante no puede avanzar hasta ver el video entero y acertar las preguntas obligatorias; el botón Siguiente le dice por qué. Las preguntas del video ayudan a repasar y no cuentan para la nota.
 
-Prueba todo con **▶ Probar en la vista previa** (en modo Revisión puedes ir directo a la pantalla del video). Impedir adelantar el video llega en la próxima entrega.
+Debajo del video está la casilla **Impedir adelantar hasta responder**. Si la marcas, el participante no puede mover la barra del video más allá de una pregunta que no respondió (o que no saltó, si es opcional): el video vuelve al segundo de esa pregunta, la muestra y le avisa «No puedes adelantar: responde primero la pregunta de 0:30.». Retroceder siempre se puede, y después de responder puede adelantar libremente. La casilla se guarda sola, como las preguntas, y **↶ Deshacer** también la deshace. El porcentaje mínimo del video que hay que ver todavía no se aplica.
+
+Prueba todo con **▶ Probar en la vista previa** (en modo Revisión puedes ir directo a la pantalla del video).
 
 ## 9. Preguntas frecuentes
 
@@ -648,6 +650,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.39 | 2026-11-12 | Navegación: «✦ Recomendar», «✦ Crear con IA» con una descripción, la franja de la propuesta con Aplicar, Descartar y «Probar alternativa», y el patrón personalizado con su nombre (8.18). |
 | 0.40 | 2026-11-12 | Editor: «Avanzado: disparadores» con «a los N segundos» o «al terminar la voz» para mostrar, ocultar o ir a otra pantalla, su marca ◆ en la línea de tiempo y cómo se ven con ▶ Reproducir (8.8). |
 | 0.41 | 2026-11-12 | Video interactivo (8.19): agregar preguntas en un segundo del video, sus opciones y retroalimentación, obligatoria u opcional, y cómo se ven en la vista previa y en el paquete. |
+| 0.42 | 2026-11-12 | Video interactivo (8.19): la casilla «Impedir adelantar hasta responder» y lo que ve el participante al intentar adelantar. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
