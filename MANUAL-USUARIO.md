@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.42 · actualizado con la segunda entrega del Sprint 9 (12 de noviembre de 2026)**
+**Versión 0.43 · actualizado con la tercera entrega del Sprint 9 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -569,6 +569,8 @@ En la vista previa y en el paquete, al llegar a ese segundo el video se detiene 
 
 Debajo del video está la casilla **Impedir adelantar hasta responder**. Si la marcas, el participante no puede mover la barra del video más allá de una pregunta que no respondió (o que no saltó, si es opcional): el video vuelve al segundo de esa pregunta, la muestra y le avisa «No puedes adelantar: responde primero la pregunta de 0:30.». Retroceder siempre se puede, y después de responder puede adelantar libremente. La casilla se guarda sola, como las preguntas, y **↶ Deshacer** también la deshace. El porcentaje mínimo del video que hay que ver todavía no se aplica.
 
+Si el video ya tiene su transcripción en **Material del cliente** (ahí se transcribe), el botón **✦ Proponer pausas desde la transcripción** le pide a la IA que lea lo que se dice en el video y proponga dónde pausar: un capítulo al empezar cada tema, preguntas después de los pasos clave y puntos para destacar algo en pantalla. Si el video no está transcrito, la herramienta te lo dice («Transcribe el video en Material del cliente»). Mientras la IA trabaja verás «La IA está leyendo la transcripción del video…». Cuando termina, las marcas propuestas aparecen **en espera** sobre la línea de tiempo, con otro estilo, y debajo hay una lista con una casilla por cada una: revísalas, deja marcadas las que quieras y pulsa **Aplicar las elegidas**, o **Descartar la propuesta** si no te sirve ninguna. La IA nunca pone una pausa en mitad de una frase. Las que aplicas se suman a las que ya tenías (no reemplazan ninguna) y quedan marcadas como de la IA hasta que las revises; si una queda a menos de 2 segundos de otra del mismo tipo, se omite y te dice por qué. **↶ Deshacer** quita todas las que acabas de aplicar. Si alguien cambió la pantalla después de pedir la propuesta, la herramienta te pide pedirla de nuevo.
+
 Prueba todo con **▶ Probar en la vista previa** (en modo Revisión puedes ir directo a la pantalla del video).
 
 ## 9. Preguntas frecuentes
@@ -651,6 +653,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.40 | 2026-11-12 | Editor: «Avanzado: disparadores» con «a los N segundos» o «al terminar la voz» para mostrar, ocultar o ir a otra pantalla, su marca ◆ en la línea de tiempo y cómo se ven con ▶ Reproducir (8.8). |
 | 0.41 | 2026-11-12 | Video interactivo (8.19): agregar preguntas en un segundo del video, sus opciones y retroalimentación, obligatoria u opcional, y cómo se ven en la vista previa y en el paquete. |
 | 0.42 | 2026-11-12 | Video interactivo (8.19): la casilla «Impedir adelantar hasta responder» y lo que ve el participante al intentar adelantar. |
+| 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
