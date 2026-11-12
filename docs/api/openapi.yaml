@@ -2457,7 +2457,7 @@ paths:
       - Idiomas
       summary: Traducir pendientes con el glosario
       operationId: post_cursos_cursoId_traducciones_traducir
-      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (el revisor del cliente recibe 403). HU-0802. Encola IA-10 en la cola ia con el glosario del cliente (RN-08-1). Solo traduce los textos PENDIENTE, en lotes de hasta 60; no toca lo REVISADA (RN-08-2). Cada lote se guarda entero o no se guarda, como una versión del curso, y sus textos quedan TRADUCIDA_IA.
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (el revisor del cliente recibe 403). HU-0802. Encola IA-10 en la cola ia con el glosario del cliente (RN-08-1). Solo traduce los textos PENDIENTE, en lotes de hasta 60; no toca lo REVISADA (RN-08-2). Cada lote se guarda entero o no se guarda, como una versión del curso, y sus textos quedan TRADUCIDA_IA, o DESBORDE si no caben en su límite (HU-0803); para esos la IA propone una versión corta, también para los DESBORDE que aún no la tienen.
       parameters:
       - name: cursoId
         in: path
@@ -2484,7 +2484,7 @@ paths:
       - Idiomas
       summary: Editar o marcar como revisada
       operationId: patch_traducciones_traduccionId
-      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (el revisor del cliente recibe 403). HU-0802. Editar el inglés guarda una versión del curso (motivo «traducción») y deja el texto REVISADA. Marcar REVISADA sin cambiar el texto no crea versión. 422 con código SIN_TRADUCCION (marcar revisado un texto sin inglés) o SIN_CAMBIOS (sin en ni estado).
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (el revisor del cliente recibe 403). HU-0802. Editar el inglés guarda una versión del curso (motivo «traducción») y deja el texto REVISADA, o DESBORDE si no cabe en su límite (HU-0803, conserva la propuesta). Usar la versión corta es enviar `en` con la propuesta. Marcar REVISADA sin cambiar el texto no crea versión y acepta también un inglés que no cabe. 422 con código SIN_TRADUCCION (marcar revisado un texto sin inglés) o SIN_CAMBIOS (sin en ni estado).
       parameters:
       - name: traduccionId
         in: path
@@ -5409,9 +5409,18 @@ components:
           - TRADUCIDA_IA
           - REVISADA
           - DESBORDE
-        detalle:
+        limite:
+          type: integer
+          nullable: true
+          description: HU-0803 · Caracteres que caben en el componente (título 45, subtítulo y destacado 70, cuerpo 160, instrucción 90, opción 60, tarjeta de memoria 24, etiqueta de grupo 20); null si no ocupa espacio en pantalla (narración, alt, metadatos, objetivos)
+        caracteres:
+          type: integer
+          nullable: true
+          description: Caracteres del inglés actual, sin espacios al borde; DESBORDE si pasa el límite
+        propuesta:
           type: string
-          description: Motivo del DESBORDE con su propuesta de versión corta (HU-0803)
+          nullable: true
+          description: HU-0803 · Versión corta que propone la IA para un texto en DESBORDE; el inglés del curso no cambia hasta usarla
     TraduccionCambio:
       type: object
       properties:

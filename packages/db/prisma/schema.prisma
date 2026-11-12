@@ -549,6 +549,7 @@ model Traduccion {
   idioma          String
   textoOrigenHash String
   estado          EstadoTraduccion @default(PENDIENTE)
+  propuesta       String? // HU-0803 · versión corta de la IA para un texto en Desborde
   actualizadoEn   DateTime         @updatedAt
 
   curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)

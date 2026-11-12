@@ -21,6 +21,7 @@ const correo = (n: string) => `${n}-${sufijo}@prueba.test`;
 const loto = () => JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
 const TITULO = '/modulos/0/capsulas/0/pantallas/0/titulo';
 const SUBTITULO = '/modulos/0/capsulas/0/pantallas/0/bloques/1/contenido';
+const TARJETA = '/modulos/0/capsulas/0/pantallas/6/bloques/1/interaccion/datos/pares/2/b/texto';
 type T = { id: string; ruta: string; pantallaId: string | null; es: string; en: string | null; estado: string };
 
 describe.skipIf(!hayBase && !process.env.CI)('traducciones (HU-0802)', () => {
@@ -83,8 +84,9 @@ describe.skipIf(!hayBase && !process.env.CI)('traducciones (HU-0802)', () => {
     const r = await como('productor').get(`/cursos/${cursoId}/traducciones`);
     expect(r.status).toBe(200);
     expect(r.body).toHaveLength(291);
-    expect(r.body[1]).toEqual({ id: expect.any(String), ruta: expect.stringMatching(/^\//), pantallaId: null, es: expect.any(String), en: null, estado: 'PENDIENTE' });
-    expect(r.body.find((t: T) => t.ruta === TITULO)).toMatchObject({ pantallaId: 'p01', es: 'Bloqueo y etiquetado', en: null, estado: 'PENDIENTE' });
+    expect(r.body[1]).toEqual({ id: expect.any(String), ruta: expect.stringMatching(/^\//), pantallaId: null, es: expect.any(String), en: null, estado: 'PENDIENTE', limite: 45, caracteres: null, propuesta: null });
+    expect(r.body.find((t: T) => t.ruta === TITULO)).toMatchObject({ pantallaId: 'p01', es: 'Bloqueo y etiquetado', en: null, estado: 'PENDIENTE', limite: 45 });
+    expect(r.body.find((t: T) => t.ruta === TARJETA)).toMatchObject({ pantallaId: 'p07', es: 'Cilindros y mangueras', limite: 24 });
     expect(await prisma.traduccion.count({ where: { cursoId } })).toBe(291);
     // Listar de nuevo no duplica ni cambia los ids.
     expect((await lista()).map((t) => t.id)).toEqual(r.body.map((t: T) => t.id));
@@ -111,7 +113,7 @@ describe.skipIf(!hayBase && !process.env.CI)('traducciones (HU-0802)', () => {
     const antes = (await curso()).version;
     const r = await como('productor').patch(`/traducciones/${sub.id}`, { en: '  Safety capsule, reviewed by hand  ' });
     expect(r.status).toBe(200);
-    expect(r.body).toEqual({ id: sub.id, ruta: SUBTITULO, pantallaId: 'p01', es: sub.es, en: 'Safety capsule, reviewed by hand', estado: 'REVISADA' });
+    expect(r.body).toEqual({ id: sub.id, ruta: SUBTITULO, pantallaId: 'p01', es: sub.es, en: 'Safety capsule, reviewed by hand', estado: 'REVISADA', limite: 70, caracteres: 32, propuesta: null });
     const c = await curso();
     expect(c.version).toBe(antes + 1);
     expect(textosDe(c.documento).find((t) => t.ruta === SUBTITULO)?.en).toBe('Safety capsule, reviewed by hand');
@@ -154,5 +156,38 @@ describe.skipIf(!hayBase && !process.env.CI)('traducciones (HU-0802)', () => {
     expect(encolados).toEqual([]);
     // El curso de otro cliente de la misma organización sí lo ve el equipo.
     expect((await como('productor').get(`/cursos/${otroCursoId}/traducciones`)).status).toBe(200);
+  });
+
+  it('CP-078 · un inglés que no cabe queda en Desborde con su propuesta; usar la versión corta o marcar revisado lo deja Revisado', async () => {
+    const largo = 'Cylinders and pressure hoses';
+    // Lo que deja el worker: el inglés largo en el curso y la fila en Desborde con la versión corta.
+    const c = await curso();
+    const doc = structuredClone(c.documento) as ReturnType<typeof loto>;
+    doc.modulos[0].capsulas[0].pantallas[6].bloques[1].interaccion.datos.pares[2].b.texto.en = largo;
+    await prisma.curso.update({ where: { id: cursoId }, data: { documento: doc } });
+    const fila = (await lista()).find((t) => t.ruta === TARJETA)!;
+    await prisma.traduccion.update({ where: { id: fila.id }, data: { estado: 'DESBORDE', propuesta: 'Cylinders and hoses' } });
+    expect((await lista('?estado=DESBORDE'))).toEqual([{ ...fila, en: largo, estado: 'DESBORDE', limite: 24, caracteres: 28, propuesta: 'Cylinders and hoses' }]);
+
+    // Una persona escribe otro inglés que tampoco cabe: se guarda (con versión) y sigue en Desborde con la propuesta.
+    const v = (await curso()).version;
+    const otroLargo = await como('productor').patch(`/traducciones/${fila.id}`, { en: 'Cylinders and air hoses (high)' });
+    expect(otroLargo.body).toMatchObject({ en: 'Cylinders and air hoses (high)', estado: 'DESBORDE', caracteres: 30, propuesta: 'Cylinders and hoses' });
+    expect((await curso()).version).toBe(v + 1);
+
+    // «Usar versión corta»: el inglés pasa a ser la propuesta y queda Revisado.
+    const corta = await como('productor').patch(`/traducciones/${fila.id}`, { en: 'Cylinders and hoses' });
+    expect(corta.body).toMatchObject({ en: 'Cylinders and hoses', estado: 'REVISADA', caracteres: 19, propuesta: null });
+    expect(textosDe((await curso()).documento).find((t) => t.ruta === TARJETA)?.en).toBe('Cylinders and hoses');
+
+    // Con un inglés largo, «Marcar revisado» lo acepta así (decide la persona).
+    await como('productor').patch(`/traducciones/${fila.id}`, { en: largo });
+    expect((await lista()).find((t) => t.ruta === TARJETA)?.estado).toBe('DESBORDE');
+    const aceptado = await como('instruccional').patch(`/traducciones/${fila.id}`, { estado: 'REVISADA' });
+    expect(aceptado.body).toMatchObject({ en: largo, estado: 'REVISADA', caracteres: 28 });
+
+    // Un inglés de la IA que no cabe pasa a Desborde al listar.
+    await prisma.traduccion.update({ where: { id: fila.id }, data: { estado: 'TRADUCIDA_IA' } });
+    expect((await lista()).find((t) => t.ruta === TARJETA)?.estado).toBe('DESBORDE');
   });
 });

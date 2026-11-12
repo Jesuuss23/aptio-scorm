@@ -2,6 +2,8 @@
 // «✦ Traducir pendientes» manda a la IA solo lo Pendiente, con el glosario del cliente (RN-08-1); lo Revisado no se toca
 // (RN-08-2, CP-077). Editar el inglés a mano lo deja Revisado; «Marcar revisado» confirma el de la IA. El avance llega por
 // SSE (un evento por lote guardado) con consulta cada 2 s de respaldo. El revisor del cliente solo ve.
+// HU-0803 · Desbordes (RN-08-3, CP-078): el inglés que no cabe en su componente queda en Desborde con «72 de 60
+// caracteres» y la versión corta de la IA («Usar versión corta»); mientras se escribe, un contador avisa.
 import { NOMBRE_ESTADO } from '@aptio/schema/traduccion';
 import { Cabecera } from '@aptio/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -202,7 +204,7 @@ export function IdiomasVista({ proyectoId, rol, alCargar }: { proyectoId: string
               <button type="button" className="opcion" aria-pressed={filtro === 'revisar'} onClick={() => setFiltro('revisar')}>Por revisar</button>
             </div>
             <span className="sec" data-conteo>
-              {filas.length} textos · {pendientes} pendientes · {cuenta('TRADUCIDA_IA')} traducidos por IA · {cuenta('REVISADA')} revisados
+              {filas.length} textos · {pendientes} pendientes · {cuenta('TRADUCIDA_IA')} traducidos por IA · {cuenta('DESBORDE')} desbordes · {cuenta('REVISADA')} revisados
             </span>
           </div>
           {grupos.length ? (
@@ -231,10 +233,21 @@ export function IdiomasVista({ proyectoId, rol, alCargar }: { proyectoId: string
                               onBlur={() => guardarBorrador(f)}
                               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.blur(); } }}
                             />
+                            <Contador texto={borradores[f.id] ?? f.en ?? ''} limite={f.limite} editando={f.id in borradores} />
                             {f.estado === 'PENDIENTE' && f.en ? <small className="sec">El español cambió: este inglés es el anterior.</small> : null}
+                            {f.estado === 'DESBORDE' && f.propuesta ? (
+                              <div className="propuesta-corta">
+                                <small className="sec">Versión corta propuesta ({f.propuesta.length} caracteres):</small>
+                                <span lang="en">{f.propuesta}</span>
+                                {puedeEditar ? (
+                                  <button className="boton ia marcar-revisado" type="button" disabled={ocupada === f.id} onClick={() => void cambiar(f, { en: f.propuesta! })}>Usar versión corta</button>
+                                ) : null}
+                              </div>
+                            ) : null}
                           </td>
                           <td>
                             <span className={CLASE_ESTADO[f.estado]}>{NOMBRE_ESTADO[f.estado]}</span>
+                            {f.estado === 'DESBORDE' && f.limite !== null && f.caracteres !== null ? <small className="detalle-desborde">{f.caracteres} de {f.limite} caracteres</small> : null}
                             {puedeEditar && f.estado !== 'REVISADA' && f.en ? (
                               <button className="boton marcar-revisado" type="button" disabled={ocupada === f.id} onClick={() => void cambiar(f, { estado: 'REVISADA' })}>Marcar revisado</button>
                             ) : null}
@@ -259,5 +272,16 @@ export function IdiomasVista({ proyectoId, rol, alCargar }: { proyectoId: string
         </aside>
       </div>
     </>
+  );
+}
+
+/** HU-0803 · Caracteres del inglés frente al límite de su componente; en rojo de aviso si no cabe. */
+function Contador({ texto, limite, editando }: { texto: string; limite: number | null; editando: boolean }) {
+  if (limite === null || (!editando && !texto)) return null;
+  const n = texto.trim().length;
+  return (
+    <small className={n > limite ? 'contador-caracteres excede' : 'contador-caracteres'} aria-live={editando ? 'polite' : 'off'} data-contador>
+      {n} / {limite}{n > limite ? ' · no cabe' : ''}
+    </small>
   );
 }
