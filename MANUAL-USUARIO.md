@@ -381,15 +381,6 @@ Desde el proyecto, **Exportar SCORM** abre **Entrega**. Primero eliges el **form
 
 Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**.
 
-### 8.11 HTML autocontenido: presentar sin LMS ni internet
-
-Cuando el cliente quiere mostrar la cápsula en una sala, en una feria o en una computadora sin plataforma, elige en Entrega **HTML autocontenido · para presentar sin LMS** y pulsa **Exportar HTML**.
-
-- Se descarga un ZIP con una carpeta. **Descomprímelo y abre `index.html` con doble clic**: funciona sin internet y sin LMS, con imágenes, personaje, video, subtítulos y todas las actividades. Dentro va un `LEEME.txt` con esa misma instrucción.
-- **No guarda el avance ni la nota.** Si se cierra, empieza de nuevo. Para registrar el seguimiento de los participantes, exporta SCORM 1.2 y súbelo al LMS.
-- La verificación no muestra el límite de subida ni `suspend_data`, porque no hay LMS. El peso aparece solo como dato. Si quedan pantallas sin aprobar, se pide la misma confirmación que en SCORM.
-- En el historial, la columna **Formato** dice «HTML» y el archivo se llama `<proyecto>-html-v<versión>.zip`.
-
 ### 8.10 Modo diagnóstico del paquete (para el soporte)
 
 Cuando un cliente dice «el curso no guarda el avance» o «no llega la nota», el propio paquete puede mostrar qué pasa en su LMS. El participante nunca lo ve: se abre solo a pedido.
@@ -400,6 +391,15 @@ Cuando un cliente dice «el curso no guarda el avance» o «no llega la nota», 
 4. Cierra con **Cerrar** o **Escape**.
 
 Si dice **«No se encontró la API SCORM 1.2»**, el curso funciona pero el LMS no recibe avance ni nota: suele pasar cuando el paquete se abrió fuera del LMS o en una ventana que el LMS no controla. El informe no incluye el nombre ni el código del participante.
+
+### 8.11 HTML autocontenido: presentar sin LMS ni internet
+
+Cuando el cliente quiere mostrar la cápsula en una sala, en una feria o en una computadora sin plataforma, elige en Entrega **HTML autocontenido · para presentar sin LMS** y pulsa **Exportar HTML**.
+
+- Se descarga un ZIP con una carpeta. **Descomprímelo y abre `index.html` con doble clic**: funciona sin internet y sin LMS, con imágenes, personaje, video, subtítulos y todas las actividades. Dentro va un `LEEME.txt` con esa misma instrucción.
+- **No guarda el avance ni la nota.** Si se cierra, empieza de nuevo. Para registrar el seguimiento de los participantes, exporta SCORM 1.2 y súbelo al LMS.
+- La verificación no muestra el límite de subida ni `suspend_data`, porque no hay LMS. El peso aparece solo como dato. Si quedan pantallas sin aprobar, se pide la misma confirmación que en SCORM.
+- En el historial, la columna **Formato** dice «HTML» y el archivo se llama `<proyecto>-html-v<versión>.zip`.
 
 ## 9. Preguntas frecuentes
 
