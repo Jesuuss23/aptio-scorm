@@ -1,8 +1,11 @@
 // HU-0504 · Propuestas de la IA (M05, RN-05-3, RN-05-4, SUP-39): pedir una propuesta encola IA-16 en la cola ia; el
 // worker la guarda con su versión base. Aplicar cambia la pantalla y crea una versión; vence si la pantalla cambió.
 // Deshacer restaura la versión anterior conservando la narración actual (su audio, boca y subtítulos).
-import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+// HU-1002 · El tipo `alineacion` es del curso entero (sin pantalla): encola IA-17, vence con cualquier versión nueva del
+// curso (su patch usa posiciones) y solo lo piden, aplican y descartan administración y diseño instruccional.
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma, Propuesta } from '@aptio/db';
+import { aplicarCorreccion, type CambioCorreccion, informeAlineacion, type PantallaAfectada, TAREA_CORRECCION } from '@aptio/schema/alineacion';
 import type { OperacionPatch } from '@aptio/schema/patch';
 import { aplicarEnPantalla, type CambiosPropuesta, huellaPantalla, patchDe, TAREA_PROPUESTA, TIPOS_PROPUESTA, type Variante } from '@aptio/schema/propuesta';
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
@@ -15,8 +18,16 @@ import type { CambioResultadoDto } from './curso.dto.js';
 import { CursosService } from './cursos.service.js';
 import type { AplicarPropuestaDto, CursoRestauradoDto, FiltroPropuestasDto, PropuestaDto, PropuestaSolicitudDto, Trabajo202Dto } from './propuesta.dto.js';
 
-type Guardado = CambiosPropuesta & { huella: string | null };
+type Guardado = CambiosPropuesta & { huella: string | null; correcciones?: CambioCorreccion[] };
 const VENCIDA = { codigo: 'PROPUESTA_VENCIDA', mensaje: 'La pantalla cambió desde que se calculó esta propuesta. Recalcular propuesta.' };
+const VENCIDA_CURSO = { codigo: 'PROPUESTA_VENCIDA', mensaje: 'El curso cambió desde que se calculó esta propuesta. Recalcular propuesta.' };
+/** HU-1002 · Propuestas del curso entero: la corrección de la alineación (IA-17). */
+const ALINEACION = 'alineacion';
+/** HU-1002 · Quienes piden, aplican y descartan la corrección de la alineación (los mismos que cambian niveles, M14). */
+const CORRIGEN_ALINEACION = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
+function exigirCorrector(u: UsuarioSesion) {
+  if (!CORRIGEN_ALINEACION.includes(u.rol)) throw new ForbiddenException('Tu rol no permite esta acción');
+}
 
 /** Reemplaza la pantalla en el documento (lo modifica). */
 function reemplazar(doc: CursoDoc, pantallaId: string, cambiar: (p: CursoDoc['modulos'][number]['capsulas'][number]['pantallas'][number]) => typeof p) {
@@ -45,6 +56,7 @@ export class PropuestasService {
   }
 
   async pedir(u: UsuarioSesion, cursoId: string, dto: PropuestaSolicitudDto): Promise<Trabajo202Dto> {
+    if (dto.tipo === ALINEACION) return this.pedirCorreccion(u, cursoId);
     const c = await this.cursos.buscar(u, cursoId);
     if (!(TIPOS_PROPUESTA as readonly string[]).includes(dto.tipo)) {
       throw new UnprocessableEntityException({
@@ -71,6 +83,25 @@ export class PropuestasService {
     return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
   }
 
+  /** HU-1002 · «✦ Proponer correcciones»: encola IA-17 sobre el curso entero si tiene alertas de alineación. */
+  private async pedirCorreccion(u: UsuarioSesion, cursoId: string): Promise<Trabajo202Dto> {
+    exigirCorrector(u);
+    const c = await this.cursos.buscar(u, cursoId);
+    if (!informeAlineacion(c.documento as unknown as CursoDoc).totalAlertas) {
+      throw new UnprocessableEntityException({ codigo: 'SIN_ALERTAS', mensaje: 'El curso no tiene alertas de alineación que corregir' });
+    }
+    const t = await this.bd.trabajoIA.create({
+      data: { organizacionId: c.organizacionId, proyectoId: c.proyectoId, tarea: TAREA_CORRECCION, tipo: 'TEXTO', proveedor: '-', modelo: '-' },
+    });
+    try {
+      await this.colas.encolar('ia', { trabajoId: t.id, organizacionId: c.organizacionId, tarea: TAREA_CORRECCION, propuesta: { cursoId: c.id, tipo: ALINEACION } });
+    } catch (e) {
+      await this.bd.trabajoIA.update({ where: { id: t.id }, data: { estado: 'ERROR', error: 'No se pudo encolar' } });
+      throw e;
+    }
+    return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
+  }
+
   /** RN-05-4: al listar, una pendiente cuya pantalla cambió pasa a VENCIDA. */
   async listar(u: UsuarioSesion, cursoId: string, f: FiltroPropuestasDto): Promise<PropuestaDto[]> {
     const c = await this.cursos.buscar(u, cursoId);
@@ -80,7 +111,9 @@ export class PropuestasService {
       include: { trabajoIA: { select: { costoUsd: true } } },
       orderBy: { creadoEn: 'desc' },
     });
-    const vencidas = filas.filter((p) => p.estado === 'PENDIENTE' && p.pantallaId && huellaPantalla(doc, p.pantallaId) !== (p.cambios as unknown as Guardado).huella);
+    const vencidas = filas.filter((p) => p.estado === 'PENDIENTE' && (p.tipo === ALINEACION
+      ? p.versionBase !== c.version
+      : p.pantallaId && huellaPantalla(doc, p.pantallaId) !== (p.cambios as unknown as Guardado).huella));
     if (vencidas.length) await this.bd.propuesta.updateMany({ where: { id: { in: vencidas.map((p) => p.id) }, estado: 'PENDIENTE' }, data: { estado: 'VENCIDA' } });
     for (const p of vencidas) p.estado = 'VENCIDA';
     return filas.filter((p) => !f.estado || p.estado === f.estado).map((p) => PropuestasService.aDto(p, Number(p.trabajoIA?.costoUsd ?? 0)));
@@ -91,6 +124,7 @@ export class PropuestasService {
     return {
       id: p.id, tipo: p.tipo, pantallaId: p.pantallaId, titulo: p.titulo, descripcion: p.descripcion,
       cambios: 'patch' in cambios ? cambios.patch : [], ...('variantes' in cambios ? { vistaPrevia: cambios.variantes as Variante[] } : {}),
+      ...(cambios.correcciones ? { correcciones: cambios.correcciones } : {}),
       versionBase: p.versionBase, estado: p.estado, costoUsd, creadoEn: p.creadoEn.toISOString(),
     };
   }
@@ -105,6 +139,7 @@ export class PropuestasService {
   /** CP-052 y CP-053: aplica el patch (o la variante) si la pantalla no cambió; crea una versión y vuelve a borrador. */
   async aplicar(u: UsuarioSesion, propuestaId: string, dto: AplicarPropuestaDto): Promise<CambioResultadoDto> {
     const p = await this.buscar(u, propuestaId);
+    if (p.tipo === ALINEACION) return this.aplicarCorreccion(u, p);
     if (p.estado === 'VENCIDA') throw new ConflictException(VENCIDA);
     if (p.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: p.estado === 'APLICADA' ? 'Esta propuesta ya se aplicó' : 'Esta propuesta se descartó' });
     const guardado = p.cambios as unknown as Guardado;
@@ -140,8 +175,48 @@ export class PropuestasService {
     }
   }
 
+  /**
+   * HU-1002 · CP-084: aplica la corrección si el curso sigue en la versión base; crea una versión con motivo «alineación»
+   * (se deshace con la restauración) y devuelve las pantallas nuevas o cambiadas, que quedan en borrador por revisar.
+   */
+  private async aplicarCorreccion(u: UsuarioSesion, p: Propuesta): Promise<CambioResultadoDto> {
+    exigirCorrector(u);
+    const vencer = async () => {
+      await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'VENCIDA' } });
+      return new ConflictException(VENCIDA_CURSO);
+    };
+    if (p.estado === 'VENCIDA') throw new ConflictException(VENCIDA_CURSO);
+    if (p.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: p.estado === 'APLICADA' ? 'Esta propuesta ya se aplicó' : 'Esta propuesta se descartó' });
+    const c = await this.cursos.buscar(u, p.cursoId);
+    if (c.version !== p.versionBase) throw await vencer();
+    const guardado = p.cambios as unknown as Guardado & { patch: OperacionPatch[] };
+    let afectadas: PantallaAfectada[] = [];
+    try {
+      // Con la versión base como versión leída: si otra persona guarda en medio, 409 y la propuesta vence.
+      const r = await this.cursos.guardar(u, p.cursoId, p.versionBase, 'alineación', (doc) => {
+        let resultado: ReturnType<typeof aplicarCorreccion>;
+        try {
+          resultado = aplicarCorreccion(doc, { resumen: p.descripcion, cambios: guardado.correcciones ?? [], patch: guardado.patch });
+        } catch (e) {
+          throw new UnprocessableEntityException({ codigo: 'PROPUESTA_NO_APLICA', mensaje: `La propuesta no se puede aplicar: ${(e as Error).message}` });
+        }
+        // `guardar` valida y guarda el documento que recibe: se reemplaza su contenido por el corregido.
+        for (const k of Object.keys(doc)) delete (doc as unknown as Record<string, unknown>)[k];
+        Object.assign(doc, resultado.documento);
+        afectadas = resultado.afectadas;
+        return { regenerando: [] as string[] };
+      });
+      await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'APLICADA', resueltoPorId: u.id, resueltoEn: new Date() } });
+      return { ...r, pantallasPorRevisar: afectadas };
+    } catch (e) {
+      if (e instanceof ConflictException && (e.getResponse() as { codigo?: string }).codigo === 'VERSION_CAMBIO') throw await vencer();
+      throw e;
+    }
+  }
+
   async descartar(u: UsuarioSesion, propuestaId: string): Promise<void> {
     const p = await this.buscar(u, propuestaId);
+    if (p.tipo === ALINEACION) exigirCorrector(u);
     if (p.estado === 'APLICADA') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: 'Esta propuesta ya se aplicó' });
     await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'DESCARTADA', resueltoPorId: u.id, resueltoEn: new Date() } });
   }

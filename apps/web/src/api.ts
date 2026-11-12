@@ -1,5 +1,5 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
-import type { InformeAlineacion as InformeAlineacionBase, NivelBloom } from '@aptio/schema/alineacion';
+import type { CambioCorreccion, InformeAlineacion as InformeAlineacionBase, NivelBloom, PantallaAfectada } from '@aptio/schema/alineacion';
 import type { AjusteElemento, ElementoExtra } from '@aptio/player';
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
@@ -297,17 +297,21 @@ export interface CambioResultado {
   aprobadas?: string[];
   pendientes?: string[];
   estado?: string;
+  /** HU-1002 · Pantallas nuevas o cambiadas por la corrección de la alineación: quedan en borrador. */
+  pantallasPorRevisar?: PantallaAfectada[];
 }
 
 /** HU-0504 · Propuesta de la IA sobre una pantalla. `cambios` es el JSON Patch; las variantes van en `vistaPrevia`. */
 export interface Propuesta {
   id: string;
-  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre';
+  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre' | 'alineacion';
   pantallaId: string | null;
   titulo: string;
   descripcion: string;
   cambios: OperacionPatch[];
   vistaPrevia?: { nombre: string; disposicion: string; patch: OperacionPatch[] }[];
+  /** HU-1002 · Los cambios de la corrección de la alineación (tipo `alineacion`, del curso entero). */
+  correcciones?: CambioCorreccion[];
   versionBase: number;
   estado: 'PENDIENTE' | 'APLICADA' | 'DESCARTADA' | 'VENCIDA';
   costoUsd: number;
@@ -463,6 +467,8 @@ export const api = {
   pedirPropuesta: (cursoId: string, datos: { tipo: Propuesta['tipo']; pantallaId: string; pedido?: string }) =>
     pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json(datos)),
   propuestas: (cursoId: string) => pedir<Propuesta[]>(`/cursos/${cursoId}/propuestas`),
+  // HU-1002 · «✦ Proponer correcciones» de la alineación (IA-17, curso entero).
+  pedirCorreccion: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json({ tipo: 'alineacion' })),
   aplicarPropuesta: (id: string, varianteIndice?: number) => pedir<CambioResultado>(`/propuestas/${id}/aplicar`, json(varianteIndice === undefined ? {} : { varianteIndice })),
   descartarPropuesta: (id: string) => pedir<void>(`/propuestas/${id}/descartar`, { method: 'POST' }),
   restaurarVersion: (cursoId: string, version: number) => pedir<{ version: number }>(`/cursos/${cursoId}/versiones/${version}/restaurar`, { method: 'POST' }),

@@ -1,20 +1,60 @@
 {
-  "resumen": "El objetivo 3 (aplicar) solo tiene preguntas de recordar en el quiz formativo p22; se propone una situación.",
+  "resumen": "Agregar al Reto final (pantalla 28) dos preguntas: un escenario de bloqueo con varios trabajadores (obj-3 · aplicar) y una distinción de prácticas (obj-2 · comprender).",
   "cambios": [
     {
-      "tipo": "ajustar-pregunta",
+      "tipo": "nueva-pregunta",
       "objetivoId": "obj-3",
       "nivelBloom": "aplicar",
-      "motivo": "Convertir p22-q3 en una situación de trabajo.",
-      "pantallaId": "p22"
+      "motivo": "obj-3 pide aplicar los pasos y el Reto final solo lo evalúa con preguntas de recordar: se agrega un escenario de trabajo.",
+      "pantallaId": "p28",
+      "preguntaId": "bq-09"
+    },
+    {
+      "tipo": "nueva-pregunta",
+      "objetivoId": "obj-2",
+      "nivelBloom": "comprender",
+      "motivo": "obj-2 pide distinguir prácticas seguras y riesgosas y se evalúa solo con preguntas de recordar: se agrega una distinción.",
+      "pantallaId": "p28",
+      "preguntaId": "bq-10"
     }
   ],
   "patch": [
     {
-      "op": "replace",
-      "path": "/modulos/0/capsulas/0/pantallas/21/bloques/1/interaccion/datos/preguntas/2/enunciado",
+      "op": "add",
+      "path": "/modulos/0/capsulas/0/pantallas/27/bloques/1/interaccion/datos/preguntas/-",
       "value": {
-        "es": "Cortaste la energía del motor con el interruptor. ¿Qué haces ahora?"
+        "id": "bq-09",
+        "objetivoId": "obj-3",
+        "nivelBloom": "aplicar",
+        "enunciado": { "es": "Tres mecánicos van a cambiar la faja del chancador. ¿Cómo bloquean el equipo?" },
+        "opciones": [
+          { "id": "bq-09-a", "contenido": { "texto": { "es": "El supervisor pone un candado por todos" } }, "correcta": false },
+          { "id": "bq-09-b", "contenido": { "texto": { "es": "Cada uno pone su candado en una pinza grupal" } }, "correcta": true },
+          { "id": "bq-09-c", "contenido": { "texto": { "es": "Basta con la tarjeta del primero que llega" } }, "correcta": false }
+        ],
+        "retroalimentacion": {
+          "correcta": { "es": "Cada trabajador protege su vida con su propio candado." },
+          "incorrecta": { "es": "En un bloqueo grupal cada uno coloca su propio candado." }
+        }
+      }
+    },
+    {
+      "op": "add",
+      "path": "/modulos/0/capsulas/0/pantallas/27/bloques/1/interaccion/datos/preguntas/-",
+      "value": {
+        "id": "bq-10",
+        "objetivoId": "obj-2",
+        "nivelBloom": "comprender",
+        "enunciado": { "es": "¿Cuál de estas prácticas es segura durante el bloqueo?" },
+        "opciones": [
+          { "id": "bq-10-a", "contenido": { "texto": { "es": "Apagar el equipo desde el pulsador y empezar" } }, "correcta": false },
+          { "id": "bq-10-b", "contenido": { "texto": { "es": "Aislar cada fuente y verificar energía cero" } }, "correcta": true },
+          { "id": "bq-10-c", "contenido": { "texto": { "es": "Prestar mi llave a quien termina el trabajo" } }, "correcta": false }
+        ],
+        "retroalimentacion": {
+          "correcta": { "es": "Aislar y verificar es lo que separa una práctica segura de una riesgosa." },
+          "incorrecta": { "es": "El pulsador no aísla la energía y la llave es solo tuya." }
+        }
       }
     }
   ]

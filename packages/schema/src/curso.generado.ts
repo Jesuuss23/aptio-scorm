@@ -532,6 +532,16 @@ export interface PreguntaQuiz {
     correcta: TextoI18N;
     incorrecta: TextoI18N;
   };
+  origen?: Origen1;
+}
+/**
+ * HU-1002 · Una pregunta que creó o cambió la IA queda marcada sin revisar.
+ */
+export interface Origen1 {
+  tipo: 'documento' | 'ia' | 'manual';
+  documentoId?: Id;
+  paginas?: number[];
+  revisado: boolean;
 }
 /**
  * This interface was referenced by `CursoDeCapsulasEsquemaV0`'s JSON-Schema

@@ -2,8 +2,11 @@
 // la matriz lo avisa; subir el nivel de la pregunta bq-06 desde su chip quita la alerta; el chip abre la pantalla en
 // Revisión; Entrega avisa «N objetivos sin alinear» sin bloquear. axe WCAG 2.2 A/AA sin violaciones. Diseño gráfico ve
 // la matriz sin selectores. La API se simula con el cálculo real de @aptio/schema/alineacion.
+// HU-1002 · CP-084: «✦ Proponer correcciones» trae la propuesta de IA-17 (salida grabada de LOTO); aplicarla deja 0
+// alertas y «1 pantalla por revisar» lleva a Revisión; una propuesta vencida ofrece «Recalcular propuesta».
+import { readFileSync } from 'node:fs';
 import AxeBuilder from '@axe-core/playwright';
-import { aplicarNiveles, type CambioNivel, informeAlineacion } from '@aptio/schema/alineacion';
+import { aplicarCorreccion, aplicarNiveles, type CambioNivel, type CorreccionAlineacion, informeAlineacion } from '@aptio/schema/alineacion';
 import type { CursoDoc } from '@aptio/schema/revision';
 import { expect, type Page, test } from '@playwright/test';
 import { cursoLoto, simularApi } from './api-simulada';
@@ -12,11 +15,52 @@ const PROYECTO = '00000000-0000-4000-8000-000000000701';
 const CURSO = '00000000-0000-4000-8000-000000000990';
 const URL_ALINEACION = `/proyectos/${PROYECTO}/alineacion`;
 const REGLAS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa'];
+const CORRECCION = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/salidas/X-IA-17-alineacion.json', import.meta.url), 'utf8')) as CorreccionAlineacion;
 
-async function simularAlineacion(page: Page) {
-  const doc = cursoLoto() as unknown as CursoDoc;
+type PropuestaSim = { id: string; tipo: string; pantallaId: null; titulo: string; descripcion: string; cambios: unknown[]; correcciones: unknown[]; versionBase: number; estado: string; costoUsd: number; creadoEn: string };
+
+async function simularAlineacion(page: Page, { vencida = false } = {}) {
+  let doc = cursoLoto() as unknown as CursoDoc;
   let version = 1;
   const cambios: Record<string, unknown>[] = [];
+  const pedidos: unknown[] = [];
+  const propuestas: PropuestaSim[] = [];
+  const nueva = (n: number, versionBase: number, estado = 'PENDIENTE'): PropuestaSim => ({
+    id: `00000000-0000-4000-8000-00000000c0${n}0`, tipo: 'alineacion', pantallaId: null, titulo: 'Corregir 2 alertas de alineación', descripcion: CORRECCION.resumen,
+    cambios: CORRECCION.patch, correcciones: CORRECCION.cambios, versionBase, estado, costoUsd: 0, creadoEn: '2026-11-12T18:00:00.000Z',
+  });
+  if (vencida) propuestas.unshift(nueva(9, 0, 'VENCIDA'));
+  // El trabajo de la IA termina a la 2.ª consulta y deja una propuesta nueva con la versión actual.
+  const consultas = new Map<string, number>();
+  await page.route(`**/api/v1/cursos/${CURSO}/propuestas`, (r) => {
+    if (r.request().method() === 'POST') {
+      pedidos.push(r.request().postDataJSON());
+      const id = `00000000-0000-4000-8000-00000000a0${pedidos.length}0`;
+      consultas.set(id, 0);
+      return r.fulfill({ status: 202, json: { id, estado: 'EN_COLA', eventos: '/api/v1/eventos' } });
+    }
+    return r.fulfill({ json: propuestas });
+  });
+  await page.route('**/api/v1/trabajos/*', (r) => {
+    const id = r.request().url().split('/').at(-1)!;
+    const n = (consultas.get(id) ?? 0) + 1;
+    consultas.set(id, n);
+    if (n === 2) propuestas.unshift(nueva(pedidos.length, version));
+    return r.fulfill({ json: { id, tarea: 'IA-17', estado: n >= 2 ? 'COMPLETADO' : 'EN_CURSO', progreso: n >= 2 ? 100 : 50 } });
+  });
+  await page.route('**/api/v1/propuestas/*/*', (r) => {
+    const [id, accion] = r.request().url().split('/').slice(-2);
+    const p = propuestas.find((x) => x.id === id)!;
+    if (accion === 'descartar') {
+      p.estado = 'DESCARTADA';
+      return r.fulfill({ status: 204 });
+    }
+    const { documento, afectadas } = aplicarCorreccion(doc, CORRECCION);
+    doc = documento;
+    version += 1;
+    p.estado = 'APLICADA';
+    return r.fulfill({ json: { version, regenerando: [], pantallasPorRevisar: afectadas } });
+  });
   await page.route(`**/api/v1/cursos/${CURSO}/alineacion`, (r) => {
     if (r.request().method() === 'PATCH') {
       const pedido = r.request().postDataJSON() as { version: number; objetivos?: { id: string; nivelBloom: string }[]; elementos?: { pantallaId: string; preguntaId?: string; nivelBloom: string }[] };
@@ -27,7 +71,7 @@ async function simularAlineacion(page: Page) {
     }
     return r.fulfill({ json: { version, ...informeAlineacion(doc) } });
   });
-  return { cambios };
+  return { cambios, pedidos, propuestas };
 }
 
 const fila = (page: Page, id: string) => page.getByRole('table').locator(`tr[data-objetivo="${id}"]`);
@@ -81,7 +125,61 @@ test('diseño gráfico ve la matriz sin cambiar niveles; el chip solo muestra el
   await fila(page, 'obj-1').getByRole('button', { name: /Pantalla 7/ }).click();
   await expect(page.getByText('Nivel recordar, según su diseño.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Abrir en Revisión' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '✦ Proponer correcciones' })).toHaveCount(0);
   expect(cambios).toEqual([]);
+});
+
+test('CP-084 · «✦ Proponer correcciones» trae la propuesta; aplicarla deja 0 alertas y la pantalla 28 por revisar', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL' });
+  const { pedidos, propuestas } = await simularAlineacion(page);
+  await page.goto(URL_ALINEACION);
+  await expect(page.locator('.alineacion-cifras')).toContainText('Alertas2');
+  await page.getByRole('button', { name: '✦ Proponer correcciones' }).click();
+  expect(pedidos).toEqual([{ tipo: 'alineacion' }]);
+  await expect(page.getByRole('status').filter({ hasText: 'La IA está preparando la propuesta…' })).toBeVisible();
+
+  const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+  await expect(franja.getByText('✦ Corregir 2 alertas de alineación')).toBeVisible();
+  await expect(franja).toContainText('Agregar al Reto final (pantalla 28) dos preguntas');
+  await expect(franja.getByRole('list', { name: 'Cambios propuestos' }).getByRole('listitem').locator('b')).toHaveText([
+    'Pregunta nueva · obj-3 · aplicar · pantalla 28, pregunta bq-09',
+    'Pregunta nueva · obj-2 · comprender · pantalla 28, pregunta bq-10',
+  ]);
+  await expect(page.getByRole('button', { name: '✦ Proponer correcciones' })).toHaveCount(0);
+  expect(await auditar(page)).toEqual([]);
+
+  await franja.getByRole('button', { name: 'Aplicar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Propuesta aplicada · 0 alertas' })).toBeVisible();
+  expect(propuestas[0]!.estado).toBe('APLICADA');
+  await expect(franja).toHaveCount(0);
+  await expect(page.locator('.alineacion-cifras')).toContainText('Alertas0');
+  await expect(fila(page, 'obj-3').getByText('✓ Alineado')).toBeVisible();
+  await expect(fila(page, 'obj-3').getByRole('list', { name: 'Evalúa obj-3' }).getByRole('button')).toHaveText(['28 · recordar', '28 · recordar', '28 · aplicar']);
+  await expect(page.getByText('Todos los objetivos se presentan, se practican y se evalúan a su nivel.')).toBeVisible();
+  await expect(page.getByText('La propuesta cambió la pantalla 28 (Reto final).')).toBeVisible();
+  expect(await auditar(page)).toEqual([]);
+
+  await page.getByRole('link', { name: '1 pantalla por revisar' }).click();
+  await expect(page).toHaveURL(`/proyectos/${PROYECTO}/revision?pantalla=p28`);
+  await expect(page.getByRole('complementary', { name: 'Pantallas' }).getByRole('button', { name: /Reto final/ })).toHaveAttribute('aria-current', 'true');
+});
+
+test('una propuesta vencida ofrece «Recalcular propuesta»; la nueva se puede descartar', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL' });
+  const { pedidos, propuestas } = await simularAlineacion(page, { vencida: true });
+  await page.goto(URL_ALINEACION);
+  const franja = page.getByRole('region', { name: 'Propuesta de la IA' });
+  await expect(franja).toContainText('El curso cambió desde que se calculó esta propuesta.');
+  await expect(franja.getByRole('button', { name: 'Aplicar' })).toHaveCount(0);
+  await franja.getByRole('button', { name: 'Recalcular propuesta' }).click();
+  expect(pedidos).toEqual([{ tipo: 'alineacion' }]);
+  await expect(franja.getByRole('button', { name: 'Aplicar' })).toBeVisible();
+  await franja.getByRole('button', { name: 'Descartar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Propuesta descartada' })).toBeVisible();
+  await expect(franja).toHaveCount(0);
+  expect(propuestas[0]!.estado).toBe('DESCARTADA');
+  await expect(page.getByRole('button', { name: '✦ Proponer correcciones' })).toBeVisible();
+  await expect(page.locator('.alineacion-cifras')).toContainText('Alertas2');
 });
 
 test('Entrega avisa los objetivos sin alinear sin bloquear la exportación', async ({ page }) => {

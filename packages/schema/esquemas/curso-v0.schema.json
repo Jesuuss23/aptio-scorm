@@ -730,6 +730,10 @@
               "$ref": "#/$defs/textoI18n"
             }
           }
+        },
+        "origen": {
+          "description": "HU-1002 · Una pregunta que creó o cambió la IA queda marcada sin revisar.",
+          "$ref": "#/$defs/origen"
         }
       }
     },

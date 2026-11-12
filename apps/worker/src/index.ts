@@ -10,11 +10,13 @@ import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { crearCascada } from './cascada.js';
 import { crearPropuestas } from './propuesta.js';
+import { crearCorrecciones } from './alineacion.js';
 import { crearTraductor } from './traducir.js';
 import { controlCalidad, crearRevisorCalidad } from './calidad.js';
 import { TAREA_CALIDAD } from '@aptio/schema/calidad';
 import { TAREA_TRADUCIR } from '@aptio/schema/traduccion';
 import { TAREA_PROPUESTA } from '@aptio/schema/propuesta';
+import { TAREA_CORRECCION } from '@aptio/schema/alineacion';
 import { EJECUTORES } from './etapas/index.js';
 import { crearEtapaVoz } from './etapas/voz.js';
 import { crearEtapaSubtitulos } from './etapas/subtitulos.js';
@@ -56,6 +58,8 @@ const generar = crearGenerador({
 const cascada = crearCascada({ bd: prisma, voz: vozEs, boca, subtitulos });
 // Las propuestas de la IA (HU-0504) usan el mismo proveedor de texto que la generación.
 const proponer = crearPropuestas({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
+// La corrección de la alineación (HU-1002, IA-17 v2) también.
+const corregir = crearCorrecciones({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 const traducir = crearTraductor({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 // El control de calidad (HU-0505): reglas e IA-12 por lotes, con «✦ Revisar con IA» y en la etapa 10.
 const revisarCalidad = crearRevisorCalidad({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
@@ -68,6 +72,7 @@ const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_GENERAR) return generar(trabajo);
   if (trabajo.data.tarea === TAREA_CASCADA) return cascada(trabajo);
   if (trabajo.data.tarea === TAREA_PROPUESTA) return proponer(trabajo);
+  if (trabajo.data.tarea === TAREA_CORRECCION && trabajo.data.propuesta) return corregir(trabajo);
   if (trabajo.data.tarea === TAREA_TRADUCIR && trabajo.data.traduccion) return traducir(trabajo);
   if (trabajo.data.tarea === TAREA_CALIDAD && trabajo.data.calidad) return revisarCalidad(trabajo);
   return procesar(trabajo);

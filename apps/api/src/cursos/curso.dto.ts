@@ -52,6 +52,15 @@ export class CambioResultadoDto {
   @ApiPropertyOptional({ type: [String] }) aprobadas?: string[];
   @ApiPropertyOptional({ type: [String], description: 'Las que no se aprobaron porque tienen observaciones abiertas' }) pendientes?: string[];
   @ApiPropertyOptional({ description: 'Estado de la pantalla después del cambio' }) estado?: string;
+  @ApiPropertyOptional({ type: () => [PantallaPorRevisarDto], description: 'HU-1002 · Pantallas nuevas o cambiadas por la corrección de la alineación: quedan en borrador' }) pantallasPorRevisar?: PantallaPorRevisarDto[];
+}
+
+/** HU-1002 · Una pantalla que creó o cambió la corrección de la alineación. */
+export class PantallaPorRevisarDto {
+  @ApiProperty() pantallaId: string;
+  @ApiProperty({ description: 'Número de la pantalla en el curso (1 = la primera)' }) numero: number;
+  @ApiProperty() titulo: string;
+  @ApiProperty({ description: 'true si la pantalla es nueva' }) nueva: boolean;
 }
 
 export class FiltroObservacionesDto {
