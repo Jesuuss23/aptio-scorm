@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.40 · actualizado con la quinta entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.41 · actualizado con la primera entrega del Sprint 9 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -551,6 +551,24 @@ Un patrón creado aparece como una tarjeta más con su nombre y la insignia **�
 
 Administración y Diseño instruccional cambian la navegación y usan la IA; Diseño gráfico y Producción la ven y pueden probarla; el revisor del cliente no la ve.
 
+### 8.19 Video interactivo: preguntas que pausan el video
+
+En el proyecto, el botón **Video interactivo** abre las pantallas que tienen un video del cliente. Si hay más de una, elígela en **Pantalla con video**; si el curso no tiene ninguna, la vista te dice cómo agregarla.
+
+Arriba ves el video y, debajo, su **línea de marcadores**: cada pregunta es un círculo con **?**, los capítulos son una raya y los puntos interactivos, un cuadrado. Capítulos y puntos se ven y se conservan, pero todavía no se editan.
+
+Para agregar una pregunta:
+1. Reproduce el video y detente en el momento donde quieres preguntar (o mueve la barra del video).
+2. Pulsa **+ Pregunta en 0:45** (el botón muestra el segundo en que estás).
+3. En el panel **Marcadores**, escribe el **Enunciado** y las **Opciones**, y marca cuál es la correcta. Puedes agregar opciones (hasta 6) y cambiar la **Retroalimentación al acertar** y **al fallar**.
+4. Deja marcada **Obligatoria** si el participante debe acertarla para seguir; si la desmarcas, verá el botón **Saltar**.
+
+La pregunta se guarda sola un segundo después de tu último cambio. Si algo falta (el enunciado, una opción vacía, la correcta) o el segundo pasa el final del video, la pregunta queda marcada «Por corregir» y no se guarda hasta que lo arregles. **↶ Deshacer** vuelve al último cambio guardado y **Quitar pregunta** la borra.
+
+En la vista previa y en el paquete, al llegar a ese segundo el video se detiene y la pregunta aparece encima. Si el participante acierta, el video sigue solo; si falla, ve la retroalimentación y vuelve a intentar. Si la pantalla del video es obligatoria, el participante no puede avanzar hasta ver el video entero y acertar las preguntas obligatorias; el botón Siguiente le dice por qué. Las preguntas del video ayudan a repasar y no cuentan para la nota.
+
+Prueba todo con **▶ Probar en la vista previa** (en modo Revisión puedes ir directo a la pantalla del video). Impedir adelantar el video llega en la próxima entrega.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -629,6 +647,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.38 | 2026-11-12 | Navegación: los 7 patrones, reglas, elementos visibles, «▶ Probar este patrón» y preferido del cliente (8.18); la vista previa usa el patrón del curso (8.6). |
 | 0.39 | 2026-11-12 | Navegación: «✦ Recomendar», «✦ Crear con IA» con una descripción, la franja de la propuesta con Aplicar, Descartar y «Probar alternativa», y el patrón personalizado con su nombre (8.18). |
 | 0.40 | 2026-11-12 | Editor: «Avanzado: disparadores» con «a los N segundos» o «al terminar la voz» para mostrar, ocultar o ir a otra pantalla, su marca ◆ en la línea de tiempo y cómo se ven con ▶ Reproducir (8.8). |
+| 0.41 | 2026-11-12 | Video interactivo (8.19): agregar preguntas en un segundo del video, sus opciones y retroalimentación, obligatoria u opcional, y cómo se ven en la vista previa y en el paquete. |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
