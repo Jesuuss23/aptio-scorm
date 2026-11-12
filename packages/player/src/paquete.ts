@@ -3,6 +3,8 @@
 // y los WebVTT van como texto dentro de los datos, así el paquete no necesita `fetch` y abre también sin servidor.
 // HU-1105 · Al volver al curso, si el LMS guardó avance válido, el reproductor pregunta si se continúa donde quedó.
 // HU-1204 · Modo diagnóstico: Ctrl+Alt+Shift+D o ?diagnostico=1 abren el panel para el soporte (nunca se abre solo).
+// HU-1203 · Con `modo: 'html'` (HTML autocontenido) no hay LMS: no se busca la API, no se avisa en la consola y no hay
+// modo diagnóstico. El curso funciona completo, sin seguimiento.
 import { informeDiagnostico, type InformeDiagnostico, RegistroDiagnostico } from './diagnostico.ts';
 import { aplanar } from './navegacion.ts';
 import { abrirPanelDiagnostico } from './panel-diagnostico.ts';
@@ -24,6 +26,8 @@ export interface DatosPaquete {
   subtitulos?: Record<string, string>;
   /** HU-1204 · false: el paquete se exportó sin modo diagnóstico (no responde al atajo ni a ?diagnostico=1). */
   diagnostico?: boolean;
+  /** HU-1203 · 'html': la carpeta se abre sin LMS (no se busca la API de SCORM). Por defecto, 'scorm12'. */
+  modo?: 'scorm12' | 'html';
 }
 
 export interface Paquete {
@@ -37,14 +41,25 @@ export interface Paquete {
 
 const esAtajoDiagnostico = (e: KeyboardEvent) => e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyD' || e.key.toLowerCase() === 'd');
 
+/**
+ * Conecta el paquete con el LMS. En SCORM busca la API con el algoritmo de ADL (y lo anota en el registro); en HTML
+ * (HU-1203) no toca las ventanas ni avisa: la conexión queda sin LMS y nada se reporta.
+ */
+export function conectarPaquete(datos: DatosPaquete, ventana: VentanaLms, registro: RegistroDiagnostico, orden: string[], huella: string): ConexionScorm12 {
+  const html = datos.modo === 'html';
+  return conectarScorm12(html ? null : buscarApi(ventana, registro), {
+    orden, idioma: datos.idioma, huella, mejorNota: datos.curso.seguimiento.notaReportada !== 'ultima', registro,
+    ...(html ? { avisar: () => undefined } : {}),
+  });
+}
+
 export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ventana: Window = window): Paquete {
   const orden = aplanar(datos.curso).map((x) => x.pantalla.id);
   const huella = huellaCurso(datos.curso.id, orden);
   const registro = new RegistroDiagnostico();
-  const lms = conectarScorm12(buscarApi(ventana as unknown as VentanaLms, registro), {
-    orden, idioma: datos.idioma, huella, mejorNota: datos.curso.seguimiento.notaReportada !== 'ultima', registro,
-  });
-  if (!lms.conectado) console.warn('[Aptio SCORM] No se encontró la API SCORM 1.2: el curso funciona, pero el LMS no recibe avance ni nota. Ctrl+Alt+Shift+D abre el diagnóstico.');
+  const html = datos.modo === 'html';
+  const lms = conectarPaquete(datos, ventana as unknown as VentanaLms, registro, orden, huella);
+  if (!lms.conectado && !html) console.warn('[Aptio SCORM] No se encontró la API SCORM 1.2: el curso funciona, pero el LMS no recibe avance ni nota. Ctrl+Alt+Shift+D abre el diagnóstico.');
   // HU-1105 · Con avance válido y lejos de la primera pantalla, se pregunta; hasta que se elige no se envía nada al LMS
   // (ni lesson_location ni LMSCommit), para no pisar lo guardado.
   // `navegacion.reanudar` del curso: «no» empieza siempre de cero; «automatica» vuelve sin preguntar.
@@ -74,7 +89,7 @@ export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ven
     conectado: lms.conectado, inicial: lms.inicial, userAgent: ventana.navigator?.userAgent ?? '', enIframe: enIframe(ventana),
   });
   const sombra = contenedor.shadowRoot;
-  const diagnostico = datos.diagnostico === false || !sombra ? null : () => { abrirPanelDiagnostico({ sombra, registro, informe }); };
+  const diagnostico = html || datos.diagnostico === false || !sombra ? null : () => { abrirPanelDiagnostico({ sombra, registro, informe }); };
   if (diagnostico) {
     ventana.addEventListener('keydown', (e) => {
       if (!esAtajoDiagnostico(e)) return;

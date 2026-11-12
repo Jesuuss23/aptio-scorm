@@ -4,12 +4,13 @@
 // HU-1201 · «Verificación automática»: peso estimado contra el límite del destino (advierte con alternativas y nunca
 // bloquea, RN-12-2, CP-090), suspend_data, archivos y pantallas sin aprobar. Los errores de esquema deshabilitan Exportar;
 // con pantallas sin aprobar se pide confirmación (RN-12-3). Se vuelve a validar al cambiar el LMS destino.
+// HU-1203 · Formato HTML autocontenido: sin LMS destino, sin límite de subida ni suspend_data; la confirmación sigue.
 import { Cabecera } from '@aptio/ui';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
+import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type FormatoExportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
 import { navegar } from '../ruta';
-import { LIMITE_SUSPEND, mb, megas, PERFILES } from './entrega';
+import { FORMATOS, LIMITE_SUSPEND, mb, megas, NOMBRE_FORMATO, PERFILES } from './entrega';
 
 const CONSULTA_MS = 2000;
 const ACTIVAS = new Set<Exportacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -26,18 +27,22 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const [sinCurso, setSinCurso] = useState(false);
   const [lista, setLista] = useState<Exportacion[]>([]);
   const [perfil, setPerfil] = useState<PerfilExportacion>('generico');
+  const [formato, setFormato] = useState<FormatoExportacion>('SCORM12');
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
-  /** La última validación y para qué LMS fue: si no coincide con el elegido, se está validando de nuevo. */
-  const [validada, setValidada] = useState<{ perfil: PerfilExportacion; v: Validacion } | null>(null);
+  /** La última validación y para qué formato y LMS fue: si no coincide con lo elegido, se está validando de nuevo. */
+  const [validada, setValidada] = useState<{ clave: string; v: Validacion } | null>(null);
   const confirmar = useRef<HTMLDialogElement>(null);
   const puedeExportar = EXPORTAN.includes(rol);
   // El historial es del equipo: el revisor del cliente no lo ve (la API responde 403).
   const veHistorial = rol !== 'REVISOR_CLIENTE';
   const cursoId = curso?.id;
-  const validacion = validada?.v ?? null;
-  const validando = validada?.perfil !== perfil;
+  const html = formato === 'HTML';
+  // En HTML el LMS no cambia nada: la validación es la misma para cualquier perfil.
+  const clave = html ? 'HTML' : `SCORM12|${perfil}`;
+  const validacion = validada?.clave === clave ? validada.v : null;
+  const validando = validada?.clave !== clave;
 
   useEffect(() => {
     api.proyecto(proyectoId).then((p) => {
@@ -55,12 +60,12 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   useEffect(() => {
     if (!cursoId || !veHistorial) return;
     let vigente = true;
-    api.validar(cursoId, { formato: 'SCORM12', perfilLms: perfil }).then(
-      (v) => { if (vigente) setValidada({ perfil, v }); },
+    api.validar(cursoId, { formato: html ? 'HTML' : 'SCORM12', perfilLms: html ? 'generico' : perfil }).then(
+      (v) => { if (vigente) setValidada({ clave, v }); },
       (e: unknown) => { if (vigente) setError(e instanceof ErrorApi ? e.message : 'No se pudo validar el curso'); },
     );
     return () => { vigente = false; };
-  }, [cursoId, perfil, veHistorial]);
+  }, [cursoId, perfil, html, clave, veHistorial]);
 
   const recargar = useCallback(() => {
     if (!cursoId || !veHistorial) return;
@@ -109,9 +114,9 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
     setError('');
     setAviso('');
     try {
-      const nueva = await api.exportar(cursoId, { formato: 'SCORM12', perfilLms: perfil });
+      const nueva = await api.exportar(cursoId, { formato, perfilLms: html ? 'generico' : perfil });
       setLista((l) => [nueva, ...l]);
-      setAviso(`Exportación pedida: se arma el paquete con la versión ${nueva.versionCurso} del curso.`);
+      setAviso(`Exportación pedida: se arma ${html ? 'la carpeta HTML' : 'el paquete'} con la versión ${nueva.versionCurso} del curso.`);
     } catch (e) {
       setError(e instanceof ErrorApi ? e.message : 'No se pudo exportar');
     } finally {
@@ -163,37 +168,49 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
         <section className="tarjeta kit-bloque" aria-label="Exportar">
           <h2>Formato</h2>
           <div className="opciones" role="group" aria-label="Formato">
-            <button type="button" className="opcion" aria-pressed="true">SCORM 1.2 · un solo SCO</button>
-          </div>
-          <p className="sec">SCORM 2004, HTML y ES + EN en el mismo paquete llegan en las próximas entregas.</p>
-          <h2>LMS destino</h2>
-          <div className="opciones" role="group" aria-label="LMS destino">
-            {PERFILES.map((p) => (
-              <button key={p.id} type="button" className="opcion" aria-pressed={perfil === p.id} onClick={() => setPerfil(p.id)}>{p.nombre}</button>
+            {FORMATOS.map((f) => (
+              <button key={f.id} type="button" className="opcion" aria-pressed={formato === f.id} onClick={() => setFormato(f.id)}>{f.nombre}</button>
             ))}
           </div>
-          <p className="nota" aria-live="polite" data-perfil={elegido.id}>{elegido.recomendacion}</p>
+          <p className="sec">SCORM 2004 y ES + EN en el mismo paquete llegan en las próximas entregas.</p>
+          {html ? (
+            <p className="nota" aria-live="polite" data-formato="HTML">Una carpeta que abre con doble clic en <span className="num">index.html</span>, sin internet y sin LMS. No guarda el avance ni la nota: para el seguimiento, exporta SCORM 1.2.</p>
+          ) : (
+            <>
+              <h2>LMS destino</h2>
+              <div className="opciones" role="group" aria-label="LMS destino">
+                {PERFILES.map((p) => (
+                  <button key={p.id} type="button" className="opcion" aria-pressed={perfil === p.id} onClick={() => setPerfil(p.id)}>{p.nombre}</button>
+                ))}
+              </div>
+              <p className="nota" aria-live="polite" data-perfil={elegido.id}>{elegido.recomendacion}</p>
+            </>
+          )}
           {veHistorial ? (
             <section className="verificacion" aria-label="Verificación automática" aria-busy={validando}>
               <h2>Verificación automática</h2>
               {v ? (
                 <>
                   <div className="cifras-entrega">
-                    <div className={v.superaLimite ? 'aviso' : ''}><span>Peso estimado</span><b className="num">{mb(v.pesoEstimadoMb)} MB</b><small>de {v.limiteMb} MB {v.origenLimite === 'ficha' ? 'según la ficha del cliente' : 'de referencia'}</small></div>
+                    <div className={v.superaLimite ? 'aviso' : ''}><span>Peso estimado</span><b className="num">{mb(v.pesoEstimadoMb)} MB</b><small>{v.limiteMb === null ? 'sin límite de subida: no hay LMS' : `de ${v.limiteMb} MB ${v.origenLimite === 'ficha' ? 'según la ficha del cliente' : 'de referencia'}`}</small></div>
                     <div className={sinAprobar ? 'aviso' : ''}><span>Pantallas aprobadas</span><b className="num">{total - sinAprobar} / {total}</b></div>
                   </div>
                   <ul className="comprobaciones">
                     <Comprobacion ok={!conErrores} grave>
                       {conErrores ? (
                         <>El curso no cumple el esquema: corrígelo antes de exportar.<ul>{v.errores.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></>
-                      ) : 'Manifiesto SCORM 1.2 de un solo SCO · el curso cumple el esquema (perfil estricto)'}
+                      ) : html ? 'Carpeta HTML autocontenida: abre sin internet y sin LMS · el curso cumple el esquema' : 'Manifiesto SCORM 1.2 de un solo SCO · el curso cumple el esquema (perfil estricto)'}
                     </Comprobacion>
-                    <Comprobacion ok={!v.superaLimite}>
-                      {v.superaLimite ? v.advertencias.find((a) => a.startsWith('El paquete pesaría')) : `El peso cabe en el límite de subida del destino (${v.limiteMb} MB)`}
-                    </Comprobacion>
-                    <Comprobacion ok={v.suspendDataCaracteres <= LIMITE_SUSPEND}>
-                      Avance, nota y reanudación caben en <span className="num">suspend_data</span> ({v.suspendDataCaracteres.toLocaleString('es-PE')} de {LIMITE_SUSPEND.toLocaleString('es-PE')} caracteres)
-                    </Comprobacion>
+                    {v.limiteMb === null || v.suspendDataCaracteres === null ? null : (
+                      <>
+                        <Comprobacion ok={!v.superaLimite}>
+                          {v.superaLimite ? v.advertencias.find((a) => a.startsWith('El paquete pesaría')) : `El peso cabe en el límite de subida del destino (${v.limiteMb} MB)`}
+                        </Comprobacion>
+                        <Comprobacion ok={v.suspendDataCaracteres <= LIMITE_SUSPEND}>
+                          Avance, nota y reanudación caben en <span className="num">suspend_data</span> ({v.suspendDataCaracteres.toLocaleString('es-PE')} de {LIMITE_SUSPEND.toLocaleString('es-PE')} caracteres)
+                        </Comprobacion>
+                      </>
+                    )}
                     <Comprobacion ok={!otrasAdvertencias.length}>{otrasAdvertencias[0] ?? 'Están todos los archivos del idioma exportado'}</Comprobacion>
                     <Comprobacion ok={!sinAprobar}>
                       {sinAprobar ? <>{sinAprobar} de {total} pantallas sin aprobar. Puedes exportar igual; revísalas antes de entregar al cliente. {irARevision}</> : 'Todas las pantallas están aprobadas'}
@@ -215,12 +232,12 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
           ) : null}
           {puedeExportar ? (
             <div className="acciones-form">
-              <button className="boton primario" type="button" disabled={ocupado || conErrores || !v} onClick={pedirExportar}>{ocupado ? 'Exportando…' : 'Exportar SCORM 1.2'}</button>
+              <button className="boton primario" type="button" disabled={ocupado || conErrores || !v} onClick={pedirExportar}>{ocupado ? 'Exportando…' : html ? 'Exportar HTML' : 'Exportar SCORM 1.2'}</button>
             </div>
           ) : <p className="sec">Solo administración, diseño instruccional y producción exportan.</p>}
           <dialog ref={confirmar} className="confirmar-exportar" aria-labelledby="confirmar-exportar-titulo" aria-describedby="confirmar-exportar-detalle">
             <h2 id="confirmar-exportar-titulo">¿Exportar con pantallas sin aprobar?</h2>
-            <p id="confirmar-exportar-detalle">{sinAprobar} de {total} pantallas no están aprobadas. El paquete saldrá con su contenido actual; revísalas antes de entregarlo al cliente.</p>
+            <p id="confirmar-exportar-detalle">{sinAprobar} de {total} pantallas no están aprobadas. {html ? 'La carpeta HTML' : 'El paquete'} saldrá con su contenido actual; revísalas antes de entregarlo al cliente.</p>
             <div className="acciones-form">
               <button className="boton" type="button" autoFocus onClick={() => confirmar.current?.close()}>Cancelar</button>
               <button className="boton primario" type="button" onClick={() => void exportar()}>Exportar igual</button>
@@ -240,9 +257,9 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
                   {lista.map((e) => (
                     <tr key={e.id} data-exportacion={e.id}>
                       <td>{fecha(e.creadoEn)}</td>
-                      <td>SCORM 1.2</td>
+                      <td>{NOMBRE_FORMATO[e.formato] ?? e.formato}</td>
                       <td>v{e.versionCurso}</td>
-                      <td>{PERFILES.find((p) => p.id === e.perfilLms)?.nombre ?? e.perfilLms}</td>
+                      <td>{e.formato === 'HTML' ? '—' : (PERFILES.find((p) => p.id === e.perfilLms)?.nombre ?? e.perfilLms)}</td>
                       <td>
                         <span role={ACTIVAS.has(e.estado) ? 'status' : undefined}>{NOMBRE_ESTADO[e.estado]}</span>
                         {e.estado === 'ERROR' && e.motivo ? <div className="sec">{e.motivo}</div> : null}

@@ -2,10 +2,11 @@
 // del curso ligada a la exportación (RN-12-4), los archivos de sus recursos desde el almacenamiento y el kit del cliente;
 // arma el ZIP con @aptio/exporters y lo guarda cifrado como recurso PAQUETE. El informe lista los recursos que faltan
 // (advertencias, no bloquean). Si algo falla, la exportación queda en ERROR con el motivo.
+// HU-1203 · Con formato HTML arma la carpeta autocontenida (sin manifiesto ni LMS) y la nombra `<proyecto>-html-v<n>.zip`.
 import { createHash, randomUUID } from 'node:crypto';
 import { type EventoTrabajo, publicarEvento } from '@aptio/colas';
 import type { Prisma, PrismaClient } from '@aptio/db';
-import { codigoReproductor, construirScorm12 } from '@aptio/exporters';
+import { codigoReproductor, construirHtml, construirScorm12 } from '@aptio/exporters';
 import type { CursoReproductor, KitReproductor } from '@aptio/player';
 import type { Redis } from 'ioredis';
 import type { TrabajoEnCola } from './procesar.js';
@@ -22,10 +23,10 @@ export interface DependenciasExportar {
   reproductor?: () => Promise<string>;
 }
 
-/** Nombre del archivo que se descarga: `<proyecto>-scorm12-v<versión>.zip`, sin tildes ni espacios. */
-export function nombrePaquete(proyecto: string, version: number): string {
+/** Nombre del archivo que se descarga: `<proyecto>-scorm12-v<versión>.zip` o `<proyecto>-html-v<versión>.zip`, sin tildes ni espacios. */
+export function nombrePaquete(proyecto: string, version: number, formato: string = 'SCORM12'): string {
   const base = proyecto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'curso';
-  return `${base}-scorm12-v${version}.zip`;
+  return `${base}-${formato === 'HTML' ? 'html' : 'scorm12'}-v${version}.zip`;
 }
 
 export function crearExportador({ bd, redis, leer, subir, reproductor = codigoReproductor }: DependenciasExportar) {
@@ -65,7 +66,8 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
       const kit: KitReproductor | undefined = k
         ? { paleta: k.paleta as KitReproductor['paleta'] & object, tipografias: k.tipografias as KitReproductor['tipografias'] & object, personaje: (k.personaje as { nombre?: string } | null)?.nombre ?? null }
         : undefined;
-      const paquete = await construirScorm12({ curso, recursos, reproductor: await reproductor(), incluirDiagnostico: exp.incluirDiagnostico, ...(kit ? { kit } : {}) });
+      const comun = { curso, recursos, reproductor: await reproductor(), ...(kit ? { kit } : {}) };
+      const paquete = exp.formato === 'HTML' ? await construirHtml(comun) : await construirScorm12({ ...comun, incluirDiagnostico: exp.incluirDiagnostico });
 
       const proyecto = exp.curso.proyecto;
       const recursoId = randomUUID();
@@ -84,7 +86,7 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
           data: {
             id: recursoId, organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'PAQUETE', origen: 'GENERADO',
             claveS3, mime: MIME_ZIP, bytes: BigInt(paquete.zip.byteLength), hash: createHash('sha256').update(paquete.zip).digest('hex'),
-            nombre: nombrePaquete(proyecto.nombre, exp.versionCurso), licencia: 'Paquete generado por Aptio SCORM',
+            nombre: nombrePaquete(proyecto.nombre, exp.versionCurso, exp.formato), licencia: 'Paquete generado por Aptio SCORM',
           },
         }),
         bd.exportacion.update({

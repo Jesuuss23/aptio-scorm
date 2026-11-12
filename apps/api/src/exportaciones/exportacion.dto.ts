@@ -6,15 +6,15 @@ export const FORMATOS = ['SCORM12', 'SCORM2004', 'HTML', 'JSON', 'KIT_GAMIFICACI
 export const PERFILES_LMS = ['generico', 'moodle', 'blackboard', 'chamilo', 'canvas'] as const;
 export const MODOS_IDIOMA = ['unico', 'separados', 'mismo-paquete'] as const;
 
-/** HU-1202 · Por ahora solo SCORM12 en un idioma (SUP-49); el perfil no cambia el paquete (RN-12-1). */
+/** HU-1202 · SCORM12 o HTML (HU-1203) en un idioma (SUP-49); el perfil no cambia el paquete (RN-12-1). */
 export class ExportacionEntradaDto {
-  @ApiProperty({ enum: FORMATOS, description: 'Solo SCORM12 por ahora; los demás responden 422 FORMATO_NO_DISPONIBLE' })
+  @ApiProperty({ enum: FORMATOS, description: 'SCORM12 o HTML (HU-1203, sin LMS ni seguimiento); los demás responden 422 FORMATO_NO_DISPONIBLE' })
   @IsIn(FORMATOS) formato: (typeof FORMATOS)[number];
-  @ApiPropertyOptional({ enum: PERFILES_LMS, default: 'generico', description: 'Solo agrega recomendaciones; el paquete es el mismo' })
+  @ApiPropertyOptional({ enum: PERFILES_LMS, default: 'generico', description: 'Solo agrega recomendaciones; el paquete es el mismo. En HTML se ignora y se guarda generico' })
   @IsOptional() @IsIn(PERFILES_LMS) perfilLms?: (typeof PERFILES_LMS)[number];
   @ApiPropertyOptional({ enum: MODOS_IDIOMA, default: 'unico', description: 'Solo unico por ahora (el primer idioma del curso); los demás responden 422 IDIOMA_NO_DISPONIBLE' })
   @IsOptional() @IsIn(MODOS_IDIOMA) modoIdioma?: (typeof MODOS_IDIOMA)[number];
-  @ApiPropertyOptional({ default: true, description: 'Modo diagnóstico en el paquete (HU-1204): con false no se abre ni con el atajo ni con ?diagnostico=1' })
+  @ApiPropertyOptional({ default: true, description: 'Modo diagnóstico en el paquete (HU-1204): con false no se abre ni con el atajo ni con ?diagnostico=1. En HTML no hay modo diagnóstico (se guarda false)' })
   @IsOptional() @IsBoolean() incluirDiagnostico?: boolean;
   @ApiPropertyOptional({ default: true, description: 'Informe para el cliente; todavía no cambia nada' })
   @IsOptional() @IsBoolean() incluirInforme?: boolean;
@@ -52,16 +52,17 @@ export class RecursoPesadoDto {
 
 /** HU-1201 · Resultado de validar antes de exportar. Nunca bloquea por tamaño (RN-12-2): solo los errores impiden exportar. */
 export class ValidacionDto {
+  @ApiProperty({ enum: ['SCORM12', 'HTML'] }) formato: 'SCORM12' | 'HTML';
   @ApiProperty({ type: [String], description: 'Impiden exportar (el curso no cumple el esquema)' }) errores: string[];
   @ApiProperty({ type: [String], description: 'No impiden exportar: peso sobre el límite, archivos faltantes, suspend_data, pantallas sin aprobar' }) advertencias: string[];
   @ApiProperty({ description: 'Peso estimado del paquete en MB (1 MB = 1.048.576 bytes)' }) pesoEstimadoMb: number;
   @ApiProperty() pesoEstimadoBytes: number;
-  @ApiProperty({ description: 'Límite de subida del destino en MB' }) limiteMb: number;
-  @ApiProperty({ enum: ['ficha', 'referencia'], description: 'ficha: la ficha de compatibilidad del cliente; referencia: LIMITE_SUBIDA_REFERENCIA_MB' }) origenLimite: 'ficha' | 'referencia';
+  @ApiProperty({ nullable: true, type: Number, description: 'Límite de subida del destino en MB; null en HTML (no hay LMS)' }) limiteMb: number | null;
+  @ApiProperty({ enum: ['ficha', 'referencia'], nullable: true, description: 'ficha: la ficha de compatibilidad del cliente; referencia: LIMITE_SUBIDA_REFERENCIA_MB; null en HTML' }) origenLimite: 'ficha' | 'referencia' | null;
   @ApiProperty() superaLimite: boolean;
   @ApiProperty({ type: [String], description: 'Las 5 alternativas de docs/08 cuando se pasa el límite' }) alternativas: string[];
   @ApiProperty({ type: [RecursoPesadoDto], description: 'Los 5 recursos que más pesan' }) recursosPesados: RecursoPesadoDto[];
-  @ApiProperty({ description: 'Peor caso de cmi.suspend_data v2 (límite 4096)' }) suspendDataCaracteres: number;
+  @ApiProperty({ nullable: true, type: Number, description: 'Peor caso de cmi.suspend_data v2 (límite 4096); null en HTML' }) suspendDataCaracteres: number | null;
   @ApiProperty() pantallasTotal: number;
   @ApiProperty() pantallasSinAprobar: number;
   @ApiProperty({ type: [String] }) recursosFaltantes: string[];

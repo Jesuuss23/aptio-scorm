@@ -106,11 +106,11 @@ describe.skipIf(!hayBase && !process.env.CI)('ingresar con Google (HU-0108)', ()
   });
 
   it('CP-008 · un correo que nadie invitó ve «sin acceso» y no se crea ninguna cuenta', async () => {
-    const antes = await prisma.usuario.count();
     const { res, sesion } = await ingresarConGoogle({ sub: 'google-extrano', email: correo('extrano') });
     expect(res.headers.location).toBe(`${WEB}/ingresar?error=sin_acceso`);
     expect(sesion).toBeUndefined();
-    expect(await prisma.usuario.count()).toBe(antes);
+    // Se cuenta solo ese correo: las demás pruebas corren a la vez (`pnpm -r test`) y crean sus propios usuarios.
+    expect(await prisma.usuario.count({ where: { email: correo('extrano') } })).toBe(0);
     expect(await prisma.usuario.findUnique({ where: { googleSub: 'google-extrano' } })).toBeNull();
     // Un usuario desactivado tampoco entra, ni otra cuenta de Google con el correo de alguien ya vinculado.
     expect((await ingresarConGoogle({ sub: 'google-baja', email: correo('baja') })).res.headers.location).toBe(`${WEB}/ingresar?error=sin_acceso`);

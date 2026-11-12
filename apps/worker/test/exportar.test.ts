@@ -41,8 +41,8 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
   };
 
   /** Lo que hace la API al exportar: la Exportacion en cola, ligada a la versión del curso. */
-  const exportacion = (versionCurso: number) => prisma.exportacion.create({
-    data: { organizacionId: e.ids.orgId, cursoId, versionCurso, formato: 'SCORM12', perfilLms: 'moodle', modoIdioma: 'unico', creadoPorId: e.ids.usuarioId },
+  const exportacion = (versionCurso: number, formato: 'SCORM12' | 'HTML' = 'SCORM12') => prisma.exportacion.create({
+    data: { organizacionId: e.ids.orgId, cursoId, versionCurso, formato, perfilLms: formato === 'HTML' ? 'generico' : 'moodle', modoIdioma: 'unico', creadoPorId: e.ids.usuarioId },
   });
   const correr = (id: string, r: Redis = redis) => crearExportador({ bd: prisma, redis: r, leer, subir })({
     data: { trabajoId: id, organizacionId: e.ids.orgId, tarea: TAREA_EXPORTAR }, queueName: 'export', updateProgress: async () => undefined,
@@ -105,6 +105,20 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     expect(datos).toContain('Hola, soy Ana.');
   }, 60_000);
 
+  it('HU-1203 · con formato HTML arma la carpeta sin manifiesto, con LEEME.txt y modo html, y la nombra -html-v<n>', async () => {
+    const exp = await exportacion(3, 'HTML');
+    const { recursoId } = await correr(exp.id);
+    const r = await prisma.recurso.findUniqueOrThrow({ where: { id: recursoId } });
+    expect(r).toMatchObject({ tipo: 'PAQUETE', mime: MIME_ZIP, nombre: 'bloqueo-y-etiquetado-html-v3.zip' });
+    expect(await prisma.exportacion.findUniqueOrThrow({ where: { id: exp.id } })).toMatchObject({ estado: 'COMPLETADO', formato: 'HTML', recursoId });
+    const contenido = await JSZip.loadAsync(almacen.get(r.claveS3)!);
+    expect(contenido.file('imsmanifest.xml')).toBeNull();
+    expect(await contenido.file('LEEME.txt')!.async('string')).toContain('Descomprime y abre index.html con doble clic.');
+    expect(await contenido.file('datos.js')!.async('string')).toContain('"modo":"html"');
+    expect(contenido.file(`recursos/${ids.ana}.svg`)).not.toBeNull();
+    expect(Object.keys(contenido.files).some((n) => n.endsWith('.pdf'))).toBe(false);
+  }, 60_000);
+
   it('si un recurso no se puede leer, la exportación queda en ERROR con el motivo', async () => {
     const perdido = randomUUID();
     const doc = documento();
@@ -128,5 +142,6 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
   it('el nombre del archivo no lleva tildes ni espacios', () => {
     expect(nombrePaquete('Inducción · Seguridad   2026', 7)).toBe('induccion-seguridad-2026-scorm12-v7.zip');
     expect(nombrePaquete('¡¿?!', 1)).toBe('curso-scorm12-v1.zip');
+    expect(nombrePaquete('Inducción · Seguridad', 2, 'HTML')).toBe('induccion-seguridad-html-v2.zip');
   });
 });

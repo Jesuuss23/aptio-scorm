@@ -2626,7 +2626,7 @@ paths:
       - Entrega
       summary: Validar antes de exportar
       operationId: post_cursos_cursoId_validar
-      description: 'HU-1201. Nunca bloquea por tamaño (RN-12-2): responde 200 con errores (esquema) y advertencias. 422 FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE; 403 al revisor del cliente.'
+      description: 'HU-1201. Nunca bloquea por tamaño (RN-12-2): responde 200 con errores (esquema) y advertencias. Formatos SCORM12 y HTML (HU-1203; en HTML no hay límite de subida ni suspend_data: limiteMb, origenLimite y suspendDataCaracteres vienen en null). 422 FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE; 403 al revisor del cliente.'
       parameters:
       - name: cursoId
         in: path
@@ -2663,7 +2663,8 @@ paths:
       operationId: post_cursos_cursoId_exportaciones
       description: 'HU-1202 · Crea la exportación en EN_COLA ligada a la versión actual del curso (RN-12-4) y encola EXPORTAR
         en la cola `export`; el worker arma el ZIP SCORM 1.2 de un solo SCO y la deja en COMPLETADO (o ERROR con `motivo`).
-        Por ahora solo `formato: SCORM12` y `modoIdioma: unico` (el primer idioma del curso, SUP-49). El perfil de LMS se
+        Formatos `SCORM12` y `HTML` (HU-1203: carpeta autocontenida sin manifiesto, sin LMS ni modo diagnóstico, perfil
+        `generico`) con `modoIdioma: unico` (el primer idioma del curso, SUP-49). El perfil de LMS se
         guarda y solo cambia las recomendaciones: el paquete es el mismo (RN-12-1). Se exporta aunque haya pantallas sin
         aprobar (SUP-51). Exportan administración, diseño instruccional y producción. 422 con `codigo`: ESQUEMA_NO_VALIDO
         (con `detalles`), FORMATO_NO_DISPONIBLE o IDIOMA_NO_DISPONIBLE.'
@@ -5500,6 +5501,7 @@ components:
           - HTML
           - JSON
           - KIT_GAMIFICACION
+          description: SCORM12 o HTML (HU-1203, carpeta autocontenida sin LMS ni seguimiento, `<proyecto>-html-v<n>.zip`); los demás responden 422 FORMATO_NO_DISPONIBLE
         perfilLms:
           type: string
           enum:
@@ -5509,6 +5511,7 @@ components:
           - chamilo
           - canvas
           default: generico
+          description: Solo agrega recomendaciones. En HTML se ignora y se guarda generico
         modoIdioma:
           type: string
           enum:
@@ -5518,13 +5521,14 @@ components:
         incluirDiagnostico:
           type: boolean
           default: true
-          description: HU-1204. Modo diagnóstico en el paquete (Ctrl+Alt+Shift+D o ?diagnostico=1, nunca se abre solo); con false no responde a ninguno
+          description: HU-1204. Modo diagnóstico en el paquete (Ctrl+Alt+Shift+D o ?diagnostico=1, nunca se abre solo); con false no responde a ninguno. En HTML no hay modo diagnóstico (se guarda false)
         incluirInforme:
           type: boolean
           default: true
     Validacion:
       type: object
       required:
+      - formato
       - errores
       - advertencias
       - pesoEstimadoMb
@@ -5539,6 +5543,11 @@ components:
       - pantallasSinAprobar
       - recursosFaltantes
       properties:
+        formato:
+          type: string
+          enum:
+          - SCORM12
+          - HTML
         errores:
           type: array
           description: Impiden exportar (el curso no cumple el esquema)
@@ -5556,13 +5565,16 @@ components:
           type: integer
         limiteMb:
           type: integer
-          description: Límite de subida del destino
+          nullable: true
+          description: Límite de subida del destino; null en HTML (no hay LMS)
         origenLimite:
           type: string
+          nullable: true
           enum:
           - ficha
           - referencia
-          description: ficha, la ficha de compatibilidad del cliente; referencia, LIMITE_SUBIDA_REFERENCIA_MB (100 por defecto)
+          - null
+          description: ficha, la ficha de compatibilidad del cliente; referencia, LIMITE_SUBIDA_REFERENCIA_MB (100 por defecto); null en HTML
         superaLimite:
           type: boolean
         alternativas:
@@ -5588,7 +5600,8 @@ components:
                 type: integer
         suspendDataCaracteres:
           type: integer
-          description: Peor caso de cmi.suspend_data v2 (límite 4096; si se pasa, advertencia)
+          nullable: true
+          description: Peor caso de cmi.suspend_data v2 (límite 4096; si se pasa, advertencia); null en HTML
         pantallasTotal:
           type: integer
         pantallasSinAprobar:
