@@ -22,6 +22,7 @@ pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.jso
 | `entrada/proyecto.json` | Datos del proyecto: público, meta de 15 minutos, 30 pantallas, ES + EN, celular, gamificación |
 | `entrada/glosario.json` | Términos ES → EN que la traducción debe respetar |
 | `entrada/kit.json` | Paleta, tipografías, estilo, disposiciones permitidas, personaje y biblioteca de imágenes |
+| `entrada/transcripcion-procedimiento.json` | HU-0903 · Transcripción del video de p18 (2:30) con sus tiempos: una introducción y 4 cambios de tema |
 
 ## Salidas por etapa
 
@@ -37,6 +38,7 @@ pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.jso
 | | `04-IA-07-interacciones.json` | Datos de las 9 actividades (INT-01, 02, 03, 05, 06, 07, 08) |
 | | `04-IA-08-banco-preguntas.json` | 8 preguntas del reto final |
 | | `04-IA-09-video-p18.json` | Marcadores del video |
+| | `X-IA-09-pausas-p18.json` | HU-0903 · Pausas propuestas desde la transcripción (IA-09 v2): 4 cambios de tema y 8 marcadores; la pregunta de 1:02 se cruza con la que ya existe |
 | | `04-IA-06-sugerencia-p10.json`, `04-IA-14-navegacion.json` | Tareas bajo pedido |
 | 5 · Ilustraciones | `05-IA-11-imagenes.json` | Reutiliza 3 de la biblioteca y genera 2 |
 | 6 a 8 · Voz, boca, subtítulos | `06-voz-es.json`, `07-boca-p03.json`, `08-subtitulos-p03-es.vtt` | **Simulados** (65 ms por letra). Con voz real los calcula el audio y Rhubarb |

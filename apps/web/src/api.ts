@@ -4,6 +4,7 @@ import type { AjusteElemento, Disparador, ElementoExtra } from '@aptio/player';
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
 import type { OperacionPatch } from '@aptio/schema/patch';
+import type { MarcadorVideo } from '@aptio/schema/marcadores';
 import type { EstadoTraduccion } from '@aptio/schema/traduccion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 
@@ -297,14 +298,26 @@ export interface CambioResultado {
   aprobadas?: string[];
   pendientes?: string[];
   estado?: string;
+  /** HU-0903 · Los ids nuevos de los marcadores sumados al video y por qué se omitió alguno. */
+  agregados?: string[];
+  observaciones?: string[];
   /** HU-1002 · Pantallas nuevas o cambiadas por la corrección de la alineación: quedan en borrador. */
   pantallasPorRevisar?: PantallaAfectada[];
+}
+
+/** HU-0903 · Salida de IA-09 v2: los cambios de tema y los marcadores propuestos (ids provisionales «ia-N»). */
+export interface PausasPropuestas {
+  bloqueId: string;
+  duracionMs: number;
+  cambiosTema: { tiempoMs: number; tema: string }[];
+  marcadores: MarcadorVideo[];
+  observaciones: string[];
 }
 
 /** HU-0504 · Propuesta de la IA sobre una pantalla. `cambios` es el JSON Patch; las variantes van en `vistaPrevia`. */
 export interface Propuesta {
   id: string;
-  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre' | 'alineacion' | 'patron';
+  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre' | 'alineacion' | 'patron' | 'pausas-video';
   pantallaId: string | null;
   titulo: string;
   descripcion: string;
@@ -314,6 +327,8 @@ export interface Propuesta {
   correcciones?: CambioCorreccion[];
   /** HU-1104 · El patrón propuesto por IA-14 (tipo `patron`, del curso entero). */
   patron?: PatronPropuesto;
+  /** HU-0903 · Las pausas propuestas desde la transcripción (tipo `pausas-video`, de una pantalla). */
+  pausas?: PausasPropuestas;
   versionBase: number;
   estado: 'PENDIENTE' | 'APLICADA' | 'DESCARTADA' | 'VENCIDA';
   costoUsd: number;
@@ -524,6 +539,9 @@ export const api = {
     pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json({ tipo: 'patron', ...datos })),
   pedirCorreccion: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json({ tipo: 'alineacion' })),
   aplicarPropuesta: (id: string, varianteIndice?: number) => pedir<CambioResultado>(`/propuestas/${id}/aplicar`, json(varianteIndice === undefined ? {} : { varianteIndice })),
+  /** HU-0903 · «✦ Proponer pausas desde la transcripción» (IA-09, de la pantalla con video) y aplicar las elegidas. */
+  pedirPausas: (cursoId: string, pantallaId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json({ tipo: 'pausas-video', pantallaId })),
+  aplicarPausas: (id: string, marcadorIds: string[]) => pedir<CambioResultado>(`/propuestas/${id}/aplicar`, json({ marcadorIds })),
   descartarPropuesta: (id: string) => pedir<void>(`/propuestas/${id}/descartar`, { method: 'POST' }),
   restaurarVersion: (cursoId: string, version: number) => pedir<{ version: number }>(`/cursos/${cursoId}/versiones/${version}/restaurar`, { method: 'POST' }),
   trabajo: (id: string) => pedir<TrabajoEstado>(`/trabajos/${id}`),

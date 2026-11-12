@@ -16,7 +16,7 @@ const ESQUEMA_CURSO = join(RAIZ, '..', 'schema', 'esquemas', 'curso-v0.schema.js
 /** Tareas sin IA de texto que también tienen salida grabada. */
 const OTRAS: Record<string, string> = { VOZ: '06-voz-es.json', BOCA: '07-boca-p03.json' };
 /** Tareas con varias salidas grabadas: la que responde el modo simulado (HU-0504: una propuesta por tipo de pedido). */
-const PREFERIDAS: Record<string, string> = { 'IA-16': 'X-IA-16-propuestas-p05.json', 'IA-14': '04-IA-14-navegacion.json' };
+const PREFERIDAS: Record<string, string> = { 'IA-16': 'X-IA-16-propuestas-p05.json', 'IA-14': '04-IA-14-navegacion.json', 'IA-09': 'X-IA-09-pausas-p18.json' };
 
 export interface ResultadoSimulado {
   tarea: string;

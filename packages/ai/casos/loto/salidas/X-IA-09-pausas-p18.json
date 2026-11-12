@@ -1,0 +1,262 @@
+{
+  "duracionMs": 150000,
+  "cambiosTema": [
+    {
+      "tiempoMs": 30000,
+      "tema": "Preparar y avisar"
+    },
+    {
+      "tiempoMs": 62000,
+      "tema": "Apagar y aislar"
+    },
+    {
+      "tiempoMs": 95000,
+      "tema": "Bloquear y etiquetar"
+    },
+    {
+      "tiempoMs": 125000,
+      "tema": "Verificar energía cero"
+    }
+  ],
+  "marcadores": [
+    {
+      "id": "ia-1",
+      "tiempoMs": 30000,
+      "tipo": "capitulo",
+      "obligatorio": false,
+      "titulo": {
+        "es": "Preparar y avisar"
+      }
+    },
+    {
+      "id": "ia-2",
+      "tiempoMs": 52000,
+      "tipo": "pregunta",
+      "obligatorio": true,
+      "pregunta": {
+        "id": "ia-2-q",
+        "enunciado": {
+          "es": "¿A quién avisa el técnico antes de detener la faja?"
+        },
+        "opciones": [
+          {
+            "id": "ia-2-q-a",
+            "contenido": {
+              "texto": {
+                "es": "Al operador y al supervisor del turno"
+              }
+            },
+            "correcta": true
+          },
+          {
+            "id": "ia-2-q-b",
+            "contenido": {
+              "texto": {
+                "es": "Solo al área de mantenimiento"
+              }
+            },
+            "correcta": false
+          },
+          {
+            "id": "ia-2-q-c",
+            "contenido": {
+              "texto": {
+                "es": "A nadie: basta con apagar"
+              }
+            },
+            "correcta": false
+          }
+        ],
+        "retroalimentacion": {
+          "correcta": {
+            "es": "Exacto: avisar a los afectados evita un arranque mientras se trabaja."
+          },
+          "incorrecta": {
+            "es": "Revisa el aviso: va al operador y al supervisor del turno."
+          }
+        },
+        "objetivoId": "obj-2"
+      }
+    },
+    {
+      "id": "ia-3",
+      "tiempoMs": 62000,
+      "tipo": "capitulo",
+      "obligatorio": false,
+      "titulo": {
+        "es": "Apagar y aislar"
+      }
+    },
+    {
+      "id": "ia-4",
+      "tiempoMs": 62000,
+      "tipo": "pregunta",
+      "obligatorio": true,
+      "pregunta": {
+        "id": "ia-4-q",
+        "enunciado": {
+          "es": "¿Por qué hay que avisar antes de apagar?"
+        },
+        "opciones": [
+          {
+            "id": "ia-4-q-a",
+            "contenido": {
+              "texto": {
+                "es": "Para que nadie arranque la faja mientras se trabaja"
+              }
+            },
+            "correcta": true
+          },
+          {
+            "id": "ia-4-q-b",
+            "contenido": {
+              "texto": {
+                "es": "Para registrar la hora de la parada"
+              }
+            },
+            "correcta": false
+          },
+          {
+            "id": "ia-4-q-c",
+            "contenido": {
+              "texto": {
+                "es": "Para pedir herramientas"
+              }
+            },
+            "correcta": false
+          }
+        ],
+        "retroalimentacion": {
+          "correcta": {
+            "es": "Bien: el aviso protege a quien trabaja."
+          },
+          "incorrecta": {
+            "es": "El aviso evita que alguien arranque la faja."
+          }
+        },
+        "objetivoId": "obj-2"
+      }
+    },
+    {
+      "id": "ia-5",
+      "tiempoMs": 95000,
+      "tipo": "capitulo",
+      "obligatorio": false,
+      "titulo": {
+        "es": "Bloquear y etiquetar"
+      }
+    },
+    {
+      "id": "ia-6",
+      "tiempoMs": 118000,
+      "tipo": "pregunta",
+      "obligatorio": true,
+      "pregunta": {
+        "id": "ia-6-q",
+        "enunciado": {
+          "es": "¿Qué datos lleva la tarjeta de bloqueo?"
+        },
+        "opciones": [
+          {
+            "id": "ia-6-q-a",
+            "contenido": {
+              "texto": {
+                "es": "Nombre, área, fecha, hora y motivo"
+              }
+            },
+            "correcta": true
+          },
+          {
+            "id": "ia-6-q-b",
+            "contenido": {
+              "texto": {
+                "es": "Solo el nombre del técnico"
+              }
+            },
+            "correcta": false
+          },
+          {
+            "id": "ia-6-q-c",
+            "contenido": {
+              "texto": {
+                "es": "El número del candado"
+              }
+            },
+            "correcta": false
+          }
+        ],
+        "retroalimentacion": {
+          "correcta": {
+            "es": "Correcto: con esos datos todos saben quién bloqueó y por qué."
+          },
+          "incorrecta": {
+            "es": "La tarjeta lleva nombre, área, fecha, hora y motivo."
+          }
+        },
+        "objetivoId": "obj-3"
+      }
+    },
+    {
+      "id": "ia-7",
+      "tiempoMs": 125000,
+      "tipo": "capitulo",
+      "obligatorio": false,
+      "titulo": {
+        "es": "Verificar energía cero"
+      }
+    },
+    {
+      "id": "ia-8",
+      "tiempoMs": 141000,
+      "tipo": "pregunta",
+      "obligatorio": false,
+      "pregunta": {
+        "id": "ia-8-q",
+        "enunciado": {
+          "es": "¿Cómo se comprueba la energía cero?"
+        },
+        "opciones": [
+          {
+            "id": "ia-8-q-a",
+            "contenido": {
+              "texto": {
+                "es": "Intentando arrancar y midiendo con el probador"
+              }
+            },
+            "correcta": true
+          },
+          {
+            "id": "ia-8-q-b",
+            "contenido": {
+              "texto": {
+                "es": "Mirando que la luz del tablero esté apagada"
+              }
+            },
+            "correcta": false
+          },
+          {
+            "id": "ia-8-q-c",
+            "contenido": {
+              "texto": {
+                "es": "Preguntando al operador"
+              }
+            },
+            "correcta": false
+          }
+        ],
+        "retroalimentacion": {
+          "correcta": {
+            "es": "Así es: se intenta arrancar y se mide."
+          },
+          "incorrecta": {
+            "es": "Se intenta arrancar con el control local y se mide con el probador."
+          }
+        },
+        "objetivoId": "obj-3"
+      }
+    }
+  ],
+  "observaciones": [
+    "La pregunta de 1:02 se cruza con la que ya tiene el video en ese segundo; si la eliges, se omite al aplicar."
+  ]
+}

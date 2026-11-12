@@ -21,7 +21,8 @@ export interface DatosTrabajo {
   /** HU-0503 · La pantalla de una regeneración en cascada (`trabajoId` es entonces el curso). */
   pantallaId?: string;
   /** HU-0504 · El pedido de una propuesta de la IA (IA-16; HU-1002: IA-17 con tipo `alineacion`, sin pantalla); `trabajoId` es entonces el TrabajoIA. */
-  propuesta?: { cursoId: string; tipo: string; texto?: string; /** HU-1104 · Tipo `patron` (IA-14): recomendar o crear. */ modo?: string };
+  propuesta?: { cursoId: string; tipo: string; texto?: string; /** HU-1104 · Tipo `patron` (IA-14): recomendar o crear. */ modo?: string;
+    /** HU-0903 · Tipo `pausas-video` (IA-09): el bloque de video y el material con su transcripción. */ bloqueId?: string; materialId?: string };
   /** HU-0802 · El curso cuyos textos pendientes se traducen (IA-10); `trabajoId` es entonces el TrabajoIA. */
   traduccion?: { cursoId: string };
   /** HU-0505 · El curso que revisa el control de calidad (IA-12); `trabajoId` es entonces el TrabajoIA. */

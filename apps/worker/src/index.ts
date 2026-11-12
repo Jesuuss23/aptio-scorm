@@ -12,6 +12,7 @@ import { crearCascada } from './cascada.js';
 import { crearPropuestas } from './propuesta.js';
 import { crearCorrecciones } from './alineacion.js';
 import { crearPatrones } from './patron.js';
+import { crearPausas } from './pausas.js';
 import { crearTraductor } from './traducir.js';
 import { controlCalidad, crearRevisorCalidad } from './calidad.js';
 import { TAREA_CALIDAD } from '@aptio/schema/calidad';
@@ -19,6 +20,7 @@ import { TAREA_TRADUCIR } from '@aptio/schema/traduccion';
 import { TAREA_PROPUESTA } from '@aptio/schema/propuesta';
 import { TAREA_CORRECCION } from '@aptio/schema/alineacion';
 import { TAREA_PATRON } from '@aptio/schema/navegacion';
+import { TAREA_PAUSAS } from '@aptio/schema/pausas';
 import { EJECUTORES } from './etapas/index.js';
 import { crearEtapaVoz } from './etapas/voz.js';
 import { crearEtapaSubtitulos } from './etapas/subtitulos.js';
@@ -64,6 +66,8 @@ const proponer = crearPropuestas({ bd: prisma, redis, proveedor: proveedorDesdeE
 const corregir = crearCorrecciones({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 // El patrón de navegación recomendado o creado con IA (HU-1104, IA-14 v2).
 const proponerPatron = crearPatrones({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
+// Las pausas del video propuestas desde la transcripción (HU-0903, IA-09 v2).
+const proponerPausas = crearPausas({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 const traducir = crearTraductor({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 // El control de calidad (HU-0505): reglas e IA-12 por lotes, con «✦ Revisar con IA» y en la etapa 10.
 const revisarCalidad = crearRevisorCalidad({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
@@ -78,6 +82,7 @@ const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_PROPUESTA) return proponer(trabajo);
   if (trabajo.data.tarea === TAREA_CORRECCION && trabajo.data.propuesta) return corregir(trabajo);
   if (trabajo.data.tarea === TAREA_PATRON && trabajo.data.propuesta) return proponerPatron(trabajo);
+  if (trabajo.data.tarea === TAREA_PAUSAS && trabajo.data.propuesta?.tipo === 'pausas-video') return proponerPausas(trabajo);
   if (trabajo.data.tarea === TAREA_TRADUCIR && trabajo.data.traduccion) return traducir(trabajo);
   if (trabajo.data.tarea === TAREA_CALIDAD && trabajo.data.calidad) return revisarCalidad(trabajo);
   return procesar(trabajo);

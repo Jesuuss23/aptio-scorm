@@ -1931,6 +1931,11 @@ paths:
         dispositivo, actividades, gamificación y estaciones del mapa). `modo` es obligatorio (422 MODO_REQUERIDO);
         `recomendar` elige un patrón del catálogo con una alternativa; `crear` arma un patrón personalizado a partir de
         `descripcion`, obligatoria en ese modo (422 DESCRIPCION_VACIA). Solo administración y diseño instruccional (403 al resto).
+        HU-0903 · `pausas-video` es de una pantalla con video (`pantallaId` obligatorio, 422 PANTALLA_REQUERIDA; 422
+        BLOQUE_NO_EXISTE si no tiene video) y encola IA-09 v2 en la cola ia con la transcripción del video, la del material
+        del cliente del mismo recurso, ya transcrito (HU-0305). Sin ella, 422 SIN_TRANSCRIPCION («Transcribe el video en
+        Material del cliente»). La propuesta trae en `pausas` los cambios de tema, los marcadores propuestos (al menos uno
+        por cambio de tema, ninguno en mitad de una frase) y las observaciones. Piden los editores de pantallas.
       parameters:
       - name: cursoId
         in: path
@@ -2018,7 +2023,13 @@ paths:
         HU-1104 · Una propuesta `patron` también vence si el curso cambió de versión (409 PROPUESTA_VENCIDA); al aplicarla
         solo cambian `navegacion.patron` y `navegacion.patronPersonalizado` (se quita si el patrón es del catálogo), las
         reglas y los elementos visibles quedan (RN-11-1), y se crea una versión con motivo «navegación». Mismos roles que
-        `alineacion` (403 al resto).'
+        `alineacion` (403 al resto).
+        HU-0903 · Una propuesta `pausas-video` se aplica con `marcadorIds` (los elegidos; 422 MARCADORES_REQUERIDOS si no
+        hay ninguno, PROPUESTA_NO_APLICA si uno no está en la propuesta o el resultado no pasa las reglas del video). Los
+        elegidos se suman a los marcadores del video sin reemplazar ninguno, con ids nuevos y marcados como de la IA sin
+        revisar; uno a menos de 2 s de otro del mismo tipo se omite y lo dice `observaciones`. Vence como las de pantalla
+        (409 PROPUESTA_VENCIDA si la pantalla cambió); versión nueva con motivo «propuesta», la pantalla vuelve a borrador
+        y la respuesta trae `agregados`. Se deshace mandando la lista anterior de marcadores con `motivo: deshacer`.'
       parameters:
       - name: propuestaId
         in: path
@@ -5238,6 +5249,16 @@ components:
           items:
             type: string
           description: Pantallas que quedaron aprobadas con esta llamada
+        agregados:
+          type: array
+          items:
+            type: string
+          description: HU-0903 · Los ids nuevos de los marcadores que se sumaron al video
+        observaciones:
+          type: array
+          items:
+            type: string
+          description: HU-0903 · Por qué se omitió algún marcador elegido (a menos de 2 s de otro del mismo tipo)
         pendientes:
           type: array
           items:
@@ -5434,6 +5455,8 @@ components:
             $ref: '#/components/schemas/CorreccionAlineacion'
         patron:
           $ref: '#/components/schemas/PatronPropuesto'
+        pausas:
+          $ref: '#/components/schemas/PausasPropuestas'
         versionBase:
           type: integer
         estado:
@@ -5455,6 +5478,50 @@ components:
           type: integer
           minimum: 0
           description: Si la propuesta trae variantes
+        marcadorIds:
+          type: array
+          maxItems: 12
+          items:
+            type: string
+          description: HU-0903 · Con `pausas-video`, los ids de los marcadores propuestos que se aplican (al menos uno); los
+            demás quedan descartados
+    PausasPropuestas:
+      type: object
+      description: HU-0903 · Las pausas propuestas desde la transcripción (salida de IA-09 v2, ya validada con
+        `erroresPausas`).
+      required:
+      - bloqueId
+      - duracionMs
+      - cambiosTema
+      - marcadores
+      - observaciones
+      properties:
+        bloqueId:
+          type: string
+        duracionMs:
+          type: integer
+        cambiosTema:
+          type: array
+          description: Los momentos en que la transcripción cambia de tema (sin el inicio del video)
+          items:
+            type: object
+            required:
+            - tiempoMs
+            - tema
+            properties:
+              tiempoMs:
+                type: integer
+              tema:
+                type: string
+        marcadores:
+          type: array
+          description: Los marcadores propuestos, con ids provisionales («ia-N»); al aplicar toman ids nuevos
+          items:
+            $ref: '#/components/schemas/MarcadorVideo'
+        observaciones:
+          type: array
+          items:
+            type: string
     Observacion:
       type: object
       required:

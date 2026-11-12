@@ -67,6 +67,8 @@ export class CambioResultadoDto {
   @ApiPropertyOptional({ type: [String] }) aprobadas?: string[];
   @ApiPropertyOptional({ type: [String], description: 'Las que no se aprobaron porque tienen observaciones abiertas' }) pendientes?: string[];
   @ApiPropertyOptional({ description: 'Estado de la pantalla después del cambio' }) estado?: string;
+  @ApiPropertyOptional({ type: [String], description: 'HU-0903 · Los ids nuevos de los marcadores que se sumaron al video' }) agregados?: string[];
+  @ApiPropertyOptional({ type: [String], description: 'HU-0903 · Por qué se omitió algún marcador elegido (a menos de 2 s de otro del mismo tipo)' }) observaciones?: string[];
   @ApiPropertyOptional({ type: () => [PantallaPorRevisarDto], description: 'HU-1002 · Pantallas nuevas o cambiadas por la corrección de la alineación: quedan en borrador' }) pantallasPorRevisar?: PantallaPorRevisarDto[];
 }
 

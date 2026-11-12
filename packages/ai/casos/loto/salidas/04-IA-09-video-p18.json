@@ -1,5 +1,23 @@
 {
   "duracionMs": 150000,
+  "cambiosTema": [
+    {
+      "tiempoMs": 30000,
+      "tema": "Preparar y avisar"
+    },
+    {
+      "tiempoMs": 62000,
+      "tema": "Apagar y aislar"
+    },
+    {
+      "tiempoMs": 95000,
+      "tema": "Bloquear y etiquetar"
+    },
+    {
+      "tiempoMs": 125000,
+      "tema": "Verificar energía cero"
+    }
+  ],
   "marcadores": [
     {
       "id": "vm-1",

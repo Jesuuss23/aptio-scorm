@@ -10,9 +10,29 @@ import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
 import { conservarRetoques } from '@aptio/schema/retoques';
 import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
 import { erroresMarcadores } from '@aptio/schema/marcadores';
+import { aplicarPausas, type PropuestaPausas } from '@aptio/schema/pausas';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 
+/** HU-0903 · La salida simulada de IA-09 v2 para el video de prueba de 60 s (ya normalizada). */
+const ia = { tipo: 'ia', revisado: false };
+const preguntaSim = (id: string, enunciado: string, correcta: string, otras: string[]) => ({
+  id: `${id}-q`, enunciado: { es: enunciado },
+  opciones: [correcta, ...otras].map((t, i) => ({ id: `${id}-q-${'abc'[i]}`, contenido: { texto: { es: t } }, correcta: i === 0 })),
+  retroalimentacion: { correcta: { es: 'Exacto.' }, incorrecta: { es: 'Revisa ese paso en el video.' } },
+});
+const PAUSAS_60S = {
+  bloqueId: 'p18-video', duracionMs: 60000,
+  cambiosTema: [{ tiempoMs: 15000, tema: 'Preparar y avisar' }, { tiempoMs: 35000, tema: 'Apagar y aislar' }],
+  marcadores: [
+    { id: 'ia-1', tiempoMs: 15000, tipo: 'capitulo' as const, obligatorio: false, titulo: { es: 'Preparar y avisar' }, origen: ia },
+    { id: 'ia-2', tiempoMs: 21000, tipo: 'punto' as const, obligatorio: false, titulo: { es: 'Candado personal' }, contenido: { es: 'Cada persona pone el suyo.' }, posicion: { x: 40, y: 50 }, origen: ia },
+    { id: 'ia-3', tiempoMs: 30000, tipo: 'pregunta' as const, obligatorio: true, pregunta: preguntaSim('ia-3', '¿A quién se avisa antes de detener la faja?', 'Al operador y al supervisor', ['Solo a mantenimiento', 'A nadie']), origen: ia },
+    { id: 'ia-4', tiempoMs: 35000, tipo: 'capitulo' as const, obligatorio: false, titulo: { es: 'Apagar y aislar' }, origen: ia },
+    { id: 'ia-5', tiempoMs: 50000, tipo: 'pregunta' as const, obligatorio: false, pregunta: preguntaSim('ia-5', '¿Qué se hace después de apagar?', 'Aislar cada fuente', ['Empezar a trabajar', 'Retirar la tarjeta']), origen: ia },
+  ],
+  observaciones: ['El punto de 0:21 se cruza con el que ya tiene el video en 0:20.'],
+};
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'instruccional@aulaseducativas.test',
@@ -265,7 +285,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-0504 · Pedidos a la IA (terminan a la 2.ª consulta), propuestas con la salida grabada de p05 e historial de versiones.
   const salidasIA16 = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/salidas/X-IA-16-propuestas-p05.json', import.meta.url), 'utf8')) as
     { tipo: string; titulo: string; resumen: string; patch?: unknown[]; variantes?: { nombre: string; disposicion: string; patch: unknown[] }[] }[];
-  type PropuestaSim = { id: string; tipo: string; pantallaId: string; titulo: string; descripcion: string; cambios: unknown[]; vistaPrevia?: unknown[]; versionBase: number; estado: string; costoUsd: number; creadoEn: string; huella: string | null };
+  type PropuestaSim = { id: string; tipo: string; pantallaId: string; titulo: string; descripcion: string; cambios: unknown[]; vistaPrevia?: unknown[]; pausas?: PropuestaPausas & { bloqueId: string; observaciones: string[] }; versionBase: number; estado: string; costoUsd: number; creadoEn: string; huella: string | null };
   const pedidosIA = new Map<string, { tipo: string; pantallaId: string; consultas: number; falla: boolean }>();
   let fallaIA = Boolean(propuestaFalla);
   const propuestasSim: PropuestaSim[] = [];
@@ -614,6 +634,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     const docSim = () => revision.documento as unknown as CursoDoc;
     if (ruta === `/cursos/${CURSO_ID}/propuestas` && req.method() === 'POST') {
       const datos = req.postDataJSON() as { tipo: string; pantallaId: string };
+      // HU-0903 · Solo el video de prueba (conVideo) tiene transcripción en Material del cliente.
+      if (datos.tipo === 'pausas-video' && !conVideo) return responder(422, { codigo: 'SIN_TRANSCRIPCION', mensaje: 'Transcribe el video en Material del cliente' });
       const id = `00000000-0000-4000-8000-${String(800 + pedidosIA.size).padStart(12, '0')}`;
       pedidosIA.set(id, { ...datos, consultas: 0, falla: fallaIA });
       fallaIA = false;
@@ -624,7 +646,15 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const t = pedidosIA.get(trabajoIA[1]!)!;
       if (++t.consultas < 2) return responder(200, { id: trabajoIA[1], estado: 'EN_CURSO', error: null });
       if (t.falla) return responder(200, { id: trabajoIA[1], estado: 'ERROR', error: 'La salida de IA-16 no validó tras 3 intentos' });
-      if (t.consultas === 2) {
+      if (t.consultas === 2 && t.tipo === 'pausas-video') {
+        // HU-0903 · IA-09 sobre el video de prueba de 60 s: 2 cambios de tema y 5 marcadores; el punto de 0:21 queda a
+        // menos de 2 s del punto que ya tiene el video en 0:20.
+        propuestasSim.unshift({
+          id: trabajoIA[1]!.replace(/-8000-/, '-9000-'), tipo: t.tipo, pantallaId: t.pantallaId, titulo: '5 pausas propuestas desde la transcripción',
+          descripcion: '2 cambios de tema: Preparar y avisar (0:15), Apagar y aislar (0:35).', cambios: [], pausas: PAUSAS_60S,
+          versionBase: revision.version, estado: 'PENDIENTE', costoUsd: 0.01, creadoEn: new Date().toISOString(), huella: huellaPantalla(docSim(), t.pantallaId),
+        });
+      } else if (t.consultas === 2) {
         const sal = salidasIA16.find((x) => x.tipo === t.tipo)!;
         propuestasSim.unshift({
           id: trabajoIA[1]!.replace(/-8000-/, '-9000-'), tipo: t.tipo, pantallaId: t.pantallaId, titulo: sal.titulo, descripcion: sal.resumen,
@@ -649,6 +679,21 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (huellaPantalla(docSim(), p.pantallaId) !== p.huella) {
         p.estado = 'VENCIDA';
         return responder(409, { codigo: 'PROPUESTA_VENCIDA', mensaje: 'La pantalla cambió desde que se calculó esta propuesta. Recalcular propuesta.' });
+      }
+      if (p.pausas) {
+        const { marcadorIds = [] } = req.postDataJSON() as { marcadorIds?: string[] };
+        const video = ((pantallasSim().find((x) => x.id === p.pantallaId) as unknown as { bloques: { id: string; marcadores?: never[] }[] }).bloques).find((b) => b.id === p.pausas!.bloqueId)!;
+        let r: ReturnType<typeof aplicarPausas>;
+        try {
+          r = aplicarPausas(video.marcadores ?? [], p.pausas, marcadorIds, { pantallaId: p.pantallaId, ruta: `${p.pantallaId}/${video.id}`, duracionMs: 60000 });
+        } catch (e) {
+          return responder(422, { codigo: 'PROPUESTA_NO_APLICA', mensaje: `La propuesta no se puede aplicar: ${(e as Error).message}` });
+        }
+        historial.set(revision.version, structuredClone(revision.documento));
+        video.marcadores = r.marcadores as never[];
+        pantallasSim().find((x) => x.id === p.pantallaId)!.estado = 'borrador';
+        p.estado = 'APLICADA';
+        return responder(200, { version: ++revision.version, regenerando: [], estado: 'borrador', agregados: r.agregados, observaciones: r.observaciones });
       }
       const { varianteIndice } = req.postDataJSON() as { varianteIndice?: number };
       historial.set(revision.version, structuredClone(revision.documento));
