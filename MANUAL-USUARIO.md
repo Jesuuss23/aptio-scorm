@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.36 · actualizado con la primera entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.37 · actualizado con la segunda entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -498,7 +498,14 @@ En el proyecto, el botón **Alineación** abre la vista **Alineación pedagógic
 
 Al guardar, la matriz se recalcula y el aviso dice cuántas alertas quedan. Cada cambio guarda una versión del curso. Desde el chip, **Abrir en Revisión** lleva a esa pantalla.
 
-Diseño gráfico y Producción ven la matriz sin poder cambiar niveles; el revisor del cliente no la ve. Las alertas no impiden exportar: en **Entrega**, la verificación avisa «N objetivos sin alinear» con **Ir a Alineación**. La propuesta de la IA para corregir las alertas llegará en la próxima entrega.
+Diseño gráfico y Producción ven la matriz sin poder cambiar niveles; el revisor del cliente no la ve. Las alertas no impiden exportar: en **Entrega**, la verificación avisa «N objetivos sin alinear» con **Ir a Alineación**.
+
+**Corregir con la IA.** Cuando hay alertas, Administración y Diseño instruccional ven **✦ Proponer correcciones**. La IA prepara en unos segundos una propuesta, sin cambiar todavía el curso:
+- la franja **✦ Propuesta de la IA** resume qué agrega (por ejemplo, dos preguntas nuevas en el Reto final) y lista cada cambio con su objetivo, su nivel, la pantalla y el motivo;
+- **Aplicar** la guarda como una versión nueva del curso: la matriz se recalcula (en el ejemplo, 0 alertas) y el aviso **«1 pantalla por revisar»** abre Revisión en la pantalla que cambió. Esa pantalla vuelve a borrador y las preguntas nuevas quedan marcadas como propuestas de la IA, sin revisar, hasta que alguien las apruebe;
+- **Descartar** la deja sin aplicar.
+
+Si alguien cambia el curso antes de aplicar, la propuesta vence y aparece **Recalcular propuesta** para pedir otra. Para deshacer una propuesta aplicada, restaura la versión anterior del curso: vuelven las alertas.
 
 ## 9. Preguntas frecuentes
 
@@ -574,6 +581,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.34 | 2026-11-12 | Voz en inglés: bloque «Voz en inglés» en Idiomas con «Generar voz en inglés» y la cápsula que suena en inglés (8.15). |
 | 0.35 | 2026-11-12 | Control de calidad: observaciones de reglas y de la IA, «✦ Revisar con IA», «Descartar» y «Del curso» (8.16); la etapa 10 ya corre (8.2). |
 | 0.36 | 2026-11-12 | Alineación pedagógica: matriz por objetivo con niveles de Bloom, alertas, cambiar niveles y el aviso en Entrega (8.17). |
+| 0.37 | 2026-11-12 | Alineación pedagógica: «✦ Proponer correcciones», aplicar o descartar la propuesta de la IA y «pantallas por revisar» (8.17). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
