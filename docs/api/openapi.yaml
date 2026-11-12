@@ -2535,7 +2535,10 @@ paths:
       - Alineación y navegación
       summary: Informe de alineación pedagógica
       operationId: get_cursos_cursoId_alineacion
-      description: Calculado desde el documento; sin costo de IA
+      description: HU-1001 · Calculado desde el documento, sin costo de IA (RN-10-3). Por objetivo, las pantallas y preguntas
+        que presentan (P, contenido y video), practican (A, actividad formativa) y evalúan (E, actividad sumativa; en el reto
+        final cuenta cada pregunta con su objetivo), con su nivel de Bloom (el escrito o el de su disposición) y las alertas
+        de RN-10-2, que no bloquean. Lo ve el equipo; el revisor del cliente recibe 403.
       parameters:
       - name: cursoId
         in: path
@@ -2556,6 +2559,43 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+    patch:
+      tags:
+      - Alineación y navegación
+      summary: Cambiar el nivel de Bloom de un objetivo, una pantalla o una pregunta
+      operationId: patch_cursos_cursoId_alineacion
+      description: HU-1001 · Exige la versión leída y crea una versión del curso con motivo «alineación». Solo administración
+        y diseño instruccional; diseño gráfico, producción y el revisor del cliente reciben 403.
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlineacionCambio'
+      responses:
+        '200':
+          description: El informe recalculado con la versión nueva
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlineacionInforme'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /cursos/{cursoId}/navegacion:
     get:
       tags:
@@ -5482,44 +5522,162 @@ components:
           type: string
           enum:
           - REVISADA
+    NivelBloom:
+      type: string
+      enum:
+      - recordar
+      - comprender
+      - aplicar
+      - analizar
+      - evaluar
+      - crear
+    ElementoAlineacion:
+      type: object
+      required:
+      - pantallaId
+      - numero
+      - titulo
+      - rol
+      - nivelBloom
+      - nivelEscrito
+      - objetivoIds
+      properties:
+        pantallaId:
+          type: string
+        numero:
+          type: integer
+          description: Número de la pantalla en el curso (1 = la primera)
+        titulo:
+          type: string
+        preguntaId:
+          type: string
+          description: Solo en una actividad sumativa, donde cada pregunta cuenta con su objetivo
+        rol:
+          type: string
+          enum:
+          - P
+          - A
+          - E
+        nivelBloom:
+          $ref: '#/components/schemas/NivelBloom'
+        nivelEscrito:
+          type: boolean
+          description: El nivel está escrito en la pantalla o la pregunta; si no, sale de su disposición
+        objetivoIds:
+          type: array
+          items:
+            type: string
     AlineacionInforme:
       type: object
       required:
+      - version
       - objetivos
       - totalAlertas
+      - indicadores
       properties:
+        version:
+          type: integer
+          description: Versión del curso con la que se calculó (para el PATCH)
         objetivos:
           type: array
           items:
             type: object
+            required:
+            - id
+            - texto
+            - nivelBloom
+            - presenta
+            - practica
+            - evalua
+            - alertas
             properties:
               id:
                 type: string
               texto:
                 type: string
               nivelBloom:
-                type: string
+                $ref: '#/components/schemas/NivelBloom'
               presenta:
                 type: array
                 items:
-                  type: object
-                  additionalProperties: true
+                  $ref: '#/components/schemas/ElementoAlineacion'
               practica:
                 type: array
                 items:
-                  type: object
-                  additionalProperties: true
+                  $ref: '#/components/schemas/ElementoAlineacion'
               evalua:
                 type: array
                 items:
-                  type: object
-                  additionalProperties: true
+                  $ref: '#/components/schemas/ElementoAlineacion'
               alertas:
                 type: array
                 items:
                   type: string
+                description: RN-10-2, p. ej. «Se evalúa solo en «recordar», menor que «aplicar»»; no bloquean
         totalAlertas:
           type: integer
+        indicadores:
+          type: object
+          required:
+          - objetivosAlineados
+          - elementosSinObjetivo
+          - equilibrio
+          properties:
+            objetivosAlineados:
+              type: integer
+            elementosSinObjetivo:
+              type: integer
+              description: Pantallas o preguntas que cuentan pero no tienen objetivo
+            equilibrio:
+              type: object
+              required:
+              - presenta
+              - practica
+              - evalua
+              properties:
+                presenta:
+                  type: integer
+                practica:
+                  type: integer
+                evalua:
+                  type: integer
+    AlineacionCambio:
+      type: object
+      required:
+      - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: Versión del curso leída (bloqueo optimista)
+        objetivos:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            required:
+            - id
+            - nivelBloom
+            properties:
+              id:
+                type: string
+              nivelBloom:
+                $ref: '#/components/schemas/NivelBloom'
+        elementos:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            required:
+            - pantallaId
+            - nivelBloom
+            properties:
+              pantallaId:
+                type: string
+              preguntaId:
+                type: string
+              nivelBloom:
+                $ref: '#/components/schemas/NivelBloom'
     Navegacion:
       type: object
       properties:
@@ -5726,6 +5884,10 @@ components:
             total:
               type: integer
           description: HU-0804 · En el paquete bilingüe, cuántos textos tienen su inglés; null con un solo idioma
+        objetivosSinAlinear:
+          type: integer
+          minimum: 0
+          description: HU-1001 · Objetivos con alertas de alineación (PNT-18); advierte «N objetivos sin alinear», no bloquea
       description: Nunca bloquea por tamaño; solo advierte (RN-12-2, CP-090).
     Creditos:
       type: object

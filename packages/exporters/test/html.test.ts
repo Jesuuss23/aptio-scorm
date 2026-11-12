@@ -75,7 +75,7 @@ describe('validarExportacion para HTML (HU-1203)', () => {
     const v = validarExportacion('HTML', cursoLoto(), pesos().filter((r) => !r.nombre.endsWith('.mp3')), 0, null);
     expect(v.pantallasSinAprobar).toBe(30);
     expect(v.recursosFaltantes).toHaveLength(30);
-    expect(v.advertencias.map((a) => a.slice(0, 12))).toEqual(['Faltan 30 ar', '30 de 30 pan']);
+    expect(v.advertencias.map((a) => a.slice(0, 12))).toEqual(['Faltan 30 ar', '2 objetivos ', '30 de 30 pan']);
     const roto = { ...cursoLoto(), version: undefined };
     expect(validarExportacion('HTML', roto, [], 0, null).errores.length).toBeGreaterThan(0);
   });

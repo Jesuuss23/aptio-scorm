@@ -1,4 +1,5 @@
 // Cliente de la API (docs/api/openapi.yaml). Mismo origen: la cookie httpOnly `sesion` viaja sola.
+import type { InformeAlineacion as InformeAlineacionBase, NivelBloom } from '@aptio/schema/alineacion';
 import type { AjusteElemento, ElementoExtra } from '@aptio/player';
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
@@ -55,6 +56,8 @@ export const CREAN_PROYECTOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL
 /** docs/14-modulos.md: editan pantallas todos los del equipo; aprueban administración y diseño instruccional. */
 export const EDITAN_PANTALLAS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 export const APRUEBAN_PANTALLAS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
+/** HU-1001 · Cambian el nivel de Bloom en Alineación; diseño gráfico y producción solo ven, el revisor del cliente no. */
+export const EDITAN_ALINEACION: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
 export const EDITAN_GLOSARIO: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
 /** HU-0703: regenera narraciones todo el equipo; el revisor del cliente no. */
 export const REGENERAN_VOZ: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
@@ -412,6 +415,8 @@ export interface Validacion {
   /** HU-0804 · Idiomas del paquete validado y, en el bilingüe, cuántos textos tienen su inglés. */
   modoIdioma?: ModoIdiomaExportacion;
   textosIngles?: { traducidos: number; total: number } | null;
+  /** HU-1001 · Objetivos con alertas de alineación (advierten, no bloquean). */
+  objetivosSinAlinear?: number;
 }
 /** HU-1204 · Ficha de compatibilidad del LMS de un cliente, con el informe del modo diagnóstico si se pegó. */
 export interface FichaCompatibilidad {
@@ -426,6 +431,9 @@ export interface FichaCompatibilidad {
 export type FichaCompatibilidadEntrada = { lmsNombre: string; lmsVersion?: string; limiteSubidaMb?: number; notas?: string; resultadoDiagnostico?: Record<string, unknown> };
 /** Exportan administración, diseño instruccional y producción (HU-1202). */
 export const EXPORTAN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'];
+
+/** HU-1001 · Informe de alineación pedagógica (PNT-18). */
+export type InformeAlineacion = InformeAlineacionBase & { version: number };
 
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
@@ -444,6 +452,10 @@ export const api = {
   /** HU-0505 · «✦ Revisar con IA» (IA-12) y descartar una observación de la IA. */
   controlCalidad: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/control-calidad`, { method: 'POST' }),
   descartarObservacion: (id: string) => pedir<Observacion>(`/observaciones/${id}`, json({ resuelta: true }, 'PATCH')),
+  /** HU-1001 · Matriz de alineación (sin IA) y cambio del nivel de Bloom de un objetivo, una pantalla o una pregunta. */
+  alineacion: (cursoId: string) => pedir<InformeAlineacion>(`/cursos/${cursoId}/alineacion`),
+  cambiarAlineacion: (cursoId: string, datos: { version: number; objetivos?: { id: string; nivelBloom: NivelBloom }[]; elementos?: { pantallaId: string; preguntaId?: string; nivelBloom: NivelBloom }[] }) =>
+    pedir<InformeAlineacion>(`/cursos/${cursoId}/alineacion`, json(datos, 'PATCH')),
   editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string; extras?: ElementoExtra[]; motivo?: 'deshacer' | 'rehacer' }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
   aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),

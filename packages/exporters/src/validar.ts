@@ -8,6 +8,8 @@
 // solo advierten. El peso suma los recursos de los dos idiomas.
 import { aplanar, codificarSuspend, huellaCurso, LIMITE_SUSPEND, type CursoReproductor, type ResultadoActividad } from '@aptio/player';
 import { erroresCurso } from '@aptio/schema';
+import { informeAlineacion } from '@aptio/schema/alineacion';
+import type { CursoDoc } from '@aptio/schema/revision';
 import { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma, pantallasSinVozIngles, textosEnIngles } from './bilingue.ts';
 import { LEEME_HTML } from './html.ts';
 import { indexHtml, INICIAR_JS } from './scorm12.ts';
@@ -51,6 +53,8 @@ export interface ValidacionScorm12 {
   /** HU-0804 · Idiomas del paquete y, en el bilingüe, cuántos textos tienen su inglés. */
   modoIdioma: ModoIdioma;
   textosIngles: { traducidos: number; total: number } | null;
+  /** HU-1001 · Objetivos con alertas de alineación (advertencia, no bloquea). */
+  objetivosSinAlinear: number;
 }
 
 /** Opciones de la validación: el origen del límite (solo el texto), el idioma o el paquete bilingüe. */
@@ -124,7 +128,7 @@ export function validarExportacion(
   const resultado: ValidacionScorm12 = {
     formato, errores, advertencias, pesoEstimadoBytes: 0, pesoEstimadoMb: 0, limiteMb: html ? null : limiteMb, superaLimite: false, alternativas: [],
     recursosPesados: [], suspendDataCaracteres: html ? null : 0, pantallasTotal: 0, pantallasSinAprobar: 0, recursosFaltantes: [],
-    modoIdioma: bilingue ? 'mismo-paquete' : 'unico', textosIngles,
+    modoIdioma: bilingue ? 'mismo-paquete' : 'unico', textosIngles, objetivosSinAlinear: 0,
   };
   // Con errores de esquema se calcula lo que se pueda; si el documento no tiene ni la forma básica, solo los errores.
   let c: CursoReproductor;
@@ -198,6 +202,17 @@ export function validarExportacion(
     if (opciones.desbordes) advertencias.push(`${opciones.desbordes} ${opciones.desbordes === 1 ? 'texto en inglés no cabe' : 'textos en inglés no caben'} en su espacio (Desborde): revísalos en Idiomas.`);
     const sinVoz = pantallasSinVozIngles(c);
     if (sinVoz) advertencias.push(avisoSinVozIngles(sinVoz));
+  }
+
+  // ---------- Alineación pedagógica (HU-1001, PNT-18): los objetivos con alertas solo advierten ----------
+  try {
+    resultado.objetivosSinAlinear = informeAlineacion(c as unknown as CursoDoc).objetivos.filter((o) => o.alertas.length).length;
+  } catch {
+    resultado.objetivosSinAlinear = 0;
+  }
+  if (resultado.objetivosSinAlinear) {
+    const n = resultado.objetivosSinAlinear;
+    advertencias.push(`${n} ${n === 1 ? 'objetivo sin alinear' : 'objetivos sin alinear'}: revísalos en Alineación pedagógica.`);
   }
 
   // ---------- Pantallas sin aprobar (RN-12-3) ----------

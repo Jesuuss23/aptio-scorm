@@ -42,7 +42,7 @@ function fasesCascada(n: Narracion | undefined, generacionActiva: boolean): Pick
 const conActividad = (p: PantallaDoc) => p.bloques.some((b) => b.tipo === 'interaccion');
 const mensajeDe = (e: unknown, otro: string) => (e instanceof ErrorApi ? e.message : otro);
 
-export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: string; rol: Rol; alCargar: (nombre: string) => void }) {
+export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: { proyectoId: string; rol: Rol; alCargar: (nombre: string) => void; pantallaId?: string | null }) {
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [curso, setCurso] = useState<Curso | null>(null);
   const [kit, setKit] = useState<Kit | null>(null);
@@ -51,7 +51,8 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [filtro, setFiltro] = useState<Filtro>('todas');
-  const [seleccion, setSeleccion] = useState<string | null>(null);
+  // HU-1001 · Alineación abre Revisión en la pantalla pulsada (?pantalla=pNN).
+  const [seleccion, setSeleccion] = useState<string | null>(pantallaId);
   const [ocupado, setOcupado] = useState(false);
   const [cascada, setCascada] = useState<Cascada | null>(null);
   // HU-0504 · Propuestas del curso, el pedido en curso, la variante en vista y lo que se puede deshacer.

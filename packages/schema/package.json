@@ -34,6 +34,7 @@
     "./propuesta": "./src/propuesta.ts",
     "./retoques": "./src/retoques.ts",
     "./tiempos": "./src/tiempos.ts",
-    "./traduccion": "./src/traduccion.ts"
+    "./traduccion": "./src/traduccion.ts",
+    "./alineacion": "./src/alineacion.ts"
   }
 }
