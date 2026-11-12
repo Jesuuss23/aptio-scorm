@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.39 · actualizado con la cuarta entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.40 · actualizado con la quinta entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -132,6 +132,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - HTML (HU-1203): con `DatosPaquete.modo: 'html'`, `conectarPaquete` no toca `API`, `parent` ni `opener` y no avisa; tampoco hay modo diagnóstico. No agregues `fetch` al camino del paquete: en `file://` no funciona. Los SVG y los WebVTT van en `datos.js`.
 - Accesibilidad (HU-1401): no uses `disabled` en un control que puede tener el foco en ese momento (una carta emparejada usa `aria-disabled`); si una acción quita o desactiva el control enfocado, mueve el foco con `enfocar(el)` de `interacciones/comun.ts` (espera a que el elemento esté en la página). `pieResultado` ya enfoca el resultado; el texto que debe leerse al empezar o al pasar de paso lleva `tabindex=-1` y `data-enfocar` (`inicioDe` lo busca al repetir). Los colores del kit que se usan como texto pasan por `colorLegible` (`src/contraste.ts`) y se exponen como `--ap-bien-texto`, `--ap-mal-texto` y `--ap-foco`; no pongas `var(--ap-secundario)` como color de texto.
 - Créditos (HU-1406): `montar(..., { creditos })` suma el botón «Créditos» a la barra (solo con marco); `src/creditos.ts` (`abrirCreditos`) dibuja el diálogo modal, deja `inert` el resto de la raíz y devuelve el foco al botón. `DatosPaquete.creditos` lo pasa desde `datos.js`. Si agregas controles al diálogo, cambia el manejo de Tab, que hoy deja el foco en «Cerrar».
+- Disparadores (HU-0610): `src/disparadores.ts` es lógica pura (`cumplidos`, `visibilidad`, `elementosConDisparador`, `ultimoSegundo`). El reproductor los evalúa en `seguirReloj`, en el `ended` del audio y en `reproducir` del editor; un «ir a» pasa por `motivoBloqueo` y, en el editor, llama a `alSalto({ pantallaId, bloqueado })` en lugar de cambiar de pantalla. Las clases son `ap-oculto-el` (oculto en Capas), `ap-fuera` (fuera de su tiempo) y `ap-disparo-oculto` (ocultado por un disparador). En el esquema, `@aptio/schema/disparadores` tiene `erroresDisparadores` y `purgarDisparadores`; `disparadores` está en `CLAVES_RETOQUE`, así que un patch de IA no lo toca. En la web, la lógica del panel está en `vistas/disparadores-panel.ts` y el componente en `PanelDisparadores.tsx`.
 - Para el paquete: `pnpm --filter @aptio/player construir` deja `packages/player/dist/aptio-reproductor.js` con `window.AptioReproductor.montar`.
 
 ### 6.5.1 Entrega (`@aptio/exporters`)
@@ -395,6 +396,7 @@ Ninguna clave real va al repositorio.
 | 0.37 | 2026-11-12 | HU-1002: IA-17 v2, `erroresCorreccion` y `aplicarCorreccion`, `origen` en la pregunta, worker `alineacion.ts`, propuestas `alineacion` en la API y la franja en Alineación. |
 | 0.38 | 2026-11-12 | HU-1103: `patrones.ts` y los 7 marcos del reproductor, migración `KitMarca.patronPreferido`, módulo `navegacion` de la API, vista Navegación y vista previa con `?patron=`. |
 | 0.39 | 2026-11-12 | HU-1104: `@aptio/schema/navegacion`, IA-14 v2, opción `preparar` de `ejecutarTarea`, worker `patron.ts`, propuestas `patron` en la API, `marcoDe` en el reproductor y la franja en Navegación. |
+| 0.40 | 2026-11-12 | HU-0610: `@aptio/schema/disparadores` (regla 6 del validador, retoque), `src/disparadores.ts` del reproductor con `alSalto`, `disparadores` en el `PATCH` de pantalla y el panel «Avanzado: disparadores» con sus marcas en la línea de tiempo. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |

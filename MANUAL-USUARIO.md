@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.39 · actualizado con la cuarta entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.40 · actualizado con la quinta entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -368,6 +368,15 @@ Cada cambio se guarda solo y se puede deshacer. La vista previa y el paquete mue
 
 **Capas, ocultar y eliminar.** En **Capas** ves todos los elementos de la pantalla, los del contenido y los que agregaste («· agregado»). Clic en un nombre lo elige; el ojo lo oculta o lo muestra. En el editor lo oculto se ve tenue y con borde punteado para que puedas elegirlo otra vez; en la vista previa y en el paquete no aparece. También puedes usar **Ocultar** y **Mostrar** en la barra o en Propiedades. **Eliminar** (o la tecla Supr) solo está para lo que agregaste: lo que puso la IA no se borra, se oculta.
 
+**Disparadores (avanzado).** Sirven para que algo pase solo en un momento de la pantalla, por ejemplo que un botón oculto aparezca a los 3 segundos. Sin ningún elemento elegido, abre **Avanzado: disparadores** en **Propiedades** y pulsa **+ Nuevo disparador**. Cada disparador tiene:
+- **Cuando:** «A los N s» (escribe el segundo, de 0 a 600) o «Termina la voz». Si la pantalla no tiene voz, «al terminar la voz» ocurre apenas se entra.
+- **Hacer:** **Mostrar** un elemento (aunque esté oculto en Capas o tenga otra entrada), **Ocultar** un elemento (aunque tenga otra salida) o **Ir a otra pantalla**.
+- El **elemento** o la **pantalla**, según lo que elegiste, y **Quitar** para borrarlo.
+
+El disparador nuevo propone «a los 3 s → mostrar» el primer elemento oculto. Se guarda solo un segundo después del último cambio; si algo no está bien (por ejemplo, 700 segundos), la fila lo marca en rojo y no se guarda hasta que lo corrijas. Puedes tener hasta 10 por pantalla. Los disparadores por tiempo se marcan con **◆** en la regla de la línea de tiempo.
+
+En el editor quieto ves todos los elementos; con **▶ Reproducir** los disparadores actúan como en la cápsula, y un «ir a» no te saca del editor: aparece el aviso «◆ Aquí la cápsula iría a la pantalla N». En la vista previa y en el paquete funcionan igual. «Ir a» respeta la regla de avance de Navegación: si la regla no deja ir a esa pantalla, no salta y muestra el motivo. Al volver a la pantalla, todo empieza de nuevo. Si quitas un elemento agregado, se borran los disparadores que lo usaban. La IA no cambia los disparadores al regenerar la pantalla.
+
 Las actividades y la narración se cambian desde Revisión. Con esto el editor del Sprint 5 está completo. El revisor del cliente no entra al editor.
 
 ---
@@ -619,6 +628,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.37 | 2026-11-12 | Alineación pedagógica: «✦ Proponer correcciones», aplicar o descartar la propuesta de la IA y «pantallas por revisar» (8.17). |
 | 0.38 | 2026-11-12 | Navegación: los 7 patrones, reglas, elementos visibles, «▶ Probar este patrón» y preferido del cliente (8.18); la vista previa usa el patrón del curso (8.6). |
 | 0.39 | 2026-11-12 | Navegación: «✦ Recomendar», «✦ Crear con IA» con una descripción, la franja de la propuesta con Aplicar, Descartar y «Probar alternativa», y el patrón personalizado con su nombre (8.18). |
+| 0.40 | 2026-11-12 | Editor: «Avanzado: disparadores» con «a los N segundos» o «al terminar la voz» para mostrar, ocultar o ir a otra pantalla, su marca ◆ en la línea de tiempo y cómo se ven con ▶ Reproducir (8.8). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

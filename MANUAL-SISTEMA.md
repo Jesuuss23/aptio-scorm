@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.39 · actualizado con la cuarta entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.40 · actualizado con la quinta entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -225,7 +225,9 @@ Deshacer y rehacer en el editor (HU-0607) mandan el mismo `PATCH` con `motivo` `
 
 Los tiempos de la línea de tiempo (HU-0608) van en los mismos `ajustes`: `retardoS` (cuándo aparece), `finS` (cuándo sale) y `anclaPalabra` (el índice de la palabra de la narración a la que quedó pegada la entrada). Las marcas de palabra no se guardan: se calculan repartiendo la duración del audio en español por letras (SUP-47). La pantalla dura lo mayor entre la voz + 1 s y la última salida (RN-06-7); sin tiempo, los elementos entran escalonados de a 0,3 s (RN-06-9). El reproductor del paquete y de la vista previa aplica los tiempos con el reloj del audio. Al corregir la narración, la API pasa cada ancla a la misma palabra del texto nuevo; con la voz nueva, el worker le da el segundo de esa palabra (RN-06-8). Si la palabra ya no está, el elemento conserva su segundo y queda una observación con origen `tiempo` («Revisar tiempo», aviso, no bloquea), que se borra al cambiar su entrada o su ancla. «Sincronizar con la voz» se calcula en el editor, sin IA ni costo (SUP-48), y se guarda como cualquier retoque.
 
-Los retoques (`ajustes` y `extras`) nunca van a la IA (HU-0604, SUP-43): IA-16 recibe la pantalla sin ellos, un patch que los toque se rechaza y la huella que vence una propuesta no los cuenta. Al aplicar una propuesta, al restaurar una versión y al generar el curso de nuevo, cada pantalla conserva sus extras y los ajustes de los elementos que siguen; si cambia la disposición, los ajustes se reinician (RN-06-3) y Revisión lo avisa antes de aplicar (CP-059).
+Los disparadores (HU-0610, CP-069, REQ-045) van en el mismo `PATCH` con `disparadores`: la lista completa de la pantalla, cada uno con `id` (`pNN-disp-N`), `cuando` (`tiempo` con `segundo` de 0 a 600, o `fin-voz`) y `accion` (`mostrar` u `ocultar` con `elementoId`, un bloque o un extra de la pantalla, o `ir-a` con `pantallaId`, otra pantalla del curso). La regla 6 del validador (`erroresDisparadores`) exige como mucho 10 por pantalla, ids que no se repiten y referencias que existen; si falla, la API responde 422 DISPARADOR_NO_VALIDO con `detalles`. Quitar un extra borra los disparadores que lo usan. El reproductor los evalúa con el mismo reloj de la línea de tiempo en la vista previa y en el paquete: `mostrar` gana a `oculto` y a `retardoS`, `ocultar` gana a `finS`, «ir a» pasa por la regla de avance (RN-11-4) y, si está bloqueado, no salta y muestra el motivo; volver a la pantalla los reinicia. La pantalla dura hasta 1 s después del último disparador por tiempo. En el editor solo actúan con ▶ Reproducir y el «ir a» se avisa sin cambiar de pantalla (SUP-111 a SUP-115).
+
+Los retoques (`ajustes`, `extras` y `disparadores`) nunca van a la IA (HU-0604, SUP-43): IA-16 recibe la pantalla sin ellos, un patch que los toque se rechaza y la huella que vence una propuesta no los cuenta. Al aplicar una propuesta, al restaurar una versión y al generar el curso de nuevo, cada pantalla conserva sus extras y los ajustes de los elementos que siguen; si cambia la disposición, los ajustes se reinician (RN-06-3) y Revisión lo avisa antes de aplicar (CP-059).
 
 ### 3.3.1 Narración con boca sincronizada
 
@@ -387,6 +389,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.37 | 2026-11-12 | Corrección de la alineación con IA (punto 7 de 3.4): IA-17 v2, propuesta del curso entero, vencimiento por versión, permisos y pantallas por revisar; SUP-96 a SUP-99. |
 | 0.38 | 2026-11-12 | Patrones de navegación (3.3, punto 3): 7 marcos sobre el mismo núcleo, estaciones del mapa, API de navegación con versión, permisos y preferido del cliente en el kit; SUP-100 a SUP-104. |
 | 0.39 | 2026-11-12 | Patrón con IA (3.3, punto 3): IA-14 v2 en modos recomendar y crear, validación extra, propuesta del curso que solo cambia el patrón, 5 opciones del personalizado sobre su base; SUP-105 a SUP-110. |
+| 0.40 | 2026-11-12 | Disparadores (3.3.0.1): campo `disparadores` en la pantalla, regla 6 del validador, 422 DISPARADOR_NO_VALIDO, purga al quitar un extra, precedencia y reloj del reproductor, «ir a» con la regla de avance; SUP-111 a SUP-115. |
 | 0.15 | 2026-11-10 | Retoques del elemento en `ajustes` (PATCH de pantalla, reproductor) y SUP-41. |
 | 0.14 | 2026-11-10 | Editor (PNT-21): edición en el lugar con el PATCH de pantalla y SUP-40. |
 | 0.13 | 2026-11-10 | Propuestas de la IA (IA-16 v2, aplicar, vencer y deshacer) y SUP-39. |
