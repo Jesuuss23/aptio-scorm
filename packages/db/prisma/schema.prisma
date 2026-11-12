@@ -426,8 +426,12 @@ model Observacion {
   tipo       TipoObservacion
   severidad  String // info | aviso | bloquea-entrega
   mensaje    String
-  origen     String // regla | ia | usuario
+  origen     String // regla | ia | usuario | tiempo
   resuelta   Boolean         @default(false)
+  // HU-0505 · Categoría que muestra Revisión (ortografia, longitud, accesibilidad…), sugerencia de IA-12 y ruta del texto.
+  categoria  String?
+  sugerencia String?
+  ruta       String?
   creadoEn   DateTime        @default(now())
 
   curso Curso @relation(fields: [cursoId], references: [id], onDelete: Cascade)

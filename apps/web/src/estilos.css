@@ -1028,6 +1028,24 @@ ul.fila-chips {
   align-items: flex-start;
   gap: 4px;
 }
+/* HU-0505 · Control de calidad: chips de gravedad, categoría e IA en una fila, y botones pequeños. */
+.chips-observacion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.control-calidad .fila-titulo {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.control-calidad h3 {
+  margin: 8px 0 0;
+  font-size: var(--texto-sm);
+}
+.boton.chico {
+  padding: 4px 10px;
+  font-size: var(--texto-xs);
+}
 @media (max-width: 1100px) {
   .revision {
     grid-template-columns: minmax(0, 1fr);

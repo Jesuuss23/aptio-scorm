@@ -24,6 +24,8 @@ export interface DatosTrabajo {
   propuesta?: { cursoId: string; tipo: string; texto?: string };
   /** HU-0802 · El curso cuyos textos pendientes se traducen (IA-10); `trabajoId` es entonces el TrabajoIA. */
   traduccion?: { cursoId: string };
+  /** HU-0505 · El curso que revisa el control de calidad (IA-12); `trabajoId` es entonces el TrabajoIA. */
+  calidad?: { cursoId: string };
 }
 
 export type EstadoTrabajo = 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';

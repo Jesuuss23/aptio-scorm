@@ -204,6 +204,8 @@ const ETAPAS_SIMULADAS: Record<string, { detalle: string; costoUsd: number }> = 
   // HU-0702: la boca se calcula en el worker, sin costo (SUP-35).
   BOCA: { detalle: '30 narraciones con boca sincronizada · simulada por letras', costoUsd: 0 },
   SUBTITULOS: { detalle: '30 narraciones con subtítulos sincronizados · WebVTT en español', costoUsd: 0 },
+  // HU-0505: IA-12 en 3 lotes de 10 pantallas sobre LOTO (10-IA-12-calidad.json).
+  CONTROL_CALIDAD: { detalle: '5 observaciones de la IA · 0 de reglas', costoUsd: 0.02 },
 };
 /** Pantallas que la etapa 4 deja listas en cada consulta (y narraciones, la etapa 6). */
 const PANTALLAS_POR_CONSULTA = 10;

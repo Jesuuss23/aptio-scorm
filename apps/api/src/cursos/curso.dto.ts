@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import { ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { CATEGORIAS } from '@aptio/schema/calidad';
 
 const recortar = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -67,7 +68,21 @@ export class ObservacionDto {
   @ApiProperty({ enum: ['regla', 'ia', 'usuario', 'tiempo'], description: '`tiempo`: «Revisar tiempo» de la línea de tiempo (HU-0608)' }) origen: string;
   @ApiProperty() resuelta: boolean;
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
+  @ApiProperty({ nullable: true, type: String, enum: [...CATEGORIAS], description: 'HU-0505 · Categoría que muestra Revisión' }) categoria: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'HU-0505 · Sugerencia de IA-12' }) sugerencia: string | null;
+  @ApiProperty({ nullable: true, type: String, description: 'HU-0505 · JSON Pointer del texto o bloque' }) ruta: string | null;
 }
+
+/** HU-0505 · Descartar (o reabrir) una observación de la IA. */
+export class ObservacionCambioDto {
+  @ApiProperty() @IsBoolean() resuelta: boolean;
+}
+
+type FilaObservacion = { id: string; pantallaId: string | null; tipo: string; severidad: string; mensaje: string; origen: string; resuelta: boolean; creadoEn: Date; categoria: string | null; sugerencia: string | null; ruta: string | null };
+export const aObservacionDto = (o: FilaObservacion): ObservacionDto => ({
+  id: o.id, pantallaId: o.pantallaId, tipo: o.tipo, severidad: o.severidad, mensaje: o.mensaje, origen: o.origen, resuelta: o.resuelta, creadoEn: o.creadoEn.toISOString(),
+  categoria: o.categoria, sugerencia: o.sugerencia, ruta: o.ruta,
+});
 
 export class FiltroNarracionesDto {
   @ApiPropertyOptional({ enum: ['es', 'en'] }) @IsOptional() @IsIn(['es', 'en']) idioma?: 'es' | 'en';

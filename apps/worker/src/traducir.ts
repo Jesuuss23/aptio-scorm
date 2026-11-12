@@ -7,7 +7,7 @@
 // Desborde con el inglés completo en el curso, y una segunda pasada de IA-10 propone la versión corta (`propuesta`).
 import { neutralizar, type ProveedorTexto } from '@aptio/ai';
 import { type EventoTrabajo, publicarEvento } from '@aptio/colas';
-import type { Prisma, PrismaClient } from '@aptio/db';
+import { type Prisma, type PrismaClient, recalcularReglas } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import {
   aplicarTraducciones, desborda, erroresLimite, erroresLote, type EstadoTraduccion, huellaTexto, LOTE_TRADUCCION, sincronizarFilas, TAREA_TRADUCIR, type TextoCurso,
@@ -169,6 +169,8 @@ async function guardarLote(bd: PrismaClient, cursoId: string, lote: readonly Tex
       const rutasLargas = largos.map((t) => t.ruta);
       await tx.traduccion.updateMany({ where: { cursoId, idioma: IDIOMA, ruta: { in: Object.keys(cambios).filter((r) => !rutasLargas.includes(r)) } }, data: { estado: 'TRADUCIDA_IA', propuesta: null } });
       if (largos.length) await tx.traduccion.updateMany({ where: { cursoId, idioma: IDIOMA, ruta: { in: rutasLargas } }, data: { estado: 'DESBORDE', propuesta: null } });
+      // HU-0505 · Las reglas leen el inglés nuevo y los Desbordes.
+      await recalcularReglas(tx, cursoId, doc);
       return { traducidos: Object.keys(cambios).length, largos };
     });
     if (r !== null) return r;

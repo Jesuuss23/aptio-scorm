@@ -256,6 +256,10 @@ export interface Observacion {
   origen: string;
   resuelta: boolean;
   creadoEn: string;
+  /** HU-0505 · Categoría (ortografia, longitud, accesibilidad…), sugerencia de IA-12 y ruta del texto. */
+  categoria?: string | null;
+  sugerencia?: string | null;
+  ruta?: string | null;
 }
 
 /** HU-0701 · Narración de una pantalla: ACTUALIZADA se muestra como «Lista». */
@@ -437,6 +441,9 @@ export const api = {
   regenerarNarraciones: (cursoId: string, datos: { pantallaIds?: string[]; soloDesactualizadas?: boolean; idiomas?: ('es' | 'en')[] } = {}) =>
     pedir<Regeneracion>(`/cursos/${cursoId}/narraciones/regenerar`, json(datos)),
   observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
+  /** HU-0505 · «✦ Revisar con IA» (IA-12) y descartar una observación de la IA. */
+  controlCalidad: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/control-calidad`, { method: 'POST' }),
+  descartarObservacion: (id: string) => pedir<Observacion>(`/observaciones/${id}`, json({ resuelta: true }, 'PATCH')),
   editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string; extras?: ElementoExtra[]; motivo?: 'deshacer' | 'rehacer' }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
   aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),

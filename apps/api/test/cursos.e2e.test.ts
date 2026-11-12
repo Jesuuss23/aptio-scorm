@@ -132,7 +132,12 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(p06.narracion!.texto.es).toBe('Hay seis tipos de energía.');
     expect(p06.narracion!.porIdioma.es.hashTexto).not.toBe(antes.narracion!.porIdioma.es.hashTexto);
     const obs = (await como('grafico').get(`/cursos/${cursoId}/observaciones?pantallaId=p06`)).body;
-    expect(obs).toMatchObject([{ origen: 'regla', tipo: 'CALIDAD', severidad: 'aviso' }]);
+    // HU-0505: además de las palabras, el cuerpo no cabe en su componente (160 caracteres).
+    expect(obs).toHaveLength(2);
+    expect(obs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ origen: 'regla', tipo: 'CALIDAD', severidad: 'aviso', categoria: 'longitud', ruta: null }),
+      expect.objectContaining({ origen: 'regla', tipo: 'CALIDAD', severidad: 'aviso', categoria: 'longitud', ruta: '/modulos/0/capsulas/0/pantallas/5/bloques/1/contenido' }),
+    ]));
     const lote = await como('instruccional').post(`/cursos/${cursoId}/pantallas/aprobar`, { soloSinObservaciones: true });
     expect(lote.body.aprobadas).toEqual(['p04']);
     expect(lote.body.pendientes).toEqual(['p06', 'p12', 'p20']);

@@ -4,20 +4,19 @@
 // HU-0503 · Corregir la narración regenera su voz, boca y subtítulos en español; los chips muestran el avance.
 // HU-0504 · «Ajustar con IA» pide una propuesta (IA-16) que se aplica, se descarta o se deshace (RN-05-3, RN-05-4).
 // HU-0601 · «✎ Editar pantalla» abre el editor en esa pantalla.
+// HU-0505 · «Control de calidad» (ControlCalidad): reglas e IA-12, con «Revisar con IA», «Descartar» y «Del curso».
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, montar } from '@aptio/player';
 import { cursoConPropuesta } from '@aptio/schema/propuesta';
 import { type CursoDoc, origenDe, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ORIGEN_REVISAR_TIEMPO } from '@aptio/schema/tiempos';
 import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Propuesta, type Proyecto, type Rol, type TextoI18n } from '../api';
 import { navegar } from '../ruta';
 import './fuentes-kit';
 import { AjustarConIA, FranjaPropuesta, type TipoPedido } from './propuestas';
+import { ControlCalidad } from './ControlCalidad';
 
 type Filtro = 'todas' | 'revisar' | 'actividades';
-const NOMBRE_SEVERIDAD = { info: 'Información', aviso: 'Aviso', 'bloquea-entrega': 'Bloquea la entrega' } as const;
-const CLASE_SEVERIDAD = { info: '', aviso: 'aviso', 'bloquea-entrega': 'error' } as const;
 const NOMBRE_ESTADO: Record<string, string> = { borrador: 'Borrador', 'propuesta-ia': 'Propuesta de la IA', aprobado: 'Aprobada' };
 
 const ChipEstado = ({ estado }: { estado: string }) => (
@@ -349,20 +348,7 @@ export function RevisionVista({ proyectoId, rol, alCargar }: { proyectoId: strin
 
         <aside className="revision-lateral">
           {editan ? <AjustarConIA ocupado={ocupado} calculando={pedido !== null} alPedir={(tipo, texto) => void pedirIA(tipo, texto)} /> : null}
-          <section className="tarjeta kit-bloque" aria-label="Control de calidad">
-            <h2>Control de calidad</h2>
-            {obsActual.length ? (
-              <ul className="revision-observaciones">
-                {obsActual.map((o) => (
-                  <li key={o.id}>
-                    <span className={`chip ${CLASE_SEVERIDAD[o.severidad]}`}>{NOMBRE_SEVERIDAD[o.severidad]}</span>
-                    {o.origen === ORIGEN_REVISAR_TIEMPO ? <span className="chip lt-revisar">⚠ revisar tiempo</span> : null}
-                    <span>{o.mensaje}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="sec">Sin observaciones abiertas.</p>}
-          </section>
+          <ControlCalidad cursoId={curso.id} pantallaId={actual.id} observaciones={observaciones} editan={editan} alCambiar={recargar} />
           <section className="tarjeta kit-bloque" aria-label="Origen">
             <h2>Origen</h2>
             <p>
