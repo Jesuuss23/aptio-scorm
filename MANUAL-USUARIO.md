@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.34 · actualizado con la cuarta entrega del Sprint 7 (12 de noviembre de 2026)**
+**Versión 0.35 · actualizado con la quinta entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -220,7 +220,9 @@ Solo puede haber una generación en curso por proyecto. Si otra persona ya la la
 
 | 8 | **Subtítulos** | Los subtítulos de cada narración, frase por frase y sincronizados con el audio. Muestran el texto tal como está escrito, aunque la voz lo pronuncie distinto (por ejemplo, «LOTO» y no «lo-to»). Los ves con el botón **CC** de la vista previa. | — |
 
-La etapa 5 (ilustraciones) y las etapas 9 a 11 (versión en inglés, control de calidad y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
+| 10 | **Control de calidad** | La revisión de la IA de toda la cápsula, de 10 en 10 pantallas, que se suma a las observaciones automáticas. Al terminar, cuántas observaciones dejó la IA y cuántas las reglas. | **Revisión** (8.16) |
+
+La etapa 5 (ilustraciones) y las etapas 9 y 11 (versión en inglés y paquete) quedan **«En espera»** con el aviso «Se habilita en un sprint siguiente». Que las ilustraciones estén en espera no frena la voz: la generación sigue con las etapas que ya están disponibles.
 
 ### 8.3 Cómo revisar cada resultado
 
@@ -306,7 +308,7 @@ En unos segundos aparece una franja naranja sobre la pantalla con lo que propone
 Si la pantalla cambió después de pedir la propuesta (por ejemplo, alguien corrigió el título), la franja lo avisa y ofrece **Recalcular propuesta** para pedirla de nuevo sobre lo último. Lo que cambia la IA queda marcado como propuesto por la IA hasta que lo revises. La IA no cambia la narración: esa se corrige a mano en **Textos**. Lo usan los mismos que corrigen textos; el revisor del cliente no lo ve.
 
 **Control de calidad, origen y aprobación (derecha).**
-- **Control de calidad:** las observaciones de la pantalla. Unas son avisos (por ejemplo, demasiadas palabras en pantalla o una narración muy larga). Otras **bloquean la entrega**, como una imagen sin descripción para personas con discapacidad visual. La aplicación revisa esto sola cada vez que se guarda un cambio.
+- **Control de calidad:** las observaciones de la pantalla. Unas son avisos (por ejemplo, demasiadas palabras en pantalla o una narración muy larga). Otras **bloquean la entrega**, como una imagen sin descripción para personas con discapacidad visual. La aplicación revisa esto sola cada vez que se guarda un cambio, y la IA puede sumar las suyas (ver 8.16).
 - **Origen:** de dónde sale el contenido. Puede venir del material del cliente, con su página (por ejemplo, «Manual p. 12»), puede haberlo redactado la IA a partir del objetivo, o puede haberlo escrito el equipo.
 - **Aprobar pantalla:** la marca como aprobada. No se puede aprobar mientras tenga una observación que bloquea la entrega.
 
@@ -463,6 +465,23 @@ Funciona con **SCORM 1.2** y con **HTML autocontenido**, y en el historial la ex
 
 En el paquete ES + EN, al cambiar a inglés, cada pantalla con voz en inglés suena en inglés, con la boca y los subtítulos (**CC**) en inglés. Las que aún no tienen voz en inglés muestran la narración como texto, y **Entrega** avisa «Sin voz en inglés en N pantallas».
 
+### 8.16 Control de calidad con IA
+
+En **Revisión**, la tarjeta **Control de calidad** junta dos tipos de observaciones:
+
+- **Las automáticas (reglas).** La aplicación las calcula sola al guardar: demasiado texto, un texto que no cabe en su espacio (en español o en inglés), una imagen sin descripción (en español bloquea la entrega; en inglés avisa), una narración con voz sin subtítulos, una actividad sin objetivo o sin retroalimentación, y un objetivo sin actividad. Desaparecen cuando corriges el curso, por eso no se descartan.
+- **Las de la IA.** Llevan el chip **IA**. Revisan ortografía, coherencia, tono, exactitud frente al material del cliente, faltantes y accesibilidad, y muchas traen una **Sugerencia** de cómo resolverlas. Nunca bloquean la aprobación: decides tú.
+
+Cada observación muestra su gravedad (**Bloquea la entrega**, **Aviso** o **Información**) y su categoría (por ejemplo, **Accesibilidad** o **Exactitud**).
+
+**✦ Revisar con IA.** Pide a la IA que revise toda la cápsula. Una barra muestra el avance por lotes («Lote 1 de 3 revisado») y, al terminar, el aviso **Revisión terminada** con cuántas dejó la IA y cuántas las reglas. Cada revisión nueva reemplaza las observaciones de la IA que seguían abiertas. La generación también la hace sola en su etapa 10. Si ya hay una revisión en curso en el proyecto, espera a que termine.
+
+**Descartar.** Si una observación de la IA no aplica, pulsa **Descartar**: desaparece y no vuelve a aparecer en la próxima revisión (si la IA la dice con otras palabras, sí puede volver). El filtro **Revisar** de la lista se actualiza.
+
+**Del curso.** Debajo de las de la pantalla, la sección **Del curso** reúne lo que no es de una pantalla en particular: un objetivo que ninguna actividad practica o un kit de marca con poco contraste (el reproductor ya oscurece el color cuando lo usa como texto, pero conviene revisar la paleta).
+
+La IA deja como mucho 120 observaciones por revisión. Si llega a ese tope, la tarjeta lo avisa: resuelve o descarta esas y vuelve a pedir la revisión. Piden la revisión y descartan Administración, Diseño instruccional, Diseño gráfico y Producción; el revisor del cliente ve las observaciones, sin los botones.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -535,6 +554,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.32 | 2026-11-12 | Desbordes en Idiomas: contador de caracteres, chip «Desborde» y «Usar versión corta» (8.14). |
 | 0.33 | 2026-11-12 | Español e inglés en el mismo paquete: opción «Idioma» en Entrega y botón EN / ES en la cápsula y en la vista previa (8.15). |
 | 0.34 | 2026-11-12 | Voz en inglés: bloque «Voz en inglés» en Idiomas con «Generar voz en inglés» y la cápsula que suena en inglés (8.15). |
+| 0.35 | 2026-11-12 | Control de calidad: observaciones de reglas y de la IA, «✦ Revisar con IA», «Descartar» y «Del curso» (8.16); la etapa 10 ya corre (8.2). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

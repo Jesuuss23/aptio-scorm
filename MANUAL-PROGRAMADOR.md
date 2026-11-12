@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.34 · actualizado con la cuarta entrega del Sprint 7 (12 de noviembre de 2026)**
+**Versión 0.35 · actualizado con la quinta entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -158,6 +158,8 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
   - Aplica `cambiar` sobre una copia del documento y la valida con `erroresCurso`. Si no valida, responde 422 y nada se guarda.
   - En una transacción, actualiza solo si la versión no cambió, crea un `CursoVersion` con el motivo y recalcula las observaciones por reglas.
 - Las observaciones por reglas (`observacionesRegla`) y el origen de una pantalla (`origenDe`) viven en `@aptio/schema/revision`. Las usan el worker (al terminar la etapa 4), la API (en cada guardado) y la web. Las observaciones `origen: regla` se borran y se vuelven a crear; las de la IA y las de personas no se tocan.
+- Control de calidad (HU-0505): las reglas viven en `@aptio/schema/calidad` (`observacionesRegla(doc, { paleta, desbordesEn })`, `LIMITES`, `TOPE_OBSERVACIONES_IA`, `severidadDeGravedad`, `tipoDeCategoria`); `@aptio/schema/revision` las reexporta. Para guardarlas usa siempre `recalcularReglas(bd, cursoId, documento)` de `@aptio/db` (dentro de la transacción cuando la hay): lee el kit y los desbordes por ti. Una regla nueva se agrega en `calidad.ts` con su prueba en `packages/schema/test/calidad.test.ts`, y LOTO debe seguir sin observaciones.
+- IA-12: `apps/worker/src/calidad.ts` tiene `revisarCurso(bd, cursoId, llamar, alLote)`, que comparten la etapa 10 (`controlCalidad`) y el trabajo de la cola `ia` (`crearRevisorCalidad`, `data.calidad.cursoId`). La API está en `apps/api/src/cursos/calidad.service.ts` y `calidad.controller.ts`; la tarjeta web, en `apps/web/src/vistas/ControlCalidad.tsx`. Las pruebas: `apps/worker/test/calidad.test.ts`, `apps/api/test/calidad.e2e.test.ts` y `apps/web/e2e/calidad.spec.ts` (con axe).
 - RN-05-1: aprobar exige que no haya una observación abierta `bloquea-entrega`. RN-05-2: editar deja la pantalla en `borrador`. Lo que escribe una persona cambia `origen.tipo` a `manual` y conserva el documento y la página.
 - Al cambiar la narración se recalcula `hashTexto` (sha256 de texto, voz y velocidad) y el audio `generado` pasa a `desactualizado`. Así la regeneración en cascada (S5) sabe qué rehacer.
 
@@ -383,6 +385,7 @@ Ninguna clave real va al repositorio.
 | 0.32 | 2026-11-12 | HU-0803: `LIMITE_CARACTERES`, `componenteDe`, `limiteDe`, `desborda`, `erroresLimite`; `Traduccion.propuesta`; versión corta en el worker; contador y «Usar versión corta» en Idiomas. |
 | 0.33 | 2026-11-12 | HU-0804 parte 1: `montar` y `montarUno`, botón `.ap-idioma`, `cambiarIdioma` en la conexión SCORM, `bilingue.ts` en el exportador, `traducirLoto` y `cursoTraducido` en las pruebas. |
 | 0.34 | 2026-11-12 | HU-0804 parte 2: `idiomaDe` en las etapas 6 a 8, `VOZ_INGLES_PREDETERMINADA`, `VozIngles.tsx`, `sinIngles` y `recursosExtra` en las pruebas. |
+| 0.35 | 2026-11-12 | HU-0505: `@aptio/schema/calidad`, `recalcularReglas`, `revisarCurso` y `crearRevisorCalidad`, `CalidadService`, `ControlCalidad.tsx` y sus pruebas. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |
