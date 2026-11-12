@@ -1,5 +1,7 @@
 // HU-1201 · CP-090 · Validar antes de exportar: errores de esquema, peso estimado contra el límite del destino (nunca
 // bloquea, advierte con alternativas), recursos más pesados, peor caso de suspend_data y pantallas sin aprobar.
+import { aplicarNiveles } from '@aptio/schema/alineacion';
+import type { CursoDoc } from '@aptio/schema/revision';
 import { describe, expect, it } from 'vitest';
 import { codigoReproductor } from '../src/reproductor.ts';
 import { construirScorm12 } from '../src/scorm12.ts';
@@ -61,7 +63,19 @@ describe('validar SCORM 1.2 (HU-1201)', () => {
     for (const m of curso.modulos) for (const c of m.capsulas) for (const p of c.pantallas) (p as { estado?: string }).estado = 'aprobado';
     const v = validarScorm12(curso, pesosLoto(), 0, 100);
     expect(v.pantallasSinAprobar).toBe(0);
-    expect(v.advertencias).toEqual([]);
+    // HU-1001: LOTO tiene 2 objetivos con alertas de alineación (advierten, no bloquean).
+    expect(v.advertencias).toEqual(['2 objetivos sin alinear: revísalos en Alineación pedagógica.']);
+  });
+
+  it('HU-1001 · los objetivos sin alinear advierten sin ser error y desaparecen al alinearlos', () => {
+    const curso = cursoLoto();
+    const v = validarScorm12(curso, pesosLoto(), 0, 100);
+    expect(v).toMatchObject({ objetivosSinAlinear: 2, errores: [] });
+    expect(v.advertencias).toContain('2 objetivos sin alinear: revísalos en Alineación pedagógica.');
+    aplicarNiveles(curso as unknown as CursoDoc, [{ objetivoId: 'obj-2', nivelBloom: 'recordar' }, { pantallaId: 'p28', preguntaId: 'bq-06', nivelBloom: 'aplicar' }]);
+    const alineado = validarScorm12(curso, pesosLoto(), 0, 100);
+    expect(alineado.objetivosSinAlinear).toBe(0);
+    expect(alineado.advertencias.some((a) => a.includes('sin alinear'))).toBe(false);
   });
 
   it('el peor caso de suspend_data de LOTO cabe en 4096; uno enorme advierte sin ser error', () => {

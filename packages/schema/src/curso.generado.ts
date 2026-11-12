@@ -213,6 +213,10 @@ export interface Pantalla {
   tipo: 'portada' | 'contenido' | 'interactiva' | 'evaluacion' | 'video' | 'cierre';
   objetivoIds?: Id[];
   /**
+   * Nivel de Bloom de la pantalla para la alineación (HU-1001). Si falta, se toma el de su disposición.
+   */
+  nivelBloom?: 'recordar' | 'comprender' | 'aplicar' | 'analizar' | 'evaluar' | 'crear';
+  /**
    * id de plantilla de pantalla del estilo del kit
    */
   plantilla: string;
@@ -403,6 +407,10 @@ export interface Visual {
 export interface PreguntaQuiz {
   id: Id;
   objetivoId?: Id;
+  /**
+   * Nivel de Bloom de la pregunta para la alineación (HU-1001). Si falta, se toma el de la pantalla.
+   */
+  nivelBloom?: 'recordar' | 'comprender' | 'aplicar' | 'analizar' | 'evaluar' | 'crear';
   enunciado: TextoI18N;
   seleccionMultiple?: boolean;
   /**

@@ -666,6 +666,17 @@
         "objetivoId": {
           "$ref": "#/$defs/id"
         },
+        "nivelBloom": {
+          "description": "Nivel de Bloom de la pregunta para la alineación (HU-1001). Si falta, se toma el de la pantalla.",
+          "enum": [
+            "recordar",
+            "comprender",
+            "aplicar",
+            "analizar",
+            "evaluar",
+            "crear"
+          ]
+        },
         "enunciado": {
           "$ref": "#/$defs/textoI18n"
         },
@@ -1629,6 +1640,17 @@
           "items": {
             "$ref": "#/$defs/id"
           }
+        },
+        "nivelBloom": {
+          "description": "Nivel de Bloom de la pantalla para la alineación (HU-1001). Si falta, se toma el de su disposición.",
+          "enum": [
+            "recordar",
+            "comprender",
+            "aplicar",
+            "analizar",
+            "evaluar",
+            "crear"
+          ]
         },
         "plantilla": {
           "type": "string",

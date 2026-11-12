@@ -10,7 +10,7 @@ export const MENU: GrupoMenu[] = [
 ];
 
 /** Vista a partir de la ruta: grupo de la ruta, nombre, ítem activo del menú y parámetro. */
-export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' } | null {
+export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' | 'alineacion' } | null {
   if (camino === '/') return { grupo: 'Inicio', nombre: 'Proyectos', activo: '/' };
   if (camino === '/nuevo') return { grupo: 'Inicio', nombre: 'Nuevo SCORM', activo: '/nuevo' };
   const proyecto = camino.match(/^\/proyectos\/([0-9a-f-]{36})$/i);
@@ -25,6 +25,8 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (entrega) return { grupo: 'Inicio', nombre: 'Entrega', activo: '/', id: entrega[1]!, sub: 'entrega' };
   const idiomas = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/idiomas$/i);
   if (idiomas) return { grupo: 'Inicio', nombre: 'Idiomas', activo: '/', id: idiomas[1]!, sub: 'idiomas' };
+  const alineacion = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/alineacion$/i);
+  if (alineacion) return { grupo: 'Inicio', nombre: 'Alineación pedagógica', activo: '/', id: alineacion[1]!, sub: 'alineacion' };
   if (camino === '/clientes') return { grupo: 'Empresa', nombre: 'Clientes y kits', activo: '/clientes' };
   const cliente = camino.match(/^\/clientes\/([0-9a-f-]{36})$/i);
   if (cliente) return { grupo: 'Empresa', nombre: 'Cliente', activo: '/clientes', id: cliente[1]! };

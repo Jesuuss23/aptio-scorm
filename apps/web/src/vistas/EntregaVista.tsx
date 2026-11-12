@@ -164,6 +164,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const avisosIngles = v?.advertencias.filter(esAvisoIngles) ?? [];
   const bilingue = v?.modoIdioma === 'mismo-paquete' && v.textosIngles;
   const otrasAdvertencias = v?.advertencias.filter((a) => /^Falta/.test(a)) ?? [];
+  const sinAlinear = v?.objetivosSinAlinear ?? 0;
   const irARevision = (
     <a href={`/proyectos/${proyectoId}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/revision`); }}>Ir a revisión</a>
   );
@@ -238,6 +239,9 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
                     <Comprobacion ok={!otrasAdvertencias.length}>{otrasAdvertencias[0] ?? 'Están todos los archivos del idioma exportado'}</Comprobacion>
                     <Comprobacion ok={!sinAprobar}>
                       {sinAprobar ? <>{sinAprobar} de {total} pantallas sin aprobar. Puedes exportar igual; revísalas antes de entregar al cliente. {irARevision}</> : 'Todas las pantallas están aprobadas'}
+                    </Comprobacion>
+                    <Comprobacion ok={!sinAlinear}>
+                      {sinAlinear ? <>{sinAlinear} {sinAlinear === 1 ? 'objetivo sin alinear' : 'objetivos sin alinear'}. Puedes exportar igual; revísalos antes de entregar al cliente. <a href={`/proyectos/${proyectoId}/alineacion`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/alineacion`); }}>Ir a Alineación</a></> : 'Todos los objetivos se presentan, se practican y se evalúan a su nivel'}
                     </Comprobacion>
                   </ul>
                   {v.superaLimite ? (

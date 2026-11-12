@@ -88,5 +88,6 @@ export class ValidacionDto {
   @ApiProperty({ type: [String] }) recursosFaltantes: string[];
   @ApiProperty({ enum: ['unico', 'mismo-paquete'], description: 'HU-0804 · Idiomas del paquete validado' }) modoIdioma: 'unico' | 'mismo-paquete';
   @ApiProperty({ type: TextosInglesDto, nullable: true, description: 'HU-0804 · En el paquete bilingüe, cuántos textos tienen su inglés; null con un solo idioma' }) textosIngles: TextosInglesDto | null;
+  @ApiProperty({ description: 'HU-1001 · Objetivos con alertas de alineación; advierte, no bloquea' }) objetivosSinAlinear: number;
   @ApiProperty({ type: CreditosDto, nullable: true, description: 'HU-1406 · Créditos de IA tal como saldrán en el paquete; null si ningún recurso es de IA' }) creditos: CreditosDto | null;
 }
