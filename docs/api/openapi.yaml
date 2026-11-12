@@ -916,6 +916,7 @@ paths:
       - Clientes y kits
       summary: Ver fichas de compatibilidad LMS
       operationId: get_clientes_clienteId_fichas_lms
+      description: HU-1204. De la más nueva a la más vieja. Las ve el equipo; el revisor del cliente recibe 403. 404 si el cliente no es de la organización.
       parameters:
       - name: clienteId
         in: path
@@ -943,7 +944,7 @@ paths:
       - Clientes y kits
       summary: Registrar ficha de compatibilidad
       operationId: post_clientes_clienteId_fichas_lms
-      description: Puede incluir el JSON del modo diagnóstico
+      description: HU-1204 (CP-094). Puede incluir el informe que copia el modo diagnóstico del paquete, tal cual (un objeto JSON de menos de 256 KB; se guarda como dato, nunca se ejecuta). Registran administración, diseño instruccional y producción; el resto recibe 403. 422 si falta lmsNombre, sobra un campo o resultadoDiagnostico no es un objeto (DIAGNOSTICO_NO_VALIDO si es un arreglo o pasa de 256 KB).
       parameters:
       - name: clienteId
         in: path
@@ -956,10 +957,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/FichaCompatibilidad'
+              $ref: '#/components/schemas/FichaCompatibilidadEntrada'
       responses:
         '201':
-          description: OK
+          description: Ficha creada
           content:
             application/json:
               schema:
@@ -3656,23 +3657,63 @@ components:
     FichaCompatibilidad:
       type: object
       required:
+      - id
       - lmsNombre
+      - lmsVersion
+      - limiteSubidaMb
+      - notas
+      - resultadoDiagnostico
+      - actualizadoEn
       properties:
         id:
           type: string
           format: uuid
         lmsNombre:
           type: string
+          example: Moodle
         lmsVersion:
           type: string
+          nullable: true
+          example: '4.5'
         limiteSubidaMb:
           type: integer
           nullable: true
+          description: Límite de subida del LMS; el de la ficha más nueva lo usa la validación antes de exportar (HU-1201)
         notas:
           type: string
+          nullable: true
+        resultadoDiagnostico:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Informe del modo diagnóstico del paquete (aptio = diagnostico-scorm12), sin datos del participante
+        actualizadoEn:
+          type: string
+          format: date-time
+    FichaCompatibilidadEntrada:
+      type: object
+      additionalProperties: false
+      required:
+      - lmsNombre
+      properties:
+        lmsNombre:
+          type: string
+          minLength: 2
+          maxLength: 80
+        lmsVersion:
+          type: string
+          maxLength: 40
+        limiteSubidaMb:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        notas:
+          type: string
+          maxLength: 2000
         resultadoDiagnostico:
           type: object
           additionalProperties: true
+          description: El JSON que copia «Copiar informe» en el modo diagnóstico (menos de 256 KB)
     DatosTecnicos:
       type: object
       properties:
@@ -5477,6 +5518,7 @@ components:
         incluirDiagnostico:
           type: boolean
           default: true
+          description: HU-1204. Modo diagnóstico en el paquete (Ctrl+Alt+Shift+D o ?diagnostico=1, nunca se abre solo); con false no responde a ninguno
         incluirInforme:
           type: boolean
           default: true

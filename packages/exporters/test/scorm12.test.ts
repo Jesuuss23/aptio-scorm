@@ -85,6 +85,13 @@ describe('paquete SCORM 1.2 del caso LOTO (CP-091)', () => {
     expect(paquete.archivos.filter((a) => a.startsWith('recursos/'))).toHaveLength(67);
   });
 
+  it('HU-1204 · lleva el modo diagnóstico por defecto; con incluirDiagnostico: false se desactiva en los datos', async () => {
+    expect(await texto('datos.js')).not.toContain('"diagnostico":false');
+    expect(reproductor).toContain('diagnostico-scorm12');
+    const sin = await JSZip.loadAsync((await construirScorm12({ curso: cursoLoto(), recursos: recursosLoto(), reproductor, incluirDiagnostico: false })).zip);
+    expect(await sin.file('datos.js')!.async('string')).toContain('"diagnostico":false');
+  });
+
   it('el ZIP es determinista: la misma entrada da los mismos bytes', async () => {
     const otro = await construirScorm12({ curso: cursoLoto(), recursos: recursosLoto(), reproductor });
     expect(Buffer.from(otro.zip).equals(Buffer.from(paquete.zip))).toBe(true);

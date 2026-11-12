@@ -14,7 +14,7 @@ export class ExportacionEntradaDto {
   @IsOptional() @IsIn(PERFILES_LMS) perfilLms?: (typeof PERFILES_LMS)[number];
   @ApiPropertyOptional({ enum: MODOS_IDIOMA, default: 'unico', description: 'Solo unico por ahora (el primer idioma del curso); los demás responden 422 IDIOMA_NO_DISPONIBLE' })
   @IsOptional() @IsIn(MODOS_IDIOMA) modoIdioma?: (typeof MODOS_IDIOMA)[number];
-  @ApiPropertyOptional({ default: true, description: 'Modo diagnóstico en el paquete (HU-1204); todavía no cambia nada' })
+  @ApiPropertyOptional({ default: true, description: 'Modo diagnóstico en el paquete (HU-1204): con false no se abre ni con el atajo ni con ?diagnostico=1' })
   @IsOptional() @IsBoolean() incluirDiagnostico?: boolean;
   @ApiPropertyOptional({ default: true, description: 'Informe para el cliente; todavía no cambia nada' })
   @IsOptional() @IsBoolean() incluirInforme?: boolean;

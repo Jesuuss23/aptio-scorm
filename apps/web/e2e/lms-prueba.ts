@@ -9,7 +9,7 @@ import { cursoLoto, recursosLoto } from '../../../packages/exporters/test/loto.t
 export type Curso = ReturnType<typeof cursoLoto>;
 export type Llamada = [string, ...string[]];
 
-const LMS = 'http://lms.prueba';
+const LMS = 'https://lms.prueba';
 
 /** La API de SCORM 1.2 del LMS de prueba: guarda los valores en memoria y registra cada llamada en `window.registro`. */
 const LMS_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>LMS de prueba</title></head><body>
@@ -31,12 +31,31 @@ const LMS_HTML = `<!doctype html><html lang="es"><head><meta charset="utf-8"><ti
 <iframe id="sco" title="Curso" src="paquete/index.html" style="width:1000px;height:700px;border:0"></iframe>
 </body></html>`;
 
-export async function abrirEnLms(page: Page, curso: Curso) {
-  const { zip } = await construirScorm12({ curso, recursos: recursosLoto({ sinAudio: true }), reproductor: await codigoReproductor() });
+/** HU-1204 · Una página que abre el paquete en un iframe pero no tiene la API de SCORM (como un sitio web cualquiera). */
+const SIN_API_HTML = (consulta: string) => `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Sin LMS</title></head><body>
+<iframe id="sco" title="Curso" src="paquete/index.html${consulta}" style="width:1000px;height:700px;border:0"></iframe>
+</body></html>`;
+
+export interface OpcionesLms {
+  /** HU-1204 · La página que abre el paquete no tiene `window.API`. */
+  sinApi?: boolean;
+  /** HU-1204 · Consulta del iframe, p. ej. `diagnostico=1`. */
+  consulta?: string;
+  /** HU-1204 · Paquete exportado con o sin modo diagnóstico (por defecto, con). */
+  incluirDiagnostico?: boolean;
+}
+
+export async function abrirEnLms(page: Page, curso: Curso, opciones: OpcionesLms = {}) {
+  const { zip } = await construirScorm12({
+    curso, recursos: recursosLoto({ sinAudio: true }), reproductor: await codigoReproductor(),
+    ...(opciones.incluirDiagnostico === undefined ? {} : { incluirDiagnostico: opciones.incluirDiagnostico }),
+  });
+  const consulta = opciones.consulta ? `?${opciones.consulta}` : '';
+  const pagina = opciones.sinApi ? SIN_API_HTML(consulta) : LMS_HTML.replace('src="paquete/index.html"', `src="paquete/index.html${consulta}"`);
   const archivos = await JSZip.loadAsync(zip);
   await page.route(`${LMS}/**`, async (ruta) => {
     const camino = new URL(ruta.request().url()).pathname;
-    if (camino === '/lms.html') return ruta.fulfill({ contentType: 'text/html; charset=utf-8', body: LMS_HTML });
+    if (camino === '/lms.html') return ruta.fulfill({ contentType: 'text/html; charset=utf-8', body: pagina });
     const archivo = archivos.file(camino.replace(/^\/paquete\//, ''));
     if (!archivo) return ruta.fulfill({ status: 404, body: '' });
     const tipo = camino.endsWith('.html') ? 'text/html; charset=utf-8' : camino.endsWith('.js') ? 'text/javascript' : camino.endsWith('.svg') ? 'image/svg+xml' : 'application/octet-stream';

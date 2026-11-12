@@ -2,7 +2,10 @@
 // datos que el exportador deja en `datos.js`: el curso, el kit y las rutas relativas de los recursos. Los SVG del personaje
 // y los WebVTT van como texto dentro de los datos, así el paquete no necesita `fetch` y abre también sin servidor.
 // HU-1105 · Al volver al curso, si el LMS guardó avance válido, el reproductor pregunta si se continúa donde quedó.
+// HU-1204 · Modo diagnóstico: Ctrl+Alt+Shift+D o ?diagnostico=1 abren el panel para el soporte (nunca se abre solo).
+import { informeDiagnostico, type InformeDiagnostico, RegistroDiagnostico } from './diagnostico.ts';
 import { aplanar } from './navegacion.ts';
+import { abrirPanelDiagnostico } from './panel-diagnostico.ts';
 import { montar, type Reproductor } from './reproductor.ts';
 import { decidirReanudacion } from './reanudacion.ts';
 import { buscarApi, type ConexionScorm12, conectarScorm12, type VentanaLms } from './scorm12.ts';
@@ -19,19 +22,29 @@ export interface DatosPaquete {
   svgs?: Record<string, string>;
   /** WebVTT como texto, por id de recurso. */
   subtitulos?: Record<string, string>;
+  /** HU-1204 · false: el paquete se exportó sin modo diagnóstico (no responde al atajo ni a ?diagnostico=1). */
+  diagnostico?: boolean;
 }
 
 export interface Paquete {
   reproductor: Reproductor;
   lms: ConexionScorm12;
+  /** HU-1204 · Abre el panel de diagnóstico (null si el paquete se exportó sin él). */
+  diagnostico: (() => void) | null;
+  /** HU-1204 · El informe de diagnóstico en este momento. */
+  informe: () => InformeDiagnostico;
 }
+
+const esAtajoDiagnostico = (e: KeyboardEvent) => e.ctrlKey && e.altKey && e.shiftKey && (e.code === 'KeyD' || e.key.toLowerCase() === 'd');
 
 export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ventana: Window = window): Paquete {
   const orden = aplanar(datos.curso).map((x) => x.pantalla.id);
   const huella = huellaCurso(datos.curso.id, orden);
-  const lms = conectarScorm12(buscarApi(ventana as unknown as VentanaLms), {
-    orden, idioma: datos.idioma, huella, mejorNota: datos.curso.seguimiento.notaReportada !== 'ultima',
+  const registro = new RegistroDiagnostico();
+  const lms = conectarScorm12(buscarApi(ventana as unknown as VentanaLms, registro), {
+    orden, idioma: datos.idioma, huella, mejorNota: datos.curso.seguimiento.notaReportada !== 'ultima', registro,
   });
+  if (!lms.conectado) console.warn('[Aptio SCORM] No se encontró la API SCORM 1.2: el curso funciona, pero el LMS no recibe avance ni nota. Ctrl+Alt+Shift+D abre el diagnóstico.');
   // HU-1105 · Con avance válido y lejos de la primera pantalla, se pregunta; hasta que se elige no se envía nada al LMS
   // (ni lesson_location ni LMSCommit), para no pisar lo guardado.
   // `navegacion.reanudar` del curso: «no» empieza siempre de cero; «automatica» vuelve sin preguntar.
@@ -53,5 +66,38 @@ export function iniciarPaquete(contenedor: HTMLElement, datos: DatosPaquete, ven
   const cerrar = () => lms.terminar();
   ventana.addEventListener('pagehide', cerrar);
   ventana.addEventListener('beforeunload', cerrar);
-  return { reproductor, lms };
+
+  // ---------- Modo diagnóstico (HU-1204) ----------
+  const titulo = datos.curso.metadatos.titulo;
+  const informe = () => informeDiagnostico(registro, {
+    curso: { id: datos.curso.id, titulo: titulo[datos.idioma] ?? titulo.es ?? titulo.en ?? '', pantallas: orden.length, huella },
+    conectado: lms.conectado, inicial: lms.inicial, userAgent: ventana.navigator?.userAgent ?? '', enIframe: enIframe(ventana),
+  });
+  const sombra = contenedor.shadowRoot;
+  const diagnostico = datos.diagnostico === false || !sombra ? null : () => { abrirPanelDiagnostico({ sombra, registro, informe }); };
+  if (diagnostico) {
+    ventana.addEventListener('keydown', (e) => {
+      if (!esAtajoDiagnostico(e)) return;
+      e.preventDefault();
+      diagnostico();
+    });
+    if (pideDiagnostico(ventana)) diagnostico();
+  }
+  return { reproductor, lms, diagnostico, informe };
+}
+
+function enIframe(ventana: Window): boolean {
+  try {
+    return ventana.self !== ventana.top;
+  } catch {
+    return true;
+  }
+}
+
+function pideDiagnostico(ventana: Window): boolean {
+  try {
+    return new URLSearchParams(ventana.location?.search ?? '').get('diagnostico') === '1';
+  } catch {
+    return false;
+  }
 }

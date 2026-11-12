@@ -1,10 +1,11 @@
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useState } from 'react';
 import { api, type Cliente, EDITAN_CLIENTES, ErrorApi, OPCIONES_LMS, type Rol, VEN_KIT } from '../api';
+import { FichasLms } from './FichasLms';
 import { Glosario } from './Glosario';
 import { KitMarca } from './KitMarca';
 
-/** Datos del cliente, su kit de marca con las pantallas modelo (HU-0202, HU-0204) y su glosario y pronunciación (HU-0205). */
+/** Datos del cliente, su kit de marca con las pantallas modelo (HU-0202, HU-0204), su glosario y pronunciación (HU-0205) y sus fichas de compatibilidad LMS (HU-1204). */
 export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; alCargar: (nombre: string) => void }) {
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [error, setError] = useState('');
@@ -49,7 +50,7 @@ export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; al
   const lmsConocido = !cliente.lmsHabitual || OPCIONES_LMS.includes(cliente.lmsHabitual);
   return (
     <>
-      <Cabecera titulo={cliente.nombre} subtitulo="Datos del cliente, su kit de marca y su glosario." />
+      <Cabecera titulo={cliente.nombre} subtitulo="Datos del cliente, su kit de marca, su glosario y sus fichas de LMS." />
       <div className="columnas">
         <form className="tarjeta formulario" onSubmit={guardar} aria-label="Datos del cliente">
           <h2>Datos</h2>
@@ -93,6 +94,7 @@ export function ClienteDetalle({ id, rol, alCargar }: { id: string; rol: Rol; al
         <KitMarca clienteId={cliente.id} rol={rol} conIngles={cliente.idiomas.includes('en')} alGuardar={() => setCliente({ ...cliente, tieneKit: true })} />
       ) : null}
       {VEN_KIT.includes(rol) ? <Glosario clienteId={cliente.id} rol={rol} conIngles={cliente.idiomas.includes('en')} /> : null}
+      {VEN_KIT.includes(rol) ? <FichasLms clienteId={cliente.id} rol={rol} /> : null}
     </>
   );
 }

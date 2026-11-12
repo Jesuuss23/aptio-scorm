@@ -266,6 +266,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const subidas = new Map<string, { nombre: string; mime: string }>();
   const modelos: Record<string, unknown>[] = [];
   let glosario: { termino: string; traduccion: string | null; noTraducir: boolean }[] = [];
+  // HU-1204 · Fichas de compatibilidad LMS, de la más nueva a la más vieja.
+  const fichas: Record<string, unknown>[] = [];
   let pronunciacion: { idioma: string; escrito: string; pronunciado: string }[] = [];
   const materiales = new Map<string, Record<string, unknown>[]>();
   // El curso del proyecto con pantallas: CP-047 lo muestra tomado del «Manual» del cliente y 3 pantallas tienen observaciones.
@@ -714,6 +716,18 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         proyectos[i] = proyecto(Number(String(actual.id).slice(-3)) - 700, String(actual.clienteId), String(actual.nombre), { ...actual, ...(req.postDataJSON() as object) });
       }
       return responder(200, proyectos[i]);
+    }
+    if (/^\/clientes\/[0-9a-f-]+\/fichas-lms$/.test(ruta)) {
+      if (req.method() === 'POST') {
+        const datos = req.postDataJSON() as { lmsNombre?: string; lmsVersion?: string; limiteSubidaMb?: number; notas?: string; resultadoDiagnostico?: unknown };
+        if (!datos.lmsNombre || (datos.resultadoDiagnostico !== undefined && (typeof datos.resultadoDiagnostico !== 'object' || Array.isArray(datos.resultadoDiagnostico)))) {
+          return responder(422, { codigo: 'VALIDACION', mensaje: 'Revisa los datos de la ficha' });
+        }
+        const ficha = { id: `00000000-0000-4000-8000-${String(900 + fichas.length).padStart(12, '0')}`, lmsNombre: datos.lmsNombre, lmsVersion: datos.lmsVersion ?? null, limiteSubidaMb: datos.limiteSubidaMb ?? null, notas: datos.notas ?? null, resultadoDiagnostico: datos.resultadoDiagnostico ?? null, actualizadoEn: '2026-11-11T15:00:00.000Z' };
+        fichas.unshift(ficha);
+        return responder(201, ficha);
+      }
+      return responder(200, fichas);
     }
     if (/^\/clientes\/[0-9a-f-]+\/glosario$/.test(ruta)) {
       if (req.method() === 'PUT') {
