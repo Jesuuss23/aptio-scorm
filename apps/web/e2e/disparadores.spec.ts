@@ -56,7 +56,7 @@ test('CP-069 · «a los 3 s → mostrar botón»: se guarda solo, se marca en la
     disparadores: [{ id: 'p05-disp-1', cuando: { evento: 'tiempo', segundo: 3 }, accion: { tipo: 'mostrar', elementoId: 'p05-boton' } }],
   });
   await expect(linea(page).locator('[data-disparo="p05-disp-1"]')).toHaveAttribute('title', 'A los 3 s → mostrar «Botón · Ver ejemplo»');
-  expect(await auditar(page, '.disparadores')).toEqual([]);
+  expect(await auditar(page, '.editor-propiedades')).toEqual([]);
 
   // Un segundo fuera de rango no se guarda y lo dice.
   const guardados = ediciones.length;
@@ -64,7 +64,7 @@ test('CP-069 · «a los 3 s → mostrar botón»: se guarda solo, se marca en la
   await expect(d1.getByText('El segundo debe estar entre 0 y 600')).toBeVisible();
   await expect(d1.getByRole('spinbutton', { name: 'Segundo' })).toHaveAttribute('aria-invalid', 'true');
   await expect(propiedades(page).getByText('Corrige el disparador marcado para guardar.')).toBeVisible();
-  expect(await auditar(page, '.disparadores')).toEqual([]);
+  expect(await auditar(page, '.editor-propiedades')).toEqual([]);
   await d1.getByRole('spinbutton', { name: 'Segundo' }).fill('3');
   await expect(propiedades(page).getByText('Corrige el disparador marcado para guardar.')).toHaveCount(0);
   expect(ediciones.length).toBe(guardados);
@@ -103,7 +103,7 @@ test('con ▶ Reproducir el editor aplica el disparador y avisa del «ir a» sin
     { id: 'p05-disp-1', cuando: { evento: 'tiempo', segundo: 1 }, accion: { tipo: 'mostrar', elementoId: 'p05-boton' } },
     { id: 'p05-disp-2', cuando: { evento: 'fin-voz' }, accion: { tipo: 'ir-a', pantallaId: 'p08' } },
   ]);
-  expect(await auditar(page, '.disparadores')).toEqual([]);
+  expect(await auditar(page, '.editor-propiedades')).toEqual([]);
 
   // En el lienzo quieto el botón oculto se ve tenue; con ▶ aparece y, al terminar la voz, se avisa del salto.
   const boton = lienzo(page).locator('[data-bloque="p05-boton"]');

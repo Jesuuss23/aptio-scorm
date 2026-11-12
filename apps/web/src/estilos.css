@@ -1171,6 +1171,10 @@ ul.fila-chips {
   justify-content: space-between;
   gap: 8px;
 }
+/* Cierre del S8 · El chip del diseño hereda el gris de `.campo` y no llega a 4,5:1 sobre su fondo (WCAG 1.4.3). */
+.fila-aviso > .chip {
+  color: var(--color-texto);
+}
 
 /* HU-0601 · Editor (PNT-21), esqueleto: barra superior, lienzo y tira de pantallas. */
 .editor {
