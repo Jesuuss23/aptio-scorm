@@ -1,0 +1,26 @@
+{
+  "recomendado": {
+    "patron": "personalizado",
+    "motivo": "Un tablero de misiones: las 3 partes del curso son estaciones que se desbloquean, el avance se marca con puntos y un marcador flotante suma lo ganado."
+  },
+  "alternativa": {
+    "patron": "hub",
+    "motivo": "Si el equipo prefiere elegir el orden de los temas, el menú de temas mantiene las tarjetas sin la ruta."
+  },
+  "navegacion": {
+    "patron": "personalizado",
+    "patronPersonalizado": {
+      "nombre": "Tablero de misiones de seguridad",
+      "base": "mapa",
+      "progreso": "puntos",
+      "avance": "botones",
+      "menu": "mapa",
+      "marcador": true,
+      "barra": "abajo",
+      "origen": "ia"
+    },
+    "modo": "condiciones",
+    "siguienteSeHabilita": "actividad",
+    "reanudar": "preguntar"
+  }
+}

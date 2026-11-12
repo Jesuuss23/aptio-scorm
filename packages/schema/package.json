@@ -35,6 +35,7 @@
     "./retoques": "./src/retoques.ts",
     "./tiempos": "./src/tiempos.ts",
     "./traduccion": "./src/traduccion.ts",
-    "./alineacion": "./src/alineacion.ts"
+    "./alineacion": "./src/alineacion.ts",
+    "./navegacion": "./src/navegacion.ts"
   }
 }

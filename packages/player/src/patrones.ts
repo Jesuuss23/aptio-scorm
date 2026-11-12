@@ -9,16 +9,67 @@ export type PatronBase = (typeof PATRONES_BASE)[number];
 const esBase = (x: unknown): x is PatronBase => typeof x === 'string' && (PATRONES_BASE as readonly string[]).includes(x);
 
 /**
- * El patrón que se dibuja. Sin `navegacion`, Clásico; el personalizado usa su patrón base (RN-11-3; sus opciones de
- * progreso, avance, menú y barra llegan con la HU-1104); un valor desconocido también cae en Clásico.
+ * El patrón base que se dibuja. Sin `navegacion`, Clásico; el personalizado usa su patrón base (RN-11-3) y un valor
+ * desconocido también cae en Clásico.
  */
 export function patronDe(nav: Navegacion | undefined): PatronBase {
   if (nav?.patron === 'personalizado') return esBase(nav.patronPersonalizado?.base) ? nav.patronPersonalizado!.base as PatronBase : 'clasico';
   return esBase(nav?.patron) ? nav!.patron as PatronBase : 'clasico';
 }
 
+// HU-1104 · El marco de cada patrón se describe con las mismas 5 opciones del patrón personalizado (más si lleva
+// cabecera): el reproductor dibuja el marco desde estas opciones, sin código propio por patrón.
+export const PROGRESOS = ['barra', 'segmentos', 'puntos', 'porcentaje', 'ninguno'] as const;
+export const FORMAS_AVANCE = ['botones', 'deslizar-y-botones', 'desplazar'] as const;
+export const MENUS = ['temario', 'mapa', 'temas', 'ninguno'] as const;
+export const BARRAS = ['arriba', 'abajo', 'flotante', 'ninguna'] as const;
+export type Progreso = (typeof PROGRESOS)[number];
+export type FormaAvance = (typeof FORMAS_AVANCE)[number];
+export type Menu = (typeof MENUS)[number];
+/** Dónde van Anterior y Siguiente: en la cabecera, en el pie, flotantes o como zonas a los lados (ninguna barra). */
+export type BarraNavegacion = (typeof BARRAS)[number];
+
+export interface Marco {
+  base: PatronBase;
+  /** Barra superior con el menú, el progreso y las herramientas; sin ella van en el marcador flotante. */
+  cabecera: boolean;
+  progreso: Progreso;
+  avance: FormaAvance;
+  menu: Menu;
+  /** Marcador flotante de puntos. */
+  marcador: boolean;
+  barra: BarraNavegacion;
+}
+
+const MARCOS: Record<PatronBase, Omit<Marco, 'base'>> = {
+  clasico: { cabecera: true, progreso: 'barra', avance: 'botones', menu: 'temario', marcador: false, barra: 'abajo' },
+  historias: { cabecera: true, progreso: 'segmentos', avance: 'deslizar-y-botones', menu: 'temario', marcador: false, barra: 'ninguna' },
+  vertical: { cabecera: true, progreso: 'barra', avance: 'desplazar', menu: 'temario', marcador: false, barra: 'abajo' },
+  mapa: { cabecera: true, progreso: 'barra', avance: 'botones', menu: 'mapa', marcador: false, barra: 'abajo' },
+  hub: { cabecera: true, progreso: 'barra', avance: 'botones', menu: 'temas', marcador: false, barra: 'abajo' },
+  ramificado: { cabecera: true, progreso: 'barra', avance: 'botones', menu: 'ninguno', marcador: false, barra: 'abajo' },
+  inmersivo: { cabecera: false, progreso: 'porcentaje', avance: 'botones', menu: 'temario', marcador: true, barra: 'flotante' },
+};
+const de = <T extends string>(lista: readonly T[], x: unknown): T | undefined => (typeof x === 'string' && (lista as readonly string[]).includes(x) ? x as T : undefined);
+
+/** El marco del patrón: el de su base y, en el personalizado, sus opciones válidas encima (lo inválido se ignora). */
+export function marcoDe(nav: Navegacion | undefined): Marco {
+  const base = patronDe(nav);
+  const m: Marco = { base, ...MARCOS[base] };
+  if (nav?.patron !== 'personalizado' || !nav.patronPersonalizado) return m;
+  const o = nav.patronPersonalizado;
+  return {
+    ...m,
+    progreso: de(PROGRESOS, o.progreso) ?? m.progreso,
+    avance: de(FORMAS_AVANCE, o.avance) ?? m.avance,
+    menu: de(MENUS, o.menu) ?? m.menu,
+    marcador: typeof o.marcador === 'boolean' ? o.marcador : m.marcador,
+    barra: de(BARRAS, o.barra) ?? m.barra,
+  };
+}
+
 /** Mapa de misiones y menú de temas: se elige una estación (o tema) y se recorre por dentro. */
-export const conMapa = (p: PatronBase) => p === 'mapa' || p === 'hub';
+export const conMapa = (m: Pick<Marco, 'menu'>) => m.menu === 'mapa' || m.menu === 'temas';
 
 /** Una estación del mapa o un tema del menú: pantallas `desde`..`hasta` (índices del recorrido, inclusive). */
 export interface Estacion {

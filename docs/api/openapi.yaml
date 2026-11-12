@@ -1919,6 +1919,10 @@ paths:
         `GET /cursos/{cursoId}/propuestas` cuando termina. Los editores de pantallas piden; el revisor del cliente, no (403).
         HU-1002 · `alineacion` es del curso entero, sin `pantallaId`, y encola IA-17 v2 en la cola ia con las alertas
         vigentes; 422 SIN_ALERTAS si el curso no tiene alertas; solo administración y diseño instruccional (403 al resto).
+        HU-1104 · `patron` también es del curso entero y encola IA-14 v2 con el contexto del curso (duración, público,
+        dispositivo, actividades, gamificación y estaciones del mapa). `modo` es obligatorio (422 MODO_REQUERIDO);
+        `recomendar` elige un patrón del catálogo con una alternativa; `crear` arma un patrón personalizado a partir de
+        `descripcion`, obligatoria en ese modo (422 DESCRIPCION_VACIA). Solo administración y diseño instruccional (403 al resto).
       parameters:
       - name: cursoId
         in: path
@@ -2002,7 +2006,11 @@ paths:
         HU-1002 · Una propuesta `alineacion` vence si el curso cambió de versión desde `versionBase` (409 PROPUESTA_VENCIDA,
         «Recalcular propuesta»); al aplicarla crea una versión con motivo «alineación» y devuelve `pantallasPorRevisar`:
         las pantallas nuevas o cambiadas, que quedan en borrador con sus preguntas y textos marcados como IA sin revisar.
-        Solo administración y diseño instruccional la aplican o la descartan (403 al resto).'
+        Solo administración y diseño instruccional la aplican o la descartan (403 al resto).
+        HU-1104 · Una propuesta `patron` también vence si el curso cambió de versión (409 PROPUESTA_VENCIDA); al aplicarla
+        solo cambian `navegacion.patron` y `navegacion.patronPersonalizado` (se quita si el patrón es del catálogo), las
+        reglas y los elementos visibles quedan (RN-11-1), y se crea una versión con motivo «navegación». Mismos roles que
+        `alineacion` (403 al resto).'
       parameters:
       - name: propuestaId
         in: path
@@ -2040,7 +2048,7 @@ paths:
       summary: Descartar propuesta
       operationId: post_propuestas_propuestaId_descartar
       description: 409 PROPUESTA_RESUELTA si ya se aplicó. HU-1002 · Una propuesta `alineacion` solo la descartan administración
-        y diseño instruccional (403 al resto).
+        y diseño instruccional (403 al resto). HU-1104 · Igual para una propuesta `patron`.
       parameters:
       - name: propuestaId
         in: path
@@ -5166,8 +5174,7 @@ components:
           - otra-ilustracion
           - libre
           - alineacion
-          - patron-recomendar
-          - patron-crear
+          - patron
           - pausas-video
           - kit-extraer
         pantallaId:
@@ -5175,6 +5182,63 @@ components:
         pedido:
           type: string
           maxLength: 500
+        modo:
+          type: string
+          description: HU-1104 · Obligatorio con `tipo` patron
+          enum:
+          - recomendar
+          - crear
+        descripcion:
+          type: string
+          maxLength: 300
+          description: HU-1104 · El patrón que se quiere, en palabras del diseñador; obligatoria con `modo` crear. Se
+            trata como material no confiable dentro del prompt.
+    PatronOpcion:
+      type: object
+      description: HU-1104 · Un patrón propuesto por IA-14 con su motivo.
+      required:
+      - patron
+      - motivo
+      properties:
+        patron:
+          type: string
+          enum:
+          - clasico
+          - historias
+          - vertical
+          - mapa
+          - hub
+          - ramificado
+          - inmersivo
+          - personalizado
+        motivo:
+          type: string
+    PatronPropuesto:
+      type: object
+      description: HU-1104 · Lo que trae una propuesta `patron` (salida de IA-14 v2, ya validada).
+      required:
+      - modo
+      - navegacion
+      - recomendado
+      - alternativa
+      properties:
+        modo:
+          type: string
+          enum:
+          - recomendar
+          - crear
+        navegacion:
+          type: object
+          additionalProperties: true
+          description: La navegación propuesta; al aplicar solo se toman `patron` y `patronPersonalizado` (RN-11-1)
+        recomendado:
+          $ref: '#/components/schemas/PatronOpcion'
+        alternativa:
+          $ref: '#/components/schemas/PatronOpcion'
+        descripcion:
+          type: string
+          nullable: true
+          description: La descripción pedida en modo crear
     CorreccionAlineacion:
       type: object
       description: HU-1002 · Un cambio de la corrección de la alineación (salida de IA-17 v2).
@@ -5248,6 +5312,8 @@ components:
             `cambios` es un JSON Patch con rutas desde la raíz del curso.
           items:
             $ref: '#/components/schemas/CorreccionAlineacion'
+        patron:
+          $ref: '#/components/schemas/PatronPropuesto'
         versionBase:
           type: integer
         estado:

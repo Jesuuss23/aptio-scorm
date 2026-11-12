@@ -304,7 +304,7 @@ export interface CambioResultado {
 /** HU-0504 · Propuesta de la IA sobre una pantalla. `cambios` es el JSON Patch; las variantes van en `vistaPrevia`. */
 export interface Propuesta {
   id: string;
-  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre' | 'alineacion';
+  tipo: 'mas-visual' | 'menos-texto' | 'actividad' | 'variantes' | 'libre' | 'alineacion' | 'patron';
   pantallaId: string | null;
   titulo: string;
   descripcion: string;
@@ -312,6 +312,8 @@ export interface Propuesta {
   vistaPrevia?: { nombre: string; disposicion: string; patch: OperacionPatch[] }[];
   /** HU-1002 · Los cambios de la corrección de la alineación (tipo `alineacion`, del curso entero). */
   correcciones?: CambioCorreccion[];
+  /** HU-1104 · El patrón propuesto por IA-14 (tipo `patron`, del curso entero). */
+  patron?: PatronPropuesto;
   versionBase: number;
   estado: 'PENDIENTE' | 'APLICADA' | 'DESCARTADA' | 'VENCIDA';
   costoUsd: number;
@@ -443,9 +445,30 @@ export type InformeAlineacion = InformeAlineacionBase & { version: number };
 export type PatronNavegacion = 'clasico' | 'historias' | 'vertical' | 'mapa' | 'hub' | 'ramificado' | 'inmersivo' | 'personalizado';
 export type ModoNavegacion = 'libre' | 'condiciones' | 'secuencial';
 export type Reanudar = 'preguntar' | 'automatica' | 'no';
+/** HU-1104 · Patrón personalizado: un patrón base del catálogo con 5 opciones (las aplica el reproductor). */
+export interface PatronPersonalizado {
+  nombre: string;
+  base: Exclude<PatronNavegacion, 'personalizado'>;
+  progreso?: 'barra' | 'segmentos' | 'puntos' | 'porcentaje' | 'ninguno';
+  avance?: 'botones' | 'deslizar-y-botones' | 'desplazar';
+  menu?: 'temario' | 'mapa' | 'temas' | 'ninguno';
+  marcador?: boolean;
+  barra?: 'arriba' | 'abajo' | 'flotante' | 'ninguna';
+  origen?: 'ia' | 'manual';
+}
+export type ModoPatron = 'recomendar' | 'crear';
+/** HU-1104 · Lo que trae una propuesta `patron`: la navegación propuesta, el recomendado y la alternativa con su motivo. */
+export interface PatronPropuesto {
+  modo: ModoPatron;
+  navegacion: { patron: PatronNavegacion; patronPersonalizado?: PatronPersonalizado };
+  recomendado: { patron: PatronNavegacion; motivo: string };
+  alternativa: { patron: PatronNavegacion; motivo: string };
+  descripcion: string | null;
+}
 export interface Navegacion {
   version: number;
   patron: PatronNavegacion;
+  patronPersonalizado?: PatronPersonalizado;
   modo?: ModoNavegacion;
   reanudar?: Reanudar;
   mostrar?: string[];
@@ -496,6 +519,9 @@ export const api = {
     pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json(datos)),
   propuestas: (cursoId: string) => pedir<Propuesta[]>(`/cursos/${cursoId}/propuestas`),
   // HU-1002 · «✦ Proponer correcciones» de la alineación (IA-17, curso entero).
+  /** HU-1104 · «✦ Recomendar» (modo recomendar) o «✦ Crear con IA» (modo crear, con la descripción). */
+  pedirPatron: (cursoId: string, datos: { modo: ModoPatron; descripcion?: string }) =>
+    pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json({ tipo: 'patron', ...datos })),
   pedirCorreccion: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/propuestas`, json({ tipo: 'alineacion' })),
   aplicarPropuesta: (id: string, varianteIndice?: number) => pedir<CambioResultado>(`/propuestas/${id}/aplicar`, json(varianteIndice === undefined ? {} : { varianteIndice })),
   descartarPropuesta: (id: string) => pedir<void>(`/propuestas/${id}/descartar`, { method: 'POST' }),

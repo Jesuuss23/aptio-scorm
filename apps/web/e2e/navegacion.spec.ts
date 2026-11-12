@@ -56,11 +56,11 @@ test('CP-087 · Historias + Secuencial: se guarda como preferido y en la prueba 
   await expect(tarjeta(page, 'Historias')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('radio', { name: /Libre con actividades obligatorias/ })).toBeChecked();
   await expect(page.getByRole('radio', { name: /Al volver: preguntar/ })).toBeChecked();
-  // Glosario, ayuda y accesibilidad llegan después; «✦ Recomendar» y «✦ Crear con IA» van con la HU-1104.
+  // Glosario, ayuda y accesibilidad llegan después; «✦ Recomendar» y «✦ Crear con IA» (HU-1104) son de quien edita.
   for (const x of ['Glosario', 'Ayuda', 'Accesibilidad']) await expect(page.getByRole('checkbox', { name: x })).toBeDisabled();
   await expect(page.getByRole('checkbox', { name: 'Temario' })).toBeEnabled();
   await expect(page.getByText('llega después')).toHaveCount(3);
-  await expect(page.getByRole('button', { name: /Recomendar|Crear con IA/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Recomendar|Crear con IA/ })).toHaveCount(2);
   expect(await auditar(page)).toEqual([]);
 
   // Secuencial y preferido del cliente: se guarda con la versión leída y la tarjeta queda marcada.
@@ -165,6 +165,8 @@ test('diseño gráfico ve la navegación sin poder cambiarla', async ({ page }) 
   await expect(tarjeta(page, 'Mapa de misiones')).toBeDisabled();
   await expect(page.getByRole('radio', { name: /^Secuencial/ })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Guardar navegación' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Recomendar|Crear con IA/ })).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Describe un patrón' })).toHaveCount(0);
   // Probar sí se puede.
   await expect(page.getByRole('link', { name: '▶ Probar este patrón' })).toBeVisible();
   expect(await auditar(page)).toEqual([]);

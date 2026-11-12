@@ -1,4 +1,5 @@
 // HU-1103 · Miniatura decorativa de cada patrón de navegación (PNT-17), como en el prototipo.
+// HU-1104 · Un patrón creado con IA lleva la marca ✦ y, si suma puntos, dibuja el marcador flotante.
 import type { CSSProperties } from 'react';
 import type { PatronBase } from './patrones-navegacion';
 
@@ -21,16 +22,21 @@ const CAJAS: Record<PatronBase, Caja[]> = {
 };
 const RUTAS: Partial<Record<PatronBase, string[]>> = { mapa: ['14,70 38,36 62,68 86,34'], ramificado: ['10,50 38,50 66,24 92,50', '38,50 66,76 92,50'] };
 
+/** El marcador de puntos flotante (HU-1104), arriba a la derecha bajo la cabecera. */
+const MARCADOR = caja(66, 18, 28, 12, { background: 'var(--color-naranja)', borderRadius: 8, border: '2px solid #fff' });
+
 /** Miniatura decorativa del patrón (el nombre va en el texto de la tarjeta). */
-export function Miniatura({ patron }: { patron: PatronBase }) {
+export function Miniatura({ patron, ia = false, marcador = false }: { patron: PatronBase; ia?: boolean; marcador?: boolean }) {
+  const cajas = marcador && patron !== 'inmersivo' ? [...CAJAS[patron], MARCADOR] : CAJAS[patron];
   return (
-    <div className="patron-miniatura" aria-hidden="true" data-patron={patron}>
+    <div className="patron-miniatura" aria-hidden="true" data-patron={patron} data-marcador={marcador || undefined}>
       {RUTAS[patron]?.length ? (
         <svg viewBox="0 0 100 100" preserveAspectRatio="none">
           {RUTAS[patron]!.map((r) => <polyline key={r} points={r} fill="none" stroke="currentColor" strokeWidth="2" strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />)}
         </svg>
       ) : null}
-      {CAJAS[patron].map(([l, t, w, h, estilo], i) => <i key={i} style={{ left: `${l}%`, top: `${t}%`, width: `${w}%`, height: `${h}%`, ...estilo }} />)}
+      {cajas.map(([l, t, w, h, estilo], i) => <i key={i} style={{ left: `${l}%`, top: `${t}%`, width: `${w}%`, height: `${h}%`, ...estilo }} />)}
+      {ia ? <span className="patron-miniatura-ia">✦</span> : null}
     </div>
   );
 }
