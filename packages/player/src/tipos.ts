@@ -94,6 +94,8 @@ export type ModoNavegacion = 'libre' | 'condiciones' | 'secuencial';
 
 export interface Navegacion {
   patron?: string;
+  /** HU-1103 · Del patrón personalizado, por ahora solo cuenta su patrón base (RN-11-3). */
+  patronPersonalizado?: { base?: string; [clave: string]: unknown };
   modo?: ModoNavegacion;
   siguienteSeHabilita?: 'siempre' | 'narracion' | 'actividad';
   mostrar?: string[];

@@ -290,7 +290,8 @@ async function recorrer(page: Page, url: string, pantallas: Pantalla[], opciones
       await page.keyboard.press('ArrowRight');
       conFlecha++;
     } else {
-      await usar(page, '.ap-nav.ap-primario');
+      // Siguiente con cualquier patrón (LOTO usa Historias: la zona derecha «›»).
+      await usar(page, 'button[aria-describedby="ap-motivo"]');
     }
     // Al cambiar de pantalla, el foco va a su título (el lector lo anuncia).
     await expect(page.locator(`#curso [data-pantalla="${pantallas[n + 1]!.id}"]`)).toBeVisible();

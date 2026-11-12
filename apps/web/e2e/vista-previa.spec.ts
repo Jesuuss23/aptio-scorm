@@ -40,15 +40,16 @@ test.beforeEach(async ({ page }) => {
   await simularApi(page, { conSesion: true, conProyectos: true });
 });
 
-test('desde el proyecto se abre la vista previa con el patrón Clásico y el aviso del patrón pedido', async ({ page }) => {
+test('desde el proyecto se abre la vista previa con el patrón que pide el curso (HU-1103: LOTO usa Historias)', async ({ page }) => {
   await page.goto(`/proyectos/${PROYECTO}`);
   await page.getByRole('link', { name: 'Vista previa' }).click();
   await expect(page).toHaveURL(URL_VISTA);
   await expect(page.getByRole('heading', { level: 1, name: 'Vista previa' })).toBeVisible();
-  await expect(page.getByText('Así se verá en el LMS con el patrón «Clásico» y la regla «actividades obligatorias».')).toBeVisible();
-  // LOTO pide «Historias»: por ahora se muestra con Clásico y se dice.
-  await expect(page.getByText(/El curso pide el patrón «Historias»/)).toBeVisible();
+  await expect(page.getByText('Así se verá en el LMS con el patrón «Historias» y la regla «actividades obligatorias».')).toBeVisible();
+  // Ya no hay aviso de «solo Clásico» (SUP-32): el reproductor dibuja el patrón del curso.
+  await expect(page.getByText(/Por ahora la vista previa y el paquete usan el patrón Clásico/)).toHaveCount(0);
   const r = reproductor(page);
+  await expect(r.locator('[data-patron="historias"]')).toBeVisible();
   await expect(r.getByRole('heading', { level: 2, name: 'Bloqueo y etiquetado' })).toBeVisible();
   await enPantalla(page, 1);
   await expect(page.getByLabel('Seguimiento simulado').getByText('Incompleto')).toBeVisible();

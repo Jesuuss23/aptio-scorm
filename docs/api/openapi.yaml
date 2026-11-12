@@ -2634,7 +2634,7 @@ paths:
       - Alineación y navegación
       summary: Guardar patrón y reglas
       operationId: put_cursos_cursoId_navegacion
-      description: patronPreferidoDelCliente = true lo guarda en el kit
+      description: HU-1103. Cambia los campos que vengan (los demás se conservan) y crea una versión del curso con motivo «navegación». patronPreferidoDelCliente = true guarda el patrón en el kit de marca del cliente (422 SIN_KIT si no tiene). Editan ADMINISTRADOR y DISENADOR_INSTRUCCIONAL; DISENADOR_GRAFICO y PRODUCTOR solo leen; REVISOR_CLIENTE no accede.
       parameters:
       - name: cursoId
         in: path
@@ -2647,7 +2647,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Navegacion'
+              $ref: '#/components/schemas/NavegacionCambio'
       responses:
         '200':
           description: OK
@@ -2661,6 +2661,8 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
   /cursos/{cursoId}/vista-previa:
@@ -5740,7 +5742,17 @@ components:
                 $ref: '#/components/schemas/NivelBloom'
     Navegacion:
       type: object
+      description: HU-1103. Patrón y reglas del curso, con la versión leída y el preferido del cliente
+      required:
+      - version
+      - patron
+      - patronPreferido
+      - patronPreferidoDelCliente
+      - hayKit
       properties:
+        version:
+          type: integer
+          description: Versión del curso leída (para el PUT)
         patron:
           type: string
           enum:
@@ -5755,6 +5767,7 @@ components:
         patronPersonalizado:
           type: object
           additionalProperties: true
+          description: Solo con patrón personalizado; lo valida el esquema del curso
         modo:
           type: string
           enum:
@@ -5769,17 +5782,108 @@ components:
           - actividad
         reanudar:
           type: string
+          description: Al volver al curso
           enum:
           - preguntar
           - automatica
           - 'no'
         mostrar:
           type: array
+          uniqueItems: true
           items:
             type: string
+            enum:
+            - temario
+            - progreso
+            - contador
+            - botones
+            - glosario
+            - recursos
+            - ayuda
+            - accesibilidad
+            - puntos
+            - idioma
+        objetivosAlInicio:
+          type: boolean
+        atajosTeclado:
+          type: boolean
         patronPreferidoDelCliente:
           type: boolean
-      description: Igual a `navegacion` del documento del curso.
+          description: El patrón del curso es el preferido del cliente
+        patronPreferido:
+          type: string
+          nullable: true
+          description: Preferido guardado en el kit de marca del cliente
+        hayKit:
+          type: boolean
+          description: El cliente tiene kit de marca
+    NavegacionCambio:
+      type: object
+      description: HU-1103. Solo cambian los campos que vengan
+      required:
+      - version
+      properties:
+        version:
+          type: integer
+          minimum: 1
+          description: Versión leída; si otra persona guardó antes, 409 VERSION_CAMBIO
+        patron:
+          type: string
+          enum:
+          - clasico
+          - historias
+          - vertical
+          - mapa
+          - hub
+          - ramificado
+          - inmersivo
+          - personalizado
+        patronPersonalizado:
+          type: object
+          additionalProperties: true
+          description: Solo con patrón personalizado; lo valida el esquema del curso
+        modo:
+          type: string
+          enum:
+          - libre
+          - condiciones
+          - secuencial
+        siguienteSeHabilita:
+          type: string
+          enum:
+          - siempre
+          - narracion
+          - actividad
+        reanudar:
+          type: string
+          description: Al volver al curso
+          enum:
+          - preguntar
+          - automatica
+          - 'no'
+        mostrar:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+            - temario
+            - progreso
+            - contador
+            - botones
+            - glosario
+            - recursos
+            - ayuda
+            - accesibilidad
+            - puntos
+            - idioma
+        objetivosAlInicio:
+          type: boolean
+        atajosTeclado:
+          type: boolean
+        patronPreferidoDelCliente:
+          type: boolean
+          description: true guarda el patrón como preferido en el kit de marca del cliente
     VistaPrevia:
       type: object
       required:

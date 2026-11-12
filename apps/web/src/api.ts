@@ -439,6 +439,31 @@ export const EXPORTAN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRO
 /** HU-1001 · Informe de alineación pedagógica (PNT-18). */
 export type InformeAlineacion = InformeAlineacionBase & { version: number };
 
+/** HU-1103 · Patrón y reglas de navegación del curso (PNT-17), con el preferido del cliente de su kit de marca. */
+export type PatronNavegacion = 'clasico' | 'historias' | 'vertical' | 'mapa' | 'hub' | 'ramificado' | 'inmersivo' | 'personalizado';
+export type ModoNavegacion = 'libre' | 'condiciones' | 'secuencial';
+export type Reanudar = 'preguntar' | 'automatica' | 'no';
+export interface Navegacion {
+  version: number;
+  patron: PatronNavegacion;
+  modo?: ModoNavegacion;
+  reanudar?: Reanudar;
+  mostrar?: string[];
+  patronPreferido: PatronNavegacion | null;
+  patronPreferidoDelCliente: boolean;
+  hayKit: boolean;
+}
+export interface NavegacionCambio {
+  version: number;
+  patron?: PatronNavegacion;
+  modo?: ModoNavegacion;
+  reanudar?: Reanudar;
+  mostrar?: string[];
+  patronPreferidoDelCliente?: boolean;
+}
+/** Editan la navegación administración y diseño instruccional; diseño gráfico y producción solo ven (M14). */
+export const EDITAN_NAVEGACION: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
   ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
@@ -460,6 +485,9 @@ export const api = {
   alineacion: (cursoId: string) => pedir<InformeAlineacion>(`/cursos/${cursoId}/alineacion`),
   cambiarAlineacion: (cursoId: string, datos: { version: number; objetivos?: { id: string; nivelBloom: NivelBloom }[]; elementos?: { pantallaId: string; preguntaId?: string; nivelBloom: NivelBloom }[] }) =>
     pedir<InformeAlineacion>(`/cursos/${cursoId}/alineacion`, json(datos, 'PATCH')),
+  /** HU-1103 · Patrón y reglas de navegación; guardar crea una versión del curso (409 si otra persona guardó antes). */
+  navegacion: (cursoId: string) => pedir<Navegacion>(`/cursos/${cursoId}/navegacion`),
+  guardarNavegacion: (cursoId: string, datos: NavegacionCambio) => pedir<Navegacion>(`/cursos/${cursoId}/navegacion`, json(datos, 'PUT')),
   editarPantalla: (cursoId: string, pantallaId: string, datos: { version: number; titulo?: TextoI18n; textos?: Record<string, TextoI18n>; narracion?: TextoI18n; ajustes?: Record<string, AjusteElemento | null>; disposicion?: string; extras?: ElementoExtra[]; motivo?: 'deshacer' | 'rehacer' }) =>
     pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}`, json(datos, 'PATCH')),
   aprobarPantalla: (cursoId: string, pantallaId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/${pantallaId}/aprobar`, { method: 'POST' }),

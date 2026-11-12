@@ -15,6 +15,7 @@ import { SaludModule } from './salud/salud.module.js';
 import { TrabajosModule } from './trabajos/trabajos.module.js';
 import { TraduccionesModule } from './traducciones/traducciones.module.js';
 import { AlineacionModule } from './alineacion/alineacion.module.js';
+import { NavegacionModule } from './navegacion/navegacion.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 import { VozModule } from './voz/voz.module.js';
 
@@ -32,6 +33,7 @@ import { VozModule } from './voz/voz.module.js';
     CursosModule,
     TraduccionesModule,
     AlineacionModule,
+    NavegacionModule,
     GeneracionesModule,
     ExportacionesModule,
     RecursosModule,
