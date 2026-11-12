@@ -32,6 +32,7 @@
     "./patch": "./src/patch.ts",
     "./propuesta": "./src/propuesta.ts",
     "./retoques": "./src/retoques.ts",
-    "./tiempos": "./src/tiempos.ts"
+    "./tiempos": "./src/tiempos.ts",
+    "./traduccion": "./src/traduccion.ts"
   }
 }

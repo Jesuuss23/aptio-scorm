@@ -10,6 +10,8 @@ import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { crearCascada } from './cascada.js';
 import { crearPropuestas } from './propuesta.js';
+import { crearTraductor } from './traducir.js';
+import { TAREA_TRADUCIR } from '@aptio/schema/traduccion';
 import { TAREA_PROPUESTA } from '@aptio/schema/propuesta';
 import { EJECUTORES } from './etapas/index.js';
 import { crearEtapaVoz } from './etapas/voz.js';
@@ -52,6 +54,7 @@ const generar = crearGenerador({
 const cascada = crearCascada({ bd: prisma, voz: vozEs, boca, subtitulos });
 // Las propuestas de la IA (HU-0504) usan el mismo proveedor de texto que la generación.
 const proponer = crearPropuestas({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
+const traducir = crearTraductor({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 // La exportación SCORM 1.2 (HU-1202) lee los recursos del almacenamiento y guarda el ZIP como recurso PAQUETE.
 const exportar = crearExportador({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
 const despachar = (trabajo: TrabajoEnCola) => {
@@ -61,6 +64,7 @@ const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_GENERAR) return generar(trabajo);
   if (trabajo.data.tarea === TAREA_CASCADA) return cascada(trabajo);
   if (trabajo.data.tarea === TAREA_PROPUESTA) return proponer(trabajo);
+  if (trabajo.data.tarea === TAREA_TRADUCIR && trabajo.data.traduccion) return traducir(trabajo);
   return procesar(trabajo);
 };
 

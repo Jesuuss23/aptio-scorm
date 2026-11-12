@@ -7,5 +7,5 @@ import { PropuestasController } from './propuestas.controller.js';
 import { PropuestasService } from './propuestas.service.js';
 
 /** M05 · Revisión del curso (HU-0501, HU-0502), M07 · narraciones (HU-0701), regeneración en cascada (HU-0503) y propuestas de la IA (HU-0504). */
-@Module({ imports: [RecursosModule, TrabajosModule], controllers: [CursosController, PropuestasController], providers: [CursosService, PropuestasService] })
+@Module({ imports: [RecursosModule, TrabajosModule], controllers: [CursosController, PropuestasController], providers: [CursosService, PropuestasService], exports: [CursosService] })
 export class CursosModule {}

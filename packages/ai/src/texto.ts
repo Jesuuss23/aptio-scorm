@@ -221,6 +221,54 @@ function ajustarAlPedido(datos: unknown, pedido: string): unknown {
   return datos;
 }
 
+/** Desneutraliza lo que `neutralizar` escapó para ir dentro de <material_cliente>. */
+const desneutralizar = (t: string) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+const escaparRegex = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** El término como palabra completa, sin distinguir mayúsculas (la misma regla que `@aptio/schema/voz`). */
+const palabra = (t: string) => new RegExp(`(?<![\\p{L}\\p{N}_])${escaparRegex(t.trim())}(?![\\p{L}\\p{N}_])`, 'giu');
+type TerminoSimulado = { termino: string; traduccion?: string | null; noTraducir?: boolean };
+
+/** Lo que pide el glosario: la grabada vale si lleva cada término «no traducir» igual y cada traducción del glosario. */
+function respetaGlosario(origen: string, destino: string, glosario: TerminoSimulado[]): boolean {
+  return glosario.every((t) => {
+    const formas = [...origen.matchAll(palabra(t.termino))].map((m) => m[0]);
+    if (!formas.length) return true;
+    if (t.noTraducir) return formas.every((f) => [...destino.matchAll(palabra(f))].some((m) => m[0] === f));
+    return !t.traduccion?.trim() || palabra(t.traduccion).test(destino);
+  });
+}
+
+/**
+ * IA-10 (HU-0802) simulada: las rutas pedidas en el mismo orden. Las que el caso LOTO grabó (p01 a p06) usan esa
+ * traducción si respeta el glosario; las demás, «[EN] » + el español con los términos del glosario ya traducidos.
+ */
+function traduccionSimulada(grabada: unknown, usuario: string, sistema: string): unknown {
+  const lista = usuario.match(/<material_cliente[^>]*>\n?([\s\S]*?)\n?<\/material_cliente>/)?.[1];
+  if (!lista) return grabada;
+  const pedidos = JSON.parse(desneutralizar(lista)) as { ruta: string; texto: string }[];
+  // El bloque común trae el glosario como lista JSON con sangría: termina en la primera línea que es solo «]».
+  const glosarioTexto = sistema.match(/Glosario del cliente \(respétalo tal cual\):\n(\[\]|\[\n[\s\S]*?\n\])/)?.[1] ?? '';
+  let glosario: TerminoSimulado[] = [];
+  try {
+    const leido: unknown = JSON.parse(glosarioTexto);
+    if (Array.isArray(leido)) glosario = leido as TerminoSimulado[];
+  } catch {
+    glosario = [];
+  }
+  const grabadas = new Map(((grabada as { traducciones?: { ruta: string; texto: string }[] }).traducciones ?? []).map((t) => [t.ruta, t.texto]));
+  const conGlosario = (texto: string) => glosario.reduce(
+    (t, g) => (g.noTraducir || !g.traduccion?.trim() ? t : t.replace(palabra(g.termino), g.traduccion.trim())), texto);
+  return {
+    idiomaDestino: 'en',
+    traducciones: pedidos.map((p) => {
+      const deLoto = grabadas.get(p.ruta);
+      const texto = deLoto && respetaGlosario(p.texto, deLoto, glosario) ? deLoto : `[EN] ${conGlosario(p.texto)}`;
+      const usados = glosario.filter((g) => palabra(g.termino).test(p.texto)).map((g) => g.termino);
+      return { ruta: p.ruta, texto, ...(usados.length ? { terminosGlosario: usados } : {}) };
+    }),
+  };
+}
+
 /**
  * Responde con las salidas grabadas del caso LOTO (modo simulado). `guion` permite a las pruebas forzar respuestas
  * (por ejemplo, una salida inválida) antes de la grabada.
@@ -231,10 +279,12 @@ export function proveedorSimulado(guion: Partial<Record<string, string[]>> = {})
     nombre: 'simulado',
     llamadas,
     modeloPara: () => 'simulado-loto',
-    async completar({ tarea, mensajes }) {
+    async completar({ tarea, mensajes, sistema }) {
       llamadas.push({ tarea, mensajes: mensajes.map((m) => ({ ...m })) });
       const forzada = guion[tarea]?.shift();
-      const texto = forzada ?? JSON.stringify(ajustarAlPedido(leerSalidaSimulada(tarea).datos, mensajes[0]?.texto ?? ''));
+      const grabada = forzada ? undefined : leerSalidaSimulada(tarea).datos;
+      const pedido = mensajes[0]?.texto ?? '';
+      const texto = forzada ?? JSON.stringify(tarea === 'IA-10' ? traduccionSimulada(grabada, pedido, sistema) : ajustarAlPedido(grabada, pedido));
       return { texto, modelo: 'simulado-loto', consumo: SIN_CONSUMO };
     },
   };

@@ -13,6 +13,7 @@ import { ProyectosModule } from './proyectos/proyectos.module.js';
 import { RecursosModule } from './recursos/recursos.module.js';
 import { SaludModule } from './salud/salud.module.js';
 import { TrabajosModule } from './trabajos/trabajos.module.js';
+import { TraduccionesModule } from './traducciones/traducciones.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 import { VozModule } from './voz/voz.module.js';
 
@@ -28,6 +29,7 @@ import { VozModule } from './voz/voz.module.js';
     ClientesModule,
     ProyectosModule,
     CursosModule,
+    TraduccionesModule,
     GeneracionesModule,
     ExportacionesModule,
     RecursosModule,
