@@ -22,6 +22,8 @@ export interface DatosTrabajo {
   pantallaId?: string;
   /** HU-0504 · El pedido de una propuesta de la IA (IA-16); `trabajoId` es entonces el TrabajoIA. */
   propuesta?: { cursoId: string; tipo: string; texto?: string };
+  /** HU-0802 · El curso cuyos textos pendientes se traducen (IA-10); `trabajoId` es entonces el TrabajoIA. */
+  traduccion?: { cursoId: string };
 }
 
 export type EstadoTrabajo = 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';

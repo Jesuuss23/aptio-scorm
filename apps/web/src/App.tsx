@@ -13,6 +13,7 @@ import { Proyectos } from './vistas/Proyectos';
 import { RevisionVista } from './vistas/RevisionVista';
 import { VistaPrevia } from './vistas/VistaPrevia';
 import { EntregaVista } from './vistas/EntregaVista';
+import { IdiomasVista } from './vistas/IdiomasVista';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -71,6 +72,8 @@ export function App() {
         <VistaPrevia key={vista.id} proyectoId={vista.id!} alCargar={alCargar} />
       ) : vista?.sub === 'entrega' ? (
         <EntregaVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
+      ) : vista?.sub === 'idiomas' ? (
+        <IdiomasVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'revision' ? (
         <RevisionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'editor' ? (

@@ -1776,3 +1776,78 @@ ul.fila-chips {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* ---- HU-0802 · Idiomas (PNT-11) ---- */
+.idiomas > .idiomas-textos {
+  flex: 2 1 560px;
+}
+.idiomas > .idiomas-glosario {
+  flex: 1 1 280px;
+}
+.tabla-idiomas {
+  min-width: 620px;
+}
+.tabla-idiomas td:first-child {
+  width: 42%;
+}
+.tabla-idiomas td:last-child {
+  width: 160px;
+}
+.tabla-idiomas td:last-child > * + * {
+  margin-top: 6px;
+}
+.grupo-idiomas th {
+  background: var(--color-suave);
+  font-weight: 700;
+}
+.entrada-en {
+  width: 100%;
+  font: inherit;
+  color: var(--color-texto);
+  background: var(--color-superficie);
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radio-control);
+  padding: 6px 9px;
+  resize: vertical;
+}
+.entrada-en:focus {
+  border-color: var(--color-cobalto);
+}
+.entrada-en[readonly] {
+  background: var(--color-suave);
+}
+.marcar-revisado {
+  display: block;
+  padding: 4px 10px;
+  font-size: var(--texto-xs);
+}
+.avance-traduccion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+@media (max-width: 640px) {
+  .tabla-idiomas {
+    min-width: 0;
+  }
+  .tabla-idiomas thead {
+    display: none;
+  }
+  .tabla-idiomas tr,
+  .tabla-idiomas td,
+  .tabla-idiomas th {
+    display: block;
+  }
+  .tabla-idiomas td:first-child,
+  .tabla-idiomas td:last-child {
+    width: auto;
+  }
+  .tabla-idiomas td {
+    border-bottom: 0;
+    padding: 4px 8px;
+  }
+  .tabla-idiomas tr {
+    border-bottom: 1px solid var(--color-borde);
+    padding: 6px 0;
+  }
+}

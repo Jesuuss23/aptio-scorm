@@ -3,6 +3,7 @@ import type { AjusteElemento, ElementoExtra } from '@aptio/player';
 import type { DefinicionModelo, Paleta } from '@aptio/schema/marca';
 import type { Etapa, EstadoTrabajo } from '@aptio/schema/generacion';
 import type { OperacionPatch } from '@aptio/schema/patch';
+import type { EstadoTraduccion } from '@aptio/schema/traduccion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 
 export interface Usuario {
@@ -306,6 +307,18 @@ export interface Propuesta {
   creadoEn: string;
 }
 
+/** HU-0802 · Un texto del curso con su inglés y su estado (PNT-11). */
+export interface Traduccion {
+  id: string;
+  ruta: string;
+  pantallaId: string | null;
+  es: string;
+  en: string | null;
+  estado: EstadoTraduccion;
+}
+/** HU-0802 · Traducen y revisan todos los del equipo; el revisor del cliente solo ve. */
+export const TRADUCEN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
+
 /** Un trabajo de la cola (GET /trabajos/{id}). */
 export interface TrabajoEstado {
   id: string;
@@ -427,6 +440,10 @@ export const api = {
   trabajo: (id: string) => pedir<TrabajoEstado>(`/trabajos/${id}`),
   aprobarSinObservaciones: (cursoId: string) => pedir<CambioResultado>(`/cursos/${cursoId}/pantallas/aprobar`, json({ soloSinObservaciones: true })),
   curso: (proyectoId: string) => pedir<Curso>(`/proyectos/${proyectoId}/curso`),
+  // HU-0802 · Idiomas (PNT-11).
+  traducciones: (cursoId: string, estado?: EstadoTraduccion) => pedir<Traduccion[]>(`/cursos/${cursoId}/traducciones${estado ? `?estado=${estado}` : ''}`),
+  traducir: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/traducciones/traducir`, { method: 'POST' }),
+  cambiarTraduccion: (id: string, datos: { en?: string; estado?: 'REVISADA' }) => pedir<Traduccion>(`/traducciones/${id}`, json(datos, 'PATCH')),
   exportar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
   validar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
   exportaciones: (cursoId: string) => pedir<Exportacion[]>(`/cursos/${cursoId}/exportaciones`),

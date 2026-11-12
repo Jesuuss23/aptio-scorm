@@ -2418,6 +2418,7 @@ paths:
       - Idiomas
       summary: Listar textos y su traducción
       operationId: get_cursos_cursoId_traducciones
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO, PRODUCTOR y REVISOR_CLIENTE (solo su cliente). HU-0802. Todos los textos { es, en } del curso en el orden del documento. Antes de listar pone las filas al día con el curso; si el español de un texto cambió, vuelve a PENDIENTE aunque estuviera REVISADA y conserva el inglés anterior como referencia.
       parameters:
       - name: cursoId
         in: path
@@ -2430,6 +2431,11 @@ paths:
         required: false
         schema:
           type: string
+          enum:
+          - PENDIENTE
+          - TRADUCIDA_IA
+          - REVISADA
+          - DESBORDE
       responses:
         '200':
           description: OK
@@ -2451,7 +2457,7 @@ paths:
       - Idiomas
       summary: Traducir pendientes con el glosario
       operationId: post_cursos_cursoId_traducciones_traducir
-      description: No toca lo REVISADA
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (el revisor del cliente recibe 403). HU-0802. Encola IA-10 en la cola ia con el glosario del cliente (RN-08-1). Solo traduce los textos PENDIENTE, en lotes de hasta 60; no toca lo REVISADA (RN-08-2). Cada lote se guarda entero o no se guarda, como una versión del curso, y sus textos quedan TRADUCIDA_IA.
       parameters:
       - name: cursoId
         in: path
@@ -2478,6 +2484,7 @@ paths:
       - Idiomas
       summary: Editar o marcar como revisada
       operationId: patch_traducciones_traduccionId
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL, DISENADOR_GRAFICO y PRODUCTOR (el revisor del cliente recibe 403). HU-0802. Editar el inglés guarda una versión del curso (motivo «traducción») y deja el texto REVISADA. Marcar REVISADA sin cambiar el texto no crea versión. 422 con código SIN_TRADUCCION (marcar revisado un texto sin inglés) o SIN_CAMBIOS (sin en ni estado).
       parameters:
       - name: traduccionId
         in: path
@@ -5387,10 +5394,14 @@ components:
           description: JSON Pointer
         pantallaId:
           type: string
+          nullable: true
+          description: Pantalla del texto; null en los textos del curso (objetivos, recursos)
         es:
           type: string
         en:
           type: string
+          nullable: true
+          description: El inglés actual; si el español cambió, queda el anterior como referencia
         estado:
           type: string
           enum:
@@ -5400,11 +5411,14 @@ components:
           - DESBORDE
         detalle:
           type: string
+          description: Motivo del DESBORDE con su propuesta de versión corta (HU-0803)
     TraduccionCambio:
       type: object
       properties:
         en:
           type: string
+          minLength: 1
+          maxLength: 4000
         estado:
           type: string
           enum:
