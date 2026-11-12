@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.35 · actualizado con la quinta entrega del Sprint 7 (12 de noviembre de 2026)**
+**Versión 0.36 · actualizado con la primera entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -482,6 +482,24 @@ Cada observación muestra su gravedad (**Bloquea la entrega**, **Aviso** o **Inf
 
 La IA deja como mucho 120 observaciones por revisión. Si llega a ese tope, la tarjeta lo avisa: resuelve o descarta esas y vuelve a pedir la revisión. Piden la revisión y descartan Administración, Diseño instruccional, Diseño gráfico y Producción; el revisor del cliente ve las observaciones, sin los botones.
 
+### 8.17 Alineación pedagógica: objetivos, prácticas y evaluaciones
+
+En el proyecto, el botón **Alineación** abre la vista **Alineación pedagógica**. Cada objetivo necesita al menos una pantalla que lo **presente**, una que lo **practique** y una que lo **evalúe**, al nivel de Bloom del objetivo (recordar, comprender, aplicar…). La aplicación lo calcula sola con cada cambio del curso, sin IA.
+
+- **Arriba**, las cifras: cuántos objetivos hay, cuántas alertas, cuántos objetivos están alineados, cuántas pantallas no tienen objetivo y el reparto entre presentar, practicar y evaluar.
+- **Una fila por objetivo**, con su nivel. En las columnas **Presenta**, **Practica** y **Evalúa** aparece cada pantalla como un chip con su número y su nivel (por ejemplo, «15 · aplicar»). En el reto final cuenta cada pregunta por separado, con su objetivo.
+- **Estado:** «✓ Alineado» o la alerta, por ejemplo «Se evalúa solo en «recordar», menor que «aplicar»» o «No tiene práctica».
+
+**De dónde sale el nivel de una pantalla.** Si nadie lo cambió, sale de su diseño: memoria, quiz, dato, lista y resumen son «recordar»; clasificar, verdadero o falso, hotspot, idea, personaje y video son «comprender»; ordenar y decisión son «aplicar».
+
+**Cambiar un nivel.** Administración y Diseño instruccional pueden:
+- cambiar el nivel de un objetivo con el selector de su fila;
+- pulsar un chip y elegir el nivel de esa pantalla o pregunta (por ejemplo, si una pregunta del reto final sí pide aplicar lo aprendido).
+
+Al guardar, la matriz se recalcula y el aviso dice cuántas alertas quedan. Cada cambio guarda una versión del curso. Desde el chip, **Abrir en Revisión** lleva a esa pantalla.
+
+Diseño gráfico y Producción ven la matriz sin poder cambiar niveles; el revisor del cliente no la ve. Las alertas no impiden exportar: en **Entrega**, la verificación avisa «N objetivos sin alinear» con **Ir a Alineación**. La propuesta de la IA para corregir las alertas llegará en la próxima entrega.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -555,6 +573,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.33 | 2026-11-12 | Español e inglés en el mismo paquete: opción «Idioma» en Entrega y botón EN / ES en la cápsula y en la vista previa (8.15). |
 | 0.34 | 2026-11-12 | Voz en inglés: bloque «Voz en inglés» en Idiomas con «Generar voz en inglés» y la cápsula que suena en inglés (8.15). |
 | 0.35 | 2026-11-12 | Control de calidad: observaciones de reglas y de la IA, «✦ Revisar con IA», «Descartar» y «Del curso» (8.16); la etapa 10 ya corre (8.2). |
+| 0.36 | 2026-11-12 | Alineación pedagógica: matriz por objetivo con niveles de Bloom, alertas, cambiar niveles y el aviso en Entrega (8.17). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
