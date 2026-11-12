@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.37 · actualizado con la segunda entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.38 · actualizado con la tercera entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -269,7 +269,7 @@ Cuando la generación ya armó las pantallas, el proyecto muestra el botón **Vi
 Todas las actividades se juegan de verdad: memoria, clasificar, ordenar pasos, tarjetas, preguntas con tiempo y vidas, exploración de una imagen, verdadero o falso y decisiones con consecuencias. Todo se hace con botones, así que funciona con el dedo, el ratón o el teclado.
 
 Por ahora:
-- La vista previa usa el recorrido «Clásico» (barra arriba y botones Anterior y Siguiente abajo). Si el curso pide otro recorrido, verás un aviso.
+- La vista previa usa el patrón de navegación del curso (LOTO, Historias); se cambia en **Navegación** (8.18).
 - Las imágenes y el video aparecen como un recuadro con su descripción hasta que lleguen las ilustraciones. El personaje del kit sí aparece, con los colores del cliente.
 - En las pantallas con narración verás **Escuchar narración**: al pulsarlo, Ana habla con la boca sincronizada y parpadea. **Pausar narración** la detiene.
 - El botón **CC** de la barra superior activa los subtítulos. Mientras suena la narración ves la frase que Ana está diciendo; en pausa, el texto completo. Si lo dejas activado, la próxima vez que abras la vista previa en ese navegador seguirá activado.
@@ -507,6 +507,32 @@ Diseño gráfico y Producción ven la matriz sin poder cambiar niveles; el revis
 
 Si alguien cambia el curso antes de aplicar, la propuesta vence y aparece **Recalcular propuesta** para pedir otra. Para deshacer una propuesta aplicada, restaura la versión anterior del curso: vuelven las alertas.
 
+### 8.18 Navegación: cómo se recorre la cápsula
+
+En el proyecto, el botón **Navegación** abre la vista del mismo nombre. El **patrón** define cómo se recorre la cápsula y las **reglas**, qué se puede saltar; se combinan como quieras.
+
+**Patrón de navegación.** Hay 7 tarjetas, cada una con su dibujo y para qué sirve:
+
+| Patrón | Cómo se ve | Para qué |
+| --- | --- | --- |
+| Clásico | Barra arriba con el temario y Anterior / Siguiente abajo | Cursos formales, escritorio |
+| Historias | Pantalla completa con barritas de avance arriba; se toca a los lados («‹ ›»), se desliza o se usan las flechas | Cápsulas cortas en celular |
+| Desplazamiento vertical | «↑ Volver» y «Continuar ↓» | Lectura con actividades |
+| Mapa de misiones | Las partes del curso son estaciones que se desbloquean; «← Mapa» vuelve | Gamificación |
+| Menú de temas | Tarjetas por tema, en cualquier orden si la regla lo permite; «← Temas» vuelve | Consulta y onboarding |
+| Ramificado | Como Clásico, sin temario; el camino cambia en las decisiones | Escenarios y casos |
+| Inmersivo / juego | Sin barras, con un marcador flotante de puntos y botones flotantes | Retos y quiz gamificado |
+
+En el Mapa y en el Menú, cada parte del curso empieza en una pantalla de **sección**: LOTO tiene 3 estaciones. Una estación bloqueada muestra 🔒 hasta que se cumpla la regla.
+
+**Reglas.** El avance puede ser **Libre** (va a cualquier pantalla), **Libre con actividades obligatorias** (no salta una actividad sin hacerla) o **Secuencial** (cada pantalla en orden). **Al volver** al curso se puede preguntar «¿Continuar donde lo dejaste?», continuar sin preguntar o empezar desde el inicio. En todos los patrones, si falta una actividad, Siguiente se apaga y dice «Completa la actividad para continuar».
+
+**Elementos visibles.** Temario, progreso, «Pantalla X de Y» y puntos. Glosario, ayuda y accesibilidad dicen «llega después».
+
+**Probar y guardar.** **▶ Probar este patrón** abre la Vista previa con el patrón y la regla elegidos, sin guardar. **Guardar navegación** crea una versión nueva del curso. Marca **Usar como preferido del cliente** para guardarlo en su kit: su tarjeta mostrará «Preferido del cliente» en los próximos cursos. Si el cliente aún no tiene kit, primero créalo.
+
+Administración y Diseño instruccional cambian la navegación; Diseño gráfico y Producción la ven y pueden probarla; el revisor del cliente no la ve.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -582,6 +608,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.35 | 2026-11-12 | Control de calidad: observaciones de reglas y de la IA, «✦ Revisar con IA», «Descartar» y «Del curso» (8.16); la etapa 10 ya corre (8.2). |
 | 0.36 | 2026-11-12 | Alineación pedagógica: matriz por objetivo con niveles de Bloom, alertas, cambiar niveles y el aviso en Entrega (8.17). |
 | 0.37 | 2026-11-12 | Alineación pedagógica: «✦ Proponer correcciones», aplicar o descartar la propuesta de la IA y «pantallas por revisar» (8.17). |
+| 0.38 | 2026-11-12 | Navegación: los 7 patrones, reglas, elementos visibles, «▶ Probar este patrón» y preferido del cliente (8.18); la vista previa usa el patrón del curso (8.6). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
