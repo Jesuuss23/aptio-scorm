@@ -1,17 +1,28 @@
 // HU-1001 · Alineación pedagógica (PNT-18, M10, CP-083): una fila por objetivo con su nivel de Bloom y las pantallas o
 // preguntas que lo presentan (P), practican (A) y evalúan (E), cada una con su nivel. Las alertas salen sin IA
 // (RN-10-2, RN-10-3) y no bloquean la entrega. Administración y diseño instruccional cambian el nivel de un objetivo o de
-// un elemento (crea una versión del curso); diseño gráfico y producción solo ven. «✦ Proponer correcciones» es la HU-1002.
-import { type ElementoAlineacion, NIVELES_BLOOM, NOMBRE_BLOOM, NOMBRE_ROL, type NivelBloom, type RolAlineacion } from '@aptio/schema/alineacion';
+// un elemento (crea una versión del curso); diseño gráfico y producción solo ven.
+// HU-1002 · «✦ Proponer correcciones» (CP-084): con alertas, administración y diseño instruccional piden a la IA (IA-17)
+// una propuesta revisable; al aplicarla el curso queda en 0 alertas y las pantallas nuevas o cambiadas, por revisar.
+import { type CambioCorreccion, type ElementoAlineacion, NIVELES_BLOOM, NOMBRE_BLOOM, NOMBRE_CORRECCION, NOMBRE_ROL, type NivelBloom, type PantallaAfectada, type RolAlineacion } from '@aptio/schema/alineacion';
 import { Cabecera } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, EDITAN_ALINEACION, ErrorApi, type InformeAlineacion, type Proyecto, type Rol } from '../api';
+import { api, EDITAN_ALINEACION, ErrorApi, type InformeAlineacion, type Propuesta, type Proyecto, type Rol } from '../api';
 import { navegar } from '../ruta';
 
 const ROLES: RolAlineacion[] = ['P', 'A', 'E'];
 const mensajeDe = (e: unknown, otro: string) => (e instanceof ErrorApi ? e.message : otro);
 const claveDe = (objetivoId: string, x: ElementoAlineacion) => `${objetivoId}|${x.pantallaId}|${x.preguntaId ?? ''}`;
 const nombreElemento = (x: ElementoAlineacion) => `Pantalla ${x.numero}${x.preguntaId ? `, pregunta ${x.preguntaId}` : ''}`;
+/** La última propuesta de alineación, si sigue pendiente o venció. */
+const vigenteDe = (lista: Propuesta[]) => {
+  const ultima = lista.find((p) => p.tipo === 'alineacion');
+  return ultima && (ultima.estado === 'PENDIENTE' || ultima.estado === 'VENCIDA') ? ultima : null;
+};
+const alertas = (n: number) => (n === 1 ? '1 alerta' : `${n} alertas`);
+/** Sondeo del trabajo de la IA, como en Revisión. */
+const CADA_MS = 1500;
+const LIMITE_MS = 120_000;
 
 export function AlineacionVista({ proyectoId, rol, alCargar }: { proyectoId: string; rol: Rol; alCargar: (nombre: string) => void }) {
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
@@ -22,6 +33,9 @@ export function AlineacionVista({ proyectoId, rol, alCargar }: { proyectoId: str
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
+  const [propuesta, setPropuesta] = useState<Propuesta | null>(null);
+  const [pedido, setPedido] = useState<{ trabajoId: string; desde: number } | null>(null);
+  const [porRevisar, setPorRevisar] = useState<PantallaAfectada[]>([]);
   const editan = EDITAN_ALINEACION.includes(rol);
 
   useEffect(() => {
@@ -41,11 +55,97 @@ export function AlineacionVista({ proyectoId, rol, alCargar }: { proyectoId: str
   }, [cursoId]);
   useEffect(recargar, [recargar]);
 
+  // HU-1002 · La última propuesta de alineación, mientras esté pendiente o vencida (con «Recalcular propuesta»).
+  const cargarPropuesta = useCallback(async () => {
+    if (!cursoId || !editan) return;
+    setPropuesta(vigenteDe(await api.propuestas(cursoId).catch(() => [] as Propuesta[])));
+  }, [cursoId, editan]);
+  const version = informe?.version;
+  useEffect(() => {
+    if (version === undefined || !cursoId || !editan) return;
+    let vigente = true;
+    api.propuestas(cursoId).then((l) => vigente && setPropuesta(vigenteDe(l)), () => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [version, cursoId, editan]);
+
+  useEffect(() => {
+    if (!pedido) return;
+    const t = setTimeout(async () => {
+      try {
+        const trabajo = await api.trabajo(pedido.trabajoId);
+        if (trabajo.estado === 'COMPLETADO') {
+          setPedido(null);
+          await cargarPropuesta();
+        } else if (trabajo.estado === 'ERROR' || trabajo.estado === 'CANCELADO' || Date.now() - pedido.desde > LIMITE_MS) {
+          setPedido(null);
+          setError(trabajo.estado === 'ERROR' ? 'La IA no pudo preparar la propuesta. Intenta de nuevo.' : 'La propuesta tarda más de lo normal; vuelve a pedirla más tarde.');
+        } else {
+          setPedido((x) => (x ? { ...x } : x));
+        }
+      } catch {
+        setPedido((x) => (x ? { ...x } : x));
+      }
+    }, CADA_MS);
+    return () => clearTimeout(t);
+  }, [pedido, cargarPropuesta]);
+
+  async function proponer() {
+    if (!cursoId) return;
+    setError('');
+    setAviso('');
+    setPorRevisar([]);
+    try {
+      const t = await api.pedirCorreccion(cursoId);
+      setPropuesta(null);
+      setPedido({ trabajoId: t.id, desde: Date.now() });
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo pedir la propuesta'));
+    }
+  }
+
+  async function aplicar() {
+    if (!cursoId || !propuesta) return;
+    setOcupado(true);
+    setError('');
+    setAviso('');
+    try {
+      const r = await api.aplicarPropuesta(propuesta.id);
+      const nuevo = await api.alineacion(cursoId);
+      setInforme(nuevo);
+      setPropuesta(null);
+      setPorRevisar(r.pantallasPorRevisar ?? []);
+      setAviso(`Propuesta aplicada · ${alertas(nuevo.totalAlertas)}`);
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo aplicar la propuesta'));
+      await cargarPropuesta();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function descartar() {
+    if (!propuesta) return;
+    setOcupado(true);
+    setError('');
+    try {
+      await api.descartarPropuesta(propuesta.id);
+      setPropuesta(null);
+      setAviso('Propuesta descartada');
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo descartar la propuesta'));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function cambiar(datos: { objetivos?: { id: string; nivelBloom: NivelBloom }[]; elementos?: { pantallaId: string; preguntaId?: string; nivelBloom: NivelBloom }[] }, que: string) {
     if (!cursoId || !informe) return;
     setOcupado(true);
     setError('');
     setAviso('');
+    setPorRevisar([]);
     try {
       const nuevo = await api.cambiarAlineacion(cursoId, { version: informe.version, ...datos });
       setInforme(nuevo);
@@ -73,6 +173,8 @@ export function AlineacionVista({ proyectoId, rol, alCargar }: { proyectoId: str
   if (!proyecto || !informe) return <p className="sec" role="status">Cargando alineación…</p>;
 
   const { indicadores: ind } = informe;
+  const revisionDe = (pantallaId: string) => `/proyectos/${proyectoId}/revision?pantalla=${pantallaId}`;
+  const numeros = new Map(informe.objetivos.flatMap((o) => [...o.presenta, ...o.practica, ...o.evalua]).map((x) => [x.pantallaId, x.numero]));
   const chip = (objetivoId: string, x: ElementoAlineacion) => {
     const clave = claveDe(objetivoId, x);
     const abiertoAqui = abierto === clave;
@@ -165,8 +267,61 @@ export function AlineacionVista({ proyectoId, rol, alCargar }: { proyectoId: str
           </table>
         </div>
       </section>
+      {porRevisar.length ? (
+        <div className="nota">
+          La propuesta cambió {porRevisar.map((p) => `la pantalla ${p.numero} (${p.titulo}${p.nueva ? ', nueva' : ''})`).join(', ')}.{' '}
+          <a href={revisionDe(porRevisar[0]!.pantallaId)} onClick={(e) => { e.preventDefault(); navegar(revisionDe(porRevisar[0]!.pantallaId)); }}>
+            {porRevisar.length === 1 ? '1 pantalla por revisar' : `${porRevisar.length} pantallas por revisar`}
+          </a>
+        </div>
+      ) : null}
+      {propuesta ? (
+        <FranjaCorreccion propuesta={propuesta} numeros={numeros} ocupado={ocupado || Boolean(pedido)} alAplicar={() => void aplicar()} alDescartar={() => void descartar()} alRecalcular={() => void proponer()} />
+      ) : null}
+      {pedido ? <p className="nota" role="status">✦ La IA está preparando la propuesta…</p> : null}
+      {editan && informe.totalAlertas && !propuesta && !pedido ? (
+        <button type="button" className="boton ia" disabled={ocupado} onClick={() => void proponer()}>✦ Proponer correcciones</button>
+      ) : null}
       {informe.totalAlertas ? null : <div className="nota">Todos los objetivos se presentan, se practican y se evalúan a su nivel.</div>}
       <p className="sec">P = presenta (contenido y video) · A = practica (actividad formativa) · E = evalúa (actividad sumativa; en el reto final cuenta cada pregunta). Pulsa una pantalla para ver su nivel o abrirla en Revisión.</p>
     </>
+  );
+}
+
+/** HU-1002 · Franja de la propuesta de corrección (prototipo PNT-18: «✦ Propuesta de la IA» con Aplicar y Descartar). */
+function FranjaCorreccion({ propuesta, numeros, ocupado, alAplicar, alDescartar, alRecalcular }: {
+  propuesta: Propuesta; numeros: Map<string, number>; ocupado: boolean; alAplicar: () => void; alDescartar: () => void; alRecalcular: () => void;
+}) {
+  const vencida = propuesta.estado === 'VENCIDA';
+  const donde = (x: CambioCorreccion) => {
+    if (!x.pantallaId) return '';
+    const numero = numeros.get(x.pantallaId);
+    return ` · ${x.tipo === 'nueva-pantalla' || numero === undefined ? `pantalla nueva ${x.pantallaId}` : `pantalla ${numero}`}${x.preguntaId ? `, pregunta ${x.preguntaId}` : ''}`;
+  };
+  return (
+    <section className="franja-ia" aria-label="Propuesta de la IA">
+      <div className="franja-ia-texto">
+        <b>✦ {propuesta.titulo}</b>
+        <span>{vencida ? 'El curso cambió desde que se calculó esta propuesta.' : propuesta.descripcion}</span>
+        {!vencida && propuesta.correcciones?.length ? (
+          <ul className="correcciones" aria-label="Cambios propuestos">
+            {propuesta.correcciones.map((x, i) => (
+              <li key={`${x.objetivoId}-${x.preguntaId ?? x.pantallaId ?? i}`}>
+                <b>{NOMBRE_CORRECCION[x.tipo]} · {x.objetivoId} · {x.nivelBloom}{donde(x)}</b>
+                <span>{x.motivo}</span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <div className="acciones-form">
+        {vencida ? (
+          <button type="button" className="boton ia" disabled={ocupado} onClick={alRecalcular}>Recalcular propuesta</button>
+        ) : (
+          <button type="button" className="boton ia" disabled={ocupado} onClick={alAplicar}>Aplicar</button>
+        )}
+        <button type="button" className="boton" disabled={ocupado} onClick={alDescartar}>Descartar</button>
+      </div>
+    </section>
   );
 }

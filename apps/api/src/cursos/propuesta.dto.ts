@@ -7,10 +7,10 @@ const recortar = ({ value }: { value: unknown }) => (typeof value === 'string' ?
 /** Tipos del contrato; en el S5 se calculan mas-visual, menos-texto, actividad, variantes y libre (SUP-39). */
 export const TIPOS_CONTRATO = ['mas-visual', 'menos-texto', 'actividad', 'variantes', 'otra-ilustracion', 'libre', 'alineacion', 'patron-recomendar', 'patron-crear', 'pausas-video', 'kit-extraer'] as const;
 
-/** HU-0504 · Pedido de una propuesta a la IA (IA-16). */
+/** HU-0504 · Pedido de una propuesta a la IA (IA-16; HU-1002: `alineacion` encola IA-17). */
 export class PropuestaSolicitudDto {
   @ApiProperty({ enum: TIPOS_CONTRATO }) @IsIn(TIPOS_CONTRATO) tipo: string;
-  @ApiPropertyOptional({ description: 'Pantalla a la que se le propone el cambio (obligatoria en el S5)' }) @IsOptional() @IsString() pantallaId?: string;
+  @ApiPropertyOptional({ description: 'Pantalla a la que se le propone el cambio (obligatoria salvo en `alineacion`, que es del curso entero)' }) @IsOptional() @IsString() pantallaId?: string;
   @ApiPropertyOptional({ maxLength: 500, description: 'Texto del pedido libre' }) @IsOptional() @Transform(recortar) @IsString() @MaxLength(500) pedido?: string;
 }
 
@@ -35,6 +35,16 @@ export class VarianteDto {
   @ApiProperty({ type: 'array', items: { type: 'object' }, description: 'JSON Patch relativo a la pantalla' }) patch: object[];
 }
 
+/** HU-1002 · Un cambio de la corrección de la alineación (IA-17), para mostrarlo antes de aplicar. */
+export class CorreccionDto {
+  @ApiProperty({ enum: ['nueva-pregunta', 'nueva-pantalla', 'ajustar-pregunta', 'ajustar-objetivo'] }) tipo: string;
+  @ApiProperty() objetivoId: string;
+  @ApiProperty({ enum: ['recordar', 'comprender', 'aplicar', 'analizar', 'evaluar', 'crear'] }) nivelBloom: string;
+  @ApiProperty() motivo: string;
+  @ApiPropertyOptional() pantallaId?: string;
+  @ApiPropertyOptional() preguntaId?: string;
+}
+
 export class PropuestaDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty() tipo: string;
@@ -43,6 +53,7 @@ export class PropuestaDto {
   @ApiProperty() descripcion: string;
   @ApiProperty({ type: 'array', items: { type: 'object' }, description: 'JSON Patch relativo a la pantalla (vacío si trae variantes)' }) cambios: object[];
   @ApiPropertyOptional({ type: [VarianteDto], description: 'Las 3 variantes de «Ver 3 variantes»' }) vistaPrevia?: VarianteDto[];
+  @ApiPropertyOptional({ type: [CorreccionDto], description: 'HU-1002 · Los cambios de la corrección de la alineación' }) correcciones?: CorreccionDto[];
   @ApiProperty() versionBase: number;
   @ApiProperty({ enum: ['PENDIENTE', 'APLICADA', 'DESCARTADA', 'VENCIDA'] }) estado: string;
   @ApiProperty() costoUsd: number;

@@ -42,7 +42,7 @@ pnpm --filter @aptio/schema validar packages/ai/casos/loto/curso-esperado-es.jso
 | 6 a 8 · Voz, boca, subtítulos | `06-voz-es.json`, `07-boca-p03.json`, `08-subtitulos-p03-es.vtt` | **Simulados** (65 ms por letra). Con voz real los calcula el audio y Rhubarb |
 | 9 · Inglés | `09-IA-10-traduccion-p01-p06.json` | **Muestra**: pantallas 1 a 6 (34 textos), con límites y glosario |
 | 10 · Calidad | `10-IA-12-calidad.json` | 5 observaciones (1 alta) |
-| Bajo pedido | `X-IA-16-…`, `X-IA-17-…`, `X-IA-18-…` | Sincronizar con la voz, propuestas de retoque de p05 (más visual, menos texto, actividad, 3 variantes y libre; HU-0504, IA-16 v2), corregir alineación, extraer kit |
+| Bajo pedido | `X-IA-16-…`, `X-IA-17-…`, `X-IA-18-…` | Sincronizar con la voz, propuestas de retoque de p05 (más visual, menos texto, actividad, 3 variantes y libre; HU-0504, IA-16 v2), corregir las 2 alertas de alineación con 2 preguntas nuevas en p28 (HU-1002, IA-17 v2), extraer kit |
 | Resultado | `curso-esperado-es.json` | Curso completo en español (30 pantallas, 68 recursos) que **valida** contra el esquema v0.2 |
 
 La versión en inglés completa no está escrita a mano: el caso cubre las pantallas 1 a 6 para probar el flujo de traducción. En modo simulado, el resto de los textos en inglés se completa con el prefijo `[EN] ` para que el validador bilingüe pueda correr.

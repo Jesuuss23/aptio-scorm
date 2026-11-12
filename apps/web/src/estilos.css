@@ -1944,3 +1944,21 @@ ul.fila-chips {
 .alineacion-detalle p { margin: 0; }
 .alineacion-detalle label { display: flex; flex-direction: column; gap: 4px; }
 .alineacion-elemento:has(.alineacion-detalle) { flex-basis: 100%; }
+
+/* HU-1002 · Cambios de la propuesta de corrección de la alineación. */
+.correcciones {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.correcciones li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.franja-ia-texto .correcciones li b {
+  color: var(--color-texto);
+  font-size: var(--texto-sm);
+}

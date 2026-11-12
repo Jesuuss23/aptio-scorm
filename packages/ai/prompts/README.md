@@ -22,7 +22,7 @@ Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confia
 | [IA-14](IA-14.v1.md) | Patrón de navegación | Navegación (bajo pedido) | `ANTHROPIC_MODEL_RAPIDO` | 0.4 |
 | [IA-15](IA-15.v1.md) | Componer pantalla con componentes del kit | 4 · PANTALLAS | `ANTHROPIC_MODEL_PANTALLAS` | 0.4 |
 | [IA-16](IA-16.v2.md) | Propuesta de retoque (v2 sobre bloques, HU-0504) | Revisión / Editor (bajo pedido) | `ANTHROPIC_MODEL_PANTALLAS` | 0.6 |
-| [IA-17](IA-17.v1.md) | Corrección de alineación | Alineación pedagógica (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
+| [IA-17](IA-17.v2.md) | Corrección de alineación (v2 con alertas y rutas permitidas, HU-1002) | Alineación pedagógica (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
 | [IA-18](IA-18.v1.md) | Extracción de kit | Clientes y kits (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.2 |
 
 ## Cómo se usan
