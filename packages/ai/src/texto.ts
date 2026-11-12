@@ -242,10 +242,23 @@ function respetaGlosario(origen: string, destino: string, glosario: TerminoSimul
  * IA-10 (HU-0802) simulada: las rutas pedidas en el mismo orden. Las que el caso LOTO grabó (p01 a p06) usan esa
  * traducción si respeta el glosario; las demás, «[EN] » + el español con los términos del glosario ya traducidos.
  */
+/** Modo simulado de la versión corta: palabras completas hasta caber en `limite` (si la primera no cabe, se corta). */
+function recortarPalabras(texto: string, limite: number): string {
+  const limpio = texto.trim();
+  if (limpio.length <= limite) return limpio;
+  let salida = '';
+  for (const p of limpio.split(/\s+/)) {
+    const siguiente = salida ? `${salida} ${p}` : p;
+    if (siguiente.length > limite) break;
+    salida = siguiente;
+  }
+  return salida || limpio.slice(0, limite);
+}
+
 function traduccionSimulada(grabada: unknown, usuario: string, sistema: string): unknown {
   const lista = usuario.match(/<material_cliente[^>]*>\n?([\s\S]*?)\n?<\/material_cliente>/)?.[1];
   if (!lista) return grabada;
-  const pedidos = JSON.parse(desneutralizar(lista)) as { ruta: string; texto: string }[];
+  const pedidos = JSON.parse(desneutralizar(lista)) as { ruta: string; texto: string; limite?: number; actual?: string }[];
   // El bloque común trae el glosario como lista JSON con sangría: termina en la primera línea que es solo «]».
   const glosarioTexto = sistema.match(/Glosario del cliente \(respétalo tal cual\):\n(\[\]|\[\n[\s\S]*?\n\])/)?.[1] ?? '';
   let glosario: TerminoSimulado[] = [];
@@ -262,7 +275,9 @@ function traduccionSimulada(grabada: unknown, usuario: string, sistema: string):
     idiomaDestino: 'en',
     traducciones: pedidos.map((p) => {
       const deLoto = grabadas.get(p.ruta);
-      const texto = deLoto && respetaGlosario(p.texto, deLoto, glosario) ? deLoto : `[EN] ${conGlosario(p.texto)}`;
+      const completo = deLoto && respetaGlosario(p.texto, deLoto, glosario) ? deLoto : `[EN] ${conGlosario(p.texto)}`;
+      // HU-0803 · Versión corta: si se pide acortar una traducción que no cupo (`actual`), se recorta por palabras.
+      const texto = p.actual !== undefined && p.limite ? recortarPalabras(completo, p.limite) : completo;
       const usados = glosario.filter((g) => palabra(g.termino).test(p.texto)).map((g) => g.termino);
       return { ruta: p.ruta, texto, ...(usados.length ? { terminosGlosario: usados } : {}) };
     }),

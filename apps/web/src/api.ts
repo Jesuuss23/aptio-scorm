@@ -315,6 +315,11 @@ export interface Traduccion {
   es: string;
   en: string | null;
   estado: EstadoTraduccion;
+  /** HU-0803 · Caracteres que caben en el componente; null si no ocupa espacio en pantalla. */
+  limite: number | null;
+  caracteres: number | null;
+  /** HU-0803 · Versión corta de la IA para un texto en Desborde. */
+  propuesta: string | null;
 }
 /** HU-0802 · Traducen y revisan todos los del equipo; el revisor del cliente solo ve. */
 export const TRADUCEN: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];

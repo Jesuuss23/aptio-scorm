@@ -2,7 +2,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { erroresCurso } from '../src/index.js';
-import { aplicarTraducciones, erroresGlosario, erroresLote, huellaTexto, sincronizarFilas, textosDe } from '../src/traduccion.js';
+import {
+  aplicarTraducciones, componenteDe, desborda, erroresGlosario, erroresLimite, erroresLote, huellaTexto, LIMITE_CARACTERES, limiteDe, sincronizarFilas, textosDe,
+} from '../src/traduccion.js';
 
 const loto = () => JSON.parse(readFileSync(new URL('../../ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
 const GLOSARIO = [
@@ -23,7 +25,7 @@ describe('textos del curso (HU-0802)', () => {
       '/modulos/0/capsulas/0/pantallas/0/bloques/1/contenido',
       '/modulos/0/capsulas/0/pantallas/0/narracion/texto',
     ]);
-    expect(p01[0]).toEqual({ ruta: '/modulos/0/capsulas/0/pantallas/0/titulo', pantallaId: 'p01', es: 'Bloqueo y etiquetado', en: null });
+    expect(p01[0]).toEqual({ ruta: '/modulos/0/capsulas/0/pantallas/0/titulo', pantallaId: 'p01', es: 'Bloqueo y etiquetado', en: null, limite: 45 });
     // Los textos de las actividades también (opciones, retroalimentación) y siempre dentro de su pantalla.
     expect(textos.some((t) => t.ruta.includes('/interaccion/'))).toBe(true);
     expect(new Set(textos.filter((t) => t.ruta.includes('/pantallas/')).map((t) => t.pantallaId)).size).toBe(30);
@@ -95,6 +97,7 @@ describe('filas de traducción y lotes de IA-10', () => {
       ],
       reiniciar: [{ id: '1', textoOrigenHash: huellaTexto('Texto nuevo') }],
       borrar: ['3'],
+      desbordar: [],
     });
   });
 
@@ -107,5 +110,98 @@ describe('filas de traducción y lotes de IA-10', () => {
       '/x: no se pidió esta ruta',
       '/b: falta la traducción',
     ]);
+  });
+});
+
+describe('desbordes por idioma (HU-0803, RN-08-3)', () => {
+  const P = '/modulos/0/capsulas/0/pantallas';
+  it('cada tipo de componente tiene su límite de caracteres', () => {
+    const doc = loto();
+    const casos: [string, number | null][] = [
+      [`${P}/0/titulo`, 45],
+      [`${P}/0/bloques/0/contenido`, 45],
+      [`${P}/0/bloques/1/contenido`, 70],
+      [`${P}/0/narracion/texto`, null],
+      ['/metadatos/titulo', null],
+      ['/objetivos/0/texto', null],
+    ];
+    for (const [ruta, limite] of casos) expect([ruta, limiteDe(doc, ruta)]).toEqual([ruta, limite]);
+    // Una ruta de cada forma que aparece en LOTO, con su componente.
+    const porForma = new Map<string, string>();
+    for (const t of textosDe(doc)) {
+      const forma = t.ruta.replace(/\/\d+(?=\/|$)/g, '/#');
+      const clave = forma.endsWith('/contenido') && forma.includes('/bloques/#/contenido') ? `${forma}:${componenteDe(doc, t.ruta)}` : forma;
+      porForma.set(clave, componenteDe(doc, t.ruta));
+    }
+    const B = '/modulos/#/capsulas/#/pantallas/#/bloques/#';
+    expect(Object.fromEntries([...porForma].filter(([k]) => k.startsWith(B)).map(([k, v]) => [k.slice(B.length), v]))).toEqual({
+      '/alt': 'sinLimite',
+      '/contenido:titulo': 'titulo',
+      '/contenido:subtitulo': 'subtitulo',
+      '/contenido:destacado': 'destacado',
+      '/contenido:cuerpo': 'cuerpo',
+      '/interaccion/instruccion': 'instruccion',
+      '/interaccion/datos/alt': 'sinLimite',
+      '/interaccion/datos/afirmaciones/#/texto': 'cuerpo',
+      '/interaccion/datos/afirmaciones/#/retroalimentacion': 'cuerpo',
+      '/interaccion/datos/elementos/#/contenido/texto': 'opcion',
+      '/interaccion/datos/elementos/#/retroalimentacion': 'cuerpo',
+      '/interaccion/datos/grupos/#/etiqueta': 'etiquetaGrupo',
+      '/interaccion/datos/nodos/#/situacion': 'cuerpo',
+      '/interaccion/datos/nodos/#/opciones/#/texto': 'opcion',
+      '/interaccion/datos/nodos/#/opciones/#/consecuencia': 'cuerpo',
+      '/interaccion/datos/pares/#/a/texto': 'tarjetaMemoria',
+      '/interaccion/datos/pares/#/b/texto': 'tarjetaMemoria',
+      '/interaccion/datos/pasos/#/contenido/texto': 'opcion',
+      '/interaccion/datos/preguntas/#/enunciado': 'cuerpo',
+      '/interaccion/datos/preguntas/#/opciones/#/contenido/texto': 'opcion',
+      '/interaccion/datos/preguntas/#/retroalimentacion/correcta': 'cuerpo',
+      '/interaccion/datos/preguntas/#/retroalimentacion/incorrecta': 'cuerpo',
+      '/interaccion/datos/puntos/#/titulo': 'titulo',
+      '/interaccion/datos/puntos/#/contenido': 'cuerpo',
+      '/marcadores/#/titulo': 'titulo',
+      '/marcadores/#/contenido': 'cuerpo',
+      '/marcadores/#/pregunta/enunciado': 'cuerpo',
+      '/marcadores/#/pregunta/opciones/#/contenido/texto': 'opcion',
+      '/marcadores/#/pregunta/retroalimentacion/correcta': 'cuerpo',
+      '/marcadores/#/pregunta/retroalimentacion/incorrecta': 'cuerpo',
+    });
+    expect(LIMITE_CARACTERES).toMatchObject({ titulo: 45, subtitulo: 70, destacado: 70, cuerpo: 160, instruccion: 90, opcion: 60, tarjetaMemoria: 24, etiquetaGrupo: 20, sinLimite: null });
+  });
+
+  it('el español de LOTO cabe completo: 0 desbordes en los 291 textos', () => {
+    const textos = textosDe(loto());
+    expect(textos).toHaveLength(291);
+    expect(textos.filter((t) => desborda(t.es, t.limite))).toEqual([]);
+    expect(textos.filter((t) => t.limite !== null).length).toBeGreaterThan(200);
+  });
+
+  it('desborda cuenta sin espacios al borde; sin límite nunca desborda', () => {
+    expect(desborda('a'.repeat(24), 24)).toBe(false);
+    expect(desborda(` ${'a'.repeat(24)} `, 24)).toBe(false);
+    expect(desborda('a'.repeat(25), 24)).toBe(true);
+    expect(desborda('a'.repeat(999), null)).toBe(false);
+    expect(desborda(null, 24)).toBe(false);
+  });
+
+  it('CP-078 · al sincronizar, un inglés de la IA que no cabe pasa a Desborde; lo revisado no', () => {
+    const largo = 'Cylinders and pressure hoses';
+    const textos = [
+      { ruta: '/a', pantallaId: 'p07', es: 'Cilindros y mangueras', en: largo, limite: 24 },
+      { ruta: '/b', pantallaId: 'p07', es: 'Cables', en: largo, limite: 24 },
+      { ruta: '/c', pantallaId: 'p07', es: 'Aire', en: 'Air', limite: 24 },
+      { ruta: '/d', pantallaId: 'p07', es: 'Resortes', en: largo, limite: 24 },
+    ];
+    const filas = [
+      { id: '1', ruta: '/a', textoOrigenHash: huellaTexto('Cilindros y mangueras'), estado: 'TRADUCIDA_IA' as const },
+      { id: '2', ruta: '/b', textoOrigenHash: huellaTexto('Cables'), estado: 'REVISADA' as const },
+      { id: '3', ruta: '/c', textoOrigenHash: huellaTexto('Aire'), estado: 'TRADUCIDA_IA' as const },
+    ];
+    expect(sincronizarFilas(textos, filas)).toMatchObject({
+      crear: [{ ruta: '/d', estado: 'DESBORDE' }],
+      desbordar: ['1'],
+    });
+    expect(erroresLimite([{ ruta: '/a', limite: 24 }], { traducciones: [{ ruta: '/a', texto: largo }] })).toEqual(['/a: tiene 28 caracteres y caben 24: acórtalo']);
+    expect(erroresLimite([{ ruta: '/a', limite: 24 }], { traducciones: [{ ruta: '/a', texto: 'Cylinders and hoses' }] })).toEqual([]);
   });
 });

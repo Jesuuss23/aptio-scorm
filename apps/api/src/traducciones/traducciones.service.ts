@@ -1,9 +1,11 @@
 // HU-0802 · Traducción con glosario (M08, RN-08-1, RN-08-2). Las filas de Traduccion se ponen al día con los textos del
 // curso al listar y al pedir la traducción (huella del español: si cambió, vuelve a Pendiente aunque estuviera revisada).
 // «Traducir pendientes» encola IA-10 en la cola ia; editar el inglés guarda una versión del curso y lo deja Revisado.
+// HU-0803 · Desbordes (RN-08-3, CP-078): cada texto trae su límite; un inglés de la IA o de una persona que no cabe queda
+// en Desborde (la persona puede aceptarlo con «Marcar revisado» o usar la versión corta propuesta).
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@aptio/db';
-import { type EstadoTraduccion, huellaTexto, sincronizarFilas, TAREA_TRADUCIR, type TextoCurso, textosDe } from '@aptio/schema/traduccion';
+import { desborda, type EstadoTraduccion, huellaTexto, sincronizarFilas, TAREA_TRADUCIR, type TextoCurso, textosDe } from '@aptio/schema/traduccion';
 import { resolverPuntero } from '@aptio/schema/voz';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
@@ -13,7 +15,8 @@ import { ColasService } from '../trabajos/colas.service.js';
 import type { FiltroTraduccionesDto, TraduccionCambioDto, TraduccionDto } from './traduccion.dto.js';
 
 const IDIOMA = 'en';
-type Fila = { id: string; ruta: string; textoOrigenHash: string; estado: string };
+type Fila = { id: string; ruta: string; textoOrigenHash: string; estado: string; propuesta: string | null };
+const CAMPOS = { id: true, ruta: true, textoOrigenHash: true, estado: true, propuesta: true } as const;
 
 @Injectable()
 export class TraduccionesService {
@@ -30,13 +33,14 @@ export class TraduccionesService {
   /** Pone las filas al día con los textos del curso y las devuelve. */
   private async sincronizar(cursoId: string, textos: readonly TextoCurso[]): Promise<Fila[]> {
     return this.bd.$transaction(async (tx: Prisma.TransactionClient) => {
-      const filas = await tx.traduccion.findMany({ where: { cursoId, idioma: IDIOMA }, select: { id: true, ruta: true, textoOrigenHash: true, estado: true } });
-      const { crear, reiniciar, borrar } = sincronizarFilas(textos, filas.map((f) => ({ ...f, estado: f.estado as EstadoTraduccion })));
-      if (!crear.length && !reiniciar.length && !borrar.length) return filas;
+      const filas = await tx.traduccion.findMany({ where: { cursoId, idioma: IDIOMA }, select: CAMPOS });
+      const { crear, reiniciar, borrar, desbordar } = sincronizarFilas(textos, filas.map((f) => ({ ...f, estado: f.estado as EstadoTraduccion })));
+      if (!crear.length && !reiniciar.length && !borrar.length && !desbordar.length) return filas;
       if (borrar.length) await tx.traduccion.deleteMany({ where: { id: { in: borrar } } });
       if (crear.length) await tx.traduccion.createMany({ data: crear.map((c) => ({ cursoId, idioma: IDIOMA, ...c })), skipDuplicates: true });
-      for (const r of reiniciar) await tx.traduccion.update({ where: { id: r.id }, data: { textoOrigenHash: r.textoOrigenHash, estado: 'PENDIENTE' } });
-      return tx.traduccion.findMany({ where: { cursoId, idioma: IDIOMA }, select: { id: true, ruta: true, textoOrigenHash: true, estado: true } });
+      for (const r of reiniciar) await tx.traduccion.update({ where: { id: r.id }, data: { textoOrigenHash: r.textoOrigenHash, estado: 'PENDIENTE', propuesta: null } });
+      if (desbordar.length) await tx.traduccion.updateMany({ where: { id: { in: desbordar } }, data: { estado: 'DESBORDE' } });
+      return tx.traduccion.findMany({ where: { cursoId, idioma: IDIOMA }, select: CAMPOS });
     });
   }
 
@@ -47,7 +51,7 @@ export class TraduccionesService {
     return textos
       .map((t) => ({ t, fila: porRuta.get(t.ruta)! }))
       .filter(({ fila }) => fila && (!f.estado || fila.estado === f.estado))
-      .map(({ t, fila }) => ({ id: fila.id, ruta: t.ruta, pantallaId: t.pantallaId, es: t.es, en: t.en, estado: fila.estado }));
+      .map(({ t, fila }) => aDto(fila, t, t.en, fila.estado, fila.propuesta));
   }
 
   /** RN-08-2 · Encola IA-10: el worker traduce solo los Pendientes. */
@@ -67,12 +71,16 @@ export class TraduccionesService {
     return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
   }
 
-  /** Editar el inglés crea una versión del curso y deja el texto Revisado; marcar Revisado exige que haya inglés. */
+  /**
+   * Editar el inglés crea una versión del curso y deja el texto Revisado, o en Desborde si no cabe (CP-078); marcar
+   * Revisado exige que haya inglés y acepta también uno largo (decide la persona). Usar la versión corta es editar el
+   * inglés con la propuesta.
+   */
   async cambiar(u: UsuarioSesion, traduccionId: string, dto: TraduccionCambioDto): Promise<TraduccionDto> {
     if (dto.en === undefined && dto.estado === undefined) {
       throw new UnprocessableEntityException({ codigo: 'SIN_CAMBIOS', mensaje: 'Indica el inglés o el estado' });
     }
-    const fila = await this.bd.traduccion.findUnique({ where: { id: traduccionId }, select: { id: true, cursoId: true, ruta: true, idioma: true } });
+    const fila = await this.bd.traduccion.findUnique({ where: { id: traduccionId }, select: { id: true, cursoId: true, ruta: true, idioma: true, propuesta: true } });
     if (!fila || fila.idioma !== IDIOMA) throw new NotFoundException('Traducción no encontrada');
     // buscar aplica la organización (y el cliente del revisor): una traducción de otra organización da 404.
     const c = await this.cursos.buscar(u, fila.cursoId).catch(() => { throw new NotFoundException('Traducción no encontrada'); });
@@ -89,8 +97,19 @@ export class TraduccionesService {
     } else if (!en) {
       throw new UnprocessableEntityException({ codigo: 'SIN_TRADUCCION', mensaje: 'Escribe o traduce el inglés antes de marcarlo como revisado' });
     }
-    // Revisado contra el español de ahora.
-    await this.bd.traduccion.update({ where: { id: fila.id }, data: { estado: 'REVISADA', textoOrigenHash: huellaTexto(texto.es) } });
-    return { id: fila.id, ruta: fila.ruta, pantallaId: texto.pantallaId, es: texto.es, en, estado: 'REVISADA' };
+    // Contra el español de ahora. Un inglés que no cabe queda en Desborde con su propuesta, salvo que se marque Revisado.
+    const largo = dto.estado !== 'REVISADA' && desborda(en, texto.limite);
+    const estado = largo ? 'DESBORDE' : 'REVISADA';
+    const propuesta = largo ? fila.propuesta : null;
+    await this.bd.traduccion.update({ where: { id: fila.id }, data: { estado, propuesta, textoOrigenHash: huellaTexto(texto.es) } });
+    return aDto(fila, texto, en, estado, propuesta);
   }
+}
+
+/** La fila con su texto, el límite de su componente y los caracteres del inglés (HU-0803). */
+function aDto(fila: { id: string }, t: TextoCurso, en: string | null, estado: string, propuesta: string | null): TraduccionDto {
+  return {
+    id: fila.id, ruta: t.ruta, pantallaId: t.pantallaId, es: t.es, en, estado,
+    limite: t.limite ?? null, caracteres: en === null ? null : en.trim().length, propuesta,
+  };
 }

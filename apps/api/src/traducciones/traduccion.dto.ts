@@ -13,6 +13,9 @@ export class TraduccionDto {
   @ApiProperty() es: string;
   @ApiPropertyOptional({ nullable: true, type: String, description: 'El inglés actual; si el español cambió, queda el anterior como referencia' }) en: string | null;
   @ApiProperty({ enum: ESTADOS_TRADUCCION }) estado: string;
+  @ApiPropertyOptional({ nullable: true, type: Number, description: 'HU-0803 · Caracteres que caben en el componente; null si no ocupa espacio en pantalla' }) limite: number | null;
+  @ApiPropertyOptional({ nullable: true, type: Number, description: 'Caracteres del inglés actual (sin espacios al borde)' }) caracteres: number | null;
+  @ApiPropertyOptional({ nullable: true, type: String, description: 'HU-0803 · Versión corta propuesta por la IA para un texto en Desborde' }) propuesta: string | null;
 }
 
 export class FiltroTraduccionesDto {

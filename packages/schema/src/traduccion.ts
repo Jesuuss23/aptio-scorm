@@ -2,6 +2,8 @@
 // con sus filas de Traduccion, editar el inglés), el worker (qué se manda a IA-10 y cómo se guarda) y las pruebas.
 // Cada texto del curso es un objeto por idioma `{ es, en }` (textoI18n del esquema) y se identifica por la ruta JSON
 // Pointer de ese objeto. La traducción se guarda en su `.en`; el estado vive en la tabla Traduccion.
+// HU-0803 · Desbordes (RN-08-3): cada texto en pantalla tiene un límite de caracteres según su componente; un inglés
+// que lo pasa queda en Desborde, con una propuesta de versión corta.
 import { contieneTermino, patronTermino, resolverPuntero, type TerminoGlosario } from './voz.js';
 
 export type EstadoTraduccion = 'PENDIENTE' | 'TRADUCIDA_IA' | 'REVISADA' | 'DESBORDE';
@@ -13,6 +15,58 @@ export interface TextoCurso {
   pantallaId: string | null;
   es: string;
   en: string | null;
+  /** HU-0803 · Caracteres que caben en su componente; null si no ocupa espacio en pantalla (narración, alt, metadatos). */
+  limite?: number | null;
+}
+
+/**
+ * HU-0803 · Caracteres que caben en cada tipo de componente (referencia calibrada con el español de LOTO hasta que haya
+ * medición por disposición y kit). null: el texto no ocupa espacio en la pantalla.
+ */
+export const LIMITE_CARACTERES = {
+  titulo: 45,
+  subtitulo: 70,
+  destacado: 70,
+  cuerpo: 160,
+  instruccion: 90,
+  opcion: 60,
+  tarjetaMemoria: 24,
+  etiquetaGrupo: 20,
+  sinLimite: null,
+} as const;
+export type ComponenteTexto = keyof typeof LIMITE_CARACTERES;
+
+/** Componente de cada ruta por su forma (los números de posición se cambian por #). El primero que coincide gana. */
+const COMPONENTES: [RegExp, ComponenteTexto][] = [
+  [/\/narracion\/texto$|\/alt$|^\/metadatos\/|^\/objetivos\//, 'sinLimite'],
+  [/\/pares\/#\/[ab]\/texto$/, 'tarjetaMemoria'],
+  [/\/grupos\/#\/etiqueta$/, 'etiquetaGrupo'],
+  [/\/interaccion\/instruccion$/, 'instruccion'],
+  [/\/opciones\/#\/(contenido\/)?texto$|\/pasos\/#\/contenido\/texto$|\/elementos\/#\/contenido\/texto$/, 'opcion'],
+  [/\/titulo$|\/tarjetas\/#\/frente\/texto$/, 'titulo'],
+  [/\/(situacion|consecuencia|retroalimentacion|correcta|incorrecta|enunciado|contenido)$|\/afirmaciones\/#\/texto$|\/tarjetas\/#\/reverso\/texto$/, 'cuerpo'],
+];
+
+/** Tipo de componente del texto en `ruta` (un bloque de texto se clasifica por su rol). */
+export function componenteDe(doc: unknown, ruta: string): ComponenteTexto {
+  const bloque = ruta.match(/^(.*\/bloques\/\d+)\/contenido$/);
+  if (bloque) {
+    const rol = (resolverPuntero(doc, bloque[1]!) as { rol?: string } | undefined)?.rol;
+    if (rol === 'titulo' || rol === 'subtitulo' || rol === 'destacado') return rol;
+    return 'cuerpo';
+  }
+  const forma = ruta.replace(/\/\d+(?=\/|$)/g, '/#');
+  return COMPONENTES.find(([patron]) => patron.test(forma))?.[1] ?? 'sinLimite';
+}
+
+/** HU-0803 · Caracteres que caben en el componente del texto en `ruta`; null si no tiene límite. */
+export function limiteDe(doc: unknown, ruta: string): number | null {
+  return LIMITE_CARACTERES[componenteDe(doc, ruta)];
+}
+
+/** RN-08-3 · true si el texto no cabe en su límite (sin contar espacios al inicio o al final). */
+export function desborda(texto: string | null | undefined, limite: number | null | undefined): boolean {
+  return typeof limite === 'number' && typeof texto === 'string' && texto.trim().length > limite;
 }
 
 const escapar = (parte: string) => parte.replace(/~/g, '~0').replace(/\//g, '~1');
@@ -30,7 +84,7 @@ export function textosDe(doc: unknown): TextoCurso[] {
   const salida: TextoCurso[] = [];
   const visitar = (v: unknown, ruta: string, pantallaId: string | null, esPantalla: boolean) => {
     if (esTexto(v)) {
-      salida.push({ ruta, pantallaId, es: v.es, en: typeof v.en === 'string' ? v.en : null });
+      salida.push({ ruta, pantallaId, es: v.es, en: typeof v.en === 'string' ? v.en : null, limite: limiteDe(doc, ruta) });
       return;
     }
     if (Array.isArray(v)) {
@@ -123,24 +177,35 @@ export interface FilaTraduccion {
  * Lo que hay que hacer para que las filas reflejen los textos actuales del curso: crear las que faltan (Pendiente, o
  * Traducido por IA si el texto ya trae inglés), volver a Pendiente las que cambiaron en español (aunque estuvieran
  * revisadas: lo revisado era para otro texto; el inglés anterior queda como referencia) y borrar las de rutas que ya
- * no existen.
+ * no existen. HU-0803: un inglés de la IA que pasa su límite queda en Desborde (`desbordar`); lo revisado no se toca.
  */
 export function sincronizarFilas(textos: readonly TextoCurso[], filas: readonly FilaTraduccion[]): {
   crear: { ruta: string; textoOrigenHash: string; estado: EstadoTraduccion }[];
   reiniciar: { id: string; textoOrigenHash: string }[];
   borrar: string[];
+  desbordar: string[];
 } {
   const porRuta = new Map(filas.map((f) => [f.ruta, f]));
   const vigentes = new Set(textos.map((t) => t.ruta));
   const crear: { ruta: string; textoOrigenHash: string; estado: EstadoTraduccion }[] = [];
   const reiniciar: { id: string; textoOrigenHash: string }[] = [];
+  const desbordar: string[] = [];
   for (const t of textos) {
     const huella = huellaTexto(t.es);
     const fila = porRuta.get(t.ruta);
-    if (!fila) crear.push({ ruta: t.ruta, textoOrigenHash: huella, estado: t.en ? 'TRADUCIDA_IA' : 'PENDIENTE' });
+    const largo = desborda(t.en, t.limite);
+    if (!fila) crear.push({ ruta: t.ruta, textoOrigenHash: huella, estado: t.en ? (largo ? 'DESBORDE' : 'TRADUCIDA_IA') : 'PENDIENTE' });
     else if (fila.textoOrigenHash !== huella) reiniciar.push({ id: fila.id, textoOrigenHash: huella });
+    else if (fila.estado === 'TRADUCIDA_IA' && largo) desbordar.push(fila.id);
   }
-  return { crear, reiniciar, borrar: filas.filter((f) => !vigentes.has(f.ruta)).map((f) => f.id) };
+  return { crear, reiniciar, borrar: filas.filter((f) => !vigentes.has(f.ruta)).map((f) => f.id), desbordar };
+}
+
+/** HU-0803 · En la pasada de versión corta, además de las reglas del lote, cada texto debe caber en su límite. */
+export function erroresLimite(pedidos: readonly { ruta: string; limite?: number | null | undefined }[], salida: { traducciones: { ruta: string; texto: string }[] }): string[] {
+  const limites = new Map(pedidos.map((p) => [p.ruta, p.limite]));
+  return salida.traducciones.filter((t) => desborda(t.texto, limites.get(t.ruta)))
+    .map((t) => `${t.ruta}: tiene ${t.texto.trim().length} caracteres y caben ${limites.get(t.ruta)}: acórtalo`);
 }
 
 /** Reglas propias de la salida de IA-10 sobre un lote: exactamente las rutas pedidas y el glosario en cada texto. */

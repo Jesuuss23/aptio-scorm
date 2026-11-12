@@ -1851,3 +1851,36 @@ ul.fila-chips {
     padding: 6px 0;
   }
 }
+
+/* ---- HU-0803 · Desbordes por idioma ---- */
+.contador-caracteres {
+  display: block;
+  font-size: var(--texto-xs);
+  color: var(--color-texto-sec);
+  font-family: var(--fuente-num);
+}
+.contador-caracteres.excede {
+  color: var(--color-aviso);
+  font-weight: 700;
+}
+.detalle-desborde {
+  display: block;
+  font-size: var(--texto-xs);
+  color: var(--color-aviso);
+}
+.propuesta-corta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 6px;
+  padding: 6px 9px;
+  border-radius: var(--radio-control);
+  background: var(--color-aviso-suave);
+}
+.propuesta-corta > small {
+  flex-basis: 100%;
+}
+.propuesta-corta .marcar-revisado {
+  display: inline-block;
+}
