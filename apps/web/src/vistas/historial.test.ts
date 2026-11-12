@@ -19,9 +19,18 @@ describe('historial del editor', () => {
   it('la foto es una copia: cambiar la pantalla después no la toca', () => {
     const p = p01({ ajustes: { 'p01-sub': { color: 'acento' } } });
     const f = fotoDe(p);
-    expect(f).toEqual({ titulo: { es: 'Bloqueo' }, textos: { 'p01-sub': { es: 'Sub', en: 'Sub EN' } }, narracion: { es: 'Hola' }, disposicion: 'idea', ajustes: { 'p01-sub': { color: 'acento' } }, extras: [] });
+    expect(f).toEqual({ titulo: { es: 'Bloqueo' }, textos: { 'p01-sub': { es: 'Sub', en: 'Sub EN' } }, narracion: { es: 'Hola' }, disposicion: 'idea', ajustes: { 'p01-sub': { color: 'acento' } }, extras: [], disparadores: [] });
     (p as unknown as { ajustes: Record<string, unknown> }).ajustes['p01-sub'] = { color: 'primario' };
     expect(f.ajustes['p01-sub']).toEqual({ color: 'acento' });
+  });
+
+  it('HU-0610 · deshacer vuelve la lista de disparadores y la manda entera', () => {
+    const d = { id: 'p01-disp-1', cuando: { evento: 'tiempo' as const, segundo: 3 }, accion: { tipo: 'mostrar' as const, elementoId: 'p01-sub' } };
+    const antes = fotoDe(p01({ disparadores: [d] }));
+    expect(cambioHacia(p01(), antes)).toEqual({ disparadores: [d] });
+    const disparos = (x: unknown) => (x as { disparadores?: unknown }).disparadores;
+    expect(disparos(conFoto(p01(), antes))).toEqual([d]);
+    expect(disparos(conFoto(p01({ disparadores: [d] }), fotoDe(p01())))).toBeUndefined();
   });
 
   it('una pantalla igual a la foto no tiene nada que guardar', () => {

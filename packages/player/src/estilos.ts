@@ -215,6 +215,8 @@ button:disabled{cursor:not-allowed}
 .ap-extra-forma{aspect-ratio:3/1;border-radius:10px;background:var(--ap-acento)}
 .ap-oculto-el{display:none!important}
 .ap-fuera{display:none!important}
+/* HU-0610 · «Ocultar» de un disparador: gana sobre la línea de tiempo y sobre el editor. */
+.ap-r .ap-disparo-oculto{display:none!important}
 .ap-entra{animation:ap-aparecer .4s ease-out both}
 /* HU-0603 · Desplazamiento del modo Libre, en % del ancho del reproductor y por dispositivo. */
 .ap-desp{translate:var(--ap-dx) var(--ap-dy)}

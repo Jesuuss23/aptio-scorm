@@ -417,6 +417,48 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(p01.ajustes).toEqual({ 'p01-titulo': { color: 'acento' } });
     expect((await como('grafico').patch(ruta, { version: v + 2, ajustes: { 'x-boton-1': { color: 'acento' } } })).body).toMatchObject({ codigo: 'BLOQUE_NO_EXISTE' });
   });
+  it('HU-0610 · CP-069: guarda los disparadores de la pantalla; quitar un extra borra los suyos; 422 DISPARADOR_NO_VALIDO; el revisor, 403', async () => {
+    type Pd = { id: string; extras?: { id: string }[]; disparadores?: { id: string }[] };
+    const p03De = (d: Doc) => pantallas(d).find((x) => x.id === 'p03') as unknown as Pd;
+    const ruta = `/cursos/${cursoId}/pantallas/p03`;
+    let v = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    const boton = { id: 'p03-boton-seguir', tipo: 'boton', texto: { es: 'Seguir' }, x: 60, y: 80, ancho: 25 };
+    const mostrar = { id: 'p03-disp-1', cuando: { evento: 'tiempo', segundo: 3 }, accion: { tipo: 'mostrar', elementoId: 'p03-boton-seguir' } };
+    const irA = { id: 'p03-disp-2', cuando: { evento: 'fin-voz' }, accion: { tipo: 'ir-a', pantallaId: 'p05' } };
+
+    // El botón oculto y su disparador «a los 3 s → mostrar» pueden ir en el mismo cambio.
+    const r = await como('grafico').patch(ruta, { version: v, extras: [boton], ajustes: { 'p03-boton-seguir': { oculto: true } }, disparadores: [mostrar, irA] });
+    expect(r.status).toBe(200);
+    expect(p03De(await documento()).disparadores).toEqual([mostrar, irA]);
+    v = r.body.version;
+
+    // Lo que no pasa las reglas no se guarda.
+    const malos = [
+      [{ ...mostrar, cuando: { evento: 'tiempo', segundo: 601 } }],
+      [{ ...mostrar, cuando: { evento: 'tiempo' } }],
+      [{ ...mostrar, accion: { tipo: 'mostrar', elementoId: 'p05-titulo' } }],
+      [{ ...irA, accion: { tipo: 'ir-a', pantallaId: 'p99' } }],
+      Array.from({ length: 11 }, (_, i) => ({ ...mostrar, id: `p03-disp-${i + 10}` })),
+    ];
+    const respuestas = await Promise.all(malos.map(async (disparadores) => (await como('grafico').patch(ruta, { version: v, disparadores })).body.codigo));
+    expect(respuestas).toEqual(Array.from({ length: 5 }, () => 'DISPARADOR_NO_VALIDO'));
+    const detalle = await como('grafico').patch(ruta, { version: v, disparadores: malos[3] });
+    expect(detalle.status).toBe(422);
+    expect(detalle.body.detalles).toEqual([{ mensaje: 'p03/disparadores/0/accion: la pantalla «p99» no está en el curso' }]);
+    // Un evento que no es del catálogo (el clic llega después) tampoco.
+    expect((await como('grafico').patch(ruta, { version: v, disparadores: [{ ...mostrar, cuando: { evento: 'clic' } }] })).body)
+      .toMatchObject({ codigo: 'DISPARADOR_NO_VALIDO', detalles: [{ mensaje: 'p03/disparadores/0/cuando: evento no válido' }] });
+    expect((await como('revisor').patch(ruta, { version: v, disparadores: [] })).status).toBe(403);
+    expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);
+
+    // Quitar el botón borra su disparador y deja el de «ir a»; una lista vacía los quita todos.
+    const sinBoton = await como('productor').patch(ruta, { version: v, extras: [] });
+    expect(sinBoton.status).toBe(200);
+    expect(p03De(await documento())).toMatchObject({ disparadores: [irA] });
+    expect((await como('instruccional').patch(ruta, { version: sinBoton.body.version, disparadores: [] })).status).toBe(200);
+    expect(p03De(await documento())).not.toHaveProperty('disparadores');
+  });
+
   it('HU-0608 · CP-067: al corregir la narración, el ancla sigue a su palabra; si ya no está, queda el segundo y «Revisar tiempo»', async () => {
     type Pa = { id: string; ajustes?: Record<string, Record<string, unknown>> };
     const p05De = (d: Doc) => pantallas(d).find((x) => x.id === 'p05') as unknown as Pa;

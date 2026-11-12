@@ -16,11 +16,14 @@ type Tramo = { inicioS: number; finS: number };
 const UMBRAL_PX = 3;
 
 export function LineaTiempo({
-  barras, marcas, subtitulos, boca, vozS, duracion, tiempo, reproduciendo, elegidoId, ocupado,
+  barras, disparos = [], marcas, subtitulos, boca, vozS, duracion, tiempo, reproduciendo, elegidoId, ocupado,
   alIr, alReproducir, alPausar, alDetener, alCambiar, alElegir, alAlternarOculto, alOcultar,
   sincronizacion, alSincronizar, alAplicarSincronizacion, alDescartarSincronizacion,
 }: {
-  barras: BarraTiempo[]; marcas: MarcaPalabra[]; subtitulos: (Tramo & { texto: string })[]; boca: (Tramo & { boca: string })[] | null;
+  barras: BarraTiempo[];
+  /** HU-0610 · Los disparadores por tiempo, como ◆ sobre la regla. */
+  disparos?: { id: string; segundo: number; texto: string }[];
+  marcas: MarcaPalabra[]; subtitulos: (Tramo & { texto: string })[]; boca: (Tramo & { boca: string })[] | null;
   vozS: number; duracion: number; tiempo: number | null; reproduciendo: boolean; elegidoId: string | null; ocupado: boolean;
   alIr: (s: number) => void; alReproducir: () => void; alPausar: () => void; alDetener: () => void;
   alCambiar: (id: string, cambio: CambioTiempo) => void; alElegir: (id: string) => void; alAlternarOculto: (id: string) => void; alOcultar: () => void;
@@ -125,6 +128,11 @@ export function LineaTiempo({
           <div className="lt-pista lt-regla" data-pista="regla" aria-label="Regla: clic para ir a ese segundo" onClick={irAlClic}>
             {marcasRegla(duracion).map((m) => (
               <i key={m.s} className={m.entero ? 'lt-tick lt-tick-entero' : 'lt-tick'} style={{ left: x(m.s) }}>{m.entero ? <span>{m.s} s</span> : null}</i>
+            ))}
+            {disparos.map((d) => (
+              <span key={d.id} className="lt-disparo" style={{ left: x(d.segundo) }} title={d.texto} data-disparo={d.id}>
+                <span aria-hidden="true">◆</span><span className="sr">Disparador: {d.texto}</span>
+              </span>
             ))}
           </div>
 

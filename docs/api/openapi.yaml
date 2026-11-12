@@ -1800,7 +1800,10 @@ paths:
         422 DISENO_NO_PERMITIDO si la pantalla tiene una actividad, un video o es la de resultados, o si el diseño no es
         de contenido. HU-0606 · `extras` reemplaza los elementos agregados de la pantalla; 422 EXTRA_NO_VALIDO si un id
         se repite o es el de un bloque. `ajustes` acepta también ids de extras. HU-0607 · Deshacer y rehacer del editor
-        mandan el mismo cambio con `motivo` (`deshacer` o `rehacer`), que rotula la versión.
+        mandan el mismo cambio con `motivo` (`deshacer` o `rehacer`), que rotula la versión. HU-0610 · `disparadores`
+        reemplaza la lista de disparadores de la pantalla (CP-069); 422 DISPARADOR_NO_VALIDO con `detalles` si hay más de
+        10, un id se repite, falta el segundo o sale de 0 a 600, o el elemento o la pantalla no existen. Quitar un extra
+        borra los disparadores que lo muestran u ocultan.
       parameters:
       - name: cursoId
         in: path
@@ -4942,6 +4945,53 @@ components:
         creadoEn:
           type: string
           format: date-time
+    Disparador:
+      type: object
+      description: HU-0610 · Disparador simple de una pantalla, con el mismo reloj que la línea de tiempo. `mostrar` gana
+        a un elemento oculto y a su entrada; `ocultar` gana a su salida; `ir-a` respeta las reglas de avance (RN-11-4).
+      required:
+      - id
+      - cuando
+      - accion
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          example: p05-disp-1
+        cuando:
+          type: object
+          required:
+          - evento
+          additionalProperties: false
+          properties:
+            evento:
+              type: string
+              enum:
+              - tiempo
+              - fin-voz
+            segundo:
+              type: number
+              minimum: 0
+              maximum: 600
+              description: Obligatorio con `tiempo`.
+        accion:
+          type: object
+          required:
+          - tipo
+          additionalProperties: false
+          properties:
+            tipo:
+              type: string
+              enum:
+              - mostrar
+              - ocultar
+              - ir-a
+            elementoId:
+              type: string
+              description: Bloque o extra de la misma pantalla, con `mostrar` u `ocultar`.
+            pantallaId:
+              type: string
+              description: Otra pantalla del curso, con `ir-a`.
     ElementoExtra:
       type: object
       description: HU-0606 · Elemento agregado en el editor (curso-v0 `elementoExtra`). x, y y ancho en % de la pantalla;
@@ -5083,6 +5133,12 @@ components:
             borra su ajuste.
           items:
             $ref: '#/components/schemas/ElementoExtra'
+        disparadores:
+          type: array
+          maxItems: 10
+          description: HU-0610 · Lista completa de disparadores de la pantalla (REQ-045). Una lista vacía los quita todos.
+          items:
+            $ref: '#/components/schemas/Disparador'
         motivo:
           type: string
           enum:

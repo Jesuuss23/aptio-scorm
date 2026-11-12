@@ -264,6 +264,10 @@ export interface Pantalla {
    * Elementos agregados a mano en el editor sobre la pantalla generada (v0.2).
    */
   extras?: ElementoExtra[];
+  /**
+   * Disparadores simples del editor (HU-0610): cuando llega un segundo de la línea de tiempo o termina la voz, mostrar u ocultar un elemento o ir a otra pantalla. Como mucho 10 por pantalla (regla adicional).
+   */
+  disparadores?: Disparador[];
 }
 /**
  * This interface was referenced by `CursoDeCapsulasEsquemaV0`'s JSON-Schema
@@ -346,6 +350,31 @@ export interface ElementoExtra {
   y: number;
   ancho: number;
   alClic?: 'nada' | 'siguiente' | 'retroalimentacion' | 'ventana' | 'audio' | 'puntos';
+}
+/**
+ * This interface was referenced by `CursoDeCapsulasEsquemaV0`'s JSON-Schema
+ * via the `definition` "disparador".
+ */
+export interface Disparador {
+  id: Id;
+  cuando: {
+    evento: 'tiempo' | 'fin-voz';
+    /**
+     * Con evento «tiempo»: segundo de la línea de tiempo (0 a 600, regla adicional)
+     */
+    segundo?: number;
+  };
+  accion: {
+    tipo: 'mostrar' | 'ocultar' | 'ir-a';
+    /**
+     * Con mostrar u ocultar: id de un bloque o de un extra de la pantalla (las claves de `ajustes`)
+     */
+    elementoId?: string;
+    /**
+     * Con ir-a: id de otra pantalla del curso
+     */
+    pantallaId?: string;
+  };
 }
 /**
  * This interface was referenced by `CursoDeCapsulasEsquemaV0`'s JSON-Schema

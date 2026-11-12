@@ -10,6 +10,7 @@ import { hashNarracion } from '@aptio/ai';
 import { type Prisma, recalcularReglas } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
+import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
 import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, reanclarAjustes } from '@aptio/schema/tiempos';
@@ -190,6 +191,20 @@ export class CursosService {
         if (pe.ajustes && !Object.keys(pe.ajustes).length) delete pe.ajustes;
         if (dto.extras.length) pe.extras = dto.extras as { id: string }[];
         else delete pe.extras;
+        // HU-0610 · Los disparadores de un extra que se quitó se van con él.
+        purgarDisparadores(p as PantallaDoc & { disparadores?: unknown });
+        cambios++;
+      }
+      // HU-0610 · Disparadores: la lista completa de la pantalla, como los extras (después de ellos, para poder apuntar a
+      // uno nuevo en el mismo cambio). 422 DISPARADOR_NO_VALIDO si no pasan `erroresDisparadores`.
+      if (dto.disparadores !== undefined) {
+        const pd = p as PantallaDoc & { disparadores?: unknown[] };
+        if (Array.isArray(dto.disparadores) && dto.disparadores.length) pd.disparadores = dto.disparadores;
+        else delete pd.disparadores;
+        const errores = erroresDisparadores(pd, pantallasDe(doc).map((x) => x.id));
+        if (errores.length) {
+          throw new UnprocessableEntityException({ codigo: 'DISPARADOR_NO_VALIDO', mensaje: 'Revisa los disparadores de la pantalla', detalles: errores.slice(0, 10).map((e) => ({ mensaje: e })) });
+        }
         cambios++;
       }
       if (dto.ajustes !== undefined) {

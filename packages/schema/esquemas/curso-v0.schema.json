@@ -1722,6 +1722,13 @@
           "items": {
             "$ref": "#/$defs/elementoExtra"
           }
+        },
+        "disparadores": {
+          "description": "Disparadores simples del editor (HU-0610): cuando llega un segundo de la línea de tiempo o termina la voz, mostrar u ocultar un elemento o ir a otra pantalla. Como mucho 10 por pantalla (regla adicional).",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/disparador"
+          }
         }
       }
     },
@@ -1817,6 +1824,63 @@
         },
         "oculto": {
           "type": "boolean"
+        }
+      }
+    },
+    "disparador": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "cuando",
+        "accion"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "cuando": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "evento"
+          ],
+          "properties": {
+            "evento": {
+              "enum": [
+                "tiempo",
+                "fin-voz"
+              ]
+            },
+            "segundo": {
+              "type": "number",
+              "description": "Con evento «tiempo»: segundo de la línea de tiempo (0 a 600, regla adicional)"
+            }
+          }
+        },
+        "accion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tipo"
+          ],
+          "properties": {
+            "tipo": {
+              "enum": [
+                "mostrar",
+                "ocultar",
+                "ir-a"
+              ]
+            },
+            "elementoId": {
+              "type": "string",
+              "description": "Con mostrar u ocultar: id de un bloque o de un extra de la pantalla (las claves de `ajustes`)"
+            },
+            "pantallaId": {
+              "type": "string",
+              "description": "Con ir-a: id de otra pantalla del curso"
+            }
+          }
         }
       }
     },

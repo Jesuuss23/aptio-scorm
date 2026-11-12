@@ -37,6 +37,9 @@ describe('tiempos del reproductor', () => {
     expect(duracionDe(p05(), 'es')).toBe(6.33);
     expect(duracionDe(p05({ 'p05-dato': { finS: 9 } }), 'es')).toBe(9);
     expect(duracionDe(p05(), 'en')).toBe(3);
+    // HU-0610 · Hasta 1 s después del último disparador por tiempo.
+    const conDisparador = { ...p05(), disparadores: [{ id: 'd1', cuando: { evento: 'tiempo', segundo: 12 }, accion: { tipo: 'ir-a', pantallaId: 'p06' } }] } as Parameters<typeof duracionDe>[0];
+    expect(duracionDe(conDisparador, 'es')).toBe(13);
   });
 
   it('fuera de su tiempo un elemento no ocupa lugar; lo escalonado entra con una animación', () => {
