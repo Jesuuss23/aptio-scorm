@@ -1784,8 +1784,21 @@ ul.fila-chips {
 .idiomas > .idiomas-textos {
   flex: 2 1 560px;
 }
-.idiomas > .idiomas-glosario {
+.idiomas > .idiomas-lateral {
   flex: 1 1 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* HU-0804 · Voz en inglés */
+.voz-ingles .fila-titulo {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.voz-ingles .sin-traducir ul {
+  margin: 8px 0 0;
+  padding-left: 16px;
 }
 .tabla-idiomas {
   min-width: 620px;

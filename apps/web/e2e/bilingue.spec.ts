@@ -3,6 +3,7 @@
 // mismos puntos y el texto en inglés; suspend_data guarda `en` con LMSCommit y, al volver a entrar, abre en inglés.
 // El inglés es el de la traducción simulada («[EN] …»), como queda tras HU-0801 en modo simulado.
 // axe-core WCAG 2.2 A/AA con el botón de idioma visible, en español y en inglés: cero violaciones.
+// HU-0804 · Parte 2: con la voz en inglés de p03, en inglés suenan su audio y sus subtítulos (`lang="en"`).
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type FrameLocator, type Page, test } from '@playwright/test';
 import { aplanar, type CursoReproductor, huellaCurso } from '@aptio/player';
@@ -98,6 +99,44 @@ test('CP-079 · en la pantalla 8 con puntos, cambiar a inglés deja la 8 con los
   await expect(sco.locator('.ap-r')).toHaveAttribute('lang', 'en');
   await expect(sco.locator('.ap-titulo-pantalla')).toHaveText(`[EN] ${tituloEs}`);
   expect(await estadoDe(page, /otra-vez/)).toMatchObject({ pantallaId: 'p08', puntos: antes.puntos });
+});
+
+// HU-0804 · Parte 2: p03 tiene su voz en inglés (audio, boca y subtítulos de la pista `en`).
+const VTT_EN = 'WEBVTT\n\n00:00.000 --> 00:02.275\nI am Ana, safety supervisor.\n\n00:02.275 --> 00:06.305\nI will show you how to protect yourself when you service equipment.\n';
+const p03Es = 'Soy Ana, supervisora de seguridad. Te voy a mostrar cómo protegerte cuando intervengas un equipo.';
+function conVozIngles(): Curso {
+  const c = traducirLoto(cursoLoto());
+  (c.recursos as unknown[]).push(
+    { id: 'aud-p03-en', tipo: 'audio', origen: 'generado', nombre: 'p03-en.mp3', mime: 'audio/mpeg', idioma: 'en' },
+    { id: 'vtt-p03-en', tipo: 'subtitulos', origen: 'generado', nombre: 'p03-en.vtt', mime: 'text/vtt', idioma: 'en' },
+  );
+  type Pista = { recursoAudioId?: string; subtitulosId?: string; voz?: unknown; bocas?: unknown[] };
+  const p03 = c.modulos.flatMap((m) => m.capsulas.flatMap((cap) => cap.pantallas)).find((p) => p.id === 'p03') as unknown as { narracion: { porIdioma: Record<string, Pista> } };
+  p03.narracion.porIdioma.en = { ...structuredClone(p03.narracion.porIdioma.es!), recursoAudioId: 'aud-p03-en', subtitulosId: 'vtt-p03-en', voz: { proveedor: 'google', voz: 'en-US-Neural2-F', velocidad: 1 } };
+  return c;
+}
+
+test('en inglés, la pantalla narrada usa su audio y sus subtítulos en inglés (lang="en"), sin violaciones de axe', async ({ page }) => {
+  const sco = await abrirEnLms(page, conVozIngles(), {
+    modoIdioma: 'mismo-paquete',
+    recursosExtra: [{ id: 'aud-p03-en', nombre: 'p03-en.mp3', datos: new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0]) }, { id: 'vtt-p03-en', nombre: 'p03-en.vtt', datos: VTT_EN }],
+  });
+  await pantallaVisible(sco, 'p01');
+  await sco.getByRole('button', { name: 'EN, ver en inglés' }).click();
+  await expect(sco.locator('.ap-r')).toHaveAttribute('lang', 'en');
+  for (const n of [2, 3]) {
+    await sco.getByRole('button', { name: 'Next', exact: true }).click();
+    await pantallaVisible(sco, `p0${n}`);
+  }
+  await expect(sco.locator('audio')).toHaveAttribute('src', /recursos\/aud-p03-en\.mp3$/);
+  await sco.getByRole('button', { name: /^CC/ }).click();
+  const subtitulos = sco.locator('.ap-subtitulos');
+  await expect(subtitulos).toHaveAttribute('lang', 'en');
+  // En pausa, el texto completo de la narración en inglés; al sonar, las frases salen del VTT en inglés del paquete.
+  await expect(subtitulos).toHaveText(`[EN] ${p03Es}`);
+  const datos = await page.frame({ url: /paquete\/index\.html$/ })!.evaluate(() => (window as unknown as { APTIO_DATOS: { subtitulos: Record<string, string> } }).APTIO_DATOS.subtitulos);
+  expect(datos['vtt-p03-en']).toBe(VTT_EN);
+  expect(await auditar(page, /paquete\/index\.html$/)).toEqual([]);
 });
 
 test('un paquete de un solo idioma no muestra el botón de idioma', async ({ page }) => {

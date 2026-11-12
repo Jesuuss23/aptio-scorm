@@ -2298,8 +2298,12 @@ paths:
         una narración cuyo texto, voz, velocidad y pronunciación no cambiaron vuelve a «Lista» sin pedir otra voz.
         Con `pantallaIds` y `soloDesactualizadas: false` pide una toma nueva de esas pantallas aunque nada haya
         cambiado. Lo usa el equipo; el revisor del cliente recibe 403. 409 `GENERACION_ACTIVA` si ya hay una generación
-        en curso; 422 `SIN_VOZ` si el curso aún no tiene voz, `IDIOMA_NO_DISPONIBLE` si se pide `en` (HU-0901) y
-        `PANTALLAS_REQUERIDAS` si `soloDesactualizadas` es false sin `pantallaIds`.
+        en curso; 422 `SIN_VOZ` si el curso aún no tiene voz, `IDIOMA_NO_DISPONIBLE` si se piden los dos idiomas a la vez,
+        `SIN_TRADUCCION` si se pide `en` y ninguna narración tiene su inglés, y `PANTALLAS_REQUERIDAS` si
+        `soloDesactualizadas` es false sin `pantallaIds`.
+        HU-0804 · Con `idiomas: [en]` las etapas 6 a 8 hacen la voz, la boca y los subtítulos en inglés de las narraciones
+        que ya tienen su inglés (`porIdioma.en`, `pNN-en.mp3` y `pNN-en.vtt`), con la voz en inglés del kit o
+        en-US-Neural2-F y solo los términos de pronunciación en inglés del cliente; el español no se toca.
       parameters:
       - name: cursoId
         in: path
@@ -5284,6 +5288,7 @@ components:
             pattern: ^p\d{2,3}$
         idiomas:
           type: array
+          description: Un idioma por vez, si no 422 IDIOMA_NO_DISPONIBLE (por defecto es). HU-0804 · en hace la voz, la boca y los subtítulos en inglés.
           items:
             type: string
             enum:

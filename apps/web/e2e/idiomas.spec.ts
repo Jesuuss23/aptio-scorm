@@ -185,3 +185,63 @@ test('CP-078 · la tarjeta que no cabe en inglés queda en Desborde; el contador
   expect(cambios).toEqual([{ en: 'Cylinders, pressure hoses!' }, { en: '[EN] Cilindros y' }]);
   await expect(page.getByText('291 textos · 0 pendientes · 290 traducidos por IA · 0 desbordes · 1 revisados')).toBeVisible();
 });
+
+// HU-0804 · Parte 2: «Voz en inglés» en Idiomas. LOTO traducido salvo p29 y p30; p01–p05 ya tenían su voz en inglés.
+test('«Generar voz en inglés»: contador, avance de voz, boca y subtítulos, y las pantallas que aún no tienen inglés', async ({ page }) => {
+  const GENERACION = '00000000-0000-4000-8000-000000000960';
+  await simularApi(page, { conSesion: true, conProyectos: true, cursoTraducido: true, sinIngles: ['p29', 'p30'] });
+  await simularIdiomas(page);
+  const traducidas = Array.from({ length: 28 }, (_, i) => `p${String(i + 1).padStart(2, '0')}`);
+  let listas = 5;
+  let consultas = 0;
+  const pedidos: unknown[] = [];
+  await page.route((u) => u.pathname === `/api/v1/cursos/${CURSO}/narraciones` && u.searchParams.get('idioma') === 'en', (r) => r.fulfill({
+    json: traducidas.slice(0, listas).map((pantallaId) => ({ pantallaId, idioma: 'en', origen: 'tts', voz: 'en-US-Neural2-F', estado: 'ACTUALIZADA' })),
+  }));
+  await page.route(`**/api/v1/cursos/${CURSO}/narraciones/regenerar`, (r) => {
+    pedidos.push(r.request().postDataJSON());
+    return r.fulfill({ status: 202, json: { id: GENERACION, estado: 'EN_CURSO', eventos: `/api/v1/generaciones/${GENERACION}/eventos`, pendientes: 23 } });
+  });
+  await page.route(`**/api/v1/generaciones/${GENERACION}/eventos`, (r) => r.fulfill({ headers: { 'content-type': 'text/event-stream' }, body: 'event: etapa\ndata: {"etapa":"VOZ_ES"}\n\n' }));
+  // La primera consulta y la del evento SSE ven la voz en curso; cada consulta de respaldo (2 s) avanza una etapa.
+  await page.route(`**/api/v1/generaciones/${GENERACION}`, (r) => {
+    const paso = Math.max(0, ++consultas - 2);
+    const etapa = (nombre: string, orden: number, i: number) => ({
+      etapa: nombre, orden, costoUsd: 0, inicio: null, fin: null,
+      estado: paso > i ? 'COMPLETADO' : paso === i ? 'EN_CURSO' : 'EN_COLA',
+      detalle: paso === i ? (nombre === 'VOZ_ES' ? '12 de 23 narraciones en inglés listas' : 'Boca en inglés de 23 narraciones') : null,
+    });
+    const etapas = [etapa('VOZ_ES', 6, 0), etapa('BOCA', 7, 1), etapa('SUBTITULOS', 8, 2)];
+    const fin = paso >= 3;
+    if (fin) listas = 28;
+    return r.fulfill({ json: { id: GENERACION, proyectoId: PROYECTO, estado: fin ? 'COMPLETADO' : 'EN_CURSO', avance: 0, costoUsd: 0, parametros: {}, etapas, creadoEn: '2026-11-12T10:00:00.000Z', terminadoEn: null } });
+  });
+
+  await page.goto(`/proyectos/${PROYECTO}/idiomas`);
+  const bloque = page.getByRole('region', { name: 'Voz en inglés' });
+  await expect(bloque.locator('[data-cifra="voz-ingles"]')).toHaveText('5 de 30 narraciones con voz en inglés');
+  // Las pantallas narradas que aún no tienen su inglés.
+  await bloque.getByText('2 pantallas narradas aún no tienen su inglés').click();
+  await expect(bloque.getByRole('list', { name: 'Pantallas sin inglés' }).getByRole('listitem')).toHaveText(['29 · Tus resultados', '30 · ¡Lo lograste!']);
+
+  await bloque.getByRole('button', { name: '✦ Generar voz en inglés' }).click();
+  expect(pedidos).toEqual([{ idiomas: ['en'] }]);
+  const avance = bloque.getByRole('progressbar', { name: 'Avance de la voz en inglés' });
+  await expect(bloque.getByText('Voz: 12 de 23 narraciones en inglés listas')).toBeVisible();
+  await expect(bloque.getByRole('button', { name: 'Generando voz…' })).toBeDisabled();
+  await expect(bloque.getByText('Boca: Boca en inglés de 23 narraciones')).toBeVisible();
+  await expect(avance).toHaveAttribute('aria-valuenow', '33');
+  await expect(bloque.getByRole('status').filter({ hasText: 'Voz en inglés lista: audio, boca y subtítulos.' })).toBeVisible({ timeout: 10_000 });
+  await expect(bloque.locator('[data-cifra="voz-ingles"]')).toHaveText('28 de 30 narraciones con voz en inglés');
+  await expect(bloque.getByRole('button', { name: '✦ Generar voz en inglés' })).toBeEnabled();
+});
+
+test('el revisor del cliente ve cuántas narraciones tienen voz en inglés, pero no la genera', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'REVISOR_CLIENTE', cursoTraducido: true });
+  await simularIdiomas(page);
+  await page.route((u) => u.pathname === `/api/v1/cursos/${CURSO}/narraciones` && u.searchParams.get('idioma') === 'en', (r) => r.fulfill({ json: [] }));
+  await page.goto(`/proyectos/${PROYECTO}/idiomas`);
+  const bloque = page.getByRole('region', { name: 'Voz en inglés' });
+  await expect(bloque.locator('[data-cifra="voz-ingles"]')).toHaveText('0 de 30 narraciones con voz en inglés');
+  await expect(bloque.getByRole('button', { name: /Generar voz en inglés/ })).toHaveCount(0);
+});

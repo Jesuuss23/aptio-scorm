@@ -4,6 +4,7 @@
 import { expect, type FrameLocator, type Page } from '@playwright/test';
 import JSZip from 'jszip';
 import { codigoReproductor, construirScorm12 } from '@aptio/exporters';
+import type { RecursoPaquete } from '../../../packages/exporters/src/scorm12.ts';
 import { cursoLoto, recursosLoto } from '../../../packages/exporters/test/loto.ts';
 
 export type Curso = ReturnType<typeof cursoLoto>;
@@ -45,11 +46,13 @@ export interface OpcionesLms {
   incluirDiagnostico?: boolean;
   /** HU-0804 · Español e inglés en el mismo paquete. */
   modoIdioma?: 'unico' | 'mismo-paquete';
+  /** HU-0804 · Recursos que se suman a los de LOTO (p. ej. el audio y los subtítulos en inglés). */
+  recursosExtra?: RecursoPaquete[];
 }
 
 export async function abrirEnLms(page: Page, curso: Curso, opciones: OpcionesLms = {}) {
   const { zip } = await construirScorm12({
-    curso, recursos: recursosLoto({ sinAudio: true }), reproductor: await codigoReproductor(),
+    curso, recursos: [...recursosLoto({ sinAudio: true }), ...(opciones.recursosExtra ?? [])], reproductor: await codigoReproductor(),
     ...(opciones.incluirDiagnostico === undefined ? {} : { incluirDiagnostico: opciones.incluirDiagnostico }),
     ...(opciones.modoIdioma ? { modoIdioma: opciones.modoIdioma } : {}),
   });

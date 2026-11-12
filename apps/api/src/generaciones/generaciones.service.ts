@@ -14,6 +14,14 @@ const conEtapas = { etapas: { orderBy: { orden: 'asc' } } } as const;
 type GeneracionCompleta = Prisma.GeneracionGetPayload<{ include: typeof conEtapas }>;
 const rechazo = (codigo: string, mensaje: string) => new UnprocessableEntityException({ codigo, mensaje });
 
+/** HU-0804 · Pantallas cuya narración ya tiene su inglés. */
+function narracionesTraducidas(documento: unknown): string[] {
+  type P = { id: string; narracion?: { texto?: { es?: string; en?: string } } };
+  const d = documento as { modulos?: { capsulas?: { pantallas?: P[] }[] }[] } | null;
+  return (d?.modulos ?? []).flatMap((m) => (m.capsulas ?? []).flatMap((c) => c.pantallas ?? []))
+    .filter((p) => p.narracion?.texto?.es?.trim() && p.narracion.texto.en?.trim()).map((p) => p.id);
+}
+
 export function aDto(g: GeneracionCompleta): GeneracionDto {
   const hechas = g.etapas.filter((e) => e.estado === 'COMPLETADO').length;
   return {
@@ -141,23 +149,34 @@ export class GeneracionesService {
   /**
    * HU-0703 · Regenerar narraciones: continúa la última generación del curso reabriendo las etapas 6 (voz) y 7 (boca).
    * El worker decide por el hash (RN-07-1): solo paga lo que cambió, o una toma nueva si se pide forzar.
+   * HU-0804 · Con `idiomas: ['en']` reabre las mismas etapas para la voz, la boca y los subtítulos en inglés de las
+   * pantallas narradas que ya tienen su inglés (el español no se toca).
    */
   async regenerarNarraciones(u: UsuarioSesion, cursoId: string, dto: NarracionSolicitudDto): Promise<RegeneracionDto> {
-    if (dto.idiomas?.includes('en')) throw rechazo('IDIOMA_NO_DISPONIBLE', 'La voz en inglés llega con la versión en inglés (M08); por ahora solo se regenera en español');
+    const idiomas = [...new Set(dto.idiomas ?? ['es'])];
+    if (idiomas.length > 1) throw rechazo('IDIOMA_NO_DISPONIBLE', 'Regenera un idioma a la vez: primero el español y después el inglés');
+    const idioma = idiomas[0] ?? 'es';
     if (dto.soloDesactualizadas === false && !dto.pantallaIds?.length) throw rechazo('PANTALLAS_REQUERIDAS', 'Para pedir una toma nueva, indica las pantallas');
-    const curso = await this.bd.curso.findFirst({ where: { id: cursoId, proyecto: this.alcanceProyecto(u) }, select: { id: true, proyectoId: true, organizacionId: true } });
+    const curso = await this.bd.curso.findFirst({ where: { id: cursoId, proyecto: this.alcanceProyecto(u) }, select: { id: true, proyectoId: true, organizacionId: true, documento: true } });
     if (!curso) throw new NotFoundException('Curso no encontrado');
     const g = await this.bd.generacion.findFirst({ where: { proyectoId: curso.proyectoId }, orderBy: { creadoEn: 'desc' }, include: conEtapas });
     const conAudio = await this.bd.narracion.count({ where: { cursoId, audioRecursoId: { not: null } } });
     if (!g || !conAudio) {
       throw rechazo('SIN_VOZ', 'El curso todavía no tiene voz: genera el SCORM hasta la etapa «Voz en español»');
     }
-    const pendientes = await this.bd.narracion.count({ where: { cursoId, idioma: 'es', estado: { in: ['DESACTUALIZADA', 'ERROR'] }, ...(dto.pantallaIds?.length ? { pantallaId: { in: dto.pantallaIds } } : {}) } });
+    const enPantallas = dto.pantallaIds?.length ? { pantallaId: { in: dto.pantallaIds } } : {};
+    let pendientes = await this.bd.narracion.count({ where: { cursoId, idioma, estado: { in: ['DESACTUALIZADA', 'ERROR'] }, ...enPantallas } });
+    if (idioma === 'en') {
+      const traducidas = narracionesTraducidas(curso.documento).filter((id) => !dto.pantallaIds?.length || dto.pantallaIds.includes(id));
+      if (!narracionesTraducidas(curso.documento).length) throw rechazo('SIN_TRADUCCION', 'Ninguna narración tiene su inglés todavía: tradúcelas en Idiomas');
+      const conVoz = await this.bd.narracion.count({ where: { cursoId, idioma: 'en', pantallaId: { in: traducidas }, audioRecursoId: { not: null } } });
+      pendientes += traducidas.length - conVoz;
+    }
     await this.bd.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${g.proyectoId}))`;
       const otra = await tx.generacion.findFirst({ where: { proyectoId: g.proyectoId, estado: { in: [...ACTIVOS] } }, select: { id: true } });
       if (otra) throw new ConflictException({ codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto', detalles: [{ generacionId: otra.id }] });
-      const regenerarVoz = { ...(dto.pantallaIds?.length ? { pantallaIds: dto.pantallaIds } : {}), forzar: dto.soloDesactualizadas === false };
+      const regenerarVoz = { ...(dto.pantallaIds?.length ? { pantallaIds: dto.pantallaIds } : {}), forzar: dto.soloDesactualizadas === false, ...(idioma === 'en' ? { idioma } : {}) };
       await tx.generacionEtapa.updateMany({ where: { generacionId: g.id, etapa: { in: ['VOZ_ES', 'BOCA', 'SUBTITULOS'] } }, data: { estado: 'EN_COLA', detalle: Prisma.DbNull, inicio: null, fin: null } });
       await tx.generacion.update({ where: { id: g.id }, data: { estado: 'EN_COLA', terminadoEn: null, parametros: { ...(g.parametros as Prisma.JsonObject), regenerarVoz } } });
       await tx.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'GENERANDO' } });

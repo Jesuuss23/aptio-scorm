@@ -157,7 +157,7 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
       expect(v.body.errores).toEqual([]);
       expect(v.body.textosIngles.traducidos).toBe(v.body.textosIngles.total);
       expect(v.body.advertencias).toContain('1 texto en inglés no cabe en su espacio (Desborde): revísalos en Idiomas.');
-      expect(v.body.advertencias).toContain('Sin voz en inglés: en inglés la pantalla muestra la narración como texto.');
+      expect(v.body.advertencias).toContain('Sin voz en inglés en 30 pantallas: en inglés esas pantallas muestran la narración como texto. Genérala en Idiomas.');
       const r = await como('instruccional').post(`/cursos/${bilingue.id}/exportaciones`, { formato, modoIdioma: 'mismo-paquete' });
       expect({ status: r.status, body: r.body }).toMatchObject({ status: 202, body: { formato, modoIdioma: 'mismo-paquete', versionCurso: 3, estado: 'EN_COLA' } });
     }

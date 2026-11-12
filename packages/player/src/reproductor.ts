@@ -293,7 +293,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     : null;
   const temario = h('nav', { class: 'ap-temario', 'aria-label': tx.temario, hidden: true });
   const escena = h('div', { class: 'ap-escena' });
-  const subtitulos = h('p', { class: 'ap-subtitulos', hidden: true });
+  const subtitulos = h('p', { class: 'ap-subtitulos', lang: idioma, hidden: true });
   const anterior = h('button', { type: 'button', class: 'ap-nav', onclick: () => irA(actual - 1, true) }, h('span', { 'aria-hidden': 'true' }, '◀ '), tx.anterior);
   const siguiente = h('button', { type: 'button', class: 'ap-nav ap-primario', 'aria-describedby': 'ap-motivo', onclick: () => irA(actual + 1, true) }, tx.siguiente, h('span', { 'aria-hidden': 'true' }, ' ▶'));
   const contador = h('span', { class: 'ap-contador' });
