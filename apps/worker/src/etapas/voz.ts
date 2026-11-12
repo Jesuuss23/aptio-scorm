@@ -6,6 +6,9 @@
 // realidad no cambió vuelve a «Lista» sin costo; `pantallaIds` limita a esas pantallas y `forzar` pide una toma nueva.
 // HU-0608 · Con un audio nuevo, cada elemento anclado a una palabra toma el segundo de esa palabra en la voz nueva
 // (RN-06-8, CP-067); si la voz no la tiene, conserva su segundo y queda la observación «Revisar tiempo».
+// HU-0804 · Con `regenerarVoz.idioma: 'en'` dice el inglés de cada pantalla narrada que ya lo tiene, con `kit.voces.en`
+// o, sin ella, `en-US-Neural2-F` a la velocidad del español, y el diccionario del cliente en inglés. Guarda
+// `porIdioma.en`, la Narracion en inglés y `pNN-en.mp3`; el español no se toca. Las anclas siguen la voz en español.
 import { createHash, randomUUID } from 'node:crypto';
 import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, type Sintetizador, VozNoDisponible } from '@aptio/ai';
 import { Prisma } from '@aptio/db';
@@ -26,7 +29,7 @@ const PROVEEDORES = ['google'];
 type VozDoc = { proveedor: string; voz: string; velocidad?: number };
 type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown; subtitulosId?: string };
 type PantallaDoc = {
-  id: string; titulo: { es?: string }; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } };
+  id: string; titulo: { es?: string; en?: string }; narracion?: { texto: { es?: string; en?: string }; porIdioma: { es?: AudioDoc; en?: AudioDoc } };
   ajustes?: Record<string, { retardoS?: number; anclaPalabra?: number }>;
 };
 type RecursoDoc = { id: string; tipo: string; idioma?: string };
@@ -36,7 +39,16 @@ type CursoDoc = { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[]; recur
 export interface RegenerarVoz {
   pantallaIds?: string[];
   forzar?: boolean;
+  /** HU-0804 · Idioma de la voz, la boca y los subtítulos; por defecto, español. */
+  idioma?: IdiomaVoz;
 }
+
+export type IdiomaVoz = 'es' | 'en';
+/** HU-0804 · Voz en inglés cuando el kit no tiene una (Google, GA). */
+export const VOZ_INGLES_PREDETERMINADA = 'en-US-Neural2-F';
+/** El idioma que pide la regeneración (español si no pide ninguno). */
+export const idiomaDe = (ctx: Pick<ContextoEtapa, 'parametros'>): IdiomaVoz => ((ctx.parametros.regenerarVoz as RegenerarVoz | undefined)?.idioma === 'en' ? 'en' : 'es');
+export const NOMBRE_IDIOMA: Record<IdiomaVoz, string> = { es: 'español', en: 'inglés' };
 
 export interface DependenciasVoz {
   sintetizar: Sintetizador;
@@ -56,29 +68,40 @@ export async function enParalelo<T>(lista: T[], n: number, trabajo: (x: T) => Pr
   await Promise.all(Array.from({ length: Math.min(n, lista.length) }, hilo));
 }
 
-export function textoVoz(listas: number, total: number, terminado: boolean, duracionMs = 0, voz = ''): string {
-  if (!terminado) return `${listas} de ${total} narraciones listas`;
-  return `${total} ${total === 1 ? 'narración lista' : 'narraciones listas'} · ${duracionLegible(duracionMs)} de audio${voz ? ` · voz ${voz}` : ''}`;
+export function textoVoz(listas: number, total: number, terminado: boolean, duracionMs = 0, voz = '', idioma: IdiomaVoz = 'es'): string {
+  const en = idioma === 'en' ? ' en inglés' : '';
+  if (!terminado) return `${listas} de ${total} narraciones${en} listas`;
+  return `${total} ${total === 1 ? 'narración' : 'narraciones'}${en} ${total === 1 ? 'lista' : 'listas'} · ${duracionLegible(duracionMs)} de audio${voz ? ` · voz ${voz}` : ''}`;
 }
 
 export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: DependenciasVoz): EjecutorEtapa {
   return async (ctx: ContextoEtapa) => {
+    const idioma = idiomaDe(ctx);
     const proyecto = await ctx.bd.proyecto.findFirstOrThrow({
       where: { id: ctx.proyectoId, organizacionId: ctx.organizacionId },
-      select: { id: true, clienteId: true, cliente: { select: { pronunciacion: { where: { idioma: 'es' } } } } },
+      select: { id: true, clienteId: true, cliente: { select: { pronunciacion: { where: { idioma } }, kit: { select: { voces: true } } } } },
     });
     const curso = await ctx.bd.curso.findUnique({ where: { proyectoId: proyecto.id } });
     if (!curso) throw new Error('Falta el curso: la etapa 4 (Pantallas con el kit) debe terminar antes');
-    const diccionario: TerminoPronunciacion[] = proyecto.cliente.pronunciacion.map((t) => ({ idioma: 'es', escrito: t.escrito, pronunciado: t.pronunciado }));
+    const diccionario: TerminoPronunciacion[] = proyecto.cliente.pronunciacion.map((t) => ({ idioma, escrito: t.escrito, pronunciado: t.pronunciado }));
+    const vozKit = (proyecto.cliente.kit?.voces as Partial<Record<IdiomaVoz, VozDoc>> | null | undefined)?.en;
 
-    const conNarracion = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto.es?.trim() && p.narracion.porIdioma.es);
+    // En inglés: solo las pantallas narradas que ya tienen su inglés (las demás se listan en Idiomas).
+    const conNarracion = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto[idioma]?.trim() && p.narracion.porIdioma.es);
+    /** La voz de la pantalla: la del curso o, en inglés sin voz todavía, la del kit o la predeterminada a la velocidad del español. */
+    const vozDe = (p: PantallaDoc): VozDoc => {
+      const propia = p.narracion!.porIdioma[idioma]?.voz;
+      if (propia) return propia;
+      const es = p.narracion!.porIdioma.es!.voz;
+      return vozKit?.voz ? { proveedor: vozKit.proveedor ?? 'google', voz: vozKit.voz, velocidad: vozKit.velocidad ?? es.velocidad ?? 1 } : { proveedor: 'google', voz: VOZ_INGLES_PREDETERMINADA, velocidad: es.velocidad ?? 1 };
+    };
     const previas = new Map(
-      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma: 'es', estado: { in: ['ACTUALIZADA', 'DESACTUALIZADA'] }, audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
+      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma, estado: { in: ['ACTUALIZADA', 'DESACTUALIZADA'] }, audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
     );
     const pedido = (ctx.parametros.regenerarVoz ?? {}) as RegenerarVoz;
     const solo = pedido.pantallaIds?.length ? new Set(pedido.pantallaIds) : null;
 
-    const listas = new Map<string, NarracionLista & { recursoId: string; hash: string; mime: string }>();
+    const listas = new Map<string, NarracionLista & { recursoId: string; hash: string; mime: string; velocidad: number; proveedor: string }>();
     let simulada = false;
     const datos = (): VozCurso => ({
       total: conNarracion.length, cursoId: curso.id, simulada,
@@ -88,18 +111,17 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       }),
     });
     // Los avances se encadenan para que no se pisen entre hilos.
-    let cola = ctx.avance(textoVoz(0, conNarracion.length, false), datos());
-    const avisar = () => (cola = cola.then(() => ctx.avance(textoVoz(listas.size, conNarracion.length, false), datos())));
+    let cola = ctx.avance(textoVoz(0, conNarracion.length, false, 0, '', idioma), datos());
+    const avisar = () => (cola = cola.then(() => ctx.avance(textoVoz(listas.size, conNarracion.length, false, 0, '', idioma), datos())));
 
     await enParalelo(conNarracion, EN_PARALELO, async (p) => {
-      const texto = p.narracion!.texto.es!.trim();
-      const audioDoc = p.narracion!.porIdioma.es!;
-      const voz = audioDoc.voz;
+      const texto = p.narracion!.texto[idioma]!.trim();
+      const voz = vozDe(p);
       const velocidad = voz.velocidad ?? 1;
-      const { ssml, aplicados } = aplicarPronunciacion(texto, diccionario, 'es');
+      const { ssml, aplicados } = aplicarPronunciacion(texto, diccionario, idioma);
       const usados = diccionario.filter((t) => aplicados.includes(t.escrito.trim()));
       const hash = hashNarracion(texto, voz.voz, velocidad, usados);
-      const base = { pantallaId: p.id, titulo: p.titulo.es ?? p.id, texto, voz: voz.voz, pronunciados: aplicados, hash };
+      const base = { pantallaId: p.id, titulo: p.titulo[idioma] ?? p.titulo.es ?? p.id, texto, voz: voz.voz, velocidad, proveedor: voz.proveedor, pronunciados: aplicados, hash };
 
       // Continuar: lo que ya se dijo igual no se paga otra vez. Fuera de las pantallas pedidas, el audio queda como está.
       const previa = previas.get(p.id);
@@ -127,7 +149,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         await ctx.comprobar();
         const inicio = Date.now();
         try {
-          audio = await sintetizar({ ssml, idioma: 'es', voz: voz.voz, velocidad });
+          audio = await sintetizar({ ssml, idioma, voz: voz.voz, velocidad });
           const costo = costoVoz(audio.caracteres, audio.modelo, audio.proveedor);
           await ctx.bd.trabajoIA.create({
             data: {
@@ -146,8 +168,8 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       }
       if (!audio) {
         await ctx.bd.narracion.upsert({
-          where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma: 'es' } },
-          create: { cursoId: curso.id, pantallaId: p.id, idioma: 'es', textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, estado: 'ERROR' },
+          where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma } },
+          create: { cursoId: curso.id, pantallaId: p.id, idioma, textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, estado: 'ERROR' },
           update: { textoHash: hash, estado: 'ERROR' },
         });
         throw new Error(`La voz de la pantalla ${p.id} falló ${INTENTOS_VOZ} veces: ${ultimoError}`);
@@ -164,13 +186,13 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
           data: conProcedencia({
             id: recursoId, organizacionId: ctx.organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'AUDIO', origen: 'GENERADO',
             claveS3, mime: audio.mime, bytes: BigInt(audio.audio.byteLength), duracionMs, hash: createHash('sha256').update(audio.audio).digest('hex'),
-            nombre: `${p.id}-es.${extension(audio.mime)}`, proveedor: audio.proveedor, modelo: audio.modelo,
+            nombre: `${p.id}-${idioma}.${extension(audio.mime)}`, proveedor: audio.proveedor, modelo: audio.modelo,
             licencia: audio.simulada ? 'Audio simulado de prueba' : 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)',
           }),
         }),
         ctx.bd.narracion.upsert({
-          where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma: 'es' } },
-          create: { cursoId: curso.id, pantallaId: p.id, idioma: 'es', textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, estado: 'ACTUALIZADA' },
+          where: { cursoId_pantallaId_idioma: { cursoId: curso.id, pantallaId: p.id, idioma } },
+          create: { cursoId: curso.id, pantallaId: p.id, idioma, textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, estado: 'ACTUALIZADA' },
           // Un audio nuevo deja sin boca ni subtítulos a la narración: las etapas 7 y 8 los rehacen (HU-0702, HU-0801).
           update: { textoHash: hash, origen: 'tts', voz: voz.voz, velocidad, audioRecursoId: recursoId, bocas: Prisma.DbNull, subtituloRecursoId: null, estado: 'ACTUALIZADA' },
         }),
@@ -189,26 +211,29 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       const sinAncla: { pantallaId: string; id: string }[] = [];
       for (const p of pantallasDe(doc)) {
         const n = listas.get(p.id);
-        const es = p.narracion?.porIdioma.es;
-        if (!n || !es || p.narracion!.texto.es?.trim() !== n.texto) continue;
+        if (!n || !p.narracion?.porIdioma.es || p.narracion.texto[idioma]?.trim() !== n.texto) continue;
+        // En inglés, la primera voz crea su pista en el curso.
+        const es = (p.narracion.porIdioma[idioma] ??= { estado: 'pendiente', voz: { proveedor: n.proveedor, voz: n.voz, velocidad: n.velocidad }, hashTexto: n.hash });
         // Con otro audio, la boca y los subtítulos anteriores ya no sirven (los rehacen las etapas 7 y 8) y la narración
         // vuelve a «pendiente»: el esquema exige audio, boca y subtítulos para «generado».
         if (es.recursoAudioId !== n.recursoId) {
           delete es.bocas;
           delete es.subtitulosId;
           es.estado = 'pendiente';
-          for (const id of recalcularAnclas(p.ajustes, marcasPalabra(n.texto, n.duracionMs))) sinAncla.push({ pantallaId: p.id, id });
+          // Los tiempos de la pantalla siguen la voz en español (HU-0608).
+          if (idioma === 'es') for (const id of recalcularAnclas(p.ajustes, marcasPalabra(n.texto, n.duracionMs))) sinAncla.push({ pantallaId: p.id, id });
         }
+        es.voz = { proveedor: n.proveedor, voz: n.voz, velocidad: n.velocidad };
         es.recursoAudioId = n.recursoId;
         es.duracionMs = n.duracionMs;
         es.hashTexto = n.hash;
         usados.add(n.recursoId);
       }
-      const otros = doc.recursos.filter((r) => !(r.tipo === 'audio' && r.idioma === 'es'));
+      const otros = doc.recursos.filter((r) => !(r.tipo === 'audio' && r.idioma === idioma));
       doc.recursos = [
         ...otros,
         ...[...listas.values()].filter((n) => usados.has(n.recursoId)).map((n) => ({
-          id: n.recursoId, tipo: 'audio', origen: 'generado', nombre: `${n.pantallaId}-es.${extension(n.mime)}`, mime: n.mime, idioma: 'es',
+          id: n.recursoId, tipo: 'audio', origen: 'generado', nombre: `${n.pantallaId}-${idioma}.${extension(n.mime)}`, mime: n.mime, idioma,
         })),
       ];
       const v = validarCurso(doc);
@@ -230,6 +255,6 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
 
     const total = [...listas.values()].reduce((n, x) => n + x.duracionMs, 0);
     const voces = [...new Set([...listas.values()].map((n) => n.voz))].join(', ');
-    return { texto: textoVoz(listas.size, conNarracion.length, true, total, voces), datos: datos() };
+    return { texto: textoVoz(listas.size, conNarracion.length, true, total, voces, idioma), datos: { ...datos(), ...(idioma === 'en' ? { idioma } : {}) } };
   };
 }

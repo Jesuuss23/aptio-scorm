@@ -220,7 +220,7 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     }
   });
 
-  it('HU-0703 · regenerar continúa las etapas 6 a 8 de la última generación; 422 sin voz o en inglés, 409 si ya corre', async () => {
+  it('HU-0703 · regenerar continúa las etapas 6 a 8 de la última generación; 422 sin voz o sin traducción, 409 si ya corre', async () => {
     const ruta = `/cursos/${cursoId}/narraciones/regenerar`;
     expect((await como('productor').post(ruta, {})).body).toMatchObject({ codigo: 'SIN_VOZ' });
     const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
@@ -235,7 +235,9 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     });
     await prisma.narracion.create({ data: { cursoId, pantallaId: 'p04', idioma: 'es', textoHash: 'd', origen: 'tts', audioRecursoId: audio.id, estado: 'DESACTUALIZADA' } });
 
-    expect((await como('productor').post(ruta, { idiomas: ['en'] })).body).toMatchObject({ codigo: 'IDIOMA_NO_DISPONIBLE' });
+    // HU-0804 · Un idioma por pedido; en inglés hace falta al menos una narración traducida.
+    expect((await como('productor').post(ruta, { idiomas: ['es', 'en'] })).body).toMatchObject({ codigo: 'IDIOMA_NO_DISPONIBLE' });
+    expect((await como('productor').post(ruta, { idiomas: ['en'] })).body).toMatchObject({ codigo: 'SIN_TRADUCCION' });
     expect((await como('productor').post(ruta, { soloDesactualizadas: false })).body).toMatchObject({ codigo: 'PANTALLAS_REQUERIDAS' });
     expect((await como('revisor').post(ruta, {})).status).toBe(403);
 
@@ -252,6 +254,42 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     await prisma.generacion.update({ where: { id: g.id }, data: { estado: 'COMPLETADO' } });
     expect((await como('grafico').post(ruta, { pantallaIds: ['p04'], soloDesactualizadas: false })).status).toBe(202);
     expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).toMatchObject({ regenerarVoz: { pantallaIds: ['p04'], forzar: true } });
+    await prisma.generacion.delete({ where: { id: g.id } });
+  });
+
+  it('HU-0804 · regenerar en inglés responde 202 con las traducidas sin voz y guarda el idioma; el revisor del cliente, 403', async () => {
+    const ruta = `/cursos/${cursoId}/narraciones/regenerar`;
+    const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
+    const g = await prisma.generacion.create({
+      data: {
+        organizacionId: orgId, proyectoId, estado: 'COMPLETADO', parametros: { pantallas: 30 }, iniciadoPorId: di.id, terminadoEn: new Date(),
+        etapas: { create: ETAPAS.map((etapa, i) => ({ etapa, orden: i + 1, estado: 'COMPLETADO' as const })) },
+      },
+    });
+    const audio = await prisma.recurso.create({
+      data: { organizacionId: orgId, proyectoId, tipo: 'AUDIO', origen: 'GENERADO', claveS3: `org/${orgId}/regen-en-${sufijo}`, mime: 'audio/wav', bytes: 10, duracionMs: 1000, hash: 'z', nombre: 'p06-es.wav' },
+    });
+    await prisma.narracion.upsert({
+      where: { cursoId_pantallaId_idioma: { cursoId, pantallaId: 'p06', idioma: 'es' } },
+      create: { cursoId, pantallaId: 'p06', idioma: 'es', textoHash: 'e', origen: 'tts', audioRecursoId: audio.id, estado: 'ACTUALIZADA' },
+      update: { audioRecursoId: audio.id },
+    });
+    // p06 y p07 ya tienen su inglés (lo que deja Idiomas).
+    const c = await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } });
+    const doc = structuredClone(c.documento) as unknown as Doc & { modulos: { capsulas: { pantallas: { id: string; narracion?: { texto: { es: string; en?: string } } }[] }[] }[] };
+    for (const p of pantallas(doc)) if (p.narracion && ['p06', 'p07'].includes(p.id)) (p.narracion.texto as { en?: string }).en = `[EN] ${p.narracion.texto.es}`;
+    await prisma.curso.update({ where: { id: cursoId }, data: { documento: doc as object, version: c.version + 1 } });
+
+    expect((await como('revisor').post(ruta, { idiomas: ['en'] })).status).toBe(403);
+    const r = await como('productor').post(ruta, { idiomas: ['en'] });
+    expect({ status: r.status, body: r.body }).toMatchObject({ status: 202, body: { id: g.id, estado: 'EN_COLA', pendientes: 2 } });
+    expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).toMatchObject({ regenerarVoz: { idioma: 'en', forzar: false } });
+    const etapas = await prisma.generacionEtapa.findMany({ where: { generacionId: g.id, estado: 'EN_COLA' } });
+    expect(etapas.map((e) => e.etapa).sort()).toEqual(['BOCA', 'SUBTITULOS', 'VOZ_ES']);
+    // Un pedido en español después ya no lleva el idioma.
+    await prisma.generacion.update({ where: { id: g.id }, data: { estado: 'COMPLETADO' } });
+    expect((await como('productor').post(ruta, {})).status).toBe(202);
+    expect((await prisma.generacion.findUniqueOrThrow({ where: { id: g.id } })).parametros).not.toMatchObject({ regenerarVoz: { idioma: 'en' } });
     await prisma.generacion.delete({ where: { id: g.id } });
   });
 

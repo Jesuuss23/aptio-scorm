@@ -43,7 +43,7 @@ export class EtapaResultadoDto extends EtapaDto {
 export class NarracionSolicitudDto {
   @ApiPropertyOptional({ type: [String], example: ['p02', 'p12'], description: 'Limita a estas pantallas; sin lista, todas las del curso' })
   @IsOptional() @IsArray() @ArrayMaxSize(500) @IsString({ each: true }) @Matches(/^[A-Za-z0-9_-]{1,64}$/, { each: true }) pantallaIds?: string[];
-  @ApiPropertyOptional({ type: [String], enum: ['es', 'en'], example: ['es'], description: 'Por ahora solo es; en llega con M08 (S5) y responde 422' })
+  @ApiPropertyOptional({ type: [String], enum: ['es', 'en'], example: ['es'], description: 'Un idioma por pedido: es (por defecto) o en (HU-0804, las pantallas narradas que ya tienen su inglés). Los dos juntos responden 422 IDIOMA_NO_DISPONIBLE; en sin ninguna narración traducida, 422 SIN_TRADUCCION' })
   @IsOptional() @IsArray() @IsIn(['es', 'en'], { each: true }) idiomas?: ('es' | 'en')[];
   @ApiPropertyOptional({ default: true, description: 'false (con pantallaIds) pide una toma nueva aunque nada haya cambiado' })
   @IsOptional() @IsBoolean() soloDesactualizadas?: boolean;
@@ -54,5 +54,5 @@ export class RegeneracionDto {
   @ApiProperty({ format: 'uuid', description: 'Id de la generación que se continúa' }) id: string;
   @ApiProperty({ enum: ESTADOS_TRABAJO }) estado: string;
   @ApiProperty({ format: 'uri', description: 'URL de eventos (SSE) de la generación' }) eventos: string;
-  @ApiProperty({ description: 'Narraciones marcadas «Por regenerar» o con error al pedirlo' }) pendientes: number;
+  @ApiProperty({ description: 'Narraciones marcadas «Por regenerar» o con error al pedirlo; en inglés, también las traducidas que aún no tienen voz' }) pendientes: number;
 }

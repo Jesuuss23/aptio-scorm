@@ -286,6 +286,8 @@ export interface VozCurso {
   cursoId: string;
   narraciones: NarracionLista[];
   simulada: boolean;
+  /** HU-0804 · 'en' cuando la corrida fue la voz en inglés (sin el campo, español). */
+  idioma?: 'es' | 'en';
 }
 
 /** Resultado (y avance, mientras corre) de la etapa 7 (HU-0702): cuántas narraciones ya tienen sus marcas de boca. */
@@ -295,6 +297,8 @@ export interface BocaCurso {
   cursoId: string;
   /** `rhubarb` desde el audio o `simulado` por letras (SUP-35). */
   metodo: 'rhubarb' | 'simulado';
+  /** HU-0804 · 'en' cuando la corrida fue en inglés. */
+  idioma?: 'es' | 'en';
 }
 
 /** HU-0801 · Resultado de la etapa 8: subtítulos WebVTT por narración (SUP-37). */

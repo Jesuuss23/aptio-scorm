@@ -64,6 +64,10 @@ export interface OpcionesValidacion {
 
 export const MB = 1024 * 1024;
 
+/** HU-0804 · Advertencia del bilingüe cuando hay pantallas narradas sin audio en inglés (no impide exportar). */
+export const avisoSinVozIngles = (n: number): string =>
+  `Sin voz en inglés en ${n} ${n === 1 ? 'pantalla' : 'pantallas'}: en inglés ${n === 1 ? 'esa pantalla muestra' : 'esas pantallas muestran'} la narración como texto. Genérala en Idiomas.`;
+
 /** Alternativas de docs/08-entregas-y-lms.md («Tamaño del paquete»), en ese orden. */
 export const ALTERNATIVAS_PESO = [
   'Exportar igual, con la recomendación de que el administrador del LMS amplíe el límite de subida.',
@@ -192,7 +196,8 @@ export function validarExportacion(
   // ---------- Paquete bilingüe (HU-0804): desbordes y voz en inglés solo advierten ----------
   if (bilingue) {
     if (opciones.desbordes) advertencias.push(`${opciones.desbordes} ${opciones.desbordes === 1 ? 'texto en inglés no cabe' : 'textos en inglés no caben'} en su espacio (Desborde): revísalos en Idiomas.`);
-    if (pantallasSinVozIngles(c)) advertencias.push('Sin voz en inglés: en inglés la pantalla muestra la narración como texto.');
+    const sinVoz = pantallasSinVozIngles(c);
+    if (sinVoz) advertencias.push(avisoSinVozIngles(sinVoz));
   }
 
   // ---------- Pantallas sin aprobar (RN-12-3) ----------

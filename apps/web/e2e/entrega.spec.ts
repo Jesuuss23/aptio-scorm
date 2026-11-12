@@ -327,7 +327,7 @@ test('HU-0804 · ES + EN en el mismo paquete: sin todo el inglés no se exporta;
   await simularApi(page, { conSesion: true, conProyectos: true });
   let traducidos = 118;
   const FALTA = 'Faltan 2 textos en inglés: tradúcelos en Idiomas';
-  const AVISOS = ['1 texto en inglés no cabe en su espacio (Desborde): revísalos en Idiomas.', 'Sin voz en inglés: en inglés la pantalla muestra la narración como texto.'];
+  const AVISOS = ['1 texto en inglés no cabe en su espacio (Desborde): revísalos en Idiomas.', 'Sin voz en inglés en 30 pantallas: en inglés esas pantallas muestran la narración como texto. Genérala en Idiomas.'];
   const { pedidos, validaciones } = await simularExportaciones(page, zip, {
     bilingue: () => ({ ...VALIDACION, modoIdioma: 'mismo-paquete', textosIngles: { traducidos, total: 120 }, errores: traducidos < 120 ? [FALTA] : [], advertencias: [...AVISOS, ...VALIDACION.advertencias] }),
   });

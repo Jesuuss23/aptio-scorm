@@ -2,6 +2,10 @@
 // HU-0804 · CP-079 · Cambio de idioma en el paquete bilingüe: en la pantalla 8 con puntos, cambiar a inglés deja la misma
 // pantalla con los mismos puntos y el texto en inglés; el foco queda en el botón de idioma, suspend_data guarda `en` con
 // LMSCommit y, al volver, el paquete abre en inglés. Con un solo idioma no hay botón.
+// HU-0804 parte 2 · En inglés la pantalla narrada usa la pista `en`: su audio, su boca y sus subtítulos (con lang="en").
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { iniciarPaquete } from '../src/paquete.ts';
 import { montar } from '../src/reproductor.ts';
@@ -84,6 +88,50 @@ describe('botón de idioma (HU-0804)', () => {
     botonIdioma(c)!.click();
     expect(r.estado()).toMatchObject({ pantallaId: 'p09', puntos: 100 });
     expect(tituloPantalla(c)).not.toMatch(/^\[EN\]/);
+    r.destruir();
+  });
+});
+
+describe('pista en inglés (HU-0804 parte 2)', () => {
+  const ANA = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../docs/diseno/personaje/plantilla-ana.svg'), 'utf8');
+  const VTT = {
+    'vtt-p03-es': 'WEBVTT\n\n00:00.000 --> 00:02.000\nSoy Ana, supervisora de seguridad.\n',
+    'vtt-p03-en': 'WEBVTT\n\n00:00.000 --> 00:02.000\nI am Ana, safety supervisor.\n',
+  } as Record<string, string>;
+  /** LOTO bilingüe con la pista en inglés de p03: otro audio, otra boca (F) y otros subtítulos. */
+  function conPistaIngles(): CursoReproductor {
+    const curso = lotoBilingue();
+    const p03 = curso.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas)).find((p) => p.id === 'p03')!;
+    const es = p03.narracion!.porIdioma!.es!;
+    p03.narracion!.porIdioma!.en = { ...structuredClone(es), recursoAudioId: 'aud-p03-en', subtitulosId: 'vtt-p03-en', duracionMs: 9000, bocas: [[0, 'F'], [8000, 'X']] };
+    return curso;
+  }
+
+  it('al cambiar a inglés en una pantalla narrada, suenan el audio, la boca y los subtítulos en inglés', async () => {
+    const c = contenedorNuevo();
+    const r = montar(c, conPistaIngles(), {
+      idioma: 'es', revision: true, inicio: 'p03',
+      urlRecurso: (id) => `https://recursos.prueba/${id}`, cargarSvg: async () => ANA, cargarSubtitulos: async (id) => VTT[id],
+    });
+    const sombra = () => c.shadowRoot!;
+    const subtitulos = () => sombra().querySelector<HTMLElement>('.ap-subtitulos')!;
+    const esperar = () => new Promise((ok) => setTimeout(ok, 20));
+    expect(r.estado().pantallaId).toBe('p03');
+    expect(sombra().querySelector('audio')?.getAttribute('src')).toBe('https://recursos.prueba/aud-p03-es');
+    expect(subtitulos().getAttribute('lang')).toBe('es');
+
+    botonIdioma(c)!.click();
+    expect(r.estado().pantallaId).toBe('p03');
+    expect(sombra().querySelector('audio')?.getAttribute('src')).toBe('https://recursos.prueba/aud-p03-en');
+    expect(r.duracion()).toBeGreaterThanOrEqual(9);
+    // CC encendido: con la aguja quieta en 1 s, la frase del WebVTT en inglés y la boca de la pista en inglés.
+    [...sombra().querySelectorAll<HTMLButtonElement>('.ap-boton-barra')].find((b) => b.textContent?.startsWith('CC'))!.click();
+    await esperar();
+    r.irA(1);
+    expect(subtitulos().getAttribute('lang')).toBe('en');
+    expect(subtitulos().hidden).toBe(false);
+    expect(subtitulos().textContent).toBe('I am Ana, safety supervisor.');
+    expect(sombra().querySelector('svg[data-boca]')?.getAttribute('data-boca')).toBe('F');
     r.destruir();
   });
 });

@@ -4,11 +4,13 @@
 // SSE (un evento por lote guardado) con consulta cada 2 s de respaldo. El revisor del cliente solo ve.
 // HU-0803 · Desbordes (RN-08-3, CP-078): el inglés que no cabe en su componente queda en Desborde con «72 de 60
 // caracteres» y la versión corta de la IA («Usar versión corta»); mientras se escribe, un contador avisa.
+// HU-0804 · «Voz en inglés» (VozIngles): voz, boca y subtítulos en inglés de las narraciones ya traducidas.
 import { NOMBRE_ESTADO } from '@aptio/schema/traduccion';
 import { Cabecera } from '@aptio/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type Curso, ErrorApi, type Proyecto, type Rol, type TerminoGlosario, type Traduccion, TRADUCEN } from '../api';
 import { navegar } from '../ruta';
+import { VozIngles } from './VozIngles';
 
 const CONSULTA_MS = 2000;
 const CLASE_ESTADO: Record<Traduccion['estado'], string> = { PENDIENTE: 'chip', TRADUCIDA_IA: 'chip ia', REVISADA: 'chip validado', DESBORDE: 'chip aviso' };
@@ -59,6 +61,10 @@ export function IdiomasVista({ proyectoId, rol, alCargar }: { proyectoId: string
       });
     }, (e: unknown) => setError(mensajeDe(e, 'No se pudo cargar el proyecto')));
   }, [proyectoId, alCargar]);
+
+  const recargarCurso = useCallback(() => {
+    api.curso(proyectoId).then(setCurso, () => undefined);
+  }, [proyectoId]);
 
   const recargar = useCallback(() => {
     if (!cursoId) return;
@@ -261,6 +267,8 @@ export function IdiomasVista({ proyectoId, rol, alCargar }: { proyectoId: string
             </div>
           ) : <p className="nota validado">Todos los textos están revisados.</p>}
         </section>
+        <div className="idiomas-lateral">
+        <VozIngles cursoId={curso.id} documento={curso.documento} puedeGenerar={puedeEditar} alTerminar={recargarCurso} />
         <aside className="tarjeta kit-bloque idiomas-glosario" aria-label="Glosario del cliente">
           <h2>Glosario del cliente</h2>
           {glosario.length ? (
@@ -270,6 +278,7 @@ export function IdiomasVista({ proyectoId, rol, alCargar }: { proyectoId: string
           ) : <p className="sec">El cliente aún no tiene glosario. La IA traduce sin términos fijos.</p>}
           <p className="sec">La IA respeta el glosario en cada texto: si no lo cumple, se vuelve a pedir. Lo revisado no se manda a traducir.</p>
         </aside>
+        </div>
       </div>
     </>
   );

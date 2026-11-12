@@ -2,7 +2,8 @@
 // letras sobre la duración del audio (SUP-37). Se guarda como recurso SUBTITULO, se enlaza a la narración y al curso, y
 // la narración queda «generado» en el curso cuando ya tiene audio, boca y subtítulos (cierra SUP-35). Es local y sin
 // costo: no se registra como tarea de IA. Continuar no repite: lo que ya tiene subtítulos para su audio se conserva
-// (la etapa 6 los quita cuando hay un audio nuevo). Por ahora, español; el inglés llega con su etapa (S7).
+// (la etapa 6 los quita cuando hay un audio nuevo). HU-0804 · En inglés (`regenerarVoz.idioma: 'en'`) arma `pNN-en.vtt`
+// desde el texto en inglés y su audio.
 import { createHash, randomUUID } from 'node:crypto';
 import { aVtt, subtitulosDeNarracion } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
@@ -10,10 +11,10 @@ import { conProcedencia, PROCEDENCIA_SUBTITULOS } from '../procedencia.js';
 import { validarCurso } from '@aptio/schema';
 import type { SubtitulosCurso } from '@aptio/schema/generacion';
 import type { ContextoEtapa, EjecutorEtapa } from '../generar.js';
-import { EN_PARALELO, enParalelo } from './voz.js';
+import { EN_PARALELO, enParalelo, idiomaDe, type IdiomaVoz, NOMBRE_IDIOMA } from './voz.js';
 
 type AudioDoc = { estado: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown[]; subtitulosId?: string };
-type PantallaDoc = { id: string; narracion?: { texto: { es?: string }; porIdioma: { es?: AudioDoc } } };
+type PantallaDoc = { id: string; narracion?: { texto: { es?: string; en?: string }; porIdioma: { es?: AudioDoc; en?: AudioDoc } } };
 type RecursoDoc = { id: string; tipo: string; idioma?: string };
 type CursoDoc = { modulos: { capsulas: { pantallas: PantallaDoc[] }[] }[]; recursos: RecursoDoc[] };
 
@@ -25,30 +26,31 @@ export interface DependenciasSubtitulos {
 
 const pantallasDe = (d: CursoDoc) => d.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
 
-export function textoSubtitulos(listas: number, total: number, terminado: boolean): string {
-  if (!terminado) return `${listas} de ${total} subtítulos listos`;
-  return `${total} ${total === 1 ? 'narración' : 'narraciones'} con subtítulos sincronizados · WebVTT en español`;
+export function textoSubtitulos(listas: number, total: number, terminado: boolean, idioma: IdiomaVoz = 'es'): string {
+  if (!terminado) return `${listas} de ${total} subtítulos${idioma === 'en' ? ' en inglés' : ''} listos`;
+  return `${total} ${total === 1 ? 'narración' : 'narraciones'} con subtítulos sincronizados · WebVTT en ${NOMBRE_IDIOMA[idioma]}`;
 }
 
 export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): EjecutorEtapa {
   return async (ctx: ContextoEtapa) => {
+    const idioma = idiomaDe(ctx);
     const proyecto = await ctx.bd.proyecto.findFirstOrThrow({ where: { id: ctx.proyectoId, organizacionId: ctx.organizacionId }, select: { id: true, clienteId: true } });
     const curso = await ctx.bd.curso.findUnique({ where: { proyectoId: proyecto.id } });
     if (!curso) throw new Error('Falta el curso: la etapa 4 (Pantallas con el kit) debe terminar antes');
 
-    const narradas = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto.es?.trim());
+    const narradas = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto[idioma]?.trim());
     const narraciones = new Map(
-      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma: 'es', estado: { in: ['ACTUALIZADA', 'DESACTUALIZADA'] }, audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
+      (await ctx.bd.narracion.findMany({ where: { cursoId: curso.id, idioma, estado: { in: ['ACTUALIZADA', 'DESACTUALIZADA'] }, audioRecursoId: { not: null } } })).map((n) => [n.pantallaId, n]),
     );
     const faltan = narradas.filter((p) => !narraciones.has(p.id));
     if (faltan.length) {
-      throw new Error(`Faltan ${faltan.length} narraciones con audio (${faltan.slice(0, 3).map((p) => p.id).join(', ')}): la etapa 6 (Voz en español) debe terminar antes`);
+      throw new Error(`Faltan ${faltan.length} narraciones con audio (${faltan.slice(0, 3).map((p) => p.id).join(', ')}): la etapa 6 (Voz en ${NOMBRE_IDIOMA[idioma]}) debe terminar antes`);
     }
 
     const listas = new Map<string, { audioRecursoId: string; subtitulosId: string; pantallaId: string; bytes: number }>();
-    const datos = (): SubtitulosCurso => ({ total: narradas.length, listas: listas.size, cursoId: curso.id, idioma: 'es' });
-    let cola = ctx.avance(textoSubtitulos(0, narradas.length, false), datos());
-    const avisar = () => (cola = cola.then(() => ctx.avance(textoSubtitulos(listas.size, narradas.length, false), datos())));
+    const datos = (): SubtitulosCurso => ({ total: narradas.length, listas: listas.size, cursoId: curso.id, idioma });
+    let cola = ctx.avance(textoSubtitulos(0, narradas.length, false, idioma), datos());
+    const avisar = () => (cola = cola.then(() => ctx.avance(textoSubtitulos(listas.size, narradas.length, false, idioma), datos())));
 
     await enParalelo(narradas, EN_PARALELO, async (p) => {
       const n = narraciones.get(p.id)!;
@@ -64,7 +66,7 @@ export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): Ejecuto
       await ctx.comprobar();
       const audio = await ctx.bd.recurso.findFirst({ where: { id: audioRecursoId, organizacionId: ctx.organizacionId }, select: { duracionMs: true } });
       if (!audio?.duracionMs) throw new Error(`Falta el audio de la pantalla ${p.id}: continúa desde la etapa 6`);
-      const cues = subtitulosDeNarracion(p.narracion!.texto.es!, audio.duracionMs);
+      const cues = subtitulosDeNarracion(p.narracion!.texto[idioma]!, audio.duracionMs);
       if (!cues.length) throw new Error(`La narración de la pantalla ${p.id} no dio subtítulos`);
       const cuerpo = new TextEncoder().encode(aVtt(cues));
 
@@ -76,7 +78,7 @@ export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): Ejecuto
           data: conProcedencia({
             id: recursoId, organizacionId: ctx.organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'SUBTITULO', origen: 'GENERADO',
             claveS3, mime: MIME_VTT, bytes: BigInt(cuerpo.byteLength), hash: createHash('sha256').update(cuerpo).digest('hex'),
-            nombre: `${p.id}-es.vtt`, ...PROCEDENCIA_SUBTITULOS,
+            nombre: `${p.id}-${idioma}.vtt`, ...PROCEDENCIA_SUBTITULOS,
           }),
         }),
         ctx.bd.narracion.update({ where: { id: n.id }, data: { subtituloRecursoId: recursoId } }),
@@ -93,7 +95,7 @@ export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): Ejecuto
       const usados = new Set<string>();
       for (const p of pantallasDe(doc)) {
         const l = listas.get(p.id);
-        const es = p.narracion?.porIdioma.es;
+        const es = p.narracion?.porIdioma[idioma];
         if (!l || !es || es.recursoAudioId !== l.audioRecursoId) continue;
         es.subtitulosId = l.subtitulosId;
         usados.add(l.subtitulosId);
@@ -101,9 +103,9 @@ export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): Ejecuto
         if (es.duracionMs && Array.isArray(es.bocas) && es.bocas.length) es.estado = 'generado';
       }
       doc.recursos = [
-        ...doc.recursos.filter((r) => !(r.tipo === 'subtitulos' && r.idioma === 'es')),
+        ...doc.recursos.filter((r) => !(r.tipo === 'subtitulos' && r.idioma === idioma)),
         ...[...listas.values()].filter((l) => usados.has(l.subtitulosId)).map((l) => ({
-          id: l.subtitulosId, tipo: 'subtitulos', origen: 'generado', nombre: `${l.pantallaId}-es.vtt`, mime: MIME_VTT, idioma: 'es', bytes: l.bytes,
+          id: l.subtitulosId, tipo: 'subtitulos', origen: 'generado', nombre: `${l.pantallaId}-${idioma}.vtt`, mime: MIME_VTT, idioma, bytes: l.bytes,
         })),
       ];
       const v = validarCurso(doc);
@@ -118,6 +120,6 @@ export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): Ejecuto
       if (intento === 2) throw new Error('El curso cambió muchas veces mientras se guardaban los subtítulos; continúa la generación para reintentar');
     }
 
-    return { texto: textoSubtitulos(listas.size, narradas.length, true), datos: datos() };
+    return { texto: textoSubtitulos(listas.size, narradas.length, true, idioma), datos: datos() };
   };
 }

@@ -64,6 +64,8 @@ export interface OpcionesSimulacion {
   retoquesP05?: boolean;
   /** HU-0804 · El curso con cada texto en inglés (traducción simulada «[EN] …»). */
   cursoTraducido?: boolean;
+  /** HU-0804 · Con `cursoTraducido`, pantallas cuya narración se deja sin inglés. */
+  sinIngles?: string[];
 }
 
 /** HU-0604 · Los retoques de p05 con `retoquesP05`. */
@@ -246,7 +248,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, cursoTraducido }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, cursoTraducido, sinIngles = [] }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -280,6 +282,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     Object.assign(p05, structuredClone(RETOQUES_P05));
   }
   (revision.documento.recursos as { tipo: string; nombre: string }[]).find((r) => r.tipo === 'documento')!.nombre = 'Manual.pdf';
+  for (const p of pantallasDe(revision.documento as unknown as CursoDoc)) {
+    const texto = (p as { narracion?: { texto?: { en?: string } } }).narracion?.texto;
+    if (texto && sinIngles.includes(p.id)) delete texto.en;
+  }
   type PantallaSim = { id: string; estado: string; titulo: { es: string }; narracion?: { texto: { es: string }; porIdioma?: { es?: { duracionMs?: number } } } };
   const pantallasSim = () => (revision.documento.modulos as { capsulas: { pantallas: PantallaSim[] }[] }[]).flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
   // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
