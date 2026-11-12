@@ -106,11 +106,21 @@ export interface Kit extends KitEntrada {
 export interface Recurso {
   id: string;
   tipo: string;
+  origen?: 'BIBLIOTECA' | 'GENERADO' | 'SUBIDO' | 'CLIENTE';
   nombre: string;
   mime: string;
   bytes: number;
+  /** HU-1406 · Procedencia (REQ-062): proveedor `aptio` si lo armó la plataforma sin IA. */
+  proveedor?: string | null;
+  modelo?: string | null;
+  licencia?: string | null;
   eliminadosAlSanear?: string[];
   url?: string;
+}
+/** HU-1406 · Créditos de IA del paquete, tal como saldrán (CP-107). */
+export interface Creditos {
+  aviso: string;
+  filas: { que: string; proveedor: string; modelo: string; licencia: string }[];
 }
 
 /** Página extraída del material (HU-0304). `posibleInstruccion`: el texto parece dirigido a la IA (CP-102). */
@@ -373,6 +383,8 @@ export interface Validacion {
   pantallasTotal: number;
   pantallasSinAprobar: number;
   recursosFaltantes: string[];
+  /** HU-1406 · null si ningún recurso es de IA (el paquete no lleva créditos). */
+  creditos?: Creditos | null;
 }
 /** HU-1204 · Ficha de compatibilidad del LMS de un cliente, con el informe del modo diagnóstico si se pegó. */
 export interface FichaCompatibilidad {
@@ -455,6 +467,9 @@ export const api = {
   muestraVoz: (datos: { texto: string; idioma: 'es' | 'en'; clienteId?: string }) => pedir<MuestraVoz>('/voz/muestra', json(datos)),
   guardarPersonaje: (clienteId: string, datos: { recursoId: string; nombre: string; version: number }) =>
     pedir<Kit>(`/clientes/${clienteId}/kit/personaje`, json(datos, 'PUT')),
+  /** HU-1406 · Recursos generados de un proyecto, con su procedencia. */
+  recursosGenerados: (proyectoId: string) => pedir<Recurso[]>(`/recursos?${new URLSearchParams({ proyectoId, origen: 'GENERADO' })}`),
+  recurso: (id: string) => pedir<Recurso>(`/recursos/${id}`),
   /** Sube un archivo directo al almacenamiento cifrado (HU-1404): pide la URL firmada, envía el PUT y confirma. */
   async subir(archivo: File, destino: { clienteId?: string; proyectoId?: string; origen?: 'SUBIDO' | 'CLIENTE' }): Promise<Recurso> {
     const subida = await pedir<{ subidaId: string; url: string; cabeceras: Record<string, string> }>(

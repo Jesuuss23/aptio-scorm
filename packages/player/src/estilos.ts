@@ -61,6 +61,15 @@ button:disabled{cursor:not-allowed}
 .ap-reanudar-caja{width:min(420px,100%);background:var(--ap-blanco);color:var(--ap-texto);border-radius:14px;padding:20px;box-shadow:0 12px 32px rgba(0,0,0,.25)}
 .ap-reanudar-titulo{margin:0 0 6px;font-family:var(--ap-f-titulos),system-ui,sans-serif;font-size:22px;line-height:1.2;color:var(--ap-primario)}
 .ap-reanudar-caja p{margin:0 0 16px}
+/* HU-1406 · Créditos de IA: diálogo modal sobre el curso. */
+.ap-r:has(>.ap-creditos){position:relative}
+.ap-creditos{position:absolute;inset:0;z-index:25;display:grid;place-items:center;padding:16px;background:rgba(16,32,51,.55)}
+.ap-creditos-caja{width:min(640px,100%);max-height:100%;overflow:auto;background:var(--ap-blanco);color:var(--ap-texto);border-radius:14px;padding:20px;box-shadow:0 12px 32px rgba(0,0,0,.25);font-size:14px}
+.ap-creditos-titulo{margin:0 0 8px;font-family:var(--ap-f-titulos),system-ui,sans-serif;font-size:22px;line-height:1.2;color:var(--ap-primario)}
+.ap-creditos-aviso{margin:0 0 12px;font-size:16px;font-weight:700}
+.ap-creditos-tabla{width:100%;border-collapse:collapse;margin:0 0 16px}
+.ap-creditos-tabla caption{text-align:left;font-weight:700;margin-bottom:4px}
+.ap-creditos-tabla th,.ap-creditos-tabla td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12);overflow-wrap:anywhere}
 .ap-reanudar-nombre{display:block;font-weight:700}
 .ap-reanudar-botones{display:flex;flex-wrap:wrap;gap:8px}
 .ap-nav{min-height:44px;border:2px solid var(--ap-primario);background:var(--ap-blanco);color:var(--ap-primario);border-radius:10px;padding:6px 14px;font-weight:700;white-space:nowrap}

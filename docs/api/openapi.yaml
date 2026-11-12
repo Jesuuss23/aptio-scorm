@@ -4085,6 +4085,19 @@ components:
           format: date-time
           nullable: true
           description: Borrado programado de un documento del cliente (HU-1404)
+        proveedor:
+          type: string
+          nullable: true
+          description: HU-1406 · Proveedor que lo generó (google, recraft, …; `aptio` si lo armó la plataforma sin IA).
+            Todo recurso GENERADO lo tiene (REQ-062)
+        modelo:
+          type: string
+          nullable: true
+          description: HU-1406 · Modelo y versión usados (la voz, el modelo de imagen)
+        licencia:
+          type: string
+          nullable: true
+          description: HU-1406 · Condición de uso del proveedor (ADR-010)
         creadoEn:
           type: string
           format: date-time
@@ -5611,7 +5624,46 @@ components:
           type: array
           items:
             type: string
+        creditos:
+          type: object
+          allOf:
+          - $ref: '#/components/schemas/Creditos'
+          nullable: true
+          description: HU-1406 · Créditos de IA tal como saldrán en el paquete (botón «Créditos»); null si ningún recurso
+            es de IA
       description: Nunca bloquea por tamaño; solo advierte (RN-12-2, CP-090).
+    Creditos:
+      type: object
+      description: HU-1406 · Créditos de IA del paquete (CP-107, REQ-062). Los recursos con proveedor `aptio` (lo que
+        arma la plataforma sin IA) no salen.
+      required:
+      - aviso
+      - filas
+      properties:
+        aviso:
+          type: string
+          example: Voz e ilustraciones generadas con IA y revisadas por AulasEducativas
+        filas:
+          type: array
+          items:
+            type: object
+            required:
+            - que
+            - proveedor
+            - modelo
+            - licencia
+            properties:
+              que:
+                type: string
+                example: Voz
+              proveedor:
+                type: string
+                example: Google
+              modelo:
+                type: string
+                example: es-US-Neural2-A
+              licencia:
+                type: string
     Exportacion:
       type: object
       required:

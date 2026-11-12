@@ -164,6 +164,8 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     expect(v.body.alternativas[0]).toContain('amplíe el límite de subida');
     expect(v.body.advertencias[0]).toMatch(/^El paquete pesaría unos 300(\.\d)? MB y el límite de subida del destino es 100 MB/);
     expect(v.body.recursosPesados).toEqual([{ id: videoId, nombre: 'procedimiento.mp4', bytes: 300 * 1024 * 1024 }]);
+    // HU-1406 · Un video del cliente no es de IA: el paquete no lleva créditos.
+    expect(v.body.creditos).toBeNull();
     expect(v.body.suspendDataCaracteres).toBeLessThanOrEqual(4096);
     // Los recursos de ejemplo del caso (ids que no son filas de Recurso) se informan como faltantes, sin error.
     expect(v.body.recursosFaltantes.length).toBeGreaterThan(0);
@@ -183,6 +185,31 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     expect(html.body.pesoEstimadoMb).toBeGreaterThanOrEqual(300);
     expect(html.body.advertencias.some((a: string) => a.includes('límite de subida'))).toBe(false);
     await prisma.fichaCompatibilidad.deleteMany({ where: { clienteId } });
+  });
+
+  it('HU-1406 · CP-107 · validar trae la vista previa de los créditos: voz de Google e ilustración de Recraft, sin lo de `aptio`', async () => {
+    const [voz, img, vtt] = [randomUUID(), randomUUID(), randomUUID()];
+    const doc = JSON.parse(JSON.stringify(loto()).replaceAll('"aud-p02-es"', `"${voz}"`).replaceAll('"img-p20-faja"', `"${img}"`).replaceAll('"vtt-p03-es"', `"${vtt}"`));
+    const di = await prisma.usuario.findFirstOrThrow({ where: { email: correo('instruccional') } });
+    const p = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId, nombre: 'Con créditos', creadoPorId: di.id } });
+    const curso = await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: p.id, versionEsquema: '0.2.0', documento: doc, version: 1 } });
+    const fila = (id: string, tipo: 'AUDIO' | 'IMAGEN' | 'SUBTITULO', proveedor: string, modelo: string, licencia: string) => ({
+      id, organizacionId: orgId, clienteId, proyectoId: p.id, tipo, origen: 'GENERADO' as const, claveS3: `org/${orgId}/${id}`, mime: 'application/octet-stream', bytes: BigInt(10), hash: 'x', nombre: id, proveedor, modelo, licencia,
+    });
+    await prisma.recurso.createMany({ data: [
+      fila(voz, 'AUDIO', 'google', 'es-US-Neural2-A', 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)'),
+      fila(img, 'IMAGEN', 'recraft', 'recraftv3', 'Recraft · uso comercial (plan de pago)'),
+      fila(vtt, 'SUBTITULO', 'aptio', 'subtitulos-por-letras v1', 'Generado por Aptio SCORM desde el guion'),
+    ] });
+    const v = await como('instruccional').post(`/cursos/${curso.id}/validar`, { formato: 'HTML' });
+    expect(v.status).toBe(200);
+    expect(v.body.creditos).toEqual({
+      aviso: 'Voz e ilustraciones generadas con IA y revisadas por Org exportar',
+      filas: [
+        { que: 'Voz', proveedor: 'Google', modelo: 'es-US-Neural2-A', licencia: 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)' },
+        { que: 'Ilustraciones', proveedor: 'Recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)' },
+      ],
+    });
   });
 
   it('validar: errores de esquema en 200, formato no disponible 422 y el revisor del cliente 403', async () => {

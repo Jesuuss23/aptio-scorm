@@ -247,3 +247,76 @@ test('HU-1203 · con HTML autocontenido no hay LMS destino ni límite de subida,
   await expect(fila.locator('td').nth(1)).toHaveText('HTML');
   await expect(fila.locator('td').nth(3)).toHaveText('—');
 });
+
+// HU-1406 · CP-106 · «Créditos y licencias»: los recursos generados del curso con su procedencia; al abrir la
+// ilustración se ven proveedor, modelo y licencia. Arriba, el texto de los créditos tal como saldrá en el paquete.
+const VOZ = { id: 'aud-p02-es', tipo: 'AUDIO', origen: 'GENERADO', nombre: 'p02-es.mp3', proveedor: 'google', modelo: 'es-US-Neural2-A', licencia: 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)' };
+const ILUSTRACION = { id: 'img-p20-faja', tipo: 'IMAGEN', origen: 'GENERADO', nombre: 'Faja de seguridad.png', proveedor: 'recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)' };
+const SUBTITULOS = { id: 'vtt-p03-es', tipo: 'SUBTITULO', origen: 'GENERADO', nombre: 'p03-es.vtt', proveedor: 'aptio', modelo: 'subtitulos-por-letras v1', licencia: 'Generado por Aptio SCORM desde el guion' };
+const AVISO = 'Voz e ilustraciones generadas con IA y revisadas por AulasEducativas';
+
+async function simularRecursos(page: Page) {
+  const fichas: string[] = [];
+  const base = { clienteId: '00000000-0000-4000-8000-0000000000c1', proyectoId: PROYECTO, mime: 'application/octet-stream', bytes: 1000, hash: 'x', eliminarEn: null, creadoEn: '2026-11-12T10:00:00.000Z' };
+  // Otro recurso generado del proyecto que el curso ya no usa: no se lista.
+  const sueltos = [VOZ, ILUSTRACION, SUBTITULOS, { ...ILUSTRACION, id: 'img-descartada', nombre: 'Descartada.png' }].map((r) => ({ ...base, ...r }));
+  await page.route('**/api/v1/recursos?*', (r) => r.fulfill({ json: sueltos }));
+  await page.route('**/api/v1/recursos/*', (r) => {
+    const id = new URL(r.request().url()).pathname.split('/').pop()!;
+    fichas.push(id);
+    const fila = sueltos.find((x) => x.id === id);
+    return fila ? r.fulfill({ json: { ...fila, url: `https://s3-descarga.prueba/${id}?X-Amz-Expires=900` } }) : r.fulfill({ status: 404, json: { codigo: 'NO_ENCONTRADO', mensaje: 'Recurso no encontrado' } });
+  });
+  return fichas;
+}
+
+test('CP-106 · Créditos y licencias: al abrir la ilustración se ven proveedor, modelo y licencia, y la vista previa de los créditos', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  await simularExportaciones(page, zip, { validacion: { ...VALIDACION, creditos: { aviso: AVISO, filas: [
+    { que: 'Voz', proveedor: 'Google', modelo: VOZ.modelo, licencia: VOZ.licencia },
+    { que: 'Ilustraciones', proveedor: 'Recraft', modelo: ILUSTRACION.modelo, licencia: ILUSTRACION.licencia },
+  ] } } });
+  const fichas = await simularRecursos(page);
+  await page.goto(URL_ENTREGA);
+  const seccion = page.getByRole('region', { name: 'Créditos y licencias' });
+  await expect(seccion.getByRole('heading', { name: 'Créditos y licencias' })).toBeVisible();
+
+  const vista = seccion.getByRole('group', { name: 'Así saldrán los créditos' });
+  await expect(vista.getByText(AVISO, { exact: true })).toBeVisible();
+  await expect(vista.getByRole('table', { name: 'Recursos generados con IA' }).getByRole('row')).toHaveCount(3);
+
+  // La lista: lo de IA primero, los subtítulos de la plataforma al final, y sin el recurso que el curso no usa.
+  const tabla = seccion.getByRole('table', { name: 'Recursos generados del curso' });
+  await expect(tabla.locator('tbody tr')).toHaveCount(3);
+  await expect(tabla.locator('tbody tr td:first-child')).toHaveText(['p02-es.mp3', 'Faja de seguridad.png', 'p03-es.vtt']);
+  await expect(tabla.getByText('Descartada.png')).toHaveCount(0);
+
+  await tabla.getByRole('button', { name: 'Abrir Faja de seguridad.png' }).click();
+  const dialogo = page.getByRole('dialog', { name: 'Faja de seguridad.png' });
+  await expect(dialogo).toBeVisible();
+  const campo = (nombre: string) => dialogo.locator(`dt:text-is("${nombre}") + dd`);
+  await expect(campo('Proveedor')).toHaveText('recraft');
+  await expect(campo('Modelo')).toHaveText('recraftv3');
+  await expect(campo('Licencia')).toHaveText('Recraft · uso comercial (plan de pago)');
+  await expect(campo('En los créditos')).toHaveText('Sí: se generó con IA');
+  await expect(dialogo.getByRole('link', { name: 'Ver archivo' })).toHaveAttribute('href', /img-p20-faja\?X-Amz-Expires=900$/);
+  expect(fichas).toEqual(['img-p20-faja']);
+  await page.keyboard.press('Escape');
+  await expect(dialogo).toBeHidden();
+
+  // Los subtítulos los arma la plataforma: no salen en los créditos.
+  await tabla.getByRole('button', { name: 'Abrir p03-es.vtt' }).click();
+  await expect(page.getByRole('dialog', { name: 'p03-es.vtt' }).locator('dt:text-is("En los créditos") + dd')).toHaveText('No: lo armó la plataforma, sin IA');
+});
+
+test('CP-106 · el revisor del cliente ve los recursos y su procedencia, sin la vista previa de los créditos', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'REVISOR_CLIENTE' });
+  await simularExportaciones(page, zip);
+  await simularRecursos(page);
+  await page.goto(URL_ENTREGA);
+  const seccion = page.getByRole('region', { name: 'Créditos y licencias' });
+  await expect(seccion.getByRole('table', { name: 'Recursos generados del curso' }).locator('tbody tr')).toHaveCount(3);
+  await expect(seccion.getByRole('group', { name: 'Así saldrán los créditos' })).toHaveCount(0);
+  await seccion.getByRole('button', { name: 'Abrir Faja de seguridad.png' }).click();
+  await expect(page.getByRole('dialog', { name: 'Faja de seguridad.png' }).locator('dt:text-is("Proveedor") + dd')).toHaveText('recraft');
+});

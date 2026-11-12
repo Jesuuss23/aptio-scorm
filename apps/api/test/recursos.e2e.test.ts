@@ -1,4 +1,5 @@
 // HU-1404 · Subidas cifradas y URL firmada (CP-103, CP-034) contra PostgreSQL y LocalStack reales.
+// HU-1406 · CP-106 · La ficha de un recurso generado trae proveedor, modelo y licencia, con el alcance del revisor.
 // Se salta sin esos servicios, salvo en CI.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
@@ -162,5 +163,33 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('recursos y almacenamie
     expect(r.documentos).toBe(1);
     expect(r.eliminarEn.toISOString()).toBe('2027-05-09T12:00:00.000Z');
     expect((await como('productor').get(`/recursos/${confirmado.body.id}`)).body.eliminarEn).toBe('2027-05-09T12:00:00.000Z');
+  });
+
+  it('CP-106 · una ilustración generada muestra proveedor, modelo y licencia, y el revisor la ve solo si es de su cliente', async () => {
+    // Hasta el S9 no hay generación de imágenes: la fila se siembra como la guardará el worker (SUP-65).
+    const proyecto = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId: otroClienteId, nombre: 'Cápsula banco', creadoPorId: usuarioId } });
+    const generar = (nombre: string, extra: { clienteId: string; proyectoId?: string }) => prisma.recurso.create({
+      data: {
+        organizacionId: orgId, ...extra, tipo: 'IMAGEN', origen: 'GENERADO', claveS3: `generados/${sufijo}/${nombre}`, mime: 'image/png', bytes: 1024,
+        hash: '0'.repeat(64), nombre, proveedor: 'recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)',
+      },
+    });
+    const ilustracion = await generar('Faja de seguridad.png', { clienteId: otroClienteId, proyectoId: proyecto.id });
+    const deOtroCliente = await generar('Casco.png', { clienteId });
+
+    const ficha = await como('productor').get(`/recursos/${ilustracion.id}`);
+    expect(ficha.status).toBe(200);
+    expect(ficha.body).toMatchObject({ id: ilustracion.id, tipo: 'IMAGEN', origen: 'GENERADO', proveedor: 'recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)' });
+
+    const lista = await como('productor').get(`/recursos?proyectoId=${proyecto.id}&origen=GENERADO`);
+    expect(lista.body.map((r: { id: string; proveedor: string }) => [r.id, r.proveedor])).toEqual([[ilustracion.id, 'recraft']]);
+    // Un documento subido no trae procedencia.
+    const { confirmado } = await subir('Anexo.pdf', 'application/pdf', PDF);
+    expect(confirmado.body).toMatchObject({ proveedor: null, modelo: null, licencia: null });
+
+    // El revisor del cliente ve la ficha de su cliente y no la de otro.
+    expect((await como('revisor').get(`/recursos/${ilustracion.id}`)).body).toMatchObject({ proveedor: 'recraft', modelo: 'recraftv3' });
+    expect((await como('revisor').get(`/recursos/${deOtroCliente.id}`)).status).toBe(404);
+    expect((await como('ajeno').get(`/recursos/${ilustracion.id}`)).status).toBe(404);
   });
 });

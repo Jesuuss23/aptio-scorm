@@ -1,6 +1,6 @@
 // HU-1202 · Datos de la vista Entrega (PNT-13): perfiles de LMS con sus recomendaciones y el peso legible.
 // HU-1201 · El límite de suspend_data de SCORM 1.2 y los MB con un decimal para la verificación automática.
-import type { FormatoExportacion, PerfilExportacion } from '../api';
+import type { FormatoExportacion, PerfilExportacion, Recurso } from '../api';
 
 /** Recomendaciones de docs/08-entregas-y-lms.md. La compatibilidad con cada LMS se declara solo después de probarla. */
 /** HU-1203 · Formatos que se exportan hoy. */
@@ -31,3 +31,27 @@ export const LIMITE_SUSPEND = 4096;
 
 /** MB con un decimal como máximo, en el formato de es-PE. */
 export const mb = (n: number): string => n.toLocaleString('es-PE', { maximumFractionDigits: 1 });
+
+// ---------- HU-1406 · Créditos y licencias ----------
+
+/** Proveedor de lo que arma la plataforma sin IA (subtítulos por letras, el paquete): no sale en los créditos (SUP-64). */
+export const PROVEEDOR_APTIO = 'aptio';
+export const esDeIa = (r: Pick<Recurso, 'proveedor'>): boolean => Boolean(r.proveedor?.trim()) && r.proveedor!.trim().toLowerCase() !== PROVEEDOR_APTIO;
+
+export const NOMBRE_TIPO_RECURSO: Record<string, string> = {
+  AUDIO: 'Voz', IMAGEN: 'Ilustración', SVG: 'Ilustración', VIDEO: 'Video', SUBTITULO: 'Subtítulos', PAQUETE: 'Paquete', DOCUMENTO: 'Documento', FUENTE: 'Fuente',
+};
+const ORDEN_TIPO = ['AUDIO', 'IMAGEN', 'SVG', 'VIDEO', 'SUBTITULO'];
+
+/**
+ * Los recursos generados que usa el curso (los ids de `documento.recursos`), sin paquetes: primero los de IA (voz,
+ * ilustraciones, video) y luego lo que armó la plataforma; dentro de cada tipo, por nombre.
+ */
+export function recursosDelCurso(documento: Record<string, unknown>, recursos: readonly Recurso[]): Recurso[] {
+  const lista = Array.isArray(documento.recursos) ? (documento.recursos as { id?: unknown }[]) : [];
+  const ids = new Set(lista.map((r) => r?.id).filter((id): id is string => typeof id === 'string'));
+  const orden = (t: string) => { const i = ORDEN_TIPO.indexOf(t); return i < 0 ? ORDEN_TIPO.length : i; };
+  return recursos
+    .filter((r) => ids.has(r.id) && r.tipo !== 'PAQUETE')
+    .sort((a, b) => Number(esDeIa(b)) - Number(esDeIa(a)) || orden(a.tipo) - orden(b.tipo) || a.nombre.localeCompare(b.nombre, 'es'));
+}

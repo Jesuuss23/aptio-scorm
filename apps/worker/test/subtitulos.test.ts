@@ -68,6 +68,8 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 8 en el generador', () => 
     const p03 = filas.find((n) => n.pantallaId === 'p03')!;
     const recurso = await prisma.recurso.findUniqueOrThrow({ where: { id: p03.subtituloRecursoId! } });
     expect(recurso).toMatchObject({ tipo: 'SUBTITULO', origen: 'GENERADO', mime: 'text/vtt' });
+    // HU-1406 · REQ-062 · Sin IA: proveedor `aptio`, con su modelo y licencia (SUP-64).
+    expect(recurso).toMatchObject({ proveedor: 'aptio', modelo: 'subtitulos-por-letras v1', licencia: 'Generado por Aptio SCORM desde el guion' });
     expect(new TextDecoder().decode(almacen.get(recurso.claveS3)!.cuerpo)).toBe(readFileSync(join(AI, 'casos/loto/salidas/08-subtitulos-p03-es.vtt'), 'utf8'));
     expect(esCursoValido(doc)).toBe(true);
     // Ya no queda ninguna narración pendiente al exportar (cierra SUP-35).

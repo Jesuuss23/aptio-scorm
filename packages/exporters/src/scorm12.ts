@@ -2,7 +2,7 @@
 // curso y sus recursos en `recursos/`. Todas las rutas son relativas y nada se descarga de internet. El ZIP es
 // determinista: con la misma entrada sale el mismo archivo, byte a byte (orden fijo, fecha fija, compresión fija).
 // Exporta un solo idioma, el primero del curso salvo que se pida otro (SUP-49).
-import type { CursoReproductor, Idioma, KitReproductor } from '@aptio/player';
+import type { Creditos, CursoReproductor, Idioma, KitReproductor } from '@aptio/player';
 import JSZip from 'jszip';
 import { escaparXml, manifiestoScorm12 } from './manifiesto.ts';
 
@@ -25,6 +25,8 @@ export interface EntradaScorm12 {
   reproductor: string;
   /** HU-1204 · Modo diagnóstico en el paquete (Ctrl+Alt+Shift+D o ?diagnostico=1). Por defecto, true. */
   incluirDiagnostico?: boolean;
+  /** HU-1406 · Créditos de IA (`armarCreditos`); null o ausentes: el paquete no muestra «Créditos». */
+  creditos?: Creditos | null;
 }
 
 export interface PaqueteScorm12 {
@@ -107,7 +109,7 @@ export function armarContenido(entrada: EntradaScorm12, extra: Record<string, un
     if (esVtt(r, archivo.nombre)) subtitulos[r.id] = comoTexto(archivo.datos);
   }
 
-  const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos, ...(entrada.incluirDiagnostico === false ? { diagnostico: false } : {}), ...extra };
+  const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos, ...(entrada.incluirDiagnostico === false ? { diagnostico: false } : {}), ...(entrada.creditos ? { creditos: entrada.creditos } : {}), ...extra };
   contenido.set('index.html', indexHtml(titulo, idioma));
   contenido.set('aptio-reproductor.js', entrada.reproductor);
   contenido.set('datos.js', `window.APTIO_DATOS = ${JSON.stringify(datos)};\n`);

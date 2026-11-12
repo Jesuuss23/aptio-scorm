@@ -6,6 +6,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { aVtt, subtitulosDeNarracion } from '@aptio/ai';
 import type { Prisma } from '@aptio/db';
+import { conProcedencia, PROCEDENCIA_SUBTITULOS } from '../procedencia.js';
 import { validarCurso } from '@aptio/schema';
 import type { SubtitulosCurso } from '@aptio/schema/generacion';
 import type { ContextoEtapa, EjecutorEtapa } from '../generar.js';
@@ -72,11 +73,11 @@ export function crearEtapaSubtitulos({ subir }: DependenciasSubtitulos): Ejecuto
       await subir(claveS3, cuerpo, MIME_VTT);
       await ctx.bd.$transaction([
         ctx.bd.recurso.create({
-          data: {
+          data: conProcedencia({
             id: recursoId, organizacionId: ctx.organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'SUBTITULO', origen: 'GENERADO',
             claveS3, mime: MIME_VTT, bytes: BigInt(cuerpo.byteLength), hash: createHash('sha256').update(cuerpo).digest('hex'),
-            nombre: `${p.id}-es.vtt`, licencia: 'Generado por Aptio SCORM desde el guion',
-          },
+            nombre: `${p.id}-es.vtt`, ...PROCEDENCIA_SUBTITULOS,
+          }),
         }),
         ctx.bd.narracion.update({ where: { id: n.id }, data: { subtituloRecursoId: recursoId } }),
       ]);

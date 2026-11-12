@@ -11,6 +11,7 @@
 // desde que se mostró. El editor monta con `sinTiempos` (todo a la vista) y mueve la aguja con `irA`, `reproducir`,
 // `pausar` y `verTodo`: en ese segundo se ven solo los elementos activos, con la boca y el subtítulo de ese instante.
 import { colorLegible } from './contraste.ts';
+import { abrirCreditos } from './creditos.ts';
 import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
@@ -23,7 +24,7 @@ import { ESTILOS } from './estilos.ts';
 import { estadoReanudado, type Reanudacion } from './reanudacion.ts';
 import { activoEn, duracionDe, tiemposDe, ultimoCambio } from './tiempos.ts';
 import { t, textos } from './textos.ts';
-import type { AudioNarracion, BloqueInteraccion, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
+import type { AudioNarracion, BloqueInteraccion, Creditos, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
 
 /** Estilo base (el mismo de KIT_INICIAL en @aptio/schema/marca) más blanco y alerta. */
 export const PALETA_BASE: Record<RolColor, string> = {
@@ -42,6 +43,8 @@ export interface OpcionesReproductor {
   cargarSvg?: (id: string) => Promise<string | undefined>;
   /** El WebVTT de una narración como texto (HU-0801); por defecto se descarga de `urlRecurso`. */
   cargarSubtitulos?: (id: string) => Promise<string | undefined>;
+  /** HU-1406 · Créditos de IA del paquete: con ellos, la barra muestra «Créditos». */
+  creditos?: Creditos;
   /** Modo revisión: se puede ir a cualquier pantalla y se ven los identificadores. */
   revision?: boolean;
   /** Id de la pantalla con la que empieza. */
@@ -239,6 +242,10 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   const porcentaje = h('span', { class: 'ap-porcentaje' });
   const botonTemario = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-expanded': 'false', onclick: () => { temarioAbierto = !temarioAbierto; refrescar(); } }, h('span', { 'aria-hidden': 'true' }, '☰ '), tx.temario);
   const botonSubtitulos = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-pressed': 'false', onclick: () => { conSubtitulos = !conSubtitulos; recordarSubtitulos(conSubtitulos); refrescar(); } }, 'CC', h('span', { class: 'ap-oculto' }, ` ${tx.subtitulos}`));
+  // HU-1406 · Créditos de IA: solo si el paquete los trae (sin recursos de IA no hay botón).
+  const botonCreditos: HTMLButtonElement | null = opciones.creditos && conMarco
+    ? h('button', { type: 'button', class: 'ap-boton-barra', 'aria-haspopup': 'dialog', onclick: () => abrirCreditos({ raiz, sombra, creditos: opciones.creditos!, tx, volver: botonCreditos! }) }, tx.creditos)
+    : null;
   const temario = h('nav', { class: 'ap-temario', 'aria-label': tx.temario, hidden: true });
   const escena = h('div', { class: 'ap-escena' });
   const subtitulos = h('p', { class: 'ap-subtitulos', hidden: true });
@@ -252,7 +259,8 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
       mostrar.has('temario') ? botonTemario : null,
       h('span', { class: 'ap-titulo-curso' }, titulo),
       mostrar.has('progreso') ? [barraAvance, porcentaje] : h('span', { class: 'ap-espacio' }),
-      botonSubtitulos),
+      botonSubtitulos,
+      botonCreditos),
     h('div', { class: 'ap-cuerpo' }, temario, escena),
     barraNarracion,
     audio,
@@ -262,7 +270,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   if (atajos) {
     raiz.addEventListener('keydown', (e) => {
       const destino = e.target as HTMLElement;
-      if (pendiente || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar') || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (pendiente || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar, .ap-creditos') || e.altKey || e.ctrlKey || e.metaKey) return;
       if (e.key === 'ArrowRight') irA(actual + 1, true);
       else if (e.key === 'ArrowLeft') irA(actual - 1, true);
     });

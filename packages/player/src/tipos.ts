@@ -125,6 +125,20 @@ export interface CursoReproductor {
   navegacion?: Navegacion;
 }
 
+/** HU-1406 · Una fila de los créditos: qué se generó con IA, con qué proveedor y modelo, y con qué licencia. */
+export interface FilaCreditos {
+  que: string;
+  proveedor: string;
+  modelo: string;
+  licencia: string;
+}
+
+/** HU-1406 · Créditos de IA del paquete: el aviso de revisión humana y el detalle por proveedor (REQ-062). */
+export interface Creditos {
+  aviso: string;
+  filas: FilaCreditos[];
+}
+
 /** Colores y letras del kit del cliente. Sin kit se usa el estilo base. */
 export interface KitReproductor {
   paleta?: Partial<Record<RolColor, string>>;

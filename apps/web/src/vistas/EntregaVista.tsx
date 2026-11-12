@@ -5,11 +5,13 @@
 // bloquea, RN-12-2, CP-090), suspend_data, archivos y pantallas sin aprobar. Los errores de esquema deshabilitan Exportar;
 // con pantallas sin aprobar se pide confirmación (RN-12-3). Se vuelve a validar al cambiar el LMS destino.
 // HU-1203 · Formato HTML autocontenido: sin LMS destino, sin límite de subida ni suspend_data; la confirmación sigue.
+// HU-1406 · «Créditos y licencias»: la procedencia de cada recurso generado y los créditos que llevará el paquete.
 import { Cabecera } from '@aptio/ui';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type FormatoExportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
 import { navegar } from '../ruta';
+import { CreditosLicencias } from './CreditosLicencias';
 import { FORMATOS, LIMITE_SUSPEND, mb, megas, NOMBRE_FORMATO, PERFILES } from './entrega';
 
 const CONSULTA_MS = 2000;
@@ -284,6 +286,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
           ) : <p className="sec">Todavía no hay exportaciones de este curso.</p>}
         </section>
       </div>
+      <CreditosLicencias proyectoId={proyectoId} documento={curso.documento} creditos={veHistorial && v ? (v.creditos ?? null) : undefined} conVistaPrevia={veHistorial} />
     </>
   );
 }

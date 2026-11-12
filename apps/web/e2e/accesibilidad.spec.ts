@@ -5,12 +5,13 @@
 //   cada acción el foco sigue en el curso (nunca en el body).
 // - axe-core con las reglas WCAG 2.2 A y AA en cada pantalla, al entrar y al terminar su actividad: cero violaciones.
 // - Un curso sintético con las 8 interacciones (LOTO no trae Tarjetas) y un kit de poco contraste, de punta a punta.
+// HU-1406 · CP-107 · El diálogo «Créditos» del paquete, solo con teclado y con axe: la frase, la tabla y Escape.
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import AxeBuilder from '@axe-core/playwright';
-import { codigoReproductor, construirHtml, type EntradaHtml } from '@aptio/exporters';
+import { armarCreditos, codigoReproductor, construirHtml, type EntradaHtml } from '@aptio/exporters';
 import { expect, type Page, test } from '@playwright/test';
 import JSZip from 'jszip';
 import { cursoLoto, recursosLoto } from '../../../packages/exporters/test/loto.ts';
@@ -28,9 +29,9 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR
 /** Kit de poco contraste: el verde da 2,8:1 sobre blanco y el naranja, 2,4:1. El reproductor debe ajustarlos (SUP-63). */
 const KIT_POCO_CONTRASTE = { paleta: { primario: '#0B3D91', secundario: '#4CAF50', acento: '#F28C28' } };
 
-async function carpetaHtml(curso: Curso, kit?: EntradaHtml['kit']) {
+async function carpetaHtml(curso: Curso, kit?: EntradaHtml['kit'], creditos?: EntradaHtml['creditos']) {
   const recursos = recursosLoto().map((r) => (r.nombre.endsWith('.png') ? { ...r, datos: new Uint8Array(PNG) } : r.nombre.endsWith('.mp3') ? { ...r, datos: new Uint8Array(wavSilencio(200)) } : r));
-  const { zip } = await construirHtml({ curso, recursos, reproductor: await codigoReproductor(), kit });
+  const { zip } = await construirHtml({ curso, recursos, reproductor: await codigoReproductor(), kit, creditos });
   const carpeta = mkdtempSync(join(tmpdir(), 'aptio-a11y-'));
   const archivos = await JSZip.loadAsync(zip);
   for (const [ruta, f] of Object.entries(archivos.files)) {
@@ -345,4 +346,65 @@ test('axe · WCAG 2.2 A y AA en las 30 pantallas de LOTO, al entrar y al termina
   const hallazgos: string[] = [];
   await recorrer(page, urlLoto, pantallasDe(loto), { axe: hallazgos });
   expect(hallazgos).toEqual([]);
+});
+
+test('CP-107 · solo con teclado hasta «Créditos»: la frase de revisión, la tabla de proveedores, axe sin violaciones y Escape devuelve el foco', async ({ page }) => {
+  // La procedencia que guarda el worker para LOTO: la voz de Google, una ilustración de Recraft y los subtítulos de la plataforma.
+  const creditos = armarCreditos([
+    { tipo: 'AUDIO', proveedor: 'google', modelo: 'es-US-Neural2-A', licencia: 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)' },
+    { tipo: 'IMAGEN', proveedor: 'recraft', modelo: 'recraftv3', licencia: 'Recraft · uso comercial (plan de pago)' },
+    { tipo: 'SUBTITULO', proveedor: 'aptio', modelo: 'subtitulos-por-letras v1', licencia: 'Generado por Aptio SCORM desde el guion' },
+  ], 'AulasEducativas');
+  await page.goto(await carpetaHtml(loto, undefined, creditos));
+  await expect(page.locator('#curso .ap-titulo-pantalla')).toBeVisible();
+  const BOTON = '.ap-boton-barra[aria-haspopup="dialog"]';
+  expect(await texto(page, BOTON)).toBe('Créditos');
+  await usar(page, BOTON);
+
+  const dialogo = page.getByRole('dialog', { name: 'Créditos' });
+  await expect(dialogo).toBeVisible();
+  await expect(dialogo).toHaveAttribute('aria-modal', 'true');
+  await expect(dialogo.locator('.ap-creditos-aviso')).toHaveText('Voz e ilustraciones generadas con IA y revisadas por AulasEducativas');
+  const tabla = dialogo.getByRole('table');
+  await expect(tabla.getByRole('columnheader')).toHaveText(['Qué', 'Proveedor', 'Modelo', 'Licencia']);
+  await expect(tabla.locator('tbody tr')).toHaveText([
+    /^Voz\s*Google\s*es-US-Neural2-A\s*Google Cloud Text-to-Speech · uso comercial \(servicio de pago\)$/,
+    /^Ilustraciones\s*Recraft\s*recraftv3\s*Recraft · uso comercial \(plan de pago\)$/,
+  ]);
+  // Los subtítulos por letras los arma la plataforma: no salen.
+  await expect(tabla).not.toContainText('subtitulos-por-letras');
+
+  // El foco está en «Cerrar», se ve y Tab no lo saca del diálogo.
+  const enCerrar = async () => {
+    const f = await foco(page);
+    expect(f.enCurso && f.descripcion.includes('Cerrar'), `foco en «Cerrar» (${f.descripcion})`).toBe(true);
+    expect(f.contorno).toBeGreaterThanOrEqual(2);
+    expect(f.tapado).toBe(false);
+  };
+  await enCerrar();
+  await page.keyboard.press('Tab');
+  await enCerrar();
+  await page.keyboard.press('Shift+Tab');
+  await enCerrar();
+
+  const hallazgos: string[] = [];
+  await auditar(page, 'diálogo de créditos', hallazgos);
+  expect(hallazgos, hallazgos.join('\n')).toEqual([]);
+
+  const antes = (await estado(page)).pantallaId;
+  await page.keyboard.press('ArrowRight');
+  expect((await estado(page)).pantallaId, 'las flechas no cambian de pantalla con el diálogo abierto').toBe(antes);
+  await page.keyboard.press('Escape');
+  await expect(dialogo).toHaveCount(0);
+  await expect.poll(async () => (await foco(page)).descripcion).toContain('«Créditos»');
+  const f = await foco(page);
+  expect(f.contorno).toBeGreaterThanOrEqual(2);
+  // El resto del curso vuelve a ser usable.
+  expect(await contar(page, '[inert]')).toBe(0);
+});
+
+test('CP-107 · sin créditos (nada de IA) la barra no tiene el botón', async ({ page }) => {
+  await page.goto(urlLoto);
+  await expect(page.locator('#curso .ap-titulo-pantalla')).toBeVisible();
+  expect(await contar(page, '.ap-boton-barra[aria-haspopup="dialog"]')).toBe(0);
 });
