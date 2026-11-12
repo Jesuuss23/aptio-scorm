@@ -88,11 +88,15 @@ test.describe('con el productor', () => {
     // Tab recorre los textos editables del lienzo.
     for (let i = 0; i < 40 && !(await subtitulo.evaluate((el) => el.matches(':focus'))); i++) await page.keyboard.press('Tab');
     await expect(subtitulo).toBeFocused();
+    // Se marca el título de ahora: al guardar, la versión nueva redibuja el lienzo y lo reemplaza.
+    await titulo(page).evaluate((el) => { el.dataset.antesDeGuardar = ''; });
     await page.keyboard.press('Enter');
     await page.keyboard.type('Cápsula de seguridad · 12 min');
     await page.keyboard.press('Enter');
     await expect(lienzo(page).getByText('Cápsula de seguridad · 12 min', { exact: true })).toBeVisible();
     expect(ediciones).toEqual([expect.objectContaining({ textos: { 'p01-subtitulo': { es: 'Cápsula de seguridad · 12 min' } } })]);
+    // Se escribe en el lienzo redibujado: en el de antes, lo escrito se perdería al redibujar.
+    await expect(lienzo(page).locator('[data-antes-de-guardar]')).toHaveCount(0);
     // Clic fuera mientras se escribe guarda lo escrito.
     await titulo(page).dblclick();
     await page.keyboard.type('Bloqueo y etiquetado LOTO');
