@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.28 · actualizado con la sexta entrega del Sprint 6 (12 de noviembre de 2026)**
+**Versión 0.29 · actualizado con la séptima entrega del Sprint 6 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -128,6 +128,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - Reanudación (HU-1105): `montar(..., { reanudar: { pantallaId, vistas, resultados, preguntar }, alReanudar })` restaura el avance y, con `preguntar`, muestra el aviso «¿Continuar donde lo dejaste?» dentro del Shadow DOM. La decisión y la restauración son funciones puras en `src/reanudacion.ts`. `suspend_data` v2 vive en `src/suspend.ts` (`2|<huella>|<idioma>|<vistas>|<pos:c:p[:intentos]>`; la huella sale de `huellaCurso(curso.id, orden)`) y se sigue leyendo v1. `leerSuspend` nunca lanza: lo inválido devuelve `null`. `conectarScorm12` no hace commit al entrar, no degrada un `lesson_status` cerrado y, con `mejorNota`, no baja `score.raw`. `iniciarPaquete` no reporta nada hasta que el participante elige. Si cambias el formato, súbele la versión y conserva la lectura de las anteriores.
 - Modo diagnóstico (HU-1204): `src/diagnostico.ts` (`RegistroDiagnostico`, `informeDiagnostico`, `navegadorResumido`) es lógica sin DOM; `src/panel-diagnostico.ts` es el panel. `buscarApi(ventana, registro)` y `conectarScorm12(api, { registro })` anotan solos: si agregas una llamada al LMS, pásala por `llamar(..., nota)` para que quede en el registro. Nunca leas datos del participante; si hiciera falta, agrégalos a `ELEMENTOS_PRIVADOS`. Si cambias la forma del informe, súbele `version` (lo guardan las fichas de los clientes). `DatosPaquete.diagnostico: false` lo desactiva (lo pone `construirScorm12` con `incluirDiagnostico: false`).
 - HTML (HU-1203): con `DatosPaquete.modo: 'html'`, `conectarPaquete` no toca `API`, `parent` ni `opener` y no avisa; tampoco hay modo diagnóstico. No agregues `fetch` al camino del paquete: en `file://` no funciona. Los SVG y los WebVTT van en `datos.js`.
+- Accesibilidad (HU-1401): no uses `disabled` en un control que puede tener el foco en ese momento (una carta emparejada usa `aria-disabled`); si una acción quita o desactiva el control enfocado, mueve el foco con `enfocar(el)` de `interacciones/comun.ts` (espera a que el elemento esté en la página). `pieResultado` ya enfoca el resultado; el texto que debe leerse al empezar o al pasar de paso lleva `tabindex=-1` y `data-enfocar` (`inicioDe` lo busca al repetir). Los colores del kit que se usan como texto pasan por `colorLegible` (`src/contraste.ts`) y se exponen como `--ap-bien-texto`, `--ap-mal-texto` y `--ap-foco`; no pongas `var(--ap-secundario)` como color de texto.
 - Para el paquete: `pnpm --filter @aptio/player construir` deja `packages/player/dist/aptio-reproductor.js` con `window.AptioReproductor.montar`.
 
 ### 6.5.1 Entrega (`@aptio/exporters`)
@@ -293,6 +294,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 - **Playwright** usa la API simulada. Corre con `npx playwright test --trace off` desde `apps/web`.
 - La lógica pura de la web va en archivos `*.ts` con su `*.test.ts` en `apps/web/src`; `pnpm --filter web test` corre `vitest run --dir src` (los `e2e/*.spec.ts` quedan fuera).
 - La transcripción se prueba con ffmpeg real sobre un video generado en la misma prueba (`apps/worker/test/transcribir.test.ts`).
+- Accesibilidad: `apps/web/e2e/accesibilidad.spec.ts` recorre el HTML exportado solo con teclado y corre axe (`@axe-core/playwright`, WCAG 2.2 A y AA) en cada pantalla. Antes de axe espera las animaciones, también las del Shadow DOM (`shadowRoot.getAnimations()`), porque a mitad del fundido el contraste baja. El curso con las 8 interacciones está en `packages/player/test/catalogo.ts`. Las pruebas de foco del reproductor usan happy-dom (`// @vitest-environment happy-dom`); ahí `URL` es la del navegador simulado, así que lee archivos con rutas, no con `new URL`.
 - **Prohibido** saltarse, desactivar o poner en cuarentena una prueba para obtener verde.
 
 ## 9. Integración continua
@@ -361,6 +363,7 @@ Ninguna clave real va al repositorio.
 | 0.26 | 2026-11-11 | HU-1201: `validarScorm12` en `@aptio/exporters`, `POST /cursos/{id}/validar` y la verificación automática de `EntregaVista`. |
 | 0.27 | 2026-11-11 | HU-1204: modo diagnóstico en `@aptio/player`, `incluirDiagnostico`, `FichasController` y `FichasLms.tsx`; el LMS de prueba de Playwright pasa a `https://lms.prueba` (el portapapeles exige página segura). |
 | 0.28 | 2026-11-12 | HU-1203: `construirHtml`, `armarContenido`/`comprimir`, `validarExportacion` y `modo: 'html'` del reproductor; prueba CP-093 en `file://` sin red (`e2e/html.spec.ts`). |
+| 0.29 | 2026-11-12 | HU-1401: `contraste.ts` y variables legibles, `enfocar`/`inicioDe` en las interacciones, quitar el límite del quiz; pruebas con happy-dom y `accesibilidad.spec.ts` con axe. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |

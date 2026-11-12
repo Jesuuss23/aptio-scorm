@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.28 · actualizado con la sexta entrega del Sprint 6 (12 de noviembre de 2026)**
+**Versión 0.29 · actualizado con la séptima entrega del Sprint 6 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -401,6 +401,18 @@ Cuando el cliente quiere mostrar la cápsula en una sala, en una feria o en una 
 - La verificación no muestra el límite de subida ni `suspend_data`, porque no hay LMS. El peso aparece solo como dato. Si quedan pantallas sin aprobar, se pide la misma confirmación que en SCORM.
 - En el historial, la columna **Formato** dice «HTML» y el archivo se llama `<proyecto>-html-v<versión>.zip`.
 
+### 8.12 Accesibilidad de la cápsula: teclado y lector de pantalla
+
+La cápsula exportada (SCORM o HTML) y la vista previa se usan completas sin ratón:
+
+- **Tab** y **Mayús+Tab** recorren los botones; **Enter** o **Espacio** los usan. Con el foco fuera de una actividad, las **flechas** izquierda y derecha cambian de pantalla.
+- El control enfocado siempre se ve: lleva un contorno grueso con un borde blanco, también sobre fondos oscuros.
+- Al cambiar de pantalla, el lector anuncia el título. Al comprobar o terminar una actividad, el resultado se anuncia y queda enfocado, así no hay que buscarlo. Al pasar de pregunta, el foco va al enunciado.
+- En el reto con tiempo aparece **Quitar el límite de tiempo** junto al reloj. Detiene la cuenta para el resto del reto, sin quitar vidas ni puntaje.
+- Si el verde o el naranja del kit tienen poco contraste, la cápsula usa un tono más oscuro del mismo color en los textos de acierto y error y en el contorno del foco. El kit no cambia.
+
+Se verificó con un recorrido completo solo con teclado y con la revisión automática WCAG 2.2 AA (axe), en Chromium. Falta probar con NVDA, VoiceOver y en Firefox y Safari.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -466,6 +478,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.26 | 2026-11-11 | Entrega: verificación automática antes de exportar (peso contra el límite con alternativas, pantallas sin aprobar con confirmación, errores que deshabilitan Exportar). |
 | 0.27 | 2026-11-11 | Modo diagnóstico del paquete (Ctrl+Alt+Shift+D o `?diagnostico=1`, Copiar informe) y fichas de compatibilidad LMS en el detalle del cliente. |
 | 0.28 | 2026-11-12 | Entrega: formato HTML autocontenido para presentar sin LMS ni internet (8.11). |
+| 0.29 | 2026-11-12 | Accesibilidad de la cápsula: uso con teclado, anuncios para lector de pantalla y quitar el límite de tiempo del reto (8.12). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
