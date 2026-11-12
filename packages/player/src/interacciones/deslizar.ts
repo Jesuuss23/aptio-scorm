@@ -3,7 +3,7 @@
 import { h, vaciar } from '../dom.ts';
 import { t } from '../textos.ts';
 import type { TextoI18n } from '../tipos.ts';
-import { type Actividad, intentos, lista, marca, pieResultado, porcentaje } from './comun.ts';
+import { type Actividad, enfocar, intentos, lista, marca, pieResultado, porcentaje } from './comun.ts';
 
 type Afirmacion = { id: string; texto: TextoI18n; verdadera: boolean; retroalimentacion: TextoI18n };
 
@@ -18,7 +18,8 @@ export const deslizar: Actividad = (datos, ctx) => {
   const empezar = (vuelta: number) => {
     let i = 0;
     let aciertos = 0;
-    const mostrar = () => {
+    /** `enfocar`: al pasar a la siguiente afirmación, el foco va a su texto (HU-1401). */
+    const mostrar = (enfocarla = false) => {
       const a = afirmaciones[i]!;
       let respondida = false;
       const retro = h('div', { class: 'ap-retro', 'aria-live': 'polite' });
@@ -35,7 +36,7 @@ export const deslizar: Actividad = (datos, ctx) => {
         vaciar(acciones, h('button', {
           type: 'button', class: 'ap-boton ap-primario',
           onclick: () => {
-            if (!ultima) { i++; mostrar(); return; }
+            if (!ultima) { i++; mostrar(true); return; }
             control.sumar();
             const puntaje = porcentaje(aciertos, afirmaciones.length);
             ctx.terminar({ completada: true, puntaje });
@@ -44,7 +45,8 @@ export const deslizar: Actividad = (datos, ctx) => {
         }, ultima ? ctx.tx.verResultado : ctx.tx.continuar));
         acciones.querySelector('button')?.focus();
       };
-      const tarjeta = h('div', { class: 'ap-afirmacion' }, h('p', {}, `«${t(a.texto, ctx.idioma)}»`));
+      const texto = h('p', { tabindex: -1, 'data-enfocar': '' }, `«${t(a.texto, ctx.idioma)}»`);
+      const tarjeta = h('div', { class: 'ap-afirmacion' }, texto);
       let desde: number | null = null;
       tarjeta.addEventListener('pointerdown', (e) => { desde = e.clientX; });
       tarjeta.addEventListener('pointerup', (e) => {
@@ -62,6 +64,7 @@ export const deslizar: Actividad = (datos, ctx) => {
         tarjeta,
         h('div', { class: 'ap-opciones ap-dos' }, botones),
         retro, acciones);
+      if (enfocarla) enfocar(texto);
     };
     mostrar();
   };

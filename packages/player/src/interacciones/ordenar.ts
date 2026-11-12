@@ -2,7 +2,7 @@
 // comprobar se muestra el orden correcto.
 import { barajar, h, vaciar } from '../dom.ts';
 import type { Visual } from '../tipos.ts';
-import { type Actividad, intentos, lista, marca, pieResultado, porcentaje, textoVisual, visual } from './comun.ts';
+import { type Actividad, enfocar, intentos, lista, marca, pieResultado, porcentaje, textoVisual, visual } from './comun.ts';
 
 type Paso = { id: string; contenido: Visual };
 
@@ -30,7 +30,10 @@ export const ordenar: Actividad = (datos, ctx) => {
       orden = [...orden];
       [orden[i], orden[j]] = [orden[j]!, orden[i]!];
       dibujar();
-      ol.querySelector<HTMLButtonElement>(`[data-paso="${orden[j]!.id}"] [data-mover="${d}"]`)?.focus();
+      // HU-1401 · En el primer o el último lugar esa flecha se desactiva: el foco pasa a la otra del mismo paso.
+      const fila = ol.querySelector(`[data-paso="${orden[j]!.id}"]`);
+      const misma = fila?.querySelector<HTMLButtonElement>(`[data-mover="${d}"]`);
+      enfocar(misma && !misma.disabled ? misma : fila?.querySelector<HTMLButtonElement>(`[data-mover="${-d}"]`));
       ctx.anunciar(`${textoVisual(orden[j]!.contenido, ctx.idioma)}: ${ctx.tx.paso(j + 1)}`);
     };
     const dibujar = () => {

@@ -10,6 +10,7 @@
 // a 0,3 s (RN-06-9). El reloj de la pantalla es el audio de la narración si está sonando (o ya sonó) y, si no, el tiempo
 // desde que se mostró. El editor monta con `sinTiempos` (todo a la vista) y mueve la aguja con `irA`, `reproducir`,
 // `pausar` y `verTodo`: en ese segundo se ven solo los elementos activos, con la boca y el subtítulo de ese instante.
+import { colorLegible } from './contraste.ts';
 import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
@@ -226,6 +227,10 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
   // ---------- Estructura del patrón Clásico ----------
   const variables = [
     ...Object.entries(paleta).map(([rol, color]) => `--ap-${rol}:${color}`),
+    // HU-1401 · Variantes legibles del kit (SUP-63): texto de aciertos y errores a 4,5:1 y foco a 3:1 sobre las superficies claras.
+    `--ap-bien-texto:${colorLegible(paleta.secundario, [paleta.blanco, paleta.fondo])}`,
+    `--ap-mal-texto:${colorLegible(paleta.alerta, [paleta.blanco, paleta.fondo])}`,
+    `--ap-foco:${colorLegible(paleta.acento, [paleta.blanco, paleta.fondo], 3)}`,
     `--ap-f-titulos:${JSON.stringify(opciones.kit?.tipografias?.titulos ?? 'Barlow Condensed')}`,
     `--ap-f-textos:${JSON.stringify(opciones.kit?.tipografias?.textos ?? 'Atkinson Hyperlegible')}`,
   ].join(';');
@@ -285,7 +290,7 @@ export function montar(contenedor: HTMLElement, curso: CursoReproductor, opcione
     };
     // HU-1105 · Una sumativa que ya usó todos sus intentos (en esta sesión o en una anterior) muestra su resultado.
     if (ctx.modo === 'sumativa' && ctx.intentosMaximos !== null && (ctx.intentosPrevios ?? 0) >= ctx.intentosMaximos) {
-      return h('div', { class: 'ap-juego' }, pieResultado(ctx, previa?.puntaje ?? null, false, () => undefined), anuncio);
+      return h('div', { class: 'ap-juego' }, pieResultado(ctx, previa?.puntaje ?? null, false, () => undefined, false), anuncio);
     }
     const crear = ACTIVIDADES[b.interaccion.tipo];
     return h('div', { class: 'ap-juego' }, crear ? crear(b.interaccion.datos, ctx) : null, anuncio);
