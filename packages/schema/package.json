@@ -29,6 +29,7 @@
     "./proyecto": "./src/proyecto.ts",
     "./generacion": "./src/generacion.ts",
     "./revision": "./src/revision.ts",
+    "./calidad": "./src/calidad.ts",
     "./patch": "./src/patch.ts",
     "./propuesta": "./src/propuesta.ts",
     "./retoques": "./src/retoques.ts",

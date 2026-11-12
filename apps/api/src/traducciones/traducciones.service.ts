@@ -4,7 +4,7 @@
 // HU-0803 · Desbordes (RN-08-3, CP-078): cada texto trae su límite; un inglés de la IA o de una persona que no cabe queda
 // en Desborde (la persona puede aceptarlo con «Marcar revisado» o usar la versión corta propuesta).
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import type { Prisma } from '@aptio/db';
+import { type Prisma, recalcularReglas } from '@aptio/db';
 import { desborda, type EstadoTraduccion, huellaTexto, sincronizarFilas, TAREA_TRADUCIR, type TextoCurso, textosDe } from '@aptio/schema/traduccion';
 import { resolverPuntero } from '@aptio/schema/voz';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
@@ -102,6 +102,8 @@ export class TraduccionesService {
     const estado = largo ? 'DESBORDE' : 'REVISADA';
     const propuesta = largo ? fila.propuesta : null;
     await this.bd.traduccion.update({ where: { id: fila.id }, data: { estado, propuesta, textoOrigenHash: huellaTexto(texto.es) } });
+    // HU-0505 · El Desborde cambió: las observaciones de reglas lo reflejan.
+    await recalcularReglas(this.bd, c.id, (await this.bd.curso.findUniqueOrThrow({ where: { id: c.id }, select: { documento: true } })).documento);
     return aDto(fila, texto, en, estado, propuesta);
   }
 }

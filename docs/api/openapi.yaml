@@ -2096,7 +2096,13 @@ paths:
       - Revisión
       summary: Ejecutar control de calidad
       operationId: post_cursos_cursoId_control_calidad
-      description: 'Reglas + IA: alineación, accesibilidad, ortografía, longitud por idioma, faltantes'
+      description: >-
+        HU-0505 · «✦ Revisar con IA». Encola IA-12 v2 en la cola ia (trabajo IA-12, avance por `eventos`). El worker
+        recalcula las reglas (accesibilidad, longitud por idioma, alineación básica y faltantes) y manda la cápsula a la
+        IA por lotes de 10 pantallas para ortografía, coherencia, tono y exactitud, sin repetir lo de las reglas. Una
+        corrida nueva reemplaza las observaciones de IA abiertas y no vuelve a crear las descartadas; se guardan como
+        mucho 120. Las de IA quedan en aviso o info y no bloquean la aprobación. También corre en la etapa 10 de la
+        generación. 409 `CALIDAD_EN_CURSO` si ya hay una revisión en cola o en curso; 403 al revisor del cliente.
       parameters:
       - name: cursoId
         in: path
@@ -2106,7 +2112,7 @@ paths:
           format: uuid
       responses:
         '202':
-          description: OK
+          description: Revisión de calidad en cola
           content:
             application/json:
               schema:
@@ -2117,12 +2123,18 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
   /observaciones/{observacionId}:
     patch:
       tags:
       - Revisión
-      summary: Marcar observación como resuelta
+      summary: Descartar una observación de la IA
       operationId: patch_observaciones_observacionId
+      description: >-
+        HU-0505 · `resuelta: true` descarta una observación de la IA (una corrida nueva no la vuelve a crear) y `false`
+        la reabre. Las de reglas no se descartan, desaparecen al corregir la pantalla (422 `OBSERVACION_DE_REGLA`).
+        403 al revisor del cliente.
       parameters:
       - name: observacionId
         in: path
@@ -2135,7 +2147,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Observacion'
+              $ref: '#/components/schemas/ObservacionCambio'
       responses:
         '200':
           description: OK
@@ -5199,6 +5211,37 @@ components:
         creadoEn:
           type: string
           format: date-time
+        categoria:
+          type: string
+          nullable: true
+          description: HU-0505 · Categoría que muestra Revisión.
+          enum:
+          - ortografia
+          - coherencia
+          - alineacion
+          - longitud
+          - accesibilidad
+          - faltante
+          - tono
+          - exactitud
+          - diseno
+          - null
+        sugerencia:
+          type: string
+          nullable: true
+          description: HU-0505 · Sugerencia de IA-12.
+        ruta:
+          type: string
+          nullable: true
+          description: HU-0505 · JSON Pointer del texto o bloque observado.
+    ObservacionCambio:
+      type: object
+      required:
+      - resuelta
+      properties:
+        resuelta:
+          type: boolean
+          description: true descarta la observación de la IA; false la reabre.
     Comentario:
       type: object
       required:

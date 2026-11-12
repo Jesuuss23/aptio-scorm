@@ -7,18 +7,18 @@
 // queda la observación «Revisar tiempo» (RN-06-8, CP-067). Mover o anclar de nuevo el elemento la quita.
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { hashNarracion } from '@aptio/ai';
-import type { Prisma } from '@aptio/db';
+import { type Prisma, recalcularReglas } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
 import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
-import { type CursoDoc, observacionesRegla, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
+import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, reanclarAjustes } from '@aptio/schema/tiempos';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { AlmacenService } from '../recursos/almacen.service.js';
 import { ColasService } from '../trabajos/colas.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
-import type { AprobacionDto, CambioResultadoDto, FiltroNarracionesDto, FiltroObservacionesDto, NarracionDto, ObservacionDto, PantallaCambioDto, TextoI18nDto } from './curso.dto.js';
+import { aObservacionDto, type AprobacionDto, type CambioResultadoDto, type FiltroNarracionesDto, type FiltroObservacionesDto, type NarracionDto, type ObservacionDto, type PantallaCambioDto, type TextoI18nDto } from './curso.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 type Texto = { es?: string; en?: string };
@@ -66,9 +66,7 @@ export class CursosService {
       where: { cursoId, ...(f.pantallaId ? { pantallaId: f.pantallaId } : {}), ...(f.resuelta !== undefined ? { resuelta: f.resuelta } : {}) },
       orderBy: [{ pantallaId: 'asc' }, { creadoEn: 'asc' }],
     });
-    return lista.map((o) => ({
-      id: o.id, pantallaId: o.pantallaId, tipo: o.tipo, severidad: o.severidad, mensaje: o.mensaje, origen: o.origen, resuelta: o.resuelta, creadoEn: o.creadoEn.toISOString(),
-    }));
+    return lista.map(aObservacionDto);
   }
 
   /** HU-0701 · Narraciones del curso en el orden de las pantallas, con su audio (y sus subtítulos, HU-0801) firmados por 15 minutos. */
@@ -116,9 +114,7 @@ export class CursosService {
       if (r.count === 0) throw new ConflictException({ codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       await tx.cursoVersion.create({ data: { cursoId: c.id, version, documento: doc as unknown as Prisma.InputJsonValue, motivo, creadoPorId: u.id } });
       // Las observaciones por reglas se recalculan con el documento nuevo; las de la IA y las de personas se conservan.
-      await tx.observacion.deleteMany({ where: { cursoId: c.id, origen: 'regla' } });
-      const obs = observacionesRegla(doc);
-      if (obs.length) await tx.observacion.createMany({ data: obs.map((o) => ({ cursoId: c.id, ...o, origen: 'regla' })) });
+      await recalcularReglas(tx, c.id, doc);
     });
     return { ...resultado, version };
   }

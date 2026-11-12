@@ -11,6 +11,8 @@ import { Queue, Worker } from 'bullmq';
 import { crearCascada } from './cascada.js';
 import { crearPropuestas } from './propuesta.js';
 import { crearTraductor } from './traducir.js';
+import { controlCalidad, crearRevisorCalidad } from './calidad.js';
+import { TAREA_CALIDAD } from '@aptio/schema/calidad';
 import { TAREA_TRADUCIR } from '@aptio/schema/traduccion';
 import { TAREA_PROPUESTA } from '@aptio/schema/propuesta';
 import { EJECUTORES } from './etapas/index.js';
@@ -48,13 +50,15 @@ const boca = crearEtapaBoca({ calcular: calculadorBocasDesdeEntorno(process.env)
 // La etapa 8 (HU-0801) escribe un WebVTT por narración y lo guarda en el almacenamiento.
 const subtitulos = crearEtapaSubtitulos({ subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
 const generar = crearGenerador({
-  bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: { ...EJECUTORES, VOZ_ES: vozEs, BOCA: boca, SUBTITULOS: subtitulos },
+  bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()), ejecutores: { ...EJECUTORES, VOZ_ES: vozEs, BOCA: boca, SUBTITULOS: subtitulos, CONTROL_CALIDAD: controlCalidad },
 });
 // La regeneración en cascada (HU-0503) corre las etapas 6, 7 y 8 de una sola pantalla, fuera de la generación.
 const cascada = crearCascada({ bd: prisma, voz: vozEs, boca, subtitulos });
 // Las propuestas de la IA (HU-0504) usan el mismo proveedor de texto que la generación.
 const proponer = crearPropuestas({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 const traducir = crearTraductor({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
+// El control de calidad (HU-0505): reglas e IA-12 por lotes, con «✦ Revisar con IA» y en la etapa 10.
+const revisarCalidad = crearRevisorCalidad({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 // La exportación SCORM 1.2 (HU-1202) lee los recursos del almacenamiento y guarda el ZIP como recurso PAQUETE.
 const exportar = crearExportador({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
 const despachar = (trabajo: TrabajoEnCola) => {
@@ -65,6 +69,7 @@ const despachar = (trabajo: TrabajoEnCola) => {
   if (trabajo.data.tarea === TAREA_CASCADA) return cascada(trabajo);
   if (trabajo.data.tarea === TAREA_PROPUESTA) return proponer(trabajo);
   if (trabajo.data.tarea === TAREA_TRADUCIR && trabajo.data.traduccion) return traducir(trabajo);
+  if (trabajo.data.tarea === TAREA_CALIDAD && trabajo.data.calidad) return revisarCalidad(trabajo);
   return procesar(trabajo);
 };
 

@@ -34,9 +34,11 @@ test('CP-036 · lanza la generación y muestra las 11 etapas avanzando con su co
   await expect(etapa(gen, 'Subtítulos')).toContainText('30 narraciones con subtítulos sincronizados · WebVTT en español', { timeout: 20_000 });
   await expect(etapa(gen, 'Ilustraciones')).toContainText('Se habilita en un sprint siguiente');
   await expect(etapa(gen, 'Paquete de prueba')).toContainText('Se habilita en un sprint siguiente');
-  // 7 de 11 etapas listas (la 5 todavía no tiene ejecutor).
-  await expect(gen.getByText('64 %')).toBeVisible();
-  await expect(gen.getByText('US$ 1.53')).toBeVisible();
+  // HU-0505: la etapa 10 corre IA-12 sobre el curso.
+  await expect(etapa(gen, 'Control de calidad')).toContainText('5 observaciones de la IA · 0 de reglas');
+  // 8 de 11 etapas listas (la 5, la 9 y la 11 todavía no tienen ejecutor).
+  await expect(gen.getByText('73 %')).toBeVisible();
+  await expect(gen.getByText('US$ 1.55')).toBeVisible();
   await expect(gen.getByRole('button', { name: 'Generar de nuevo' })).toBeVisible();
 });
 
