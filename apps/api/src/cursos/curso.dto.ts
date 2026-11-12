@@ -39,6 +39,11 @@ export class PantallaCambioDto {
   })
   @IsOptional() @IsArray() disparadores?: Record<string, unknown>[];
   @ApiPropertyOptional({
+    type: 'object', additionalProperties: { type: 'array', items: { $ref: '#/components/schemas/MarcadorVideo' } },
+    description: 'HU-0901 · Marcadores del video por id del bloque de video: la lista completa (capítulos y puntos incluidos). El tiempo es un entero desde 0 que no pasa la duración del video si se conoce; los ids no se repiten; una pregunta trae enunciado, al menos 2 opciones y exactamente 1 correcta. 422 BLOQUE_NO_EXISTE si el bloque no es un video de la pantalla y MARCADOR_NO_VALIDO si no.',
+  })
+  @IsOptional() @IsObject() marcadores?: Record<string, unknown[]>;
+  @ApiPropertyOptional({
     enum: ['deshacer', 'rehacer'],
     description: 'HU-0607 · Rótulo de la versión cuando el cambio viene de deshacer o rehacer en el editor (SUP-46). Sin él, la versión dice «edición».',
   })

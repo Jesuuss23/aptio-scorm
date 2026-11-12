@@ -6,8 +6,10 @@ export interface PantallaPlana {
   indice: number;
   moduloId: string;
   capsulaId: string;
-  /** Tiene una actividad que hay que hacer para avanzar (pantalla obligatoria con interacción). */
+  /** Tiene una actividad que hay que hacer para avanzar (pantalla obligatoria con interacción o con video). */
   conActividad: boolean;
+  /** HU-0901 · Lo que falta es el video: verlo entero y responder sus preguntas obligatorias. */
+  conVideo: boolean;
 }
 
 /** Las pantallas del curso en orden de recorrido. */
@@ -18,7 +20,8 @@ export function aplanar(curso: CursoReproductor): PantallaPlana[] {
       for (const p of c.pantallas)
         lista.push({
           pantalla: p, indice: lista.length, moduloId: m.id, capsulaId: c.id,
-          conActividad: p.obligatoria && p.bloques.some((b) => b.tipo === 'interaccion'),
+          conActividad: p.obligatoria && p.bloques.some((b) => b.tipo === 'interaccion' || b.tipo === 'video'),
+          conVideo: p.obligatoria && !p.bloques.some((b) => b.tipo === 'interaccion') && p.bloques.some((b) => b.tipo === 'video'),
         });
   return lista;
 }
@@ -35,8 +38,9 @@ export interface Avance {
   narracionPendiente?: boolean;
 }
 
-export type Motivo = 'actividad' | 'orden' | 'narracion';
+export type Motivo = 'actividad' | 'video' | 'orden' | 'narracion';
 
+const motivoDe = (x: PantallaPlana | undefined): Motivo => (x?.conVideo ? 'video' : 'actividad');
 const pendiente = (x: PantallaPlana | undefined, r: Avance['resultados']) => Boolean(x?.conActividad && !r.get(x.pantalla.id)?.completada);
 
 /**
@@ -52,10 +56,10 @@ export function motivoBloqueo(pantallas: readonly PantallaPlana[], avance: Avanc
   if (modo === 'libre' || destino <= avance.actual) return null;
   if (avance.narracionPendiente) return 'narracion';
   if (modo === 'condiciones') {
-    for (let j = 0; j < destino; j++) if (pendiente(pantallas[j], avance.resultados)) return 'actividad';
+    for (let j = 0; j < destino; j++) if (pendiente(pantallas[j], avance.resultados)) return motivoDe(pantallas[j]);
     return null;
   }
   if (destino <= avance.maxima) return null;
   if (destino > avance.maxima + 1) return 'orden';
-  return pendiente(pantallas[avance.maxima], avance.resultados) ? 'actividad' : null;
+  return pendiente(pantallas[avance.maxima], avance.resultados) ? motivoDe(pantallas[avance.maxima]) : null;
 }

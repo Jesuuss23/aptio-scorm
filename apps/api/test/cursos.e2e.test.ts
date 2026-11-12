@@ -459,6 +459,53 @@ describe.skipIf(!hayBase && !process.env.CI)('revisión del curso (HU-0501, HU-0
     expect(p03De(await documento())).not.toHaveProperty('disparadores');
   });
 
+  it('HU-0901 · CP-080: guarda las preguntas del video con capítulos y puntos; 422 MARCADOR_NO_VALIDO y BLOQUE_NO_EXISTE; el revisor, 403', async () => {
+    type Pv = { id: string; bloques: { id: string; tipo: string; marcadores?: { id: string; tiempoMs: number; tipo: string }[] }[] };
+    const videoDe = async () => (pantallas(await documento()).find((x) => x.id === 'p18') as unknown as Pv).bloques.find((b) => b.tipo === 'video')!;
+    const ruta = `/cursos/${cursoId}/pantallas/p18`;
+    let v = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    const previos = (await videoDe()).marcadores!;
+    const nueva = {
+      id: 'vm-45', tiempoMs: 45000, tipo: 'pregunta', obligatorio: true,
+      pregunta: {
+        id: 'vm-45-q', enunciado: { es: '¿Qué se hace antes de apagar el equipo?' },
+        opciones: [{ id: 'vm-45-a', contenido: { texto: { es: 'Avisar a los afectados' } }, correcta: true }, { id: 'vm-45-b', contenido: { texto: { es: 'Retirar los candados' } }, correcta: false }],
+        retroalimentacion: { correcta: { es: 'Bien.' }, incorrecta: { es: 'Primero se avisa.' } },
+      },
+    };
+    const lista = [...previos, nueva].sort((a, b) => a.tiempoMs - b.tiempoMs);
+
+    const r = await como('productor').patch(ruta, { version: v, marcadores: { 'p18-video': lista } });
+    expect(r.status).toBe(200);
+    const guardados = (await videoDe()).marcadores!;
+    expect(guardados.map((m) => [m.id, m.tiempoMs, m.tipo])).toEqual([['vm-1', 0, 'capitulo'], ['vm-45', 45000, 'pregunta'], ['vm-2', 62000, 'pregunta'], ['vm-3', 95000, 'punto'], ['vm-4', 130000, 'pregunta']]);
+    const version = await prisma.cursoVersion.findFirstOrThrow({ where: { cursoId }, orderBy: { version: 'desc' } });
+    expect(version.version).toBe(r.body.version);
+    v = r.body.version;
+
+    // Lo que no pasa las reglas no se guarda.
+    const sinCorrecta = { ...nueva, pregunta: { ...nueva.pregunta, opciones: nueva.pregunta.opciones.map((o) => ({ ...o, correcta: false })) } };
+    const malos = [
+      [nueva, { ...nueva, tiempoMs: 50000 }],
+      [{ ...nueva, tiempoMs: -1000 }],
+      [{ ...nueva, pregunta: { ...nueva.pregunta, enunciado: { es: '' } } }],
+      [{ ...nueva, pregunta: { ...nueva.pregunta, opciones: [nueva.pregunta.opciones[0]] } }],
+      [sinCorrecta],
+    ];
+    const respuestas = await Promise.all(malos.map(async (m) => (await como('productor').patch(ruta, { version: v, marcadores: { 'p18-video': m } })).body.codigo));
+    expect(respuestas).toEqual(Array.from({ length: 5 }, () => 'MARCADOR_NO_VALIDO'));
+    expect((await como('productor').patch(ruta, { version: v, marcadores: { 'p18-video': [sinCorrecta] } })).body.detalles)
+      .toEqual([{ mensaje: 'p18/p18-video/marcadores/0/pregunta: marca exactamente 1 opción correcta (hay 0)' }]);
+    expect((await como('productor').patch(ruta, { version: v, marcadores: { 'p18-titulo': [] } })).body.codigo).toBe('BLOQUE_NO_EXISTE');
+    expect((await como('revisor').patch(ruta, { version: v, marcadores: { 'p18-video': previos } })).status).toBe(403);
+    expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(v);
+
+    // Deshacer manda la lista anterior con su motivo.
+    const deshacer = await como('productor').patch(ruta, { version: v, marcadores: { 'p18-video': previos }, motivo: 'deshacer' });
+    expect(deshacer.status).toBe(200);
+    expect((await videoDe()).marcadores).toEqual(previos);
+  });
+
   it('HU-0608 · CP-067: al corregir la narración, el ancla sigue a su palabra; si ya no está, queda el segundo y «Revisar tiempo»', async () => {
     type Pa = { id: string; ajustes?: Record<string, Record<string, unknown>> };
     const p05De = (d: Doc) => pantallas(d).find((x) => x.id === 'p05') as unknown as Pa;

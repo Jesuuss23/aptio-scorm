@@ -115,6 +115,15 @@ button:disabled{cursor:not-allowed}
 .ap-imagen img,.ap-video video{display:block;width:100%;height:auto;border-radius:10px}
 .ap-sin-imagen{display:grid;place-items:center;min-height:120px;width:100%;padding:12px;border:2px dashed color-mix(in srgb,currentColor 35%,transparent);border-radius:10px;font-size:13px;text-align:center;opacity:.8}
 .ap-video .ap-sin-imagen{aspect-ratio:16/9;background:#0E1512;color:#fff;border:0}
+.ap-video-marco{position:relative}
+.ap-video-capa:empty{display:none}
+.ap-con-pregunta .ap-video-marco{min-height:min(360px,75vh)}
+.ap-video-capa{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;padding:12px;background:rgba(14,21,18,.55);border-radius:10px;overflow:auto}
+.ap-video-capa>.ap-video-pregunta{margin-top:auto}
+.ap-video-pregunta{background:var(--ap-blanco);color:var(--ap-texto);border-radius:12px;padding:14px 16px;width:min(100%,520px);display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.ap-video-tiempo{margin:0;font-size:.85em;font-weight:700}
+.ap-video-enunciado{margin:0;font-size:1.05em}
+.ap-opcion[aria-disabled=true]{cursor:default}
 .ap-actividad{display:flex;flex-direction:column;gap:10px;background:color-mix(in srgb,var(--ap-blanco) 70%,transparent);color:var(--ap-texto);border-radius:12px;padding:12px}
 .ap-instruccion{margin:0;font-weight:700}
 .ap-juego{display:flex;flex-direction:column;gap:10px}

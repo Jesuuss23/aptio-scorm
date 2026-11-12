@@ -14,7 +14,9 @@ describe('reglas de avance (RN-11-1, RN-11-4)', () => {
   it('aplana las 30 pantallas de LOTO en orden y marca las que tienen actividad', () => {
     expect(pantallas).toHaveLength(30);
     expect(pantallas[0]!.pantalla.id).toBe('p01');
-    expect(pantallas.filter((x) => x.conActividad).map((x) => x.pantalla.id)).toEqual(['p07', 'p10', 'p15', 'p17', 'p20', 'p22', 'p25', 'p26', 'p28']);
+    // HU-0901 · p18 es un video obligatorio: cuenta como actividad (verlo y responder sus preguntas).
+    expect(pantallas.filter((x) => x.conActividad).map((x) => x.pantalla.id)).toEqual(['p07', 'p10', 'p15', 'p17', 'p18', 'p20', 'p22', 'p25', 'p26', 'p28']);
+    expect(pantallas.filter((x) => x.conVideo).map((x) => x.pantalla.id)).toEqual(['p18']);
   });
 
   it('sin navegación en el curso usa actividades obligatorias', () => {

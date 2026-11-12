@@ -15,7 +15,17 @@ export type BloqueTexto = { id: string; tipo: 'texto'; rol: 'titulo' | 'subtitul
 export type BloqueImagen = { id: string; tipo: 'imagen'; recursoId: string; decorativa: boolean; alt?: TextoI18n };
 export type BloquePersonaje = { id: string; tipo: 'personaje'; recursoId: string; pose?: string; lado?: 'izquierda' | 'derecha' };
 export type BloqueInteraccion = { id: string; tipo: 'interaccion'; interaccion: Interaccion };
-export type BloqueVideo = { id: string; tipo: 'video'; recursoId: string; reglas?: { impedirAdelantar: boolean; porcentajeMinimo: number } };
+/** HU-0901 · Marcador del video: una pregunta pausa el video en su tiempo (RN-09-1). */
+export interface MarcadorVideo {
+  id: string;
+  tiempoMs: number;
+  tipo: 'pregunta' | 'punto' | 'capitulo';
+  obligatorio: boolean;
+  pregunta?: { id: string; enunciado: TextoI18n; opciones: { id: string; contenido: Visual; correcta: boolean }[]; retroalimentacion: { correcta: TextoI18n; incorrecta: TextoI18n } };
+  titulo?: TextoI18n;
+  contenido?: TextoI18n;
+}
+export type BloqueVideo = { id: string; tipo: 'video'; recursoId: string; marcadores?: MarcadorVideo[]; reglas?: { impedirAdelantar: boolean; porcentajeMinimo: number } };
 export type Bloque = BloqueTexto | BloqueImagen | BloquePersonaje | BloqueInteraccion | BloqueVideo;
 
 export type TipoInteraccion = 'INT-01' | 'INT-02' | 'INT-03' | 'INT-04' | 'INT-05' | 'INT-06' | 'INT-07' | 'INT-08';

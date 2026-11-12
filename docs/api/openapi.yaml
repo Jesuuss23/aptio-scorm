@@ -1803,7 +1803,10 @@ paths:
         mandan el mismo cambio con `motivo` (`deshacer` o `rehacer`), que rotula la versión. HU-0610 · `disparadores`
         reemplaza la lista de disparadores de la pantalla (CP-069); 422 DISPARADOR_NO_VALIDO con `detalles` si hay más de
         10, un id se repite, falta el segundo o sale de 0 a 600, o el elemento o la pantalla no existen. Quitar un extra
-        borra los disparadores que lo muestran u ocultan.
+        borra los disparadores que lo muestran u ocultan. HU-0901 · `marcadores` reemplaza, por id del bloque de video, sus
+        marcadores (CP-080); 422 MARCADOR_NO_VALIDO con `detalles` si un tiempo es negativo o pasa la duración conocida del
+        video, un id se repite o una pregunta no tiene enunciado, 2 opciones y exactamente 1 correcta; BLOQUE_NO_EXISTE si el
+        bloque no es un video de la pantalla.
       parameters:
       - name: cursoId
         in: path
@@ -4945,6 +4948,39 @@ components:
         creadoEn:
           type: string
           format: date-time
+    MarcadorVideo:
+      type: object
+      description: HU-0901 · Marcador del bloque de video (RN-09-1). Una `pregunta` pausa el video en `tiempoMs` y se muestra
+        encima; al acertar el video sigue y, si no es obligatoria, se puede saltar. Capítulos y puntos se conservan tal cual.
+      required:
+      - id
+      - tiempoMs
+      - tipo
+      - obligatorio
+      properties:
+        id:
+          type: string
+          example: vm-45
+        tiempoMs:
+          type: integer
+          minimum: 0
+          example: 45000
+        tipo:
+          type: string
+          enum:
+          - pregunta
+          - punto
+          - capitulo
+        obligatorio:
+          type: boolean
+        pregunta:
+          type: object
+          description: Con `tipo` pregunta. Enunciado, al menos 2 opciones con exactamente 1 correcta y la retroalimentación.
+          additionalProperties: true
+        titulo:
+          $ref: '#/components/schemas/TextoI18n'
+        contenido:
+          $ref: '#/components/schemas/TextoI18n'
     Disparador:
       type: object
       description: HU-0610 · Disparador simple de una pantalla, con el mismo reloj que la línea de tiempo. `mostrar` gana
@@ -5139,6 +5175,13 @@ components:
           description: HU-0610 · Lista completa de disparadores de la pantalla (REQ-045). Una lista vacía los quita todos.
           items:
             $ref: '#/components/schemas/Disparador'
+        marcadores:
+          type: object
+          description: HU-0901 · Por id del bloque de video, la lista completa de sus marcadores (capítulos y puntos incluidos).
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/MarcadorVideo'
         motivo:
           type: string
           enum:

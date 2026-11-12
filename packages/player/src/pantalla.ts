@@ -4,7 +4,7 @@ import { accionBoton, aplicarAjuste, posicionExtra } from './ajustes.ts';
 import { mostrarBoca, mostrarPose, svgEnLinea } from './boca.ts';
 import { h } from './dom.ts';
 import { t, type Textos } from './textos.ts';
-import type { Bloque, BloqueInteraccion, ElementoExtra, Idioma, Pantalla, RolColor } from './tipos.ts';
+import type { Bloque, BloqueInteraccion, BloqueVideo, ElementoExtra, Idioma, Pantalla, RolColor } from './tipos.ts';
 
 export interface ContextoPantalla {
   idioma: Idioma;
@@ -14,6 +14,8 @@ export interface ContextoPantalla {
   /** Modo revisión: muestra el id de la pantalla y de la actividad. */
   revision: boolean;
   actividad: (b: BloqueInteraccion, p: Pantalla) => HTMLElement;
+  /** HU-0901 · El video con sus preguntas encima. Sin él, el video se dibuja con sus controles y nada más. */
+  video?: (b: BloqueVideo, p: Pantalla) => HTMLElement;
   /** HU-0702 · El SVG del personaje como texto, para dibujarlo en línea y mover sus capas (boca, ojos y pose). */
   cargarSvg?: (recursoId: string) => Promise<string | undefined>;
   /** HU-0606 · Lo que hace un botón agregado con «Siguiente». */
@@ -155,9 +157,12 @@ export function dibujarPantalla(p: Pantalla, ctx: ContextoPantalla): HTMLElement
       medios.push(aj(h('figure', { class: 'ap-imagen', 'data-bloque': b.id },
         url ? h('img', { src: url, alt }) : h('span', { class: 'ap-sin-imagen', role: b.decorativa ? null : 'img', 'aria-label': b.decorativa ? null : alt }, alt || ctx.tx.imagenPendiente))));
     } else if (b.tipo === 'video') {
-      const url = ctx.urlRecurso(b.recursoId);
-      medios.push(h('figure', { class: 'ap-video', 'data-bloque': b.id },
-        url ? h('video', { src: url, controls: true, preload: 'metadata', playsinline: true }) : h('span', { class: 'ap-sin-imagen' }, ctx.tx.videoPendiente)));
+      if (ctx.video) medios.push(ctx.video(b, p));
+      else {
+        const url = ctx.urlRecurso(b.recursoId);
+        medios.push(h('figure', { class: 'ap-video', 'data-bloque': b.id },
+          url ? h('video', { src: url, controls: true, preload: 'metadata', playsinline: true }) : h('span', { class: 'ap-sin-imagen' }, ctx.tx.videoPendiente)));
+      }
     } else if (b.tipo === 'interaccion') {
       actividades.push(h('div', { class: 'ap-actividad', 'data-bloque': b.id, 'data-interaccion': b.interaccion.tipo },
         ctx.revision ? h('span', { class: 'ap-id' }, `${b.interaccion.tipo} · ${b.interaccion.modo}`) : null,

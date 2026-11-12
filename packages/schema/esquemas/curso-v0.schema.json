@@ -2050,6 +2050,11 @@
           "type": "integer",
           "minimum": 0
         },
+        "duracionMs": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "HU-0901 · Duración de un audio o video, si se conoce. Los marcadores del video no pueden pasarla."
+        },
         "licencia": {
           "type": "string"
         },

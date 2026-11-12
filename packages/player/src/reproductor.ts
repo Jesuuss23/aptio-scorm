@@ -34,7 +34,8 @@ import { estadoReanudado, type Reanudacion } from './reanudacion.ts';
 import { activoEn, duracionDe, tiemposDe, ultimoCambio } from './tiempos.ts';
 import { cumplidos, elementosConDisparador, ultimoSegundo, visibilidad } from './disparadores.ts';
 import { t, textos } from './textos.ts';
-import type { AudioNarracion, BloqueInteraccion, Creditos, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
+import { videoInteractivo } from './video.ts';
+import type { AudioNarracion, BloqueInteraccion, BloqueVideo, Creditos, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
 
 /** Estilo base (el mismo de KIT_INICIAL en @aptio/schema/marca) más blanco y alerta. */
 export const PALETA_BASE: Record<RolColor, string> = {
@@ -295,7 +296,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     const p = pantallas[actual]?.pantalla;
     return { actual, maxima, resultados, narracionPendiente: pideNarracion && Boolean(p && urlAudio(actual)) && !escuchadas.has(p!.id) };
   };
-  const textoMotivo = (m: Motivo | null) => (m === 'actividad' ? tx.motivoActividad : m === 'orden' ? tx.motivoOrden : m === 'narracion' ? tx.motivoNarracion : null);
+  const textoMotivo = (m: Motivo | null) => (m === 'actividad' ? tx.motivoActividad : m === 'video' ? tx.motivoVideo : m === 'orden' ? tx.motivoOrden : m === 'narracion' ? tx.motivoNarracion : null);
 
   // ---------- Estructura del patrón Clásico ----------
   const variables = [
@@ -448,11 +449,22 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     return h('div', { class: 'ap-juego' }, crear ? crear(b.interaccion.datos, ctx) : null, anuncio);
   };
 
+  // HU-0901 · El video con sus preguntas: la pantalla queda completa al terminarlo con las obligatorias respondidas.
+  const crearVideo = (b: BloqueVideo, p: Pantalla): HTMLElement => videoInteractivo(b, {
+    id: p.id, idioma, tx, urlRecurso,
+    terminar: () => {
+      if (!vivo || resultados.get(p.id)?.completada) return;
+      const previo = resultados.get(p.id);
+      resultados.set(p.id, { completada: true, puntaje: null, intentos: (previo?.intentos ?? 0) + 1 });
+      refrescar();
+    },
+  });
+
   const pantallaDe = (i: number): HTMLElement => {
     const p = pantallas[i]!.pantalla;
     let el = dibujadas.get(p.id);
     if (!el) {
-      el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad, cargarSvg, alSiguiente: opciones.sinAcciones ? undefined : () => irA(actual + 1, true) });
+      el = dibujarPantalla(p, { idioma, tx, paleta, urlRecurso, revision, actividad: crearActividad, video: crearVideo, cargarSvg, alSiguiente: opciones.sinAcciones ? undefined : () => irA(actual + 1, true) });
       if (!opciones.sinTiempos) escalonar(el, p);
       dibujadas.set(p.id, el);
     }
