@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.31 · actualizado con la primera entrega del Sprint 7 (12 de noviembre de 2026)**
+**Versión 0.32 · actualizado con la segunda entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -436,6 +436,14 @@ En el detalle del proyecto, **Idiomas** muestra cada texto del curso con su ingl
 
 **Revisar.** Escribe en la celda de inglés y sal de ella (o pulsa Enter): el texto queda **Revisado**. Si el inglés de la IA está bien, pulsa **Marcar revisado**. **Por revisar** oculta lo ya revisado. Cada cambio crea una versión del curso.
 
+**Desbordes: textos que no caben.** Cada texto en pantalla tiene un espacio según su componente (por ejemplo, un título 45 caracteres y una tarjeta de memoria 24). Bajo cada inglés verás el contador («19 / 24»), que cambia mientras escribes y avisa «no cabe». Si la IA traduce un texto que no cabe, queda en **Desborde** con el detalle («26 de 24 caracteres») y una **versión corta propuesta** por la IA. Puedes:
+
+- pulsar **Usar versión corta**: el inglés pasa a ser la propuesta y queda Revisado;
+- escribir otro inglés: si cabe, queda Revisado; si no, sigue en Desborde;
+- pulsar **Marcar revisado** para aceptarlo largo, si sabes que en esa pantalla sí hay espacio.
+
+Los Desbordes aparecen en **Por revisar** y se cuentan en el resumen. Si la IA no logró una versión corta, **✦ Traducir pendientes** la vuelve a pedir.
+
 El revisor del cliente ve el inglés y los estados, pero no traduce ni edita. La voz, la boca y los subtítulos en inglés, y el paquete con los dos idiomas, llegan en las próximas entregas.
 
 ## 9. Preguntas frecuentes
@@ -480,7 +488,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Otros recorridos de la cápsula (historias, mapa de misiones, menú de temas y más).
 - Subtítulos en inglés y elegir el idioma de los subtítulos.
 - Voz en inglés y voces de otros proveedores.
-- Textos que no caben en su espacio en inglés, voz en inglés y paquete con los dos idiomas.
+- Voz en inglés y paquete con los dos idiomas.
 - Control de calidad y otros formatos de entrega (SCORM 2004).
 - Otra ilustración desde la revisión y comentarios del cliente.
 
@@ -506,6 +514,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.29 | 2026-11-12 | Accesibilidad de la cápsula: uso con teclado, anuncios para lector de pantalla y quitar el límite de tiempo del reto (8.12). |
 | 0.30 | 2026-11-12 | Créditos y licencias en Entrega y botón «Créditos» en la cápsula (8.13). |
 | 0.31 | 2026-11-12 | Idiomas: traducir al inglés con el glosario del cliente y revisar cada texto (8.14). |
+| 0.32 | 2026-11-12 | Desbordes en Idiomas: contador de caracteres, chip «Desborde» y «Usar versión corta» (8.14). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
