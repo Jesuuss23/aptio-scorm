@@ -21,6 +21,17 @@ export function preguntaAlcanzada(marcadores: readonly MarcadorVideo[] = [], res
   return preguntasVideo(marcadores).find((m) => !resueltas.has(m.id) && m.tiempoMs / 1000 > desdeS && m.tiempoMs / 1000 <= hastaS) ?? null;
 }
 
+/**
+ * HU-0902 · Impedir adelantar (CP-081, RN-09-2): con la regla activa, ir a `haciaS` no se permite si antes de ese segundo
+ * queda una pregunta sin responder ni saltar (obligatoria u opcional). Devuelve la primera de ellas: el video vuelve a su
+ * segundo y la muestra. Sin la regla, o si no queda ninguna pendiente antes, devuelve null. Retroceder nunca se bloquea,
+ * porque con la regla activa no se pudo dejar atrás una pregunta pendiente.
+ */
+export function saltoBloqueado(marcadores: readonly MarcadorVideo[] = [], resueltas: ReadonlySet<string>, haciaS: number, impedirAdelantar: boolean): MarcadorVideo | null {
+  if (!impedirAdelantar) return null;
+  return preguntasVideo(marcadores).find((m) => !resueltas.has(m.id) && m.tiempoMs / 1000 < haciaS) ?? null;
+}
+
 /** El video cuenta como hecho cuando terminó y no queda ninguna pregunta obligatoria sin responder. */
 export const videoCompleto = (marcadores: readonly MarcadorVideo[] = [], resueltas: ReadonlySet<string>, terminado: boolean): boolean =>
   terminado && preguntasVideo(marcadores).every((m) => !m.obligatorio || resueltas.has(m.id));
@@ -56,7 +67,10 @@ export function videoInteractivo(b: BloqueVideo, ctx: ContextoVideo): HTMLElemen
   const resueltas = new Set<string>();
   const video = h('video', { src: url, controls: true, preload: 'metadata', playsinline: true });
   const capa = h('div', { class: 'ap-video-capa' });
-  vaciar(figura, h('div', { class: 'ap-video-marco' }, video, capa));
+  // Aviso de «no puedes adelantar»: región viva que el lector de pantalla anuncia al bloquear (HU-0902).
+  const aviso = h('p', { class: 'ap-video-bloqueo', role: 'alert' });
+  vaciar(figura, h('div', { class: 'ap-video-marco' }, video, capa), aviso);
+  const impedir = b.reglas?.impedirAdelantar === true;
   let ultimoS = -1;
   let abierta: MarcadorVideo | null = null;
   let terminado = false;
@@ -67,6 +81,7 @@ export function videoInteractivo(b: BloqueVideo, ctx: ContextoVideo): HTMLElemen
   };
   const seguir = () => {
     abierta = null;
+    vaciar(aviso);
     vaciar(capa);
     figura.classList.remove('ap-con-pregunta');
     enfocar(video);
@@ -122,7 +137,17 @@ export function videoInteractivo(b: BloqueVideo, ctx: ContextoVideo): HTMLElemen
     ultimoS = m.tiempoMs / 1000;
     abrir(m);
   });
-  // Saltar con la barra no dispara las preguntas que quedan atrás (impedir adelantar llega con la HU-0902).
+  // Con «impedir adelantar», ir más allá de una pregunta pendiente vuelve a su segundo, la muestra y dice por qué.
+  // Sin la regla, saltar con la barra no dispara las preguntas que quedan atrás.
+  video.addEventListener('seeking', () => {
+    const m = saltoBloqueado(marcadores, resueltas, video.currentTime, impedir);
+    if (!m) return;
+    video.pause();
+    video.currentTime = m.tiempoMs / 1000;
+    ultimoS = m.tiempoMs / 1000;
+    vaciar(aviso, ctx.tx.noAdelantar(mmss(m.tiempoMs)));
+    if (abierta !== m) abrir(m);
+  });
   video.addEventListener('seeked', () => { if (!abierta) ultimoS = video.currentTime; });
   video.addEventListener('play', () => { if (abierta) video.pause(); });
   video.addEventListener('ended', () => { terminado = true; revisar(); });

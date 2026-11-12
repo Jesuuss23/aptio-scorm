@@ -294,8 +294,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   if (conVideo) {
     // HU-0901 · El video de prueba dura 60 s: p18 queda con su capítulo y un punto, sin preguntas, para agregarlas.
     const p18 = pantallasDe(revision.documento as unknown as CursoDoc).find((x) => x.id === 'p18')!;
-    const video = (p18.bloques as unknown as { tipo: string; marcadores: { tiempoMs: number; tipo: string }[] }[]).find((b) => b.tipo === 'video')!;
+    const video = (p18.bloques as unknown as { tipo: string; marcadores: { tiempoMs: number; tipo: string }[]; reglas?: { impedirAdelantar: boolean; porcentajeMinimo: number } }[]).find((b) => b.tipo === 'video')!;
     video.marcadores = video.marcadores.filter((m) => m.tipo === 'capitulo').concat([{ ...video.marcadores.find((m) => m.tipo === 'punto')!, tiempoMs: 20000 }]);
+    // HU-0902 · Sin «impedir adelantar», para activarlo desde la vista.
+    video.reglas = { impedirAdelantar: false, porcentajeMinimo: 90 };
     (revision.documento.recursos as { tipo: string; duracionMs?: number }[]).find((r) => r.tipo === 'video')!.duracionMs = 60000;
   }
   (revision.documento.recursos as { tipo: string; nombre: string }[]).find((r) => r.tipo === 'documento')!.nombre = 'Manual.pdf';
@@ -669,7 +671,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
-      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[]; disparadores?: unknown[]; marcadores?: Record<string, unknown[]> };
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[]; disparadores?: unknown[]; marcadores?: Record<string, unknown[]>; reglasVideo?: Record<string, { impedirAdelantar?: unknown; porcentajeMinimo?: number }> };
       historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
@@ -719,6 +721,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         const errores = erroresMarcadores(`${p.id}/${id}`, lista, conVideo ? 60000 : undefined);
         if (errores.length) return responder(422, { codigo: 'MARCADOR_NO_VALIDO', mensaje: 'Revisa las preguntas del video', detalles: errores.map((mensaje) => ({ mensaje })) });
         video.marcadores = lista;
+      }
+      // HU-0902: «impedir adelantar» por bloque de video; el porcentaje se conserva.
+      for (const [id, regla] of Object.entries(datos.reglasVideo ?? {})) {
+        const video = bloques.find((x) => x.id === id) as (BloqueSim & { reglas?: { impedirAdelantar: boolean; porcentajeMinimo: number } }) | undefined;
+        if (!video || video.tipo !== 'video') return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el video «${id}»` });
+        if (typeof regla?.impedirAdelantar !== 'boolean') return responder(422, { codigo: 'REGLA_VIDEO_NO_VALIDA', mensaje: 'Revisa las reglas del video' });
+        video.reglas = { impedirAdelantar: regla.impedirAdelantar, porcentajeMinimo: regla.porcentajeMinimo ?? video.reglas?.porcentajeMinimo ?? 90 };
       }
       for (const [id, ajuste] of Object.entries(datos.ajustes ?? {})) {
         if (!bloques.some((x) => x.id === id) && !(pe.extras ?? []).some((x) => x.id === id)) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });

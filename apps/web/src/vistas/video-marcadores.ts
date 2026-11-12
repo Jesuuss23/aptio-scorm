@@ -7,13 +7,13 @@ export { mmss, type MarcadorVideo };
 export const MAX_OPCIONES = 6;
 export const NOMBRE_TIPO: Record<MarcadorVideo['tipo'], string> = { pregunta: 'Pregunta', punto: 'Punto interactivo', capitulo: 'Capítulo' };
 
-export interface PantallaVideo { pantallaId: string; numero: number; titulo: string; bloqueId: string; recursoId: string; marcadores: MarcadorVideo[] }
+export interface PantallaVideo { pantallaId: string; numero: number; titulo: string; bloqueId: string; recursoId: string; marcadores: MarcadorVideo[]; impedirAdelantar: boolean }
 
 /** Las pantallas del curso con un bloque de video, con su número en el recorrido. */
 export function pantallasConVideo(doc: CursoDoc): PantallaVideo[] {
-  return pantallasDe(doc).flatMap((p, i) => (p.bloques as unknown as { id: string; tipo: string; recursoId?: string; marcadores?: MarcadorVideo[] }[])
+  return pantallasDe(doc).flatMap((p, i) => (p.bloques as unknown as { id: string; tipo: string; recursoId?: string; marcadores?: MarcadorVideo[]; reglas?: { impedirAdelantar?: boolean } }[])
     .filter((b) => b.tipo === 'video')
-    .map((b) => ({ pantallaId: p.id, numero: i + 1, titulo: p.titulo.es ?? '', bloqueId: b.id, recursoId: b.recursoId ?? '', marcadores: b.marcadores ?? [] })));
+    .map((b) => ({ pantallaId: p.id, numero: i + 1, titulo: p.titulo.es ?? '', bloqueId: b.id, recursoId: b.recursoId ?? '', marcadores: b.marcadores ?? [], impedirAdelantar: b.reglas?.impedirAdelantar === true })));
 }
 
 /** La duración del video en ms, si el curso la conoce (`recursos[].duracionMs`). */

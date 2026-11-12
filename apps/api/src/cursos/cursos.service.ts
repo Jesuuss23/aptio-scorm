@@ -226,6 +226,27 @@ export class CursosService {
         }
         cambios++;
       }
+      // HU-0902 · Reglas del video («impedir adelantar» y el porcentaje mínimo, que se conserva si no se manda).
+      if (dto.reglasVideo !== undefined) {
+        for (const [id, regla] of Object.entries(dto.reglasVideo)) {
+          const video = bloques.find((x) => x.id === id) as { tipo: string; reglas?: { impedirAdelantar: boolean; porcentajeMinimo: number } } | undefined;
+          if (!video || video.tipo !== 'video') {
+            throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el video «${id}»` });
+          }
+          const r = regla as { impedirAdelantar?: unknown; porcentajeMinimo?: unknown } | null;
+          const extra = r && typeof r === 'object' ? Object.keys(r).filter((k) => k !== 'impedirAdelantar' && k !== 'porcentajeMinimo') : [];
+          const porcentaje = r?.porcentajeMinimo ?? video.reglas?.porcentajeMinimo ?? 90;
+          if (!r || typeof r !== 'object' || typeof r.impedirAdelantar !== 'boolean' || extra.length
+            || typeof porcentaje !== 'number' || !Number.isFinite(porcentaje) || porcentaje < 0 || porcentaje > 100) {
+            throw new UnprocessableEntityException({
+              codigo: 'REGLA_VIDEO_NO_VALIDA', mensaje: 'Revisa las reglas del video',
+              detalles: [{ mensaje: `${p.id}/${id}/reglas: impedirAdelantar es sí o no y porcentajeMinimo va de 0 a 100` }],
+            });
+          }
+          video.reglas = { impedirAdelantar: r.impedirAdelantar, porcentajeMinimo: porcentaje };
+        }
+        cambios++;
+      }
       if (dto.ajustes !== undefined) {
         const pa = p as PantallaDoc & { ajustes?: Record<string, unknown> };
         const ajustes = { ...(pa.ajustes ?? {}) };
