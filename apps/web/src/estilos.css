@@ -2045,3 +2045,32 @@ ul.fila-chips {
   position: absolute; top: 1px; z-index: 2; transform: translateX(-50%); color: var(--color-naranja-texto);
   font-size: var(--texto-sm); line-height: 1; cursor: default;
 }
+
+/* HU-0901 · Video interactivo (PNT-10): video grande con su línea de marcadores y, a la derecha, el panel. */
+.video-selector { max-width: 420px; margin-bottom: 16px; }
+.video-vista { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.video-principal { flex: 2 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.video-panel { flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.video-pantalla video { display: block; width: 100%; max-height: 60vh; background: #0e1512; border-radius: 10px; }
+.video-sin-archivo { margin: 0; aspect-ratio: 16 / 9; display: grid; place-items: center; padding: 16px; text-align: center; background: #0e1512; color: #fff; border-radius: 10px; }
+.video-linea { position: relative; height: 32px; margin: 4px 14px; border-radius: 999px; background: var(--color-suave); }
+.video-linea-avance { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--color-cobalto-suave); }
+.video-marca { position: absolute; top: 50%; transform: translate(-50%, -50%); }
+.video-marca.pregunta { width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 2px solid var(--color-superficie); background: var(--color-naranja-texto); color: #fff; font-weight: 700; cursor: pointer; }
+.video-marca.pregunta[aria-pressed='true'] { outline: 3px solid var(--color-cobalto); outline-offset: 1px; }
+.video-marca.pregunta.con-error { background: var(--color-error); }
+.video-marca.capitulo { width: 4px; height: 24px; border-radius: 2px; background: var(--color-texto); }
+.video-marca.punto { width: 14px; height: 14px; border-radius: 3px; background: var(--color-validado); }
+.video-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.video-reloj { min-width: 88px; font-weight: 700; }
+.video-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.video-lista li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radio-control); }
+.video-lista li.elegido { background: var(--color-cobalto-suave); }
+.video-lista .enlace { background: none; border: 0; padding: 0; color: var(--color-cobalto); text-decoration: underline; cursor: pointer; text-align: left; font: inherit; }
+.video-pregunta { border: 1px solid var(--color-borde); border-radius: var(--radio-control); padding: 12px; margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.video-pregunta legend, .video-opciones legend { font-weight: 700; padding: 0 4px; }
+.video-opciones { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.video-opcion { display: flex; align-items: center; gap: 8px; }
+.video-opcion input[type='text'] { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--color-borde); border-radius: var(--radio-control); font-size: var(--texto-base); }
+.video-opcion input[type='radio'] { width: 20px; height: 20px; }
+.video-obligatoria { display: flex; align-items: center; gap: 8px; font-size: var(--texto-sm); }

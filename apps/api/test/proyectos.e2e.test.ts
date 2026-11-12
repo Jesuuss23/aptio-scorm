@@ -147,7 +147,7 @@ describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', ()
     const almacen = new Almacen(configDesdeEnv());
     await prepararAlmacen(almacen, ['http://localhost:5173']);
     const svg = readFileSync(new URL('../../../docs/diseno/personaje/plantilla-ana.svg', import.meta.url), 'utf8');
-    const ids = { audio: randomUUID(), ana: randomUUID(), otraOrg: randomUUID(), vtt: randomUUID() };
+    const ids = { audio: randomUUID(), ana: randomUUID(), otraOrg: randomUUID(), vtt: randomUUID(), video: randomUUID() };
     const vtt = 'WEBVTT\n\n1\n00:00:00.000 --> 00:00:01.000\nHola.\n\n';
     const clave = (x: string) => `org/${orgId}/${clientes[0]}/${x}`;
     await almacen.subir(clave(ids.ana), svg, 'image/svg+xml');
@@ -157,17 +157,23 @@ describe.skipIf(!hayBase && !process.env.CI)('proyectos (HU-0301 a HU-0303)', ()
       { ...base, id: ids.audio, tipo: 'AUDIO', claveS3: clave(ids.audio), mime: 'audio/wav', nombre: 'p01-es.wav' },
       { ...base, id: ids.ana, tipo: 'SVG', origen: 'CLIENTE', claveS3: clave(ids.ana), mime: 'image/svg+xml', nombre: 'ana.svg' },
       { ...base, id: ids.vtt, tipo: 'SUBTITULO', claveS3: clave(ids.vtt), mime: 'text/vtt', nombre: 'p01-es.vtt' },
+      { ...base, id: ids.video, tipo: 'VIDEO', origen: 'CLIENTE', claveS3: clave(ids.video), mime: 'video/mp4', nombre: 'procedimiento.mp4' },
     ] });
     const documento = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/curso-esperado-es.json', import.meta.url), 'utf8'));
     documento.recursos.push({ id: ids.audio, tipo: 'audio', origen: 'generado', nombre: 'p01-es.wav', mime: 'audio/wav', idioma: 'es' }, { id: ids.otraOrg, tipo: 'audio', origen: 'generado', nombre: 'x.wav', mime: 'audio/wav' },
       { id: ids.vtt, tipo: 'subtitulos', origen: 'generado', nombre: 'p01-es.vtt', mime: 'text/vtt', idioma: 'es' });
+    // HU-0901 · El video del cliente de p18 también llega con su URL firmada.
+    documento.recursos.push({ id: ids.video, tipo: 'video', origen: 'cliente', nombre: 'procedimiento.mp4', mime: 'video/mp4' });
+    documento.modulos.flatMap((m: { capsulas: { pantallas: { id: string; bloques: { tipo: string; recursoId?: string }[] }[] }[] }) => m.capsulas.flatMap((c) => c.pantallas))
+      .find((p: { id: string }) => p.id === 'p18').bloques.find((b: { tipo: string }) => b.tipo === 'video').recursoId = ids.video;
     const p03 = documento.modulos[0].capsulas[0].pantallas[2];
     p03.bloques.find((b: { tipo: string }) => b.tipo === 'personaje').recursoId = ids.ana;
     await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: proyecto.id, versionEsquema: '0.2.0', documento } });
 
     const r = await como('grafico').get(`/proyectos/${proyecto.id}/curso`);
     expect(r.status).toBe(200);
-    expect(Object.keys(r.body.urlsRecursos)).toEqual([ids.audio]);
+    expect(Object.keys(r.body.urlsRecursos).sort()).toEqual([ids.audio, ids.video].sort());
+    expect(r.body.urlsRecursos[ids.video]).toMatch(/X-Amz-Signature=/);
     expect(r.body.urlsRecursos[ids.audio]).toMatch(/X-Amz-Signature=/);
     expect(Object.keys(r.body.svgPersonajes)).toEqual([ids.ana]);
     expect(r.body.svgPersonajes[ids.ana]).toContain('id="boca_A"');

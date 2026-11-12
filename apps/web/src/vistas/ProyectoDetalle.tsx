@@ -88,6 +88,7 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
                 <a className="boton" href={`/proyectos/${proyecto.id}/idiomas`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/idiomas`); }}>Idiomas</a>
                 {rol !== 'REVISOR_CLIENTE' ? <a className="boton" href={`/proyectos/${proyecto.id}/alineacion`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/alineacion`); }}>Alineación</a> : null}
                 {rol !== 'REVISOR_CLIENTE' ? <a className="boton" href={`/proyectos/${proyecto.id}/navegacion`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/navegacion`); }}>Navegación</a> : null}
+                {rol !== 'REVISOR_CLIENTE' ? <a className="boton" href={`/proyectos/${proyecto.id}/video`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/video`); }}>Video interactivo</a> : null}
                 {rol !== 'REVISOR_CLIENTE' ? <a className="boton" href={`/proyectos/${proyecto.id}/entrega`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyecto.id}/entrega`); }}>Exportar SCORM</a> : null}
               </>
             ) : null}

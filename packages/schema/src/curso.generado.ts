@@ -388,6 +388,10 @@ export interface Recurso {
   mime: string;
   idioma?: Idioma;
   bytes?: number;
+  /**
+   * HU-0901 · Duración de un audio o video, si se conoce. Los marcadores del video no pueden pasarla.
+   */
+  duracionMs?: number;
   licencia?: string;
   /**
    * ids de capas detectadas en un SVG

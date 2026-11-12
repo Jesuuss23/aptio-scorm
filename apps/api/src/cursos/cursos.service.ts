@@ -11,6 +11,7 @@ import { type Prisma, recalcularReglas } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
 import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
+import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, reanclarAjustes } from '@aptio/schema/tiempos';
@@ -204,6 +205,24 @@ export class CursosService {
         const errores = erroresDisparadores(pd, pantallasDe(doc).map((x) => x.id));
         if (errores.length) {
           throw new UnprocessableEntityException({ codigo: 'DISPARADOR_NO_VALIDO', mensaje: 'Revisa los disparadores de la pantalla', detalles: errores.slice(0, 10).map((e) => ({ mensaje: e })) });
+        }
+        cambios++;
+      }
+      // HU-0901 · Marcadores del video: por id del bloque de video, la lista completa (capítulos y puntos incluidos).
+      // 422 BLOQUE_NO_EXISTE si el bloque no es un video de la pantalla; MARCADOR_NO_VALIDO si no pasan `erroresMarcadores`.
+      if (dto.marcadores !== undefined) {
+        const duraciones = new Map(((doc as { recursos?: { id: string; duracionMs?: number }[] }).recursos ?? []).map((r) => [r.id, r.duracionMs]));
+        const errores: string[] = [];
+        for (const [id, lista] of Object.entries(dto.marcadores)) {
+          const video = bloques.find((x) => x.id === id) as { tipo: string; recursoId?: string; marcadores?: unknown } | undefined;
+          if (!video || video.tipo !== 'video') {
+            throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el video «${id}»` });
+          }
+          video.marcadores = lista;
+          errores.push(...erroresMarcadores(`${p.id}/${id}`, lista, video.recursoId ? duraciones.get(video.recursoId) : undefined));
+        }
+        if (errores.length) {
+          throw new UnprocessableEntityException({ codigo: 'MARCADOR_NO_VALIDO', mensaje: 'Revisa las preguntas del video', detalles: errores.slice(0, 10).map((e) => ({ mensaje: e })) });
         }
         cambios++;
       }

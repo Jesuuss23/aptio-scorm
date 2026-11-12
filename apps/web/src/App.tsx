@@ -16,6 +16,7 @@ import { EntregaVista } from './vistas/EntregaVista';
 import { IdiomasVista } from './vistas/IdiomasVista';
 import { AlineacionVista } from './vistas/AlineacionVista';
 import { NavegacionVista } from './vistas/NavegacionVista';
+import { VideoVista } from './vistas/VideoVista';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -80,6 +81,8 @@ export function App() {
         <AlineacionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'navegacion' ? (
         <NavegacionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
+      ) : vista?.sub === 'video' ? (
+        <VideoVista key={vista.id} proyectoId={vista.id!} pantallaId={new URLSearchParams(busqueda).get('pantalla')} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.sub === 'revision' ? (
         <RevisionVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} pantallaId={new URLSearchParams(busqueda).get('pantalla')} />
       ) : vista?.sub === 'editor' ? (

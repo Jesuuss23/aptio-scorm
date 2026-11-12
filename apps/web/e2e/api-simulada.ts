@@ -9,6 +9,9 @@ import { cursoConPropuesta, huellaPantalla, patchDe } from '@aptio/schema/propue
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
 import { conservarRetoques } from '@aptio/schema/retoques';
 import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
+import { erroresMarcadores } from '@aptio/schema/marcadores';
+
+const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -63,6 +66,8 @@ export interface OpcionesSimulacion {
   propuestaFalla?: boolean;
   /** HU-0604 · p05 llega retocada en el editor: la imagen desplazada, el párrafo en acento y un botón agregado. */
   retoquesP05?: boolean;
+  /** HU-0901 · El video de p18 llega con su URL: un WebM de 60 s hecho con ffmpeg (`e2e/fixtures/video-60s.webm`). */
+  conVideo?: boolean;
   /** HU-0804 · El curso con cada texto en inglés (traducción simulada «[EN] …»). */
   cursoTraducido?: boolean;
   /** HU-0804 · Con `cursoTraducido`, pantallas cuya narración se deja sin inglés. */
@@ -253,7 +258,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, cursoTraducido, sinIngles = [], navegacionCurso }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -286,6 +291,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     const p05 = pantallasDe(revision.documento as unknown as CursoDoc).find((x) => x.id === 'p05')!;
     Object.assign(p05, structuredClone(RETOQUES_P05));
   }
+  if (conVideo) {
+    // HU-0901 · El video de prueba dura 60 s: p18 queda con su capítulo y un punto, sin preguntas, para agregarlas.
+    const p18 = pantallasDe(revision.documento as unknown as CursoDoc).find((x) => x.id === 'p18')!;
+    const video = (p18.bloques as unknown as { tipo: string; marcadores: { tiempoMs: number; tipo: string }[] }[]).find((b) => b.tipo === 'video')!;
+    video.marcadores = video.marcadores.filter((m) => m.tipo === 'capitulo').concat([{ ...video.marcadores.find((m) => m.tipo === 'punto')!, tiempoMs: 20000 }]);
+    (revision.documento.recursos as { tipo: string; duracionMs?: number }[]).find((r) => r.tipo === 'video')!.duracionMs = 60000;
+  }
   (revision.documento.recursos as { tipo: string; nombre: string }[]).find((r) => r.tipo === 'documento')!.nombre = 'Manual.pdf';
   for (const p of pantallasDe(revision.documento as unknown as CursoDoc)) {
     const texto = (p as { narracion?: { texto?: { en?: string } } }).narracion?.texto;
@@ -297,6 +309,18 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-0702: los audios de narración se sirven como silencio WAV con la duración de su pantalla (o la pedida en el nombre).
   await page.route('**/s3-simulado/**', (route) => {
     const nombre = new URL(route.request().url()).pathname.split('/').pop() ?? '';
+    if (nombre === 'video-60s.webm') {
+      // Con rangos, como S3: sin ellos el navegador no deja mover el video a otro segundo.
+      const rango = /bytes=(\d+)-(\d*)/.exec(route.request().headers().range ?? '');
+      if (!rango) return route.fulfill({ status: 200, contentType: 'video/webm', headers: { 'Accept-Ranges': 'bytes' }, body: VIDEO_60S });
+      const desde = Number(rango[1]);
+      const hasta = rango[2] ? Math.min(Number(rango[2]), VIDEO_60S.length - 1) : VIDEO_60S.length - 1;
+      return route.fulfill({
+        status: 206, contentType: 'video/webm',
+        headers: { 'Accept-Ranges': 'bytes', 'Content-Range': `bytes ${desde}-${hasta}/${VIDEO_60S.length}` },
+        body: VIDEO_60S.subarray(desde, hasta + 1),
+      });
+    }
     const deP = nombre.match(/^(p\d\d)-es\.(mp3|wav)$/);
     const ms = nombre.match(/^audio-(\d+)\.wav$/)?.[1];
     const dur = ms ? Number(ms) : deP ? pantallasSim().find((p) => p.id === deP[1])?.narracion?.porIdioma?.es?.duracionMs : undefined;
@@ -559,7 +583,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (!p || !(p.avance as { total: number }).total) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El proyecto aún no tiene curso: genera las pantallas en Producción' });
       const origen = new URL(req.url()).origin;
       const urlsRecursos = Object.fromEntries((revision.documento.recursos as { id: string; tipo: string; nombre: string }[])
-        .filter((r) => r.tipo === 'audio').map((r) => [r.id, `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
+        .filter((r) => r.tipo === 'audio' || (conVideo && r.tipo === 'video'))
+        .map((r) => [r.id, r.tipo === 'video' ? `${origen}/s3-simulado/video-60s.webm` : `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
       return responder(200, {
         id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version,
         documento: navegacionCurso ? { ...revision.documento, navegacion: navegacionCurso() } : revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z',
@@ -644,7 +669,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
-      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[]; disparadores?: unknown[] };
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[]; disparadores?: unknown[]; marcadores?: Record<string, unknown[]> };
       historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
@@ -686,6 +711,14 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         else delete pd.disparadores;
         const errores = erroresDisparadores(pd, pantallasSim().map((x) => x.id));
         if (errores.length) return responder(422, { codigo: 'DISPARADOR_NO_VALIDO', mensaje: 'Revisa los disparadores de la pantalla', detalles: errores.map((mensaje) => ({ mensaje })) });
+      }
+      // HU-0901: los marcadores del video, por bloque, con las reglas de la API.
+      for (const [id, lista] of Object.entries(datos.marcadores ?? {})) {
+        const video = bloques.find((x) => x.id === id) as (BloqueSim & { marcadores?: unknown[] }) | undefined;
+        if (!video || video.tipo !== 'video') return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el video «${id}»` });
+        const errores = erroresMarcadores(`${p.id}/${id}`, lista, conVideo ? 60000 : undefined);
+        if (errores.length) return responder(422, { codigo: 'MARCADOR_NO_VALIDO', mensaje: 'Revisa las preguntas del video', detalles: errores.map((mensaje) => ({ mensaje })) });
+        video.marcadores = lista;
       }
       for (const [id, ajuste] of Object.entries(datos.ajustes ?? {})) {
         if (!bloques.some((x) => x.id === id) && !(pe.extras ?? []).some((x) => x.id === id)) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });

@@ -5,6 +5,7 @@ import formatosModulo, { type FormatsPlugin } from 'ajv-formats';
 import esquema from '../esquemas/curso-v0.schema.json' with { type: 'json' };
 import type { CursoDeCapsulasEsquemaV0 as Curso } from './curso.generado.js';
 import { erroresDisparadores } from './disparadores.js';
+import { erroresMarcadores } from './marcadores.js';
 
 // ajv-formats se publica como CommonJS: según el cargador, el plugin llega directo o envuelto en `default`.
 const agregarFormatos = ((formatosModulo as unknown as { default?: FormatsPlugin }).default ??
@@ -140,7 +141,15 @@ export function erroresCurso(documento: unknown): string[] {
   const idsPantallas = curso.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas.map((p) => p.id)));
   for (const m of curso.modulos) for (const c of m.capsulas) for (const p of c.pantallas) errores.push(...erroresDisparadores(p, idsPantallas));
 
-  // 7. Coherencia de idiomas
+  // 7. HU-0901 · Marcadores del video: tiempo dentro del video, ids únicos y preguntas completas
+  const duraciones = new Map((curso.recursos ?? []).map((r) => [r.id, (r as { duracionMs?: number }).duracionMs]));
+  for (const m of curso.modulos) for (const c of m.capsulas) for (const p of c.pantallas) {
+    for (const b of p.bloques as { id: string; tipo: string; recursoId?: string; marcadores?: unknown }[]) {
+      if (b.tipo === 'video') errores.push(...erroresMarcadores(`${p.id}/${b.id}`, b.marcadores, b.recursoId ? duraciones.get(b.recursoId) : undefined));
+    }
+  }
+
+  // 8. Coherencia de idiomas
   if (curso.modoIdioma === 'unico' && curso.idiomas.length !== 1) errores.push("modoIdioma 'unico' exige exactamente un idioma");
   if (curso.modoIdioma !== 'unico' && curso.idiomas.length < 2) {
     errores.push(`modoIdioma '${curso.modoIdioma}' exige al menos dos idiomas`);

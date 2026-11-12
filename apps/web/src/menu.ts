@@ -10,7 +10,7 @@ export const MENU: GrupoMenu[] = [
 ];
 
 /** Vista a partir de la ruta: grupo de la ruta, nombre, ítem activo del menú y parámetro. */
-export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' | 'alineacion' | 'navegacion' } | null {
+export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' | 'alineacion' | 'navegacion' | 'video' } | null {
   if (camino === '/') return { grupo: 'Inicio', nombre: 'Proyectos', activo: '/' };
   if (camino === '/nuevo') return { grupo: 'Inicio', nombre: 'Nuevo SCORM', activo: '/nuevo' };
   const proyecto = camino.match(/^\/proyectos\/([0-9a-f-]{36})$/i);
@@ -29,6 +29,8 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (alineacion) return { grupo: 'Inicio', nombre: 'Alineación pedagógica', activo: '/', id: alineacion[1]!, sub: 'alineacion' };
   const navegacion = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/navegacion$/i);
   if (navegacion) return { grupo: 'Inicio', nombre: 'Navegación', activo: '/', id: navegacion[1]!, sub: 'navegacion' };
+  const video = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/video$/i);
+  if (video) return { grupo: 'Inicio', nombre: 'Video interactivo', activo: '/', id: video[1]!, sub: 'video' };
   if (camino === '/clientes') return { grupo: 'Empresa', nombre: 'Clientes y kits', activo: '/clientes' };
   const cliente = camino.match(/^\/clientes\/([0-9a-f-]{36})$/i);
   if (cliente) return { grupo: 'Empresa', nombre: 'Cliente', activo: '/clientes', id: cliente[1]! };
