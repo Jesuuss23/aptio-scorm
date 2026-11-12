@@ -3,9 +3,12 @@
 // Deshacer restaura la versión anterior conservando la narración actual (su audio, boca y subtítulos).
 // HU-1002 · El tipo `alineacion` es del curso entero (sin pantalla): encola IA-17, vence con cualquier versión nueva del
 // curso (su patch usa posiciones) y solo lo piden, aplican y descartan administración y diseño instruccional.
+// HU-1104 · El tipo `patron` (IA-14) también es del curso entero y de esos dos roles: recomienda un patrón del catálogo o
+// crea un personalizado; al aplicarlo solo cambian `patron` y `patronPersonalizado` (RN-11-1), con motivo «navegación».
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma, Propuesta } from '@aptio/db';
 import { aplicarCorreccion, type CambioCorreccion, informeAlineacion, type PantallaAfectada, TAREA_CORRECCION } from '@aptio/schema/alineacion';
+import { aplicarPatron, type NavegacionPatron, type PropuestaPatron, TAREA_PATRON } from '@aptio/schema/navegacion';
 import type { OperacionPatch } from '@aptio/schema/patch';
 import { aplicarEnPantalla, type CambiosPropuesta, huellaPantalla, patchDe, TAREA_PROPUESTA, TIPOS_PROPUESTA, type Variante } from '@aptio/schema/propuesta';
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
@@ -19,10 +22,15 @@ import { CursosService } from './cursos.service.js';
 import type { AplicarPropuestaDto, CursoRestauradoDto, FiltroPropuestasDto, PropuestaDto, PropuestaSolicitudDto, Trabajo202Dto } from './propuesta.dto.js';
 
 type Guardado = CambiosPropuesta & { huella: string | null; correcciones?: CambioCorreccion[] };
+/** HU-1104 · Lo que el worker guarda en una propuesta de tipo `patron`. */
+type GuardadoPatron = { modo: string; navegacion: NavegacionPatron; recomendado: PropuestaPatron['recomendado']; alternativa: PropuestaPatron['alternativa']; descripcion: string | null; huella: null };
 const VENCIDA = { codigo: 'PROPUESTA_VENCIDA', mensaje: 'La pantalla cambió desde que se calculó esta propuesta. Recalcular propuesta.' };
 const VENCIDA_CURSO = { codigo: 'PROPUESTA_VENCIDA', mensaje: 'El curso cambió desde que se calculó esta propuesta. Recalcular propuesta.' };
 /** HU-1002 · Propuestas del curso entero: la corrección de la alineación (IA-17). */
 const ALINEACION = 'alineacion';
+/** HU-1104 · Propuestas del curso entero: el patrón de navegación (IA-14). */
+const PATRON = 'patron';
+const DEL_CURSO = [ALINEACION, PATRON];
 /** HU-1002 · Quienes piden, aplican y descartan la corrección de la alineación (los mismos que cambian niveles, M14). */
 const CORRIGEN_ALINEACION = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
 function exigirCorrector(u: UsuarioSesion) {
@@ -57,6 +65,7 @@ export class PropuestasService {
 
   async pedir(u: UsuarioSesion, cursoId: string, dto: PropuestaSolicitudDto): Promise<Trabajo202Dto> {
     if (dto.tipo === ALINEACION) return this.pedirCorreccion(u, cursoId);
+    if (dto.tipo === PATRON) return this.pedirPatron(u, cursoId, dto);
     const c = await this.cursos.buscar(u, cursoId);
     if (!(TIPOS_PROPUESTA as readonly string[]).includes(dto.tipo)) {
       throw new UnprocessableEntityException({
@@ -102,6 +111,27 @@ export class PropuestasService {
     return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
   }
 
+  /** HU-1104 · «✦ Recomendar» o «✦ Crear con IA»: encola IA-14 sobre el curso entero. */
+  private async pedirPatron(u: UsuarioSesion, cursoId: string, dto: PropuestaSolicitudDto): Promise<Trabajo202Dto> {
+    exigirCorrector(u);
+    if (!dto.modo) throw new UnprocessableEntityException({ codigo: 'MODO_REQUERIDO', mensaje: 'Indica si se recomienda o se crea el patrón' });
+    if (dto.modo === 'crear' && !dto.descripcion) throw new UnprocessableEntityException({ codigo: 'DESCRIPCION_VACIA', mensaje: 'Describe cómo quieres el patrón' });
+    const c = await this.cursos.buscar(u, cursoId);
+    const t = await this.bd.trabajoIA.create({
+      data: { organizacionId: c.organizacionId, proyectoId: c.proyectoId, tarea: TAREA_PATRON, tipo: 'TEXTO', proveedor: '-', modelo: '-' },
+    });
+    try {
+      await this.colas.encolar('ia', {
+        trabajoId: t.id, organizacionId: c.organizacionId, tarea: TAREA_PATRON,
+        propuesta: { cursoId: c.id, tipo: PATRON, modo: dto.modo, ...(dto.modo === 'crear' && dto.descripcion ? { texto: dto.descripcion } : {}) },
+      });
+    } catch (e) {
+      await this.bd.trabajoIA.update({ where: { id: t.id }, data: { estado: 'ERROR', error: 'No se pudo encolar' } });
+      throw e;
+    }
+    return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
+  }
+
   /** RN-05-4: al listar, una pendiente cuya pantalla cambió pasa a VENCIDA. */
   async listar(u: UsuarioSesion, cursoId: string, f: FiltroPropuestasDto): Promise<PropuestaDto[]> {
     const c = await this.cursos.buscar(u, cursoId);
@@ -111,7 +141,7 @@ export class PropuestasService {
       include: { trabajoIA: { select: { costoUsd: true } } },
       orderBy: { creadoEn: 'desc' },
     });
-    const vencidas = filas.filter((p) => p.estado === 'PENDIENTE' && (p.tipo === ALINEACION
+    const vencidas = filas.filter((p) => p.estado === 'PENDIENTE' && (DEL_CURSO.includes(p.tipo)
       ? p.versionBase !== c.version
       : p.pantallaId && huellaPantalla(doc, p.pantallaId) !== (p.cambios as unknown as Guardado).huella));
     if (vencidas.length) await this.bd.propuesta.updateMany({ where: { id: { in: vencidas.map((p) => p.id) }, estado: 'PENDIENTE' }, data: { estado: 'VENCIDA' } });
@@ -120,6 +150,14 @@ export class PropuestasService {
   }
 
   private static aDto(p: Propuesta, costoUsd: number): PropuestaDto {
+    if (p.tipo === PATRON) {
+      const g = p.cambios as unknown as GuardadoPatron;
+      return {
+        id: p.id, tipo: p.tipo, pantallaId: null, titulo: p.titulo, descripcion: p.descripcion, cambios: [],
+        patron: { modo: g.modo, navegacion: g.navegacion, recomendado: g.recomendado, alternativa: g.alternativa, descripcion: g.descripcion },
+        versionBase: p.versionBase, estado: p.estado, costoUsd, creadoEn: p.creadoEn.toISOString(),
+      };
+    }
     const cambios = p.cambios as unknown as Guardado;
     return {
       id: p.id, tipo: p.tipo, pantallaId: p.pantallaId, titulo: p.titulo, descripcion: p.descripcion,
@@ -140,6 +178,7 @@ export class PropuestasService {
   async aplicar(u: UsuarioSesion, propuestaId: string, dto: AplicarPropuestaDto): Promise<CambioResultadoDto> {
     const p = await this.buscar(u, propuestaId);
     if (p.tipo === ALINEACION) return this.aplicarCorreccion(u, p);
+    if (p.tipo === PATRON) return this.aplicarPatronPropuesto(u, p);
     if (p.estado === 'VENCIDA') throw new ConflictException(VENCIDA);
     if (p.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: p.estado === 'APLICADA' ? 'Esta propuesta ya se aplicó' : 'Esta propuesta se descartó' });
     const guardado = p.cambios as unknown as Guardado;
@@ -214,9 +253,37 @@ export class PropuestasService {
     }
   }
 
+  /**
+   * HU-1104 · CP-088: aplica el patrón si el curso sigue en la versión base. Solo cambian `patron` y `patronPersonalizado`
+   * (las reglas y los elementos visibles quedan, RN-11-1); versión nueva con motivo «navegación»; 409 si venció.
+   */
+  private async aplicarPatronPropuesto(u: UsuarioSesion, p: Propuesta): Promise<CambioResultadoDto> {
+    exigirCorrector(u);
+    const vencer = async () => {
+      await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'VENCIDA' } });
+      return new ConflictException(VENCIDA_CURSO);
+    };
+    if (p.estado === 'VENCIDA') throw new ConflictException(VENCIDA_CURSO);
+    if (p.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: p.estado === 'APLICADA' ? 'Esta propuesta ya se aplicó' : 'Esta propuesta se descartó' });
+    const c = await this.cursos.buscar(u, p.cursoId);
+    if (c.version !== p.versionBase) throw await vencer();
+    const g = p.cambios as unknown as GuardadoPatron;
+    try {
+      const r = await this.cursos.guardar(u, p.cursoId, p.versionBase, 'navegación', (doc) => {
+        aplicarPatron(doc, g.navegacion);
+        return { regenerando: [] as string[] };
+      });
+      await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'APLICADA', resueltoPorId: u.id, resueltoEn: new Date() } });
+      return r;
+    } catch (e) {
+      if (e instanceof ConflictException && (e.getResponse() as { codigo?: string }).codigo === 'VERSION_CAMBIO') throw await vencer();
+      throw e;
+    }
+  }
+
   async descartar(u: UsuarioSesion, propuestaId: string): Promise<void> {
     const p = await this.buscar(u, propuestaId);
-    if (p.tipo === ALINEACION) exigirCorrector(u);
+    if (DEL_CURSO.includes(p.tipo)) exigirCorrector(u);
     if (p.estado === 'APLICADA') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: 'Esta propuesta ya se aplicó' });
     await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'DESCARTADA', resueltoPorId: u.id, resueltoEn: new Date() } });
   }

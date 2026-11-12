@@ -25,7 +25,7 @@ import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
 import { pieResultado } from './interacciones/comun.ts';
 import { aplanar, type Motivo, modoDe, motivoBloqueo } from './navegacion.ts';
-import { conMapa, entradaEstacion, estaciones, estadoEstacion, type PatronBase, patronDe } from './patrones.ts';
+import { conMapa, entradaEstacion, estaciones, estadoEstacion, type Marco, marcoDe, type PatronBase } from './patrones.ts';
 import { dibujarPantalla } from './pantalla.ts';
 import { type Cue, cueEn, leerVtt } from './subtitulos.ts';
 import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
@@ -90,6 +90,8 @@ export interface EstadoReproductor extends EstadoSeguimiento {
   /** Patrón pedido por el curso y el que se dibuja (HU-1103: el personalizado usa su base). */
   patron: string;
   patronAplicado: PatronBase;
+  /** HU-1104 · Las opciones del marco que se dibuja (las del patrón base o las del personalizado). */
+  marco: Marco;
   /** HU-1103 · En Mapa de misiones o Menú de temas, true mientras se ve el mapa (no una pantalla). */
   enMapa: boolean;
   modo: ModoNavegacion;
@@ -161,8 +163,10 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   const modo: ModoNavegacion = revision ? 'libre' : modoDe(curso);
   const mostrar = new Set(curso.navegacion?.mostrar?.length ? [...curso.navegacion.mostrar, 'botones'] : MOSTRAR_BASE);
   const conMarco = opciones.marco !== false;
-  const patron = patronDe(curso.navegacion);
-  const esMapa = conMapa(patron) && conMarco;
+  const marco = marcoDe(curso.navegacion);
+  const patron = marco.base;
+  const esMapa = conMapa(marco) && conMarco;
+  const hub = marco.menu === 'temas';
   const tramos = esMapa ? estaciones(curso, pantallas) : [];
   /** Mapa de misiones o Menú de temas: true mientras se ve el mapa. */
   let enMapa = false;
@@ -313,41 +317,61 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   // HU-1103 · Anterior y Siguiente cambian de forma con el patrón; el nombre accesible sigue siendo el mismo.
   const glifo = (x: string) => h('span', { 'aria-hidden': 'true' }, x);
   const oculto = (x: string) => h('span', { class: 'ap-oculto' }, x);
+  // HU-1104 · Anterior y Siguiente según dónde va la barra (zonas, flotantes o en una barra) y la forma de avanzar.
   const [claseAnterior, claseSiguiente, contenidoAnterior, contenidoSiguiente] =
-    patron === 'historias' ? ['ap-zona ap-zona-izq', 'ap-zona ap-zona-der', [glifo('‹'), oculto(tx.anterior)], [glifo('›'), oculto(tx.siguiente)]]
-    : patron === 'inmersivo' ? ['ap-fab ap-fab-izq', 'ap-fab ap-fab-der', [glifo('◀'), oculto(tx.anterior)], [glifo('▶'), oculto(tx.siguiente)]]
-    : patron === 'vertical' ? ['ap-nav', 'ap-nav ap-primario', [glifo('↑ '), tx.volver], [tx.continuar, glifo(' ↓')]]
+    marco.barra === 'ninguna' ? ['ap-zona ap-zona-izq', 'ap-zona ap-zona-der', [glifo('‹'), oculto(tx.anterior)], [glifo('›'), oculto(tx.siguiente)]]
+    : marco.barra === 'flotante' ? ['ap-fab ap-fab-izq', 'ap-fab ap-fab-der', [glifo('◀'), oculto(tx.anterior)], [glifo('▶'), oculto(tx.siguiente)]]
+    : marco.avance === 'desplazar' ? ['ap-nav', 'ap-nav ap-primario', [glifo('↑ '), tx.volver], [tx.continuar, glifo(' ↓')]]
     : ['ap-nav', 'ap-nav ap-primario', [glifo('◀ '), tx.anterior], [tx.siguiente, glifo(' ▶')]];
   const anterior = h('button', { type: 'button', class: claseAnterior, onclick: () => irA(actual - 1, true) }, ...contenidoAnterior);
   const siguiente = h('button', { type: 'button', class: claseSiguiente, 'aria-describedby': 'ap-motivo', onclick: () => irA(actual + 1, true) }, ...contenidoSiguiente);
   const contador = h('span', { class: 'ap-contador' });
-  const motivo = h('span', { class: patron === 'historias' || patron === 'inmersivo' ? 'ap-motivo ap-motivo-flotante' : 'ap-motivo', id: 'ap-motivo', role: 'status' });
-  const puntos = mostrar.has('puntos') ? h('span', { class: 'ap-puntos' }) : null;
-  // Historias: un segmento por pantalla (las vistas se pintan); el valor accesible es el avance, como la barra.
-  const segmentos = h('div', { class: 'ap-segmentos', role: 'progressbar', 'aria-label': tx.progreso, 'aria-valuemin': 0, 'aria-valuemax': 100 }, pantallas.map(() => h('i')));
+  const conPie = marco.barra === 'abajo';
+  const motivo = h('span', { class: conPie ? 'ap-motivo' : 'ap-motivo ap-motivo-flotante', id: 'ap-motivo', role: 'status' });
+  const puntos = mostrar.has('puntos') || marco.marcador ? h('span', { class: 'ap-puntos' }) : null;
+  // Segmentos (uno por pantalla; las vistas se pintan) o puntos (los mismos, redondos); el valor accesible es el avance.
+  const segmentos = h('div', { class: marco.progreso === 'puntos' ? 'ap-segmentos ap-segmentos-puntos' : 'ap-segmentos', role: 'progressbar', 'aria-label': tx.progreso, 'aria-valuemin': 0, 'aria-valuemax': 100 }, pantallas.map(() => h('i')));
   const tituloPantalla = h('span', { class: 'ap-titulo-curso' });
   // Mapa de misiones y Menú de temas: «← Mapa» o «← Temas» vuelve a elegir estación.
-  const botonMapa = h('button', { type: 'button', class: 'ap-boton-barra ap-volver-mapa', onclick: () => verMapa(true) }, glifo('← '), patron === 'hub' ? tx.temas : tx.mapa);
-  const conTemario = mostrar.has('temario') && patron !== 'ramificado' && !esMapa;
+  const botonMapa = h('button', { type: 'button', class: 'ap-boton-barra ap-volver-mapa', onclick: () => verMapa(true) }, glifo('← '), hub ? tx.temas : tx.mapa);
+  const conTemario = mostrar.has('temario') && marco.menu === 'temario';
   const herramientas = [botonSubtitulos, botonIdioma, botonCreditos];
-
-  const barra = patron === 'inmersivo' ? null
-    : patron === 'historias'
+  const menu = esMapa ? botonMapa : conTemario ? botonTemario : null;
+  const conProgreso = mostrar.has('progreso') && marco.progreso !== 'ninguno';
+  const progresoEn = (fila: boolean) => !conProgreso ? null
+    : marco.progreso === 'barra' ? [barraAvance, porcentaje]
+    : marco.progreso === 'porcentaje' ? porcentaje
+    : fila ? null : segmentos;
+  const enBarra = marco.barra === 'arriba' ? [anterior, siguiente] : [];
+  // La cabecera: con segmentos o puntos, en dos filas (el avance arriba y el título de la pantalla); si no, en una.
+  const enDosFilas = conProgreso && (marco.progreso === 'segmentos' || marco.progreso === 'puntos');
+  const barra = !marco.cabecera ? null
+    : enDosFilas
       ? h('header', { class: 'ap-barra ap-barra-historias' },
-        mostrar.has('progreso') ? segmentos : null,
-        h('div', { class: 'ap-barra-fila' }, conTemario ? botonTemario : null, tituloPantalla, puntos, ...herramientas))
+        segmentos,
+        h('div', { class: 'ap-barra-fila' }, menu, tituloPantalla, marco.marcador ? null : puntos, ...herramientas, ...enBarra))
       : h('header', { class: 'ap-barra' },
-        esMapa ? botonMapa : conTemario ? botonTemario : null,
+        menu,
         h('span', { class: 'ap-titulo-curso' }, titulo),
-        mostrar.has('progreso') ? [barraAvance, porcentaje] : h('span', { class: 'ap-espacio' }),
-        puntos,
-        ...herramientas);
-  const flotantes = patron === 'historias' ? [anterior, siguiente, motivo]
-    : patron === 'inmersivo' ? [h('div', { class: 'ap-hud' }, conTemario ? botonTemario : null, mostrar.has('progreso') ? porcentaje : null, puntos, ...herramientas), anterior, siguiente, motivo]
-    : [];
-  const pie = flotantes.length ? null : h('footer', { class: patron === 'vertical' ? 'ap-pie ap-pie-vertical' : 'ap-pie' }, anterior, h('span', { class: 'ap-centro' }, mostrar.has('contador') ? contador : null, motivo), siguiente);
+        progresoEn(true) ?? h('span', { class: 'ap-espacio' }),
+        marco.marcador ? null : puntos,
+        ...herramientas,
+        ...enBarra);
+  // El marcador flotante: sin cabecera lleva el menú, el progreso y las herramientas; con cabecera, solo los puntos.
+  const hud = !marco.cabecera
+    ? h('div', { class: 'ap-hud' }, menu, progresoEn(false), puntos, ...herramientas, ...enBarra)
+    : marco.marcador ? h('div', { class: 'ap-hud' }, puntos) : null;
+  const flotantes = [
+    ...(hud ? [hud] : []),
+    ...(marco.barra === 'ninguna' || marco.barra === 'flotante' ? [anterior, siguiente] : []),
+    ...(conPie ? [] : [motivo]),
+  ];
+  const pie = conPie ? h('footer', { class: marco.avance === 'desplazar' ? 'ap-pie ap-pie-vertical' : 'ap-pie' }, anterior, h('span', { class: 'ap-centro' }, mostrar.has('contador') ? contador : null, motivo), siguiente) : null;
   const cuerpo = h('div', { class: 'ap-cuerpo' }, temario, escena, ...flotantes);
-  const raiz = h('div', { class: conMarco ? 'ap-r' : 'ap-r ap-sin-marco', lang: idioma, style: variables, 'data-patron': patron, 'data-modo': modo },
+  const raiz = h('div', {
+    class: conMarco ? 'ap-r' : 'ap-r ap-sin-marco', lang: idioma, style: variables, 'data-patron': patron, 'data-modo': modo,
+    'data-barra': marco.barra, 'data-cabecera': String(marco.cabecera), 'data-marcador': String(marco.marcador || !marco.cabecera),
+  },
     barra,
     cuerpo,
     barraNarracion,
@@ -360,14 +384,14 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
       const destino = e.target as HTMLElement;
       if (pendiente || enMapa || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar, .ap-creditos') || e.altKey || e.ctrlKey || e.metaKey) return;
       // Vertical también con ↓ y ↑ (sin quitarle al navegador el desplazamiento dentro de la pantalla: solo en los botones).
-      const vertical = patron === 'vertical' && destino.closest('.ap-pie');
+      const vertical = marco.avance === 'desplazar' && destino.closest('.ap-pie');
       if (e.key === 'ArrowRight' || (vertical && e.key === 'ArrowDown')) { e.preventDefault(); irA(actual + 1, true); }
       else if (e.key === 'ArrowLeft' || (vertical && e.key === 'ArrowUp')) { e.preventDefault(); irA(actual - 1, true); }
     });
   }
   // HU-1103 · Historias: deslizar el dedo (o el puntero) a la izquierda avanza y a la derecha vuelve; las zonas ‹ › y las
   // flechas hacen lo mismo. Dentro de una actividad no se desliza, para no pelear con sus controles.
-  if (patron === 'historias' && conMarco) {
+  if (marco.avance === 'deslizar-y-botones' && conMarco) {
     let inicio: { x: number; y: number } | null = null;
     cuerpo.addEventListener('pointerdown', (ev) => {
       const e = ev as PointerEvent;
@@ -523,7 +547,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
       ...seguimiento(pantallas, vistas, resultados, curso.seguimiento),
       pantallaId: pantallas[actual]?.pantalla.id ?? '', indice: actual, total: pantallas.length,
       puedeSiguiente: !ultima && m === null, motivo: ultima ? null : textoMotivo(m),
-      patron: curso.navegacion?.patron ?? 'clasico', patronAplicado: patron, enMapa, modo,
+      patron: curso.navegacion?.patron ?? 'clasico', patronAplicado: patron, marco, enMapa, modo,
       resultados: Object.fromEntries(resultados),
       vistas: pantallas.filter((x) => vistas.has(x.pantalla.id)).map((x) => x.pantalla.id),
     };
@@ -543,7 +567,9 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     }
     botonMapa.hidden = enMapa;
     if (pie) pie.hidden = enMapa;
-    for (const x of flotantes) x.hidden = enMapa && x !== motivo;
+    // HU-1104 · El marcador de puntos sigue a la vista en el mapa (sus botones de menú y avance se ocultan aparte).
+    for (const x of flotantes) x.hidden = enMapa && x !== motivo && x !== hud;
+    for (const x of enBarra) x.hidden = enMapa;
     if (enMapa) dibujarMapa();
     contador.textContent = tx.pantalla(actual + 1, pantallas.length);
     motivo.textContent = enMapa ? '' : e.motivo ?? '';
@@ -582,7 +608,6 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   /** HU-1103 · Mapa de misiones o Menú de temas: las estaciones con su avance; se entra a las que deja la regla. */
   function dibujarMapa() {
     const a = avance();
-    const hub = patron === 'hub';
     const titulo = h('h2', { class: 'ap-mapa-titulo', tabindex: '-1' }, hub ? tx.temasTitulo : tx.mapaTitulo);
     const lista = h('ol', { class: hub ? 'ap-temas' : 'ap-estaciones' }, tramos.map((e, i) => {
       const x = estadoEstacion(e, pantallas, a, modo, vistas);

@@ -16,7 +16,7 @@ const ESQUEMA_CURSO = join(RAIZ, '..', 'schema', 'esquemas', 'curso-v0.schema.js
 /** Tareas sin IA de texto que también tienen salida grabada. */
 const OTRAS: Record<string, string> = { VOZ: '06-voz-es.json', BOCA: '07-boca-p03.json' };
 /** Tareas con varias salidas grabadas: la que responde el modo simulado (HU-0504: una propuesta por tipo de pedido). */
-const PREFERIDAS: Record<string, string> = { 'IA-16': 'X-IA-16-propuestas-p05.json' };
+const PREFERIDAS: Record<string, string> = { 'IA-16': 'X-IA-16-propuestas-p05.json', 'IA-14': '04-IA-14-navegacion.json' };
 
 export interface ResultadoSimulado {
   tarea: string;
@@ -60,9 +60,9 @@ export function validarSalida(tarea: string, datos: unknown): string[] {
   return errores;
 }
 
-/** Devuelve la salida grabada de la tarea, ya validada. Lanza un error si no existe o no valida. */
-export function leerSalidaSimulada(tarea: string): ResultadoSimulado {
-  const archivo = OTRAS[tarea] ?? PREFERIDAS[tarea] ?? readdirSync(SALIDAS).find((f) => f.includes(`-${tarea}-`) && f.endsWith('.json'));
+/** Devuelve la salida grabada de la tarea (o el archivo `cual`), ya validada. Lanza un error si no existe o no valida. */
+export function leerSalidaSimulada(tarea: string, cual?: string): ResultadoSimulado {
+  const archivo = cual ?? OTRAS[tarea] ?? PREFERIDAS[tarea] ?? readdirSync(SALIDAS).find((f) => f.includes(`-${tarea}-`) && f.endsWith('.json'));
   if (!archivo) throw new Error(`El modo simulado no tiene salida para la tarea ${tarea}`);
   const datos: unknown = JSON.parse(readFileSync(join(SALIDAS, archivo), 'utf8'));
   const errores = validarSalida(tarea, datos);

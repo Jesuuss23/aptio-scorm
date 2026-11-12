@@ -4,7 +4,7 @@
 // misiones agrupa por secciones y deja entrar solo a las estaciones que permite la regla.
 import { afterEach, describe, expect, it } from 'vitest';
 import { aplanar } from '../src/navegacion.ts';
-import { estaciones, PATRONES_BASE, patronDe } from '../src/patrones.ts';
+import { estaciones, marcoDe, PATRONES_BASE, patronDe } from '../src/patrones.ts';
 import { montar } from '../src/reproductor.ts';
 import type { CursoReproductor, Navegacion } from '../src/tipos.ts';
 import { cursoLotoBase } from './catalogo.ts';
@@ -147,5 +147,116 @@ describe('patrones de navegación (HU-1103)', () => {
     const c2 = contenedorNuevo();
     const r = montar(c2, con({ patron: 'mapa' }), { marco: false, revision: true, inicio: 'p05' });
     expect(r.estado()).toMatchObject({ enMapa: false, pantallaId: 'p05' });
+  });
+});
+
+// HU-1104 · El patrón personalizado (RN-11-3): sus 5 opciones se aplican sobre el marco de su base.
+describe('patrón personalizado (HU-1104)', () => {
+  const personalizado = (o: Record<string, unknown>, modo: 'libre' | 'condiciones' = 'libre') =>
+    con({ patron: 'personalizado', modo, patronPersonalizado: { nombre: 'Prueba', base: 'clasico', progreso: 'barra', avance: 'botones', menu: 'temario', marcador: false, barra: 'abajo', ...o } });
+  const montado = (o: Record<string, unknown>) => {
+    const c = contenedorNuevo();
+    const r = montar(c, personalizado(o));
+    return { c, r, s: c.shadowRoot! };
+  };
+
+  it('marcoDe: la base con las opciones del personalizado encima; lo inválido se ignora', () => {
+    expect(marcoDe({ patron: 'personalizado', patronPersonalizado: { base: 'mapa', progreso: 'puntos', avance: 'botones', menu: 'mapa', marcador: true, barra: 'abajo' } }))
+      .toEqual({ base: 'mapa', cabecera: true, progreso: 'puntos', avance: 'botones', menu: 'mapa', marcador: true, barra: 'abajo' });
+    expect(marcoDe({ patron: 'personalizado', patronPersonalizado: { base: 'historias', progreso: 'arcoiris', marcador: 'si' } }))
+      .toEqual({ base: 'historias', cabecera: true, progreso: 'segmentos', avance: 'deslizar-y-botones', menu: 'temario', marcador: false, barra: 'ninguna' });
+    // Los patrones del catálogo no leen patronPersonalizado.
+    expect(marcoDe({ patron: 'clasico', patronPersonalizado: { base: 'mapa', barra: 'ninguna' } }).barra).toBe('abajo');
+  });
+
+  it('progreso: barra, segmentos, puntos, porcentaje o ninguno', () => {
+    const visto: Record<string, string[]> = {};
+    for (const progreso of ['barra', 'segmentos', 'puntos', 'porcentaje', 'ninguno']) {
+      const { s, r } = montado({ progreso });
+      visto[progreso] = ['.ap-avance', '.ap-segmentos:not(.ap-segmentos-puntos)', '.ap-segmentos-puntos', '.ap-porcentaje'].filter((sel) => s.querySelector(sel));
+      r.destruir();
+    }
+    expect(visto).toEqual({
+      barra: ['.ap-avance', '.ap-porcentaje'], segmentos: ['.ap-segmentos:not(.ap-segmentos-puntos)'], puntos: ['.ap-segmentos-puntos'],
+      porcentaje: ['.ap-porcentaje'], ninguno: [],
+    });
+  });
+
+  it('avance: solo con «deslizar y botones» se desliza; «desplazar» dice «Continuar ↓» y avanza con ↓', () => {
+    const botones = montado({ avance: 'botones' });
+    deslizar(botones.c, -120);
+    expect(botones.r.estado().indice).toBe(0);
+    botones.r.destruir();
+    const desliza = montado({ avance: 'deslizar-y-botones' });
+    deslizar(desliza.c, -120);
+    expect(desliza.r.estado().indice).toBe(1);
+    desliza.r.destruir();
+    const desplaza = montado({ avance: 'desplazar' });
+    expect(desplaza.s.querySelector('.ap-pie')!.textContent).toMatch(/↑ Volver.*Continuar ↓/);
+    desplaza.s.querySelector('.ap-pie')!.querySelector<HTMLElement>('.ap-primario')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(desplaza.r.estado().indice).toBe(1);
+  });
+
+  it('menú: temario, mapa, temas o ninguno', () => {
+    const visto: Record<string, unknown> = {};
+    for (const menu of ['temario', 'mapa', 'temas', 'ninguno']) {
+      const { c, s, r } = montado({ menu });
+      visto[menu] = { temario: Boolean(boton(c, /Temario/)), mapa: s.querySelector('.ap-mapa-titulo')?.textContent ?? null, enMapa: r.estado().enMapa };
+      r.destruir();
+    }
+    expect(visto).toEqual({
+      temario: { temario: true, mapa: null, enMapa: false },
+      mapa: { temario: false, mapa: 'Tu ruta de misiones', enMapa: true },
+      temas: { temario: false, mapa: 'Elige un tema', enMapa: true },
+      ninguno: { temario: false, mapa: null, enMapa: false },
+    });
+  });
+
+  it('marcador: los puntos van en un marcador flotante en lugar de la barra', () => {
+    const con_ = montado({ marcador: true });
+    expect(con_.s.querySelector('.ap-hud .ap-puntos')?.textContent).toBe('★ 0 puntos');
+    expect(con_.s.querySelector('.ap-barra .ap-puntos')).toBeNull();
+    con_.r.destruir();
+    const sin = montado({ marcador: false });
+    expect(sin.s.querySelector('.ap-hud')).toBeNull();
+    expect(sin.s.querySelector('.ap-barra .ap-puntos')).not.toBeNull();
+  });
+
+  it('barra: Anterior y Siguiente arriba, abajo, flotantes o como zonas, y siempre avanzan con su nombre', () => {
+    const donde: Record<string, string> = {};
+    const conPie: Record<string, boolean> = {};
+    const indice: Record<string, number> = {};
+    for (const barra of ['arriba', 'abajo', 'flotante', 'ninguna']) {
+      const { c, s, r } = montado({ barra });
+      const sig = boton(c, 'Siguiente')!;
+      donde[barra] = sig.closest('.ap-barra') ? 'cabecera' : sig.closest('.ap-pie') ? 'pie' : sig.className;
+      conPie[barra] = Boolean(s.querySelector('.ap-pie'));
+      sig.click();
+      indice[barra] = r.estado().indice;
+      r.destruir();
+    }
+    expect(donde).toEqual({ arriba: 'cabecera', abajo: 'pie', flotante: 'ap-fab ap-fab-der', ninguna: 'ap-zona ap-zona-der' });
+    expect(conPie).toEqual({ arriba: false, abajo: true, flotante: false, ninguna: false });
+    expect(indice).toEqual({ arriba: 1, abajo: 1, flotante: 1, ninguna: 1 });
+    // Sin cabecera (base Inmersivo), «arriba» los pone en el marcador.
+    const { c, r } = montado({ base: 'inmersivo', barra: 'arriba' });
+    expect(boton(c, 'Siguiente')!.closest('.ap-hud')).not.toBeNull();
+    r.destruir();
+  });
+
+  it('CP-088 · «tablero de misiones de seguridad»: mapa con 3 estaciones, progreso con puntos y marcador; la regla sigue mandando', () => {
+    const c = contenedorNuevo();
+    const r = montar(c, personalizado({ nombre: 'Tablero de misiones de seguridad', base: 'mapa', progreso: 'puntos', menu: 'mapa', marcador: true }, 'condiciones'));
+    expect(r.estado()).toMatchObject({ patron: 'personalizado', patronAplicado: 'mapa', enMapa: true });
+    expect(c.shadowRoot!.querySelectorAll('.ap-estacion')).toHaveLength(3);
+    expect(boton(c, /^Misión 2:/)!.disabled).toBe(true);
+    // El marcador de puntos flotante se ve también en el mapa.
+    expect((c.shadowRoot!.querySelector('.ap-hud') as HTMLElement).hidden).toBe(false);
+    boton(c, /^Misión 1:/)!.click();
+    expect(c.shadowRoot!.querySelectorAll('.ap-segmentos-puntos i')).toHaveLength(30);
+    expect(c.shadowRoot!.querySelector('.ap-hud .ap-puntos')).not.toBeNull();
+    for (let i = r.estado().indice; i < p07; i++) r.siguiente();
+    expect(r.siguiente()).toBe(false);
+    expect(motivo(c)).toBe('Completa la actividad para continuar');
   });
 });

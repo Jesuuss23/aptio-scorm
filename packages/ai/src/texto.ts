@@ -157,7 +157,7 @@ export async function ejecutarTarea<T = unknown>(
   proveedor: ProveedorTexto,
   tarea: string,
   variables: Record<string, unknown>,
-  opciones: { version?: string; validarExtra?: (datos: unknown) => string[] } = {},
+  opciones: { version?: string; validarExtra?: (datos: unknown) => string[]; preparar?: (datos: unknown) => unknown } = {},
 ): Promise<ResultadoTarea<T>> {
   const prompt = armarPrompt(tarea, variables, opciones.version);
   const modeloPedido = proveedor.modeloPara(prompt.variableModelo);
@@ -174,6 +174,8 @@ export async function ejecutarTarea<T = unknown>(
     consumo = sumar(consumo, r.consumo);
     costoUsd = Math.round((costoUsd + costoTexto(r.modelo, r.consumo)) * 10_000) / 10_000;
     const leido = leerJson(r.texto);
+    // HU-1104 · Un ajuste mecánico antes de validar (p. ej., recortar un nombre largo): lo que se valida es lo que se guarda.
+    if (!leido.error && opciones.preparar) leido.datos = opciones.preparar(leido.datos);
     errores = leido.error ? [leido.error] : revisar(tarea, leido.datos, opciones.validarExtra);
     const registro = { proveedor: proveedor.nombre, modelo, versionPrompt: `${tarea}.${prompt.version}`, intentos: intento, consumo, costoUsd, duracionMs: Date.now() - inicio };
     if (!errores.length) return { datos: leido.datos as T, ...registro };
@@ -288,6 +290,9 @@ function traduccionSimulada(grabada: unknown, usuario: string, sistema: string):
  * Responde con las salidas grabadas del caso LOTO (modo simulado). `guion` permite a las pruebas forzar respuestas
  * (por ejemplo, una salida inválida) antes de la grabada.
  */
+/** HU-1104 · La salida grabada de IA-14 al crear un patrón («tablero de misiones de seguridad»). */
+export const PATRON_CREADO = 'X-IA-14-patron-tablero.json';
+
 export function proveedorSimulado(guion: Partial<Record<string, string[]>> = {}): ProveedorTexto & { llamadas: { tarea: string; mensajes: MensajeProveedor[] }[] } {
   const llamadas: { tarea: string; mensajes: MensajeProveedor[] }[] = [];
   return {
@@ -297,8 +302,9 @@ export function proveedorSimulado(guion: Partial<Record<string, string[]>> = {})
     async completar({ tarea, mensajes, sistema }) {
       llamadas.push({ tarea, mensajes: mensajes.map((m) => ({ ...m })) });
       const forzada = guion[tarea]?.shift();
-      const grabada = forzada ? undefined : leerSalidaSimulada(tarea).datos;
       const pedido = mensajes[0]?.texto ?? '';
+      // IA-14 (HU-1104): «crear» responde el patrón personalizado grabado; «recomendar», la recomendación de LOTO.
+      const grabada = forzada ? undefined : tarea === 'IA-14' && /Tipo de pedido: tipo = "crear"/.test(pedido) ? leerSalidaSimulada(tarea, PATRON_CREADO).datos : leerSalidaSimulada(tarea).datos;
       const texto = forzada ?? JSON.stringify(tarea === 'IA-10' ? traduccionSimulada(grabada, pedido, sistema) : ajustarAlPedido(grabada, pedido));
       return { texto, modelo: 'simulado-loto', consumo: SIN_CONSUMO };
     },

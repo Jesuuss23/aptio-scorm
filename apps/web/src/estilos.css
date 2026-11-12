@@ -1999,3 +1999,23 @@ ul.fila-chips {
 .navegacion .deshabilitado { color: var(--color-texto-sec); }
 /* Sobre el fondo cobalto suave el texto secundario no llega a 4,5:1; se usa el texto principal. */
 .patron-tarjeta[aria-pressed='true'] small:not(.patron-uso), .opcion-tarjeta.activa small { color: var(--color-texto); }
+
+/* HU-1104 · Patrón con IA (PNT-17): Recomendar, Crear con IA y la franja de la propuesta con la miniatura de su base. */
+.patron-encabezado { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.patron-crear { display: flex; flex-wrap: wrap; gap: 8px; }
+.patron-crear input {
+  flex: 1 1 240px; min-width: 0; font-size: var(--texto-base); color: var(--color-texto); background: var(--color-superficie);
+  border: 1px solid var(--color-borde); border-radius: var(--radio-control); padding: 9px 11px;
+}
+.patron-crear input:focus { border-color: var(--color-cobalto); }
+.patron-tarjeta b .chip { margin-left: 6px; vertical-align: middle; }
+.patron-miniatura-ia {
+  position: absolute; left: 4px; bottom: 4px; padding: 0 5px; border-radius: 6px;
+  background: var(--color-superficie); color: var(--color-naranja-texto); font-size: var(--texto-xs); font-weight: 700; line-height: 16px;
+}
+.franja-patron-miniatura { flex: 0 0 130px; }
+.patron-alternativa {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--color-naranja-borde);
+}
+.franja-ia-texto .patron-alternativa b { color: var(--color-texto); font-size: var(--texto-sm); }
+.patron-alternativa a { align-self: flex-start; color: var(--color-cobalto); font-weight: 700; }

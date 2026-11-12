@@ -66,6 +66,8 @@ export interface OpcionesSimulacion {
   cursoTraducido?: boolean;
   /** HU-0804 · Con `cursoTraducido`, pantallas cuya narración se deja sin inglés. */
   sinIngles?: string[];
+  /** HU-1104 · La navegación vigente del curso (p. ej. tras aplicar un patrón propuesto en una simulación propia). */
+  navegacionCurso?: () => Record<string, unknown>;
 }
 
 /** HU-0604 · Los retoques de p05 con `retoquesP05`. */
@@ -250,7 +252,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, cursoTraducido, sinIngles = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, cursoTraducido, sinIngles = [], navegacionCurso }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -558,7 +560,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const urlsRecursos = Object.fromEntries((revision.documento.recursos as { id: string; tipo: string; nombre: string }[])
         .filter((r) => r.tipo === 'audio').map((r) => [r.id, `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
       return responder(200, {
-        id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version, documento: revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z',
+        id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version,
+        documento: navegacionCurso ? { ...revision.documento, navegacion: navegacionCurso() } : revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z',
         urlsRecursos, svgPersonajes: { 'svg-ana': ANA_SVG }, subtitulos: subtitulosDe(revision.documento),
       });
     }

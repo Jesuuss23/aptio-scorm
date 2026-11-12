@@ -101,18 +101,21 @@ export function VistaPrevia({ proyectoId, alCargar, prueba }: { proyectoId: stri
   const patron = probando ?? guardado;
   const modo = modoProbado ?? (esModo(documento.navegacion?.modo) ? documento.navegacion!.modo as keyof typeof NOMBRE_MODO : 'condiciones');
   const navegacion = `/proyectos/${proyectoId}/navegacion`;
+  // HU-1104 · El personalizado se nombra con su nombre propio (p. ej. el creado con IA).
+  const propio = documento.navegacion?.patronPersonalizado?.nombre;
+  const nombreDe = (x: keyof typeof NOMBRE_PATRON) => (x === 'personalizado' && typeof propio === 'string' ? propio : NOMBRE_PATRON[x]);
   const pantallas = documento.modulos.flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
 
   return (
     <>
       <Cabecera
         titulo="Vista previa"
-        subtitulo={`Así se verá en el LMS con el patrón «${NOMBRE_PATRON[patron]}» y la regla «${NOMBRE_MODO[modo]}».`}
+        subtitulo={`Así se verá en el LMS con el patrón «${nombreDe(patron)}» y la regla «${NOMBRE_MODO[modo]}».`}
         accion={volver}
       />
       {probando || modoProbado ? (
         <p className="nota">
-          Probando sin guardar. El curso usa el patrón «{NOMBRE_PATRON[guardado]}».{' '}
+          Probando sin guardar. El curso usa el patrón «{nombreDe(guardado)}».{' '}
           <a href={navegacion} onClick={(e) => { e.preventDefault(); navegar(navegacion); }}>Volver a Navegación</a>
         </p>
       ) : null}

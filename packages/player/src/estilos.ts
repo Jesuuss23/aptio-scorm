@@ -241,8 +241,14 @@ button:disabled{cursor:not-allowed}
 .ap-segmentos i.ap-visto{background:var(--ap-acento)}
 .ap-zona{position:absolute;top:0;bottom:0;z-index:3;width:44px;display:flex;align-items:center;justify-content:center;border:0;background:linear-gradient(to var(--ap-lado,right),rgba(16,32,51,.18),transparent);color:var(--ap-blanco);font-size:30px;font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 /* Las zonas, el motivo, el marcador y los botones flotantes nunca tapan el contenido ni el foco (WCAG 2.4.11). */
-.ap-r:not(.ap-sin-marco)[data-patron="historias"] .ap-escena{padding:0 44px 52px;scroll-padding:0 44px 52px}
-.ap-r:not(.ap-sin-marco)[data-patron="inmersivo"] .ap-escena{padding:64px 0 76px;scroll-padding:64px 0 76px}
+.ap-r:not(.ap-sin-marco)[data-barra="ninguna"] .ap-escena{padding-inline:44px;scroll-padding-inline:44px}
+.ap-r:not(.ap-sin-marco):not([data-barra="abajo"]) .ap-escena{padding-bottom:52px;scroll-padding-bottom:52px}
+.ap-r:not(.ap-sin-marco)[data-barra="flotante"] .ap-escena{padding-bottom:76px;scroll-padding-bottom:76px}
+.ap-r:not(.ap-sin-marco)[data-marcador="true"] .ap-escena{padding-top:64px;scroll-padding-top:64px}
+.ap-segmentos-puntos{gap:4px;justify-content:center}
+.ap-segmentos-puntos i{flex:0 0 8px;height:8px;border-radius:50%}
+.ap-barra .ap-nav{min-height:40px;padding:4px 10px}
+.ap-nav[hidden]{display:none}
 .ap-zona-izq{left:0;--ap-lado:right}
 .ap-zona-der{right:0;--ap-lado:left}
 .ap-zona:disabled{opacity:.25}
