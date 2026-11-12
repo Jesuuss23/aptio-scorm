@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.38 · actualizado con la tercera entrega del Sprint 8 (12 de noviembre de 2026)**
+**Versión 0.39 · actualizado con la cuarta entrega del Sprint 8 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -531,7 +531,16 @@ En el Mapa y en el Menú, cada parte del curso empieza en una pantalla de **secc
 
 **Probar y guardar.** **▶ Probar este patrón** abre la Vista previa con el patrón y la regla elegidos, sin guardar. **Guardar navegación** crea una versión nueva del curso. Marca **Usar como preferido del cliente** para guardarlo en su kit: su tarjeta mostrará «Preferido del cliente» en los próximos cursos. Si el cliente aún no tiene kit, primero créalo.
 
-Administración y Diseño instruccional cambian la navegación; Diseño gráfico y Producción la ven y pueden probarla; el revisor del cliente no la ve.
+**Patrón con IA.** **✦ Recomendar** pide a la IA el patrón que mejor va con el curso (su duración, público, celular, actividades, gamificación y estaciones del mapa). Para crear uno propio, escribe en **Describe un patrón** cómo lo quieres, por ejemplo «tablero de misiones de seguridad», y pulsa **✦ Crear con IA**. En unos segundos aparece la franja **✦ Propuesta de la IA** con el motivo y el dibujo del patrón (marcado con ✦ y, si suma puntos, con el marcador):
+
+- **Aplicar** cambia solo el patrón y crea una versión nueva del curso; las reglas y los elementos visibles quedan como estaban.
+- **Descartar** la quita sin tocar el curso.
+- Al recomendar, la franja también trae una **alternativa** con su motivo; **Probar alternativa** la muestra en la Vista previa sin guardar.
+- Si alguien cambió el curso mientras tanto, la propuesta vence: pulsa **Recalcular propuesta**.
+
+Un patrón creado aparece como una tarjeta más con su nombre y la insignia **✦ IA**; elígelo y pulsa **▶ Probar este patrón** para recorrerlo. Por ejemplo, el «Tablero de misiones de seguridad» muestra el mapa con las 3 estaciones de LOTO, el avance con puntos y un marcador de puntos flotante.
+
+Administración y Diseño instruccional cambian la navegación y usan la IA; Diseño gráfico y Producción la ven y pueden probarla; el revisor del cliente no la ve.
 
 ## 9. Preguntas frecuentes
 
@@ -609,6 +618,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.36 | 2026-11-12 | Alineación pedagógica: matriz por objetivo con niveles de Bloom, alertas, cambiar niveles y el aviso en Entrega (8.17). |
 | 0.37 | 2026-11-12 | Alineación pedagógica: «✦ Proponer correcciones», aplicar o descartar la propuesta de la IA y «pantallas por revisar» (8.17). |
 | 0.38 | 2026-11-12 | Navegación: los 7 patrones, reglas, elementos visibles, «▶ Probar este patrón» y preferido del cliente (8.18); la vista previa usa el patrón del curso (8.6). |
+| 0.39 | 2026-11-12 | Navegación: «✦ Recomendar», «✦ Crear con IA» con una descripción, la franja de la propuesta con Aplicar, Descartar y «Probar alternativa», y el patrón personalizado con su nombre (8.18). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
