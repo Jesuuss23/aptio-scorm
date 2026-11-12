@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.30 · actualizado con la octava entrega del Sprint 6 (12 de noviembre de 2026)**
+**Versión 0.31 · actualizado con la primera entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -139,6 +139,14 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - La validación es pura y no lanza con un documento roto: devuelve los errores de esquema y lo que se pueda calcular. Solo `errores` impide exportar; el peso nunca (RN-12-2). Los textos de las alternativas están en `ALTERNATIVAS_PESO` y siguen a `docs/08-entregas-y-lms.md`.
 - Créditos (HU-1406): `armarCreditos(recursos, organizacion, idioma)` de `src/creditos.ts` arma `{ aviso, filas }` o `null`; `construirScorm12` y `construirHtml` lo reciben como `creditos`. `esDeIa` deja fuera el proveedor `aptio` (`PROVEEDOR_APTIO`). Un proveedor nuevo suma su nombre comercial en `NOMBRE_PROVEEDOR`.
 - La API (`ExportacionesService.validar`) pide las filas de `Recurso` solo para ids con forma de UUID: los ids de ejemplo del caso LOTO no son filas y salen como faltantes.
+
+### 6.5.2 Idiomas y traducción (M08)
+
+- `@aptio/schema/traduccion` es la base: `textosDe(doc)` recorre los textos `{ es, en }` (un objeto con solo esas claves y `es` no vacío) con su ruta JSON Pointer y su pantalla; `aplicarTraducciones(doc, { ruta: en })` devuelve una copia; `huellaTexto` es la huella del español; `sincronizarFilas` dice qué filas crear, reiniciar y borrar; `erroresGlosario` y `erroresLote` validan la salida de IA-10. Las usan la API y el worker: no repitas esa lógica.
+- IA-10 v2 (`packages/ai/prompts/IA-10.v2.md`): los textos van como JSON neutralizado (`neutralizar`) en `<material_cliente>` y el glosario en el bloque común. `erroresLote` va como `validarExtra`, así el reintento lleva los errores del glosario. El modo simulado (`traduccionSimulada` en `packages/ai/src/texto.ts`) lee el glosario del sistema y responde la traducción grabada si lo respeta, o «[EN] » más el español.
+- Worker (`apps/worker/src/traducir.ts`): el despacho exige `tarea: 'IA-10'` y `traduccion: { cursoId }` en los datos del trabajo. `guardarLote` aplica solo lo que sigue Pendiente y con la misma huella, con reintento si la versión del curso cambió. Si cambias el tamaño del lote, cambia `LOTE_TRADUCCION`.
+- API (`apps/api/src/traducciones/`): listar sincroniza en una transacción; editar pasa por `CursosService.guardar` (ahora exportado por `CursosModule`).
+- Web: `IdiomasVista.tsx` (PNT-11) sigue el patrón de Entrega para el avance (SSE `trabajo` más consulta de `/trabajos/{id}` cada 2 s).
 
 ### 6.6 Cambios al documento del curso (M05)
 
@@ -368,6 +376,7 @@ Ninguna clave real va al repositorio.
 | 0.28 | 2026-11-12 | HU-1203: `construirHtml`, `armarContenido`/`comprimir`, `validarExportacion` y `modo: 'html'` del reproductor; prueba CP-093 en `file://` sin red (`e2e/html.spec.ts`). |
 | 0.29 | 2026-11-12 | HU-1401: `contraste.ts` y variables legibles, `enfocar`/`inicioDe` en las interacciones, quitar el límite del quiz; pruebas con happy-dom y `accesibilidad.spec.ts` con axe. |
 | 0.30 | 2026-11-12 | HU-1406: `conProcedencia` y procedencia `aptio`, `armarCreditos` en el exportador, diálogo `abrirCreditos` en el reproductor, procedencia en la API y «Créditos y licencias» en Entrega. |
+| 0.31 | 2026-11-12 | HU-0802: `@aptio/schema/traduccion`, IA-10 v2 con modo simulado, worker `traducir.ts` por lotes, API de traducciones y vista Idiomas. |
 | 0.15 | 2026-11-10 | Retoques (HU-0602): `ajustes.ts` del reproductor, `ajustes-elemento.ts`, `propiedades.tsx` y `ajustes` en `CursosService.editar`. |
 | 0.14 | 2026-11-10 | Editor (HU-0601): `EditorVista`, `edicion-texto.ts` y Vitest en `apps/web`. |
 | 0.13 | 2026-11-10 | Propuestas de la IA: `aplicarPatch`, `@aptio/schema/propuesta`, worker IA-16 v2, `PropuestasService` y restaurar versión. |

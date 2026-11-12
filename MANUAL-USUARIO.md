@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.30 · actualizado con la octava entrega del Sprint 6 (12 de noviembre de 2026)**
+**Versión 0.31 · actualizado con la primera entrega del Sprint 7 (12 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -424,6 +424,20 @@ Los subtítulos y el paquete los arma la propia plataforma sin IA: se registran 
 
 **En la cápsula.** Si el curso tiene algo generado con IA, la barra superior suma el botón **Créditos**. Abre un cuadro con la frase de revisión y la tabla Qué, Proveedor, Modelo y Licencia. Se usa con teclado y lector de pantalla: **Escape** o **Cerrar** lo cierran y el foco vuelve al botón.
 
+### 8.14 Idiomas: traducir al inglés con el glosario del cliente
+
+En el detalle del proyecto, **Idiomas** muestra cada texto del curso con su inglés, agrupado por pantalla. Cada texto tiene un estado:
+
+- **Pendiente:** aún no tiene inglés, o su español cambió después de traducirlo (en ese caso verás el inglés anterior y el aviso «El español cambió»).
+- **Traducido por IA:** la IA lo tradujo y falta que una persona lo revise.
+- **Revisado:** una persona lo confirmó o lo escribió.
+
+**Traducir.** **✦ Traducir pendientes** manda a la IA solo los textos Pendientes, por lotes, con el glosario del cliente (lo ves a la derecha). Una barra muestra el avance («Lote 2 de 5 traducido») y la tabla se actualiza al terminar cada lote. Los textos Revisados nunca se mandan ni cambian. Si la IA no respeta el glosario (por ejemplo, traduce «LOTO» cuando está marcado «no traducir»), se le vuelve a pedir; si tras 3 intentos no lo cumple, el trabajo termina con error y ese lote no se guarda.
+
+**Revisar.** Escribe en la celda de inglés y sal de ella (o pulsa Enter): el texto queda **Revisado**. Si el inglés de la IA está bien, pulsa **Marcar revisado**. **Por revisar** oculta lo ya revisado. Cada cambio crea una versión del curso.
+
+El revisor del cliente ve el inglés y los estados, pero no traduce ni edita. La voz, la boca y los subtítulos en inglés, y el paquete con los dos idiomas, llegan en las próximas entregas.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -466,7 +480,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Otros recorridos de la cápsula (historias, mapa de misiones, menú de temas y más).
 - Subtítulos en inglés y elegir el idioma de los subtítulos.
 - Voz en inglés y voces de otros proveedores.
-- Versión en inglés.
+- Textos que no caben en su espacio en inglés, voz en inglés y paquete con los dos idiomas.
 - Control de calidad y otros formatos de entrega (SCORM 2004).
 - Otra ilustración desde la revisión y comentarios del cliente.
 
@@ -491,6 +505,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.28 | 2026-11-12 | Entrega: formato HTML autocontenido para presentar sin LMS ni internet (8.11). |
 | 0.29 | 2026-11-12 | Accesibilidad de la cápsula: uso con teclado, anuncios para lector de pantalla y quitar el límite de tiempo del reto (8.12). |
 | 0.30 | 2026-11-12 | Créditos y licencias en Entrega y botón «Créditos» en la cápsula (8.13). |
+| 0.31 | 2026-11-12 | Idiomas: traducir al inglés con el glosario del cliente y revisar cada texto (8.14). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
