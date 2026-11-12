@@ -34,6 +34,11 @@ export class PantallaCambioDto {
   })
   @IsOptional() @IsArray() extras?: Record<string, unknown>[];
   @ApiPropertyOptional({
+    type: 'array', items: { $ref: '#/components/schemas/Disparador' },
+    description: 'HU-0610 · Disparadores simples: la lista completa de la pantalla, como los extras (lista vacía los quita). Como mucho 10; `segundo` de 0 a 600, obligatorio con «tiempo»; el elemento debe estar en la pantalla y la pantalla de «ir-a» en el curso. 422 DISPARADOR_NO_VALIDO si no. Quitar un extra borra sus disparadores.',
+  })
+  @IsOptional() @IsArray() disparadores?: Record<string, unknown>[];
+  @ApiPropertyOptional({
     enum: ['deshacer', 'rehacer'],
     description: 'HU-0607 · Rótulo de la versión cuando el cambio viene de deshacer o rehacer en el editor (SUP-46). Sin él, la versión dice «edición».',
   })

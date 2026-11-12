@@ -2019,3 +2019,25 @@ ul.fila-chips {
 }
 .franja-ia-texto .patron-alternativa b { color: var(--color-texto); font-size: var(--texto-sm); }
 .patron-alternativa a { align-self: flex-start; color: var(--color-cobalto); font-weight: 700; }
+
+/* HU-0610 · Disparadores simples: «Avanzado: disparadores» en las propiedades de la pantalla y ◆ en la regla. */
+.disparadores { border-top: 1px solid var(--color-borde); padding-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.disparadores summary { cursor: pointer; font-weight: 700; font-size: var(--texto-base); }
+.disparadores[open] { gap: 10px; }
+.disparadores-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.disparador {
+  margin: 0; padding: 10px; border: 1px solid var(--color-borde); border-radius: var(--radio-control);
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; align-items: end;
+}
+.disparador legend { font-size: var(--texto-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--color-texto-sec); padding: 0 4px; }
+.disparador label { display: flex; flex-direction: column; gap: 3px; font-size: var(--texto-sm); color: var(--color-texto-sec); min-width: 0; }
+.disparador select, .disparador input {
+  font: inherit; font-size: var(--texto-base); color: var(--color-texto); background: var(--color-superficie);
+  border: 1px solid var(--color-borde); border-radius: var(--radio-control); padding: 7px 8px; min-width: 0; width: 100%;
+}
+.disparador input[aria-invalid='true'] { border-color: var(--color-error); }
+.disparador .nota { grid-column: 1 / -1; margin: 0; }
+.lt-disparo {
+  position: absolute; top: 1px; z-index: 2; transform: translateX(-50%); color: var(--color-naranja-texto);
+  font-size: var(--texto-sm); line-height: 1; cursor: default;
+}

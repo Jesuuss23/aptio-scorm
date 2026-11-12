@@ -31,14 +31,18 @@ export function tiemposDe(p: Pick<Pantalla, 'bloques' | 'ajustes' | 'extras'>): 
 /** Si el elemento se ve en el segundo `s`. */
 export const activoEn = (x: Pick<TiempoElemento, 'inicioS' | 'finS'>, s: number) => s >= x.inicioS && (x.finS === null || s < x.finS);
 
-/** Duración de la pantalla: la mayor entre la voz + 1 s y la salida (o la entrada + 1 s) del último elemento (RN-06-7). */
-export function duracionDe(p: Pick<Pantalla, 'bloques' | 'ajustes' | 'extras' | 'narracion'>, idioma: Idioma): number {
+/**
+ * Duración de la pantalla: la mayor entre la voz + 1 s y la salida (o la entrada + 1 s) del último elemento (RN-06-7).
+ * HU-0610 · También llega hasta 1 s después del último disparador por tiempo, para que ▶ Reproducir lo alcance.
+ */
+export function duracionDe(p: Pick<Pantalla, 'bloques' | 'ajustes' | 'extras' | 'narracion' | 'disparadores'>, idioma: Idioma): number {
   const voz = p.narracion?.porIdioma?.[idioma]?.duracionMs;
   let fin = voz && voz > 0 ? voz / 1000 + 1 : DURACION_MINIMA_S;
   for (const x of tiemposDe(p)) {
     if (x.finS !== null) fin = Math.max(fin, x.finS);
     if (x.definido) fin = Math.max(fin, x.inicioS + 1);
   }
+  for (const d of p.disparadores ?? []) if (d.cuando.evento === 'tiempo' && typeof d.cuando.segundo === 'number') fin = Math.max(fin, d.cuando.segundo + 1);
   return Math.round(fin * 100) / 100;
 }
 

@@ -3,7 +3,7 @@
 // HU-0606 · Ocultar o mostrar cualquier elemento; eliminar, la imagen y lo que hace el botón, solo en los extras.
 import type { AjusteElemento, ElementoExtra, RolColor } from '@aptio/player';
 import type { MarcaPalabra } from '@aptio/schema/tiempos';
-import { type KeyboardEvent, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useState } from 'react';
 import type { CambioTiempo } from './linea-tiempo';
 import { ALINEACIONES, ANIMACIONES, type Animacion, COLORES_KIT, controlesDe, ESCALA, TAMANO } from './ajustes-elemento';
 
@@ -84,13 +84,15 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
 /** HU-0608 · El tiempo del elemento elegido en la línea de tiempo y las palabras de la narración. */
 export type TiempoElegido = { inicioS: number; finS: number | null; anclaPalabra?: number | undefined; palabras: MarcaPalabra[]; alCambiar: (c: CambioTiempo) => void };
 
-export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra, tiempo }: {
+export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra, tiempo, avanzado }: {
   elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; modo: 'auto' | 'libre'; acciones: AccionesRetoque;
   /** HU-0606 · Imágenes del curso para un extra «Imagen del kit» y cómo cambiar el extra elegido. */
   imagenes?: { id: string; nombre: string }[]; alCambiarExtra?: (cambio: CambioExtra) => void;
   /** HU-0605 · Nombre del diseño de la pantalla y cómo ir al panel Diseños. */
   diseno: string; alCambiarDiseno: () => void;
   tiempo?: TiempoElegido | null;
+  /** HU-0610 · «Avanzado: disparadores», en las propiedades de la pantalla (sin elemento elegido). */
+  avanzado?: ReactNode;
 }) {
   if (!elegido) {
     return (
@@ -104,6 +106,7 @@ export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, dis
           </div>
         </div>
         <p className="sec">Elige un elemento en el lienzo para cambiarlo: un clic, o Tab hasta él y Espacio.</p>
+        {avanzado}
       </aside>
     );
   }

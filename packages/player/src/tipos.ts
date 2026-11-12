@@ -41,6 +41,15 @@ export interface Pantalla {
   ajustes?: Record<string, AjusteElemento>;
   /** HU-0606 · Elementos agregados en el editor, sobre la pantalla (RN-06-1). */
   extras?: ElementoExtra[];
+  /** HU-0610 · Disparadores simples: cuando llega un segundo o termina la voz, mostrar, ocultar o ir a otra pantalla. */
+  disparadores?: Disparador[];
+}
+
+/** HU-0610 · Un disparador simple (curso-v0 `disparador`). */
+export interface Disparador {
+  id: string;
+  cuando: { evento: 'tiempo' | 'fin-voz'; segundo?: number };
+  accion: { tipo: 'mostrar' | 'ocultar' | 'ir-a'; elementoId?: string; pantallaId?: string };
 }
 
 /** Elemento agregado en el editor (curso-v0 `elementoExtra`): posición y ancho en % de la pantalla. */

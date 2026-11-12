@@ -8,6 +8,7 @@ import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { cursoConPropuesta, huellaPantalla, patchDe } from '@aptio/schema/propuesta';
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
 import { conservarRetoques } from '@aptio/schema/retoques';
+import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
 
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -643,7 +644,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     const editar = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/pantallas/(p\\d+)$`));
     if (editar && req.method() === 'PATCH') {
-      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[] };
+      const datos = req.postDataJSON() as { version: number; titulo?: { es: string }; textos?: Record<string, { es: string }>; narracion?: { es: string }; ajustes?: Record<string, unknown>; disposicion?: string; extras?: { id: string }[]; disparadores?: unknown[] };
       historial.set(revision.version, structuredClone(revision.documento));
       if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
       const p = pantallasSim().find((x) => x.id === editar[1])!;
@@ -676,6 +677,15 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         if (pa.ajustes && !Object.keys(pa.ajustes).length) delete pa.ajustes;
         if (datos.extras.length) pe.extras = datos.extras;
         else delete pe.extras;
+        purgarDisparadores(p as unknown as Parameters<typeof purgarDisparadores>[0]);
+      }
+      // HU-0610: los disparadores llegan como lista completa, con las reglas de la API.
+      if (datos.disparadores !== undefined) {
+        const pd = p as unknown as Parameters<typeof erroresDisparadores>[0];
+        if (datos.disparadores.length) pd.disparadores = datos.disparadores;
+        else delete pd.disparadores;
+        const errores = erroresDisparadores(pd, pantallasSim().map((x) => x.id));
+        if (errores.length) return responder(422, { codigo: 'DISPARADOR_NO_VALIDO', mensaje: 'Revisa los disparadores de la pantalla', detalles: errores.map((mensaje) => ({ mensaje })) });
       }
       for (const [id, ajuste] of Object.entries(datos.ajustes ?? {})) {
         if (!bloques.some((x) => x.id === id) && !(pe.extras ?? []).some((x) => x.id === id)) return responder(422, { codigo: 'BLOQUE_NO_EXISTE', mensaje: `La pantalla no tiene el elemento «${id}»` });

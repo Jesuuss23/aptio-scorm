@@ -1,14 +1,15 @@
 // HU-0607 · Deshacer y rehacer en el editor (SUP-46). Lógica pura, sin DOM ni red:
-// - `fotoDe` toma lo que el editor puede cambiar de una pantalla (título, textos, narración, disposición, ajustes y extras);
+// - `fotoDe` toma lo que el editor puede cambiar de una pantalla (título, textos, narración, disposición, ajustes, extras
+//   y disparadores, HU-0610);
 // - `conFoto` arma la pantalla como se ve en esa foto, para mostrarla al instante mientras se espera el guardado;
 // - `cambioHacia` calcula el cuerpo del PATCH que lleva la pantalla guardada a la foto elegida;
 // - la pila guarda hasta 60 fotos para deshacer; un cambio nuevo vacía la de rehacer.
-import type { AjusteElemento, ElementoExtra } from '@aptio/player';
+import type { AjusteElemento, Disparador, ElementoExtra } from '@aptio/player';
 import { plantillaPara, type Disposicion } from '@aptio/schema/marca';
 import type { PantallaDoc } from '@aptio/schema/revision';
 
 type Texto = { es?: string; en?: string };
-type PantallaEditable = PantallaDoc & { plantilla?: string; ajustes?: Record<string, AjusteElemento>; extras?: ElementoExtra[] };
+type PantallaEditable = PantallaDoc & { plantilla?: string; ajustes?: Record<string, AjusteElemento>; extras?: ElementoExtra[]; disparadores?: Disparador[] };
 
 /** Lo que el editor cambia de una pantalla. Es una copia: cambiar la pantalla después no la toca. */
 export type Foto = {
@@ -18,6 +19,7 @@ export type Foto = {
   disposicion?: string;
   ajustes: Record<string, AjusteElemento>;
   extras: ElementoExtra[];
+  disparadores: Disparador[];
 };
 
 /** El cuerpo del PATCH de pantalla, sin la versión. */
@@ -28,6 +30,7 @@ export type CambioHacia = {
   disposicion?: string;
   ajustes?: Record<string, AjusteElemento | null>;
   extras?: ElementoExtra[];
+  disparadores?: Disparador[];
 };
 
 const copia = <T>(v: T): T => structuredClone(v);
@@ -39,7 +42,7 @@ export function fotoDe(pantalla: PantallaDoc): Foto {
   const p = pantalla as PantallaEditable;
   const textos: Record<string, Texto> = {};
   for (const b of p.bloques) if (b.tipo === 'texto' && b.id !== idTitulo(p)) textos[b.id] = copia(b.contenido ?? {});
-  const foto: Foto = { titulo: copia(p.titulo), textos, ajustes: copia(p.ajustes ?? {}), extras: copia(p.extras ?? []) };
+  const foto: Foto = { titulo: copia(p.titulo), textos, ajustes: copia(p.ajustes ?? {}), extras: copia(p.extras ?? []), disparadores: copia(p.disparadores ?? []) };
   if (p.narracion) foto.narracion = copia(p.narracion.texto);
   if (p.disposicion !== undefined) foto.disposicion = p.disposicion;
   return foto;
@@ -63,6 +66,8 @@ export function conFoto(pantalla: PantallaDoc, foto: Foto): PantallaDoc {
   else delete p.ajustes;
   if (foto.extras.length) p.extras = copia(foto.extras);
   else delete p.extras;
+  if (foto.disparadores.length) p.disparadores = copia(foto.disparadores);
+  else delete p.disparadores;
   return p;
 }
 
@@ -84,6 +89,8 @@ export function cambioHacia(guardada: PantallaDoc, objetivo: Foto): CambioHacia 
   const otraDisposicion = objetivo.disposicion !== undefined && (antes.disposicion ?? 'idea') !== objetivo.disposicion;
   if (otraDisposicion) cambio.disposicion = objetivo.disposicion!;
   if (!igual(antes.extras, objetivo.extras)) cambio.extras = copia(objetivo.extras);
+  // HU-0610 · La API purga los disparadores de los extras quitados; aquí va la lista entera de la foto.
+  if (!igual(antes.disparadores, objetivo.disparadores)) cambio.disparadores = copia(objetivo.disparadores);
 
   const ajustes: Record<string, AjusteElemento | null> = {};
   if (otraDisposicion) {

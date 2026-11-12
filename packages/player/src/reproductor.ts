@@ -32,6 +32,7 @@ import { type EstadoSeguimiento, seguimiento } from './seguimiento.ts';
 import { ESTILOS } from './estilos.ts';
 import { estadoReanudado, type Reanudacion } from './reanudacion.ts';
 import { activoEn, duracionDe, tiemposDe, ultimoCambio } from './tiempos.ts';
+import { cumplidos, elementosConDisparador, ultimoSegundo, visibilidad } from './disparadores.ts';
 import { t, textos } from './textos.ts';
 import type { AudioNarracion, BloqueInteraccion, Creditos, CursoReproductor, Idioma, KitReproductor, ModoNavegacion, Pantalla, ResultadoActividad, RolColor } from './tipos.ts';
 
@@ -69,6 +70,11 @@ export interface OpcionesReproductor {
   marco?: boolean;
   /** HU-0606 · true en el editor: los botones agregados se eligen y se escriben, pero no navegan. */
   sinAcciones?: boolean;
+  /**
+   * HU-0610 · Editor: con ▶ Reproducir, un disparador «ir a otra pantalla» no navega; avisa a dónde saltaría y, si la
+   * regla lo bloquea, por qué.
+   */
+  alSalto?: (salto: { pantallaId: string; bloqueado: string | null }) => void;
   /** HU-0608 · true en el editor: se ve todo, sin reloj ni entrada escalonada, hasta que se mueve la aguja. */
   sinTiempos?: boolean;
   alCambiar?: (estado: EstadoReproductor) => void;
@@ -99,6 +105,8 @@ export interface EstadoReproductor extends EstadoSeguimiento {
   resultados: Record<string, ResultadoActividad>;
   /** HU-1202 · Pantallas vistas, en el orden del curso (el paquete las guarda en `suspend_data`). */
   vistas: string[];
+  /** HU-0610 · Disparadores de la pantalla actual que ya se cumplieron en esta visita, en orden. */
+  disparados: string[];
 }
 
 export interface Reproductor {
@@ -263,6 +271,9 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     if (p) escuchadas.add(p.id);
     callar();
     refrescar();
+    // HU-0610 · «Termina la voz» (fuera del editor: allí lo maneja ▶ Reproducir).
+    vozTerminada = true;
+    if (fijo === null && !enReproduccion && !opciones.sinTiempos && evaluarDisparadores(relojS(), true, false)) return;
   });
   const cargarNarracion = () => {
     callar();
@@ -483,12 +494,15 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     const p = pantallas[actual]?.pantalla;
     if (!vivo || opciones.sinTiempos || fijo !== null || !p) return;
     const tiempos = tiemposDe(p);
-    if (!tiempos.some((x) => x.definido)) return;
-    const hasta = ultimoCambio(tiempos);
+    const conDisparadores = Boolean(p.disparadores?.length) && !enMapa;
+    if (!tiempos.some((x) => x.definido) && !conDisparadores) return;
+    const hasta = Math.max(ultimoCambio(tiempos), conDisparadores ? ultimoSegundo(p.disparadores) : 0);
     const paso = () => {
       if (!vivo || fijo !== null) return;
       const s = relojS();
       aplicarTiempo(s, false);
+      // HU-0610 · Los disparadores van con el mismo reloj; si uno salta de pantalla, el reloj nuevo ya arrancó.
+      if (conDisparadores && evaluarDisparadores(s, vozTerminada, false)) return;
       if (s <= hasta || !audio.paused) latido = requestAnimationFrame(paso);
     };
     paso();
@@ -496,6 +510,9 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   const empezarReloj = () => {
     fijo = null;
     inicioReloj = performance.now();
+    // HU-0610 · Cada visita empieza de nuevo; sin audio en este idioma, «termina la voz» se cumple al entrar.
+    restablecerDisparadores();
+    vozTerminada = !urlAudio(actual);
     seguirReloj();
   };
   /** Editor: la aguja en `s`, con la boca de ese instante si no está sonando. */
@@ -503,6 +520,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     fijo = s;
     cancelAnimationFrame(latido);
     aplicarTiempo(s, true);
+    restablecerDisparadores();
     const svg = personaje();
     if (svg && audio.paused) mostrarBoca(svg, bocaEn(audioDe(actual)?.bocas ?? [], s * 1000));
     if (conSubtitulos) subtitulos.textContent = textoSubtitulos();
@@ -516,6 +534,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     const conAudio = Boolean(audio.getAttribute('src'));
     const voz = (audioDe(actual)?.duracionMs ?? 0) / 1000;
     const salida = performance.now() - desde * 1000;
+    restablecerDisparadores();
     if (conAudio && desde < voz) {
       audio.currentTime = desde;
       void audio.play().catch(() => undefined);
@@ -526,6 +545,8 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
       const terminado = s >= total;
       fijo = Math.min(s, total);
       aplicarTiempo(fijo, true);
+      // HU-0610 · En el editor los disparadores se ven en vivo; un «ir a» solo se avisa.
+      evaluarDisparadores(fijo, !conAudio || audio.ended || fijo >= voz, true);
       const svg = personaje();
       if (svg && (audio.paused || audio.ended)) mostrarBoca(svg, bocaEn(audioDe(actual)?.bocas ?? [], fijo * 1000));
       if (conSubtitulos) subtitulos.textContent = textoSubtitulos();
@@ -539,6 +560,60 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     paso();
   };
 
+  // ---------- Disparadores (HU-0610) ----------
+  /** Los disparadores cumplidos en esta visita a la pantalla, en el orden en que se cumplieron. */
+  let disparados: string[] = [];
+  /** true cuando terminó la voz de la pantalla en el idioma activo (o si no tiene audio). */
+  let vozTerminada = false;
+  /** El motivo por el que un «ir a» no saltó (RN-11-4); se borra al cambiar de pantalla. */
+  let avisoDisparo: string | null = null;
+  /** Pone cada elemento con disparador como manda el último cumplido; sin ninguno, como lo dejó el editor. */
+  const pintarDisparadores = (p: Pantalla) => {
+    const vista = visibilidad(p.disparadores, disparados);
+    for (const id of elementosConDisparador(p.disparadores)) {
+      const el = elementoDe(id);
+      if (!el) continue;
+      const v = vista.get(id);
+      el.classList.toggle('ap-oculto-el', v === undefined && p.ajustes?.[id]?.oculto === true);
+      if (v === 'mostrar') el.classList.remove('ap-fuera');
+      el.classList.toggle('ap-disparo-oculto', v === 'ocultar');
+    }
+  };
+  /** «Ir a otra pantalla»: respeta la regla (RN-11-4); si bloquea, no salta y dice por qué. En el editor solo avisa. */
+  const saltar = (pantallaId: string, editor: boolean): boolean => {
+    const destino = indiceDe(pantallaId);
+    if (destino < 0) return false;
+    const m = revision ? null : motivoBloqueo(pantallas, avance(), modo, destino);
+    if (editor) {
+      opciones.alSalto?.({ pantallaId, bloqueado: textoMotivo(m) });
+      return false;
+    }
+    if (m !== null) {
+      avisoDisparo = textoMotivo(m);
+      refrescar();
+      return false;
+    }
+    return irA(destino, true);
+  };
+  /** Cumple lo que toca en el segundo `s` y pinta. Devuelve true si saltó de pantalla. */
+  const evaluarDisparadores = (s: number, vozFin: boolean, editor: boolean): boolean => {
+    const p = pantallas[actual]?.pantalla;
+    if (!p?.disparadores?.length || enMapa) return false;
+    const nuevos = cumplidos(p.disparadores, new Set(disparados), s, vozFin);
+    disparados.push(...nuevos.map((d) => d.id));
+    pintarDisparadores(p);
+    for (const d of nuevos) if (d.accion.tipo === 'ir-a' && d.accion.pantallaId && saltar(d.accion.pantallaId, editor)) return true;
+    if (nuevos.length && !editor) refrescar();
+    return false;
+  };
+  /** Vuelve la pantalla actual a como estaba antes de los disparadores. */
+  const restablecerDisparadores = () => {
+    disparados = [];
+    avisoDisparo = null;
+    const p = pantallas[actual]?.pantalla;
+    if (p?.disparadores?.length) pintarDisparadores(p);
+  };
+
   // ---------- Estado y refresco ----------
   const estado = (): EstadoReproductor => {
     const m = motivoBloqueo(pantallas, avance(), modo, actual + 1);
@@ -550,6 +625,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
       patron: curso.navegacion?.patron ?? 'clasico', patronAplicado: patron, marco, enMapa, modo,
       resultados: Object.fromEntries(resultados),
       vistas: pantallas.filter((x) => vistas.has(x.pantalla.id)).map((x) => x.pantalla.id),
+      disparados: [...disparados],
     };
   };
 
@@ -572,7 +648,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     for (const x of enBarra) x.hidden = enMapa;
     if (enMapa) dibujarMapa();
     contador.textContent = tx.pantalla(actual + 1, pantallas.length);
-    motivo.textContent = enMapa ? '' : e.motivo ?? '';
+    motivo.textContent = enMapa ? '' : avisoDisparo ?? e.motivo ?? '';
     anterior.disabled = actual === 0;
     siguiente.disabled = !e.puedeSiguiente;
     siguiente.title = e.motivo ?? '';
@@ -766,6 +842,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
       audio.pause();
       fijo = null;
       for (const el of escena.querySelectorAll('.ap-fuera')) el.classList.remove('ap-fuera');
+      restablecerDisparadores();
       callar();
       refrescar();
       if (!opciones.sinTiempos) empezarReloj();

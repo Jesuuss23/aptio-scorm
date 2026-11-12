@@ -21,7 +21,7 @@
 // HU-0608 PR 2 · «✦ Sincronizar con la voz» (SUP-48) calcula la propuesta aquí, sin IA: se ve en la franja morada con
 // las barras donde quedarían; Aplicar la guarda en un solo PATCH y Ctrl+Z la deshace (CP-068). Las barras de los
 // elementos que perdieron su palabra al cambiar la narración muestran «⚠ revisar tiempo» (CP-067).
-import { type AjusteElemento, type CursoReproductor, duracionDe, leerVtt, montar, PALETA_BASE, type Pantalla, type Reproductor, type RolColor, tiemposDe } from '@aptio/player';
+import { type AjusteElemento, type CursoReproductor, type Disparador, duracionDe, leerVtt, montar, PALETA_BASE, type Pantalla, type Reproductor, type RolColor, tiemposDe } from '@aptio/player';
 import { elementoRevisarTiempo, marcasPalabra, ORIGEN_REVISAR_TIEMPO, sincronizarConVoz, type TiempoSincronizado } from '@aptio/schema/tiempos';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -38,6 +38,8 @@ import { LineaTiempo } from './LineaTiempo';
 import { type CambioTiempo, tramosBoca, tramosSubtitulos } from './linea-tiempo';
 import { PanelIzquierdo, type PestanaIzquierda } from './panel-izquierdo';
 import { PanelDisenos } from './disenos';
+import { PanelDisparadores } from './PanelDisparadores';
+import { marcasDisparo } from './disparadores-panel';
 import { nombreDiseno } from './disenos-pantalla';
 import { type AccionesRetoque, BarraElemento, PanelPropiedades } from './propiedades';
 import './fuentes-kit';
@@ -59,7 +61,7 @@ const ESTILOS_EDICION = `
 `;
 
 type PantallaConAjustes = PantallaDoc & { ajustes?: Record<string, AjusteElemento> };
-type CambioPantalla = CambioTexto | { ajustes: Record<string, AjusteElemento | null> } | { disposicion: string; ajustes?: Record<string, AjusteElemento | null> };
+type CambioPantalla = CambioTexto | { ajustes: Record<string, AjusteElemento | null> } | { disposicion: string; ajustes?: Record<string, AjusteElemento | null> } | { disparadores: Disparador[] };
 /** HU-0607 · Lo que se ve y falta guardar de una pantalla tras deshacer o rehacer. */
 type Pendiente = { foto: Foto; motivo: 'deshacer' | 'rehacer' };
 /** Espera tras la última pulsación de deshacer o rehacer antes de guardar (RN-06-5). */
@@ -360,6 +362,13 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       inicio: actual.id,
       sinAcciones: true,
       sinTiempos: true,
+      // HU-0610 · Con ▶ Reproducir, un «ir a otra pantalla» se avisa sin salir del editor.
+      alSalto: ({ pantallaId }) => {
+        const todas = pantallasDe(documento);
+        const i = todas.findIndex((p) => p.id === pantallaId);
+        const destino = todas[i];
+        setAviso(`◆ Aquí la cápsula iría a la pantalla ${i + 1}${destino ? ` «${destino.titulo.es ?? destino.titulo.en ?? ''}»` : ''}; en el editor no se cambia de pantalla.`);
+      },
       urlRecurso: (id) => cursoRef.current?.urlsRecursos?.[id],
       cargarSvg: async (id) => cursoRef.current?.svgPersonajes?.[id],
       cargarSubtitulos: async (id) => cursoRef.current?.subtitulos?.[id],
@@ -594,6 +603,10 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const conPersonaje = actual.bloques.some((b) => b.tipo === 'personaje') || extras.some((e) => e.tipo === 'personaje');
   const bocaLinea = conPersonaje && vozEs?.bocas?.length ? tramosBoca(vozEs.bocas, vozEs.duracionMs ?? 0) : null;
   const capas = capasDe(actual as PantallaConExtras);
+  // HU-0610 · Disparadores de la pantalla y lo que pueden elegir: sus elementos y las otras pantallas.
+  const disparadores = (actual as PantallaConExtras & { disparadores?: Disparador[] }).disparadores ?? [];
+  const opcionesElemento = capas.map((c) => ({ id: c.id, nombre: c.nombre, oculto: c.oculto }));
+  const opcionesPantalla = pantallas.flatMap((p, i) => (p.id === actual.id ? [] : [{ id: p.id, nombre: `${i + 1}. ${p.titulo.es ?? p.titulo.en ?? p.id}` }]));
   const tiempos = new Map(tiemposDe(actual as unknown as Pantalla).map((x) => [x.id, x]));
   const propuesta = sincro?.pantallaId === actual.id ? sincro : null;
   const barras = capas.map((c) => {
@@ -760,6 +773,8 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         </section>
         <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones}
           imagenes={imagenes} alCambiarExtra={cambiarExtra}
+          avanzado={<PanelDisparadores key={actual.id} pantalla={actual as PantallaConExtras} lista={disparadores} elementos={opcionesElemento} pantallas={opcionesPantalla} editan={editan}
+            alGuardar={(lista) => enviar(actual, { disparadores: lista }, lista.length ? 'Disparadores guardados.' : 'Disparadores quitados.')} />}
           tiempo={bloque && tiempos.get(bloque.id) ? {
             inicioS: tiempos.get(bloque.id)!.inicioS, finS: tiempos.get(bloque.id)!.finS, anclaPalabra: ajuste?.anclaPalabra, palabras: marcas,
             alCambiar: (c) => cambiarTiempo(bloque.id, c),
@@ -773,7 +788,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
           }} />
       </div>
       {conLinea ? (
-        <LineaTiempo key={actual.id} barras={barras} marcas={marcas} subtitulos={subtitulosLinea} boca={bocaLinea} vozS={(vozEs?.duracionMs ?? 0) / 1000}
+        <LineaTiempo key={actual.id} barras={barras} disparos={marcasDisparo(disparadores, opcionesElemento, opcionesPantalla)} marcas={marcas} subtitulos={subtitulosLinea} boca={bocaLinea} vozS={(vozEs?.duracionMs ?? 0) / 1000}
           duracion={duracion} tiempo={tiempo} reproduciendo={reproduciendo} elegidoId={elegidoId} ocupado={ocupado}
           alIr={irTiempo} alReproducir={reproducirTiempo} alPausar={pausarTiempo} alDetener={detenerTiempo} alCambiar={cambiarTiempo}
           alElegir={elegirCapa} alAlternarOculto={alternarOculto} alOcultar={() => { detenerTiempo(); setConLinea(false); }}
