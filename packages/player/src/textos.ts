@@ -62,6 +62,7 @@ const TEXTOS = {
     afirmacion: (i: number, n: number) => `Afirmación ${i} de ${n}`,
     imagenPendiente: 'Imagen pendiente',
     videoPendiente: 'Video del cliente',
+    videoNoCarga: 'El video no se pudo cargar; puedes continuar.',
     // HU-0901 · Preguntas en el video.
     preguntaEn: (tiempo: string) => `Pregunta en ${tiempo}`,
     saltar: 'Saltar',
@@ -140,6 +141,7 @@ const TEXTOS = {
     afirmacion: (i: number, n: number) => `Statement ${i} of ${n}`,
     imagenPendiente: 'Image pending',
     videoPendiente: 'Client video',
+    videoNoCarga: 'The video could not be loaded; you can continue.',
     preguntaEn: (tiempo: string) => `Question at ${tiempo}`,
     saltar: 'Skip',
     intentaDeNuevo: 'Try again.',

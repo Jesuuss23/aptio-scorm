@@ -126,5 +126,13 @@ export function videoInteractivo(b: BloqueVideo, ctx: ContextoVideo): HTMLElemen
   video.addEventListener('seeked', () => { if (!abierta) ultimoS = video.currentTime; });
   video.addEventListener('play', () => { if (abierta) video.pause(); });
   video.addEventListener('ended', () => { terminado = true; revisar(); });
+  // Si el archivo no carga (falta en el paquete o la red falla), se avisa y la pantalla no se bloquea por eso.
+  video.addEventListener('error', () => {
+    abierta = null;
+    vaciar(capa);
+    figura.classList.remove('ap-con-pregunta');
+    if (!figura.querySelector('.ap-video-aviso')) figura.append(h('p', { class: 'ap-video-aviso', role: 'status' }, ctx.tx.videoNoCarga));
+    if (!avisado) { avisado = true; ctx.terminar(); }
+  });
   return figura;
 }

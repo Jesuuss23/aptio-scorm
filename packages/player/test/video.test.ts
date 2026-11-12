@@ -139,4 +139,11 @@ describe('preguntas en el video (HU-0901)', () => {
     resultados.set('p18', { completada: true, puntaje: null, intentos: 1 });
     expect(motivoBloqueo(pantallas, { actual: i, maxima: i, resultados }, 'secuencial', i + 1)).toBeNull();
   });
+
+  it('si el archivo no carga, avisa y la pantalla no se bloquea por eso', () => {
+    const { r, video, sombra } = abrir([q('m1', 45)]);
+    video.dispatchEvent(new Event('error'));
+    expect(sombra.querySelector('.ap-video-aviso[role="status"]')!.textContent).toBe('El video no se pudo cargar; puedes continuar.');
+    expect(r.estado().resultados.p18).toEqual({ completada: true, puntaje: null, intentos: 1 });
+  });
 });
