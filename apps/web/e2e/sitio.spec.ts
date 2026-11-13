@@ -548,3 +548,94 @@ test('la vista previa muestra la página del panel con menú, bloques y pie en E
   await page.getByRole('switch', { name: 'Mostrar bloque Preguntas frecuentes' }).click();
   await expect(celular.getByRole('list', { name: 'Bloques visibles' }).locator(':scope > li > b')).toHaveText(['Portada', 'Testimonios', 'Preguntas frecuentes']);
 });
+
+// HU-1508 · CP-120 · El sitio público pre-renderizado en /s/ (DA-08, REQ-109): HTML sin JavaScript, menú de celular con
+// <details>, enlaces externos con rel="noopener" y sin violaciones de axe a 390 y 1280 px. La tarjeta «Versiones» lo abre.
+const SITIO_PUBLICO = {
+  conSesion: true, rol: 'SUPERADMIN', versionSitio: true, entornoSitio: 'produccion' as const,
+  paginasSitio: [PAG_INICIO], bloquesSitio: [bloqueSim(0, 'hero'), bloqueSim(1, 'testimonios'), bloqueSim(2, 'cta')],
+  elementosSitio: [testimonioSim(0, 'Mariana Paredes'), { ...testimonioSim(1, 'Persona de ejemplo'), ficticio: true, visible: false }],
+  enlacesSitio: [enlaceSim(1, 'menu', 'Producto', '/funcionalidades/personaje', 0), enlaceSim(2, 'menu', 'Blog', 'https://blog.aptioscorm.com', 1)],
+};
+
+for (const ancho of [390, 1280]) {
+  test(`CP-120: el sitio público en /s/ a ${ancho} px es HTML sin JavaScript, accesible y con su menú`, async ({ page }) => {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await simularApi(page, SITIO_PUBLICO);
+    const res = await page.goto('/s/');
+    expect(res?.status()).toBe(200);
+    expect(res?.headers()['content-security-policy']).toContain("default-src 'none'");
+    await expect(page).toHaveTitle('Aptio SCORM · Inicio');
+    expect(await page.locator('script').count()).toBe(0);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
+    await expect(page.getByText('Mariana Paredes')).toBeVisible();
+    await expect(page.getByText('Persona de ejemplo')).toHaveCount(0);
+
+    await expect(page.locator('a[href="https://blog.aptioscorm.com"]')).toHaveCount(2);
+    for (const blog of await page.locator('a[href="https://blog.aptioscorm.com"]').all()) {
+      await expect(blog).toHaveAttribute('target', '_blank');
+      await expect(blog).toHaveAttribute('rel', 'noopener');
+    }
+    const escritorio = page.getByRole('navigation', { name: 'Principal', exact: true });
+    const menu = page.locator('details.menu-celular');
+    if (ancho < 980) {
+      await expect(escritorio).toBeHidden();
+      await expect(menu).not.toHaveAttribute('open');
+      await page.getByText('Menú', { exact: true }).focus();
+      await page.keyboard.press('Enter');
+      await expect(menu).toHaveAttribute('open', '');
+      await expect(page.getByRole('navigation', { name: 'Principal (menú)' }).getByRole('link', { name: 'Producto' })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Principal (menú)' }).getByRole('link', { name: 'Blog' })).toBeVisible();
+    } else {
+      await expect(escritorio.getByRole('link', { name: 'Producto' })).toHaveAttribute('href', '/s/funcionalidades/personaje');
+      await expect(menu).toBeHidden();
+    }
+    const axe = await new AxeBuilder({ page }).withTags(REGLAS).analyze();
+    expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+  });
+}
+
+test('CP-120: una ruta no publicada da la página 404 en HTML con enlace al inicio', async ({ page }) => {
+  await simularApi(page, SITIO_PUBLICO);
+  const res = await page.goto('/s/precios');
+  expect(res?.status()).toBe(404);
+  await expect(page.getByRole('heading', { level: 1, name: 'Página no encontrada' })).toBeVisible();
+  await page.getByRole('link', { name: 'Ir al inicio' }).click();
+  await expect(page).toHaveURL(/\/s\/$/);
+  await expect(page.getByText('Mariana Paredes')).toBeVisible();
+});
+
+test('«Ver el sitio» en «Versiones» abre el sitio público en otra pestaña, con el sitio listo', async ({ page }) => {
+  await simularApi(page, SITIO_PUBLICO);
+  await page.goto('/sitio/paginas');
+  const versiones = page.getByRole('region', { name: 'Versiones' });
+  await expect(versiones.getByText('Sitio listo')).toBeVisible();
+  const enlace = versiones.getByRole('link', { name: 'Ver el sitio (se abre en una pestaña nueva)' });
+  await expect(enlace).toHaveAttribute('href', '/s/');
+  await expect(enlace).toHaveAttribute('target', '_blank');
+  await expect(enlace).toHaveAttribute('rel', 'noopener');
+  // La pestaña nueva no tiene la API simulada hasta que se le instala; luego se recarga.
+  const [pestana] = await Promise.all([page.context().waitForEvent('page'), enlace.click()]);
+  await expect(pestana).toHaveURL(/\/s\/$/);
+  await simularApi(pestana, SITIO_PUBLICO);
+  await pestana.reload();
+  await expect(pestana.getByText('Mariana Paredes')).toBeVisible();
+  await sinViolaciones(page);
+});
+
+test('si preparar el sitio falla, «Versiones» lo dice con el motivo', async ({ page }) => {
+  await simularApi(page, { ...SITIO_PUBLICO, prerenderSitio: 'error' });
+  await page.goto('/sitio/paginas');
+  const versiones = page.getByRole('region', { name: 'Versiones' });
+  await expect(versiones.getByText('Error al preparar el sitio')).toBeVisible();
+  await expect(versiones.getByRole('alert')).toContainText('El sitio público todavía no muestra la versión 1: no se pudo preparar. Motivo: No se pudo subir el sitio al almacenamiento: Access Denied. Se reintenta');
+  await sinViolaciones(page);
+});
+
+test('mientras se prepara el sitio, «Versiones» lo indica', async ({ page }) => {
+  await simularApi(page, { ...SITIO_PUBLICO, prerenderSitio: 'en_curso' });
+  await page.goto('/sitio/paginas');
+  const versiones = page.getByRole('region', { name: 'Versiones' });
+  await expect(versiones.getByText('Preparando el sitio', { exact: true })).toBeVisible();
+  await expect(versiones.getByRole('status')).toContainText('el sitio público la mostrará en unos segundos');
+});

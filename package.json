@@ -20,7 +20,8 @@
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @aptio/db generate",
     "db:deploy": "pnpm --filter @aptio/db exec prisma migrate deploy",
-    "ci": "pnpm lint && pnpm db:generate && pnpm typecheck && pnpm test && pnpm ia:casos"
+    "ci": "pnpm lint && pnpm db:generate && pnpm typecheck && pnpm test && pnpm ia:casos",
+    "sitio:lighthouse": "pnpm --filter @aptio/sitio run lighthouse"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

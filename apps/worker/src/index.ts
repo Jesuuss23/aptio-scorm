@@ -4,13 +4,15 @@ import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
   COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
+  type DatosPrerender, idPrerender, TAREA_PRERENDER,
 } from '@aptio/colas';
 import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
 import { configurarAvisoLimite } from './conexiones.js';
 import { correoDesdeEntorno } from './correo.js';
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
-import { prisma, publicarProgramadas } from '@aptio/db';
+import { prisma, publicarProgramadas, ultimaVersion } from '@aptio/db';
+import { prerenderizarVersion, versionPendienteDePrerender } from './sitio-prerender.js';
 import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
@@ -124,14 +126,30 @@ await mantenimiento.upsertJobScheduler(TAREA_BORRADO, { pattern: PATRON_BORRADO,
 await mantenimiento.upsertJobScheduler(TAREA_RESPALDO, { pattern: PATRON_RESPALDO, tz: 'America/Lima' }, { name: TAREA_RESPALDO, data: { origen: 'programado' } });
 // HU-1502 · Cada 30 s publica las páginas del sitio programadas que ya llegaron a su hora (CP-111).
 await mantenimiento.upsertJobScheduler(TAREA_PUBLICAR_PAGINAS, { every: CADA_PUBLICAR_PAGINAS_MS }, { name: TAREA_PUBLICAR_PAGINAS });
+// HU-1508 · Encola el pre-render de una versión del sitio (un trabajo por versión).
+const encolarPrerender = (numero: number) =>
+  mantenimiento.add(TAREA_PRERENDER, { numero } satisfies DatosPrerender, { jobId: idPrerender(numero), removeOnComplete: true, removeOnFail: 100 });
+// Al arrancar, la última versión que no quedó lista (anterior a la HU-1508 o con un trabajo perdido) se pre-renderiza.
+const pendiente = await versionPendienteDePrerender(prisma);
+if (pendiente !== null) await encolarPrerender(pendiente);
 const mantenedor = new Worker(
   COLA_MANTENIMIENTO,
   async (job) => {
     if (job.name === TAREA_RESPALDO) return respaldar(job.data as DatosRespaldo);
+    if (job.name === TAREA_PRERENDER) {
+      const r = await prerenderizarVersion(prisma, almacen, (job.data as DatosPrerender).numero);
+      if (r.estado === 'error') console.error(`[${COLA_MANTENIMIENTO}] el pre-render de la versión ${r.numero} falló: ${r.error}`);
+      else if (r.estado === 'listo') console.log(`Sitio: versión ${r.numero} pre-renderizada (${r.archivos} archivos)${r.puntero ? ', ahora se sirve' : ''}`);
+      return r;
+    }
     if (job.name === TAREA_PUBLICAR_PAGINAS) {
       // HU-1505 · En producción no publica mientras haya datos ficticios visibles (RN-16-3).
       const ids = await publicarProgramadas(prisma, new Date(), entornoSitio(process.env.SITIO_ENTORNO));
-      if (ids.length) console.log(`Publicadas ${ids.length} páginas programadas del sitio`);
+      if (ids.length) {
+        console.log(`Publicadas ${ids.length} páginas programadas del sitio`);
+        const v = await ultimaVersion(prisma);
+        if (v) await encolarPrerender(v.numero);
+      }
       return { publicadas: ids.length };
     }
     const r = await borrarDocumentosVencidos(prisma, almacen);

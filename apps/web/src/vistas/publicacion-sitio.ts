@@ -1,6 +1,6 @@
 // HU-1507 · Estado de la publicación del sitio, compartido por Páginas y el Editor de página: las versiones, si hay
 // cambios sin publicar, el aviso del último paso y el bloqueo por ficticios (RN-16-3).
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, ErrorApi, type VersionSitio, type VersionesSitio } from '../api';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
@@ -25,7 +25,7 @@ export function usePublicacionSitio() {
   }, [refresco]);
 
   /** Vuelve a leer las versiones y si hay cambios sin publicar (tras cualquier cambio en el panel). */
-  const recargar = () => setRefresco((n) => n + 1);
+  const recargar = useCallback(() => setRefresco((n) => n + 1), []);
 
   async function paso(hacer: () => Promise<VersionSitio>, titulo: string, ocultable: boolean, ok: (v: VersionSitio) => string): Promise<VersionSitio | null> {
     setOcupado(true);

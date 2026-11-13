@@ -21,6 +21,13 @@ export const ID_RESPALDO_MANUAL = 'respaldo-manual';
 /** HU-1502 · Publica las páginas del sitio programadas cuya hora ya llegó (CP-111): cada 30 s, antes del minuto. */
 export const TAREA_PUBLICAR_PAGINAS = 'publicar-paginas';
 export const CADA_PUBLICAR_PAGINAS_MS = 30_000;
+/**
+ * HU-1508 · Pre-renderiza una versión del sitio al bucket (DA-08). Se encola al crear cada versión, con `jobId`
+ * `sitio-prerender-v{numero}` para no repetirla.
+ */
+export const TAREA_PRERENDER = 'sitio-prerender';
+export interface DatosPrerender { numero: number }
+export const idPrerender = (numero: number) => `sitio-prerender-v${numero}`;
 export interface DatosRespaldo {
   origen: 'programado' | 'manual';
   solicitadoPorId?: string;

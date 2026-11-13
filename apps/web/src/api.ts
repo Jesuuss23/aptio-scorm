@@ -603,6 +603,8 @@ export interface VersionSitio {
   restauradaDe: number | null;
   publicadoPor: { id: string; nombre: string } | null;
   paginas: number;
+  /** HU-1508 · El HTML pre-renderizado de la versión (DA-08). */
+  prerender: { estado: 'en_curso' | 'listo' | 'error'; en: string | null; error: string | null };
   avisoFicticios?: number;
 }
 export interface VersionesSitio { entorno: 'produccion' | 'pruebas'; actual: number | null; pendientes: boolean; total: number; versiones: VersionSitio[] }
