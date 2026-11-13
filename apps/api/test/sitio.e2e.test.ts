@@ -1012,7 +1012,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
         await prisma.sitioPagina.update({ where: { id: p }, data: { estado: 'PUBLICADA', publicadaEn: new Date() } }); // publicada sin versión
         expect((await publica(ruta('sin'))).status).toBe(404);
         reiniciarLimite();
-        expect((await request(servidor).get('/api/v1/publico/navegacion')).body).toEqual({ menu: [], pie: [] });
+        expect((await request(servidor).get('/api/v1/publico/navegacion')).body).toEqual({ menu: [], pie: [], mostrarSelectorIdioma: true });
         expect((await request(servidor).get('/api/v1/publico/sitemap.xml')).text).not.toContain('<url>');
         const lista = (await enviar('get', '/sitio/versiones')).body;
         expect(lista).toMatchObject({ actual: null, total: 0, versiones: [], pendientes: true });
@@ -1049,8 +1049,9 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
   });
 });
 
-// HU-1508, HU-1509 y HU-1514 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
+// HU-1508, HU-1509, HU-1514 y HU-1510 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
 // en serie, para no pisarse con las pruebas de arriba.
 await import('./sitio-publico.casos.js');
 await import('./sitio-ajustes.casos.js');
 await import('./sitio-sectores.casos.js');
+await import('./sitio-idiomas.casos.js');

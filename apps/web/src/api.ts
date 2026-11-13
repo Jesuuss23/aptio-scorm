@@ -623,6 +623,8 @@ export interface AjustesSitio {
   whatsapp: { visible: boolean; numero: string | null; mensaje: string | null };
   correoLeads: string | null;
   mantenimiento: { activo: boolean; mensaje: string | null; desde: string | null };
+  /** HU-1510 · El sitio muestra el selector ES · EN; sale al sitio al publicar. */
+  mostrarSelectorIdioma: boolean;
   actualizadoEn: string | null;
 }
 export interface CambiosAjustesSitio {
@@ -632,6 +634,7 @@ export interface CambiosAjustesSitio {
   whatsapp?: Partial<AjustesSitio['whatsapp']>;
   correoLeads?: string | null;
   mantenimiento?: { activo?: boolean; mensaje?: string | null };
+  mostrarSelectorIdioma?: boolean;
 }
 export interface ComprobacionDominio { dominio: string; ok: boolean; venceEn: string | null; emisor: string | null; error: string | null }
 export interface VersionesSitio { entorno: 'produccion' | 'pruebas'; actual: number | null; pendientes: boolean; total: number; versiones: VersionSitio[] }
@@ -653,6 +656,8 @@ export interface PaginaSitioCambio {
 export interface ElementoSitio {
   id: string;
   coleccion: string;
+  /** HU-1510 · Idioma del elemento; cada idioma tiene su orden. */
+  idioma: 'es' | 'en';
   orden: number;
   visible: boolean;
   /** HU-1505 · Dato inventado: si está visible, bloquea publicar en producción (RN-16-3). */
@@ -668,6 +673,8 @@ export interface EnlaceSitio {
   id: string;
   zona: 'menu' | 'pie';
   padreId: string | null;
+  /** HU-1510 · Idioma del enlace; cada idioma tiene su menú y su pie. */
+  idioma: 'es' | 'en';
   texto: string;
   ruta: string | null;
   externo: boolean;
@@ -678,7 +685,7 @@ export interface EnlaceSitio {
 }
 export type ColumnaPieSitio = EnlaceSitio & { enlaces: EnlaceSitio[] };
 export interface NavegacionSitio { menu: EnlaceSitio[]; pie: ColumnaPieSitio[] }
-export interface EnlaceSitioEntrada { zona: 'menu' | 'pie'; padreId?: string; texto: string; ruta?: string }
+export interface EnlaceSitioEntrada { zona: 'menu' | 'pie'; padreId?: string; idioma?: 'es' | 'en'; texto: string; ruta?: string }
 /** HU-1503 · Bloque de una página del sitio (REQ-066). Nace oculto (RN-16-2). */
 export interface BloqueSitio {
   id: string;
@@ -725,10 +732,10 @@ export const api = {
   crearPaginaSitio: (datos: PaginaSitioEntrada) => pedir<PaginaSitio>('/sitio/paginas', json(datos)),
   cambiarPaginaSitio: (id: string, datos: PaginaSitioCambio) => pedir<PaginaSitio>(`/sitio/paginas/${id}`, json(datos, 'PATCH')),
   borrarPaginaSitio: (id: string) => pedir<void>(`/sitio/paginas/${id}`, { method: 'DELETE' }),
-  elementosSitio: (coleccion: string) => pedir<ElementoSitio[]>(`/sitio/elementos?coleccion=${encodeURIComponent(coleccion)}`),
-  agregarElemento: (coleccion: string, datos: Record<string, string | number>) => pedir<ElementoSitio>('/sitio/elementos', json({ coleccion, datos })),
+  elementosSitio: (coleccion: string, idioma: 'es' | 'en' = 'es') => pedir<ElementoSitio[]>(`/sitio/elementos?coleccion=${encodeURIComponent(coleccion)}&idioma=${idioma}`),
+  agregarElemento: (coleccion: string, datos: Record<string, string | number>, idioma: 'es' | 'en' = 'es') => pedir<ElementoSitio>('/sitio/elementos', json({ coleccion, datos, idioma })),
   cambiarElemento: (id: string, cambio: { datos?: Record<string, string | number>; visible?: boolean; ficticio?: boolean }) => pedir<ElementoSitio>(`/sitio/elementos/${id}`, json(cambio, 'PATCH')),
-  ordenarElementos: (coleccion: string, orden: string[]) => pedir<ElementoSitio[]>('/sitio/elementos', json({ coleccion, orden }, 'PATCH')),
+  ordenarElementos: (coleccion: string, orden: string[], idioma: 'es' | 'en' = 'es') => pedir<ElementoSitio[]>('/sitio/elementos', json({ coleccion, idioma, orden }, 'PATCH')),
   borrarElemento: (id: string) => pedir<void>(`/sitio/elementos/${id}`, { method: 'DELETE' }),
   ficticiosSitio: () => pedir<FicticiosSitio>('/sitio/ficticios'),
   ocultarFicticios: () => pedir<FicticiosSitio & { ocultados: number }>('/sitio/ficticios/ocultar', { method: 'POST' }),
@@ -742,10 +749,10 @@ export const api = {
   comprobarDominioSitio: () => pedir<ComprobacionDominio>('/sitio/ajustes/dominio/comprobar', { method: 'POST' }),
   restaurarVersionSitio: (numero: number) => pedir<VersionSitio>(`/sitio/versiones/${numero}/restaurar`, { method: 'POST' }),
   vistaPreviaPagina: (paginaId: string) => pedir<VistaPreviaPagina>(`/sitio/paginas/${paginaId}/vista-previa`),
-  navegacionSitio: () => pedir<NavegacionSitio>('/sitio/navegacion'),
+  navegacionSitio: (idioma: 'es' | 'en' = 'es') => pedir<NavegacionSitio>(`/sitio/navegacion?idioma=${idioma}`),
   agregarEnlace: (datos: EnlaceSitioEntrada) => pedir<EnlaceSitio>('/sitio/navegacion', json(datos)),
   cambiarEnlace: (id: string, cambio: { texto?: string; ruta?: string | null; visible?: boolean }) => pedir<EnlaceSitio>(`/sitio/navegacion/${id}`, json(cambio, 'PATCH')),
-  ordenarEnlaces: (zona: 'menu' | 'pie', padreId: string | null, orden: string[]) => pedir<EnlaceSitio[]>('/sitio/navegacion', json({ zona, ...(padreId ? { padreId } : {}), orden }, 'PATCH')),
+  ordenarEnlaces: (zona: 'menu' | 'pie', padreId: string | null, orden: string[], idioma: 'es' | 'en' = 'es') => pedir<EnlaceSitio[]>('/sitio/navegacion', json({ zona, ...(padreId ? { padreId } : {}), idioma, orden }, 'PATCH')),
   borrarEnlace: (id: string) => pedir<void>(`/sitio/navegacion/${id}`, { method: 'DELETE' }),
   bloquesPagina: (paginaId: string) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`),
   agregarBloque: (paginaId: string, tipo: string) => pedir<BloqueSitio>(`/sitio/paginas/${paginaId}/bloques`, json({ tipo })),

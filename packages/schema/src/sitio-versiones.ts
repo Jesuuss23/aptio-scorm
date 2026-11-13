@@ -5,7 +5,7 @@
  * y las llama, y la API y el worker usan esa armadora.
  */
 import { bloquesPublicos } from './sitio-bloques.js';
-import { COLECCION_DE_BLOQUE, elementosDeBloque, nombreElemento } from './sitio-contenido.js';
+import { COLECCION_DE_BLOQUE, delIdioma, elementosDeBloque, nombreElemento } from './sitio-contenido.js';
 import { elementosParaPublico, type EntornoSitio } from './sitio-ficticios.js';
 import { navegacionPublica, type NavegacionPublica } from './sitio-navegacion.js';
 import { ajustesPublicados, type AjustesSitio, type SitioPublicado } from './sitio-ajustes.js';
@@ -37,7 +37,10 @@ export interface PaginaInstantanea {
 export interface Instantanea {
   formato: 1;
   paginas: PaginaInstantanea[];
+  /** El menú y el pie en español (el idioma principal). */
   navegacion: NavegacionPublica;
+  /** HU-1510 · El menú y el pie en inglés; falta si no hay ningún enlace visible en inglés (y en las versiones de antes). */
+  navegacionEn?: NavegacionPublica;
   /** HU-1509 · Nombre, dominio, logo, favicon y WhatsApp publicados. Falta en las versiones de antes de los ajustes. */
   sitio?: SitioPublicado;
 }
@@ -64,6 +67,8 @@ export interface FilaElemento {
   visible: boolean;
   ficticio: boolean;
   datos: unknown;
+  /** HU-1510 · es | en; sin el campo, es. */
+  idioma?: string | null;
 }
 export interface FilaEnlace {
   id: string;
@@ -73,6 +78,8 @@ export interface FilaEnlace {
   ruta: string | null;
   orden: number;
   visible: boolean;
+  /** HU-1510 · es | en; sin el campo, es. */
+  idioma?: string | null;
 }
 
 const iso = (f: Date | string | null): string | null => (f === null ? null : typeof f === 'string' ? f : f.toISOString());
@@ -83,7 +90,8 @@ const iso = (f: Date | string | null): string | null => (f === null ? null : typ
  */
 export function armarPagina(p: FilaPagina, elementos: readonly FilaElemento[], entorno: EntornoSitio): PaginaInstantanea {
   const visibles = bloquesPublicos(p.bloques);
-  const permitidos = elementosParaPublico(entorno, elementos.filter((e) => e.visible));
+  // HU-1510 · Cada página usa solo los elementos de su idioma.
+  const permitidos = elementosParaPublico(entorno, delIdioma(elementos, p.idioma).filter((e) => e.visible));
   // HU-1514 · Una landing suma las preguntas del inicio y muestra los testimonios de su sector (CP-157).
   const sector = sectorPublicado(p);
   return {
@@ -107,7 +115,12 @@ export function armarInstantanea(datos: { paginas: readonly FilaPagina[]; elemen
     .sort((a, b) => a.ruta.localeCompare(b.ruta) || a.idioma.localeCompare(b.idioma))
     .map((p) => armarPagina(p, datos.elementos, entorno));
   // Sin fila de ajustes la instantánea queda igual que antes de la HU-1509 (no marca cambios pendientes).
-  return { formato: 1, paginas, navegacion: navegacionPublica(datos.enlaces), ...(datos.ajustes ? { sitio: ajustesPublicados(datos.ajustes) } : {}) };
+  const en = navegacionPublica(delIdioma(datos.enlaces, 'en'));
+  return {
+    formato: 1, paginas, navegacion: navegacionPublica(delIdioma(datos.enlaces, 'es')),
+    ...(en.menu.length || en.pie.length ? { navegacionEn: en } : {}),
+    ...(datos.ajustes ? { sitio: ajustesPublicados(datos.ajustes) } : {}),
+  };
 }
 
 /** Las colecciones que usan los bloques: solo esas se leen de la base. */
@@ -126,7 +139,7 @@ function canonico(v: unknown): string {
 
 /** ¿El panel tiene cambios sin publicar? Compara el contenido, no el orden de las claves. Sin versión, hay cambios si hay algo publicable. */
 export function hayPendientes(actual: Instantanea, ultima: Instantanea | null): boolean {
-  if (!ultima) return actual.paginas.length > 0 || actual.navegacion.menu.length > 0 || actual.navegacion.pie.length > 0;
+  if (!ultima) return actual.paginas.length > 0 || actual.navegacion.menu.length > 0 || actual.navegacion.pie.length > 0 || Boolean(actual.navegacionEn);
   return canonico(actual) !== canonico(ultima);
 }
 
@@ -167,6 +180,20 @@ export function paginaServida(inst: Instantanea, ruta: string, idioma: string, e
       ...(b.elementos ? { elementos: elementosParaPublico(entorno, b.elementos.map((e) => ({ ...e, ficticio: e.ficticio ?? false }))).map((e) => ({ datos: e.datos, ...(e.ficticio ? { ficticio: true as const } : {}) })) } : {}),
     })),
   };
+}
+
+/** HU-1510 · El menú y el pie de un idioma (el inglés sin enlaces queda vacío, nunca cae al español). */
+export function navegacionDe(inst: Pick<Instantanea, 'navegacion' | 'navegacionEn'>, idioma: string): NavegacionPublica {
+  return idioma === 'en' ? (inst.navegacionEn ?? { menu: [], pie: [] }) : inst.navegacion;
+}
+
+/**
+ * HU-1510 · CP-122 · Las versiones publicadas de una ruta en cada idioma (para hreflang y el sitemap): solo si la misma
+ * ruta está publicada en los dos idiomas; si no, ninguna (RN-16-6).
+ */
+export function alternasDe(inst: Pick<Instantanea, 'paginas'>, ruta: string): { idioma: 'es' | 'en' }[] {
+  const idiomas = new Set(inst.paginas.filter((p) => p.ruta === ruta).map((p) => p.idioma));
+  return idiomas.has('es') && idiomas.has('en') ? [{ idioma: 'es' }, { idioma: 'en' }] : [];
 }
 
 /** Lee una instantánea guardada; si no tiene la forma esperada, devuelve un sitio vacío en vez de romper el público. */

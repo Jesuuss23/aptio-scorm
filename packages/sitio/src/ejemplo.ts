@@ -1,7 +1,8 @@
 /**
  * HU-1508 · Un sitio de ejemplo armado con la misma función que la API (`armarInstantanea`): el Inicio con sus bloques
- * del prototipo, una página de funcionalidad, una en inglés, las landings de sector (HU-1514), menú y pie. Lo usan las
- * pruebas, la medición con Lighthouse (CP-120) y Playwright. Un testimonio va marcado como ficticio para probar que en producción no sale.
+ * del prototipo, una página de funcionalidad, las landings de sector (HU-1514), menú y pie, y el inicio en inglés con su
+ * propio contenido, menú y pie (HU-1510). Lo usan las pruebas, la medición con Lighthouse (CP-120) y Playwright. Un
+ * testimonio va marcado como ficticio para probar que en producción no sale.
  */
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
@@ -12,13 +13,15 @@ const pagina = (id: string, ruta: string, titulo: string, tipos: string[], idiom
   bloques: tipos.map((tipo, orden) => ({ id: `${id}-${orden}`, tipo, orden, visible: true, ajustes: null })),
 });
 let n = 0;
-const el = (coleccion: string, datos: Record<string, string | number>, ficticio = false) => ({ id: `e${++n}`, coleccion, orden: n, visible: true, ficticio, datos });
+const el = (coleccion: string, datos: Record<string, string | number>, ficticio = false, idioma = 'es') => ({ id: `e${++n}`, coleccion, orden: n, visible: true, ficticio, datos, idioma });
+/** HU-1510 · Un elemento en inglés. */
+const en = (coleccion: string, datos: Record<string, string | number>) => el(coleccion, datos, false, 'en');
 /** HU-1514 · Las landings del prototipo: 4 publicadas y Sector público en borrador (no sale en el sitio, CP-158). */
 const landing = (id: string, sector: string, titulo: string, texto: string, blog: string, estado = 'PUBLICADA') => ({
   ...pagina(id, `/sectores/${id}`, sector, ['hero', 'testimonios', 'faq', 'cta']), estado, publicadaEn: estado === 'PUBLICADA' ? F : null,
   tipo: 'sector', sector, portada: { titulo, texto }, metaTitulo: `Capacitación en ${sector.toLowerCase()} con cápsulas SCORM`, blogCategoriaInicial: blog,
 });
-const enlace = (id: string, zona: string, texto: string, ruta: string | null, orden: number, padreId: string | null = null) => ({ id, zona, padreId, texto, ruta, orden, visible: true });
+const enlace = (id: string, zona: string, texto: string, ruta: string | null, orden: number, padreId: string | null = null, idioma = 'es') => ({ id, zona, padreId, texto, ruta, orden, visible: true, idioma });
 
 export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion'): Instantanea {
   n = 0;
@@ -31,7 +34,7 @@ export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion'): Inst
       landing('educacion-superior', 'Educación superior', 'Educación continua bilingüe sin doble producción', 'Tus clases en cápsulas en español e inglés dentro del mismo paquete.', 'Guías'),
       landing('sector-publico', 'Sector público', 'Capacitación accesible para servidores públicos', 'Cápsulas accesibles con subtítulos y navegación por teclado.', 'Accesibilidad', 'BORRADOR'),
       pagina('personaje', '/funcionalidades/personaje', 'Personaje', ['fhero', 'comparacion', 'testimonios', 'cta']),
-      pagina('en', '/', 'Home', ['hero', 'cta'], 'en'),
+      pagina('en', '/', 'Home', ['hero', 'metricas', 'testimonios', 'cta'], 'en'),
       { ...pagina('borrador', '/borrador', 'Borrador', ['hero']), estado: 'BORRADOR', publicadaEn: null },
     ],
     elementos: [
@@ -51,11 +54,17 @@ export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion'): Inst
       el('testimonios', { nombre: 'Persona de ejemplo', cargo: 'Cargo', empresa: 'Empresa <b>ficticia</b>', texto: 'Texto de ejemplo.', estrellas: 5 }, true),
       el('preguntas', { pregunta: '¿Funciona con mi LMS?', respuesta: 'Sí: el paquete cumple SCORM 1.2 de forma estricta.' }),
       el('preguntas', { pregunta: '¿Sirve para procedimientos de seguridad?', respuesta: 'Sí: bloqueo y etiquetado, altura y espacios confinados.', pagina: '/sectores/mineria-y-energia' }),
+      // HU-1510 · El contenido del sitio en inglés: la página /en solo usa estos.
+      en('cifras', { valor: '4 days', etiqueta: 'to deliver a 30-screen capsule' }),
+      en('cifras', { valor: '2 languages', etiqueta: 'in one package, with subtitles' }),
+      en('testimonios', { nombre: 'Laura Mendoza', cargo: 'L&D Manager', empresa: 'Andes Mining Group', texto: 'We went from weeks to days.', estrellas: 5 }),
     ],
     enlaces: [
       enlace('m1', 'menu', 'Producto', '/funcionalidades/personaje', 0), enlace('m2', 'menu', 'Casos', '/#testimonios', 1),
       enlace('m3', 'menu', 'Blog', 'https://blog.aptioscorm.com', 2),
       enlace('c1', 'pie', 'Legal', null, 0), enlace('l1', 'pie', 'Privacidad', '/privacidad', 0, 'c1'),
+      enlace('m1en', 'menu', 'Customer stories', '/en#testimonios', 0, null, 'en'), enlace('m2en', 'menu', 'Blog', 'https://blog.aptioscorm.com', 1, null, 'en'),
+      enlace('c1en', 'pie', 'Company', null, 0, null, 'en'), enlace('l1en', 'pie', 'Privacy', '/en/privacidad', 0, 'c1en', 'en'),
     ],
   }, entorno);
 }

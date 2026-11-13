@@ -37,6 +37,7 @@ export class AjustesSitioDto {
   @ApiProperty({ type: WhatsappDto }) whatsapp: WhatsappDto;
   @ApiProperty({ type: String, nullable: true }) correoLeads: string | null;
   @ApiProperty({ type: MantenimientoDto, description: 'Vale al instante, sin publicar (CP-121)' }) mantenimiento: MantenimientoDto;
+  @ApiProperty({ default: true, description: 'HU-1510 · El sitio muestra el selector ES · EN; sale al sitio con «Publicar cambios»' }) mostrarSelectorIdioma: boolean;
   @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'null si nunca se guardaron' }) actualizadoEn: string | null;
 }
 
@@ -64,6 +65,7 @@ export class AjustesSitioCambioDto {
   @ApiPropertyOptional({ type: WhatsappCambioDto }) @IsOptional() @ValidateNested() @Type(() => WhatsappCambioDto) whatsapp?: WhatsappCambioDto;
   @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @ValidateIf(opcional) @IsString() correoLeads?: string | null;
   @ApiPropertyOptional({ type: MantenimientoCambioDto }) @IsOptional() @ValidateNested() @Type(() => MantenimientoCambioDto) mantenimiento?: MantenimientoCambioDto;
+  @ApiPropertyOptional({ description: 'HU-1510 · Mostrar el selector ES · EN en la cabecera y el menú de celular' }) @IsOptional() @IsBoolean() mostrarSelectorIdioma?: boolean;
 }
 
 /** HU-1509 · Resultado de «Comprobar» el dominio: el certificado que presenta por HTTPS. */

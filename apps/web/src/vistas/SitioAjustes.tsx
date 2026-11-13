@@ -2,6 +2,7 @@
 // analítica, WhatsApp, correo de leads y modo mantenimiento. Cada tarjeta guarda lo suyo y valida con las mismas reglas
 // que la API (`@aptio/schema/sitio-ajustes`). Nombre, dominio, marca y WhatsApp llegan al sitio con «Publicar cambios»;
 // el mantenimiento y el correo de leads valen al instante (CP-121).
+// HU-1510 · Tarjeta «Idiomas»: el interruptor «Mostrar selector ES/EN» (activo por defecto) llega al sitio al publicar.
 import { AJUSTES_POR_DEFECTO, type AjustesSitio as Reglas, aplicarCambiosAjustes, type CambiosAjustes, LIMITES_AJUSTES } from '@aptio/schema/sitio-ajustes';
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
@@ -30,13 +31,14 @@ export function SitioAjustes() {
 
   return (
     <>
-      <Cabecera titulo="Ajustes del sitio" subtitulo="Dominio, marca, analítica, contacto y mantenimiento del sitio comercial." />
+      <Cabecera titulo="Ajustes del sitio" subtitulo="Dominio, marca, analítica, contacto, idiomas y mantenimiento del sitio comercial." />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {!ajustes ? (!error ? <p className="sec" role="status">Cargando…</p> : null) : (
         <div className="columnas ajustes-sitio">
           <TarjetaIdentidad ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaContacto ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaAnalitica ajustes={ajustes} alGuardar={setAjustes} />
+          <TarjetaIdiomas ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaMantenimiento ajustes={ajustes} alGuardar={setAjustes} />
         </div>
       )}
@@ -242,6 +244,25 @@ function TarjetaAnalitica({ ajustes, alGuardar }: PropsTarjeta) {
         <p className="nota aviso">Se guardan ahora y se activarán en el sitio con el banner de cookies (Ley 29733): las etiquetas solo se cargan después de que el visitante acepte las cookies de analítica.</p>
         <div className="acciones-fila ajustes-acciones"><button type="submit" className="boton primario" disabled={g.ocupado}>Guardar</button></div>
       </form>
+      <Nota aviso={g.aviso} />
+    </Tarjeta>
+  );
+}
+
+function TarjetaIdiomas({ ajustes, alGuardar }: PropsTarjeta) {
+  const g = useGuardar(ajustes, alGuardar);
+  const activo = ajustes.mostrarSelectorIdioma;
+  return (
+    <Tarjeta id="ajustes-idiomas" titulo="Idiomas">
+      <div className="formulario-ajustes">
+        <div className="fila-interruptor">
+          <span id="ajuste-idiomas-etiqueta">Mostrar selector ES/EN</span>
+          <button type="button" role="switch" className="interruptor" aria-checked={activo} aria-labelledby="ajuste-idiomas-etiqueta" aria-describedby="ajuste-idiomas-ayuda" disabled={g.ocupado}
+            onClick={() => void g.guardar({ mostrarSelectorIdioma: !activo }, `${activo ? 'El selector ES · EN quedará oculto.' : 'El selector ES · EN se mostrará.'} ${PUBLICAR}`)}><span aria-hidden="true" /></button>
+          <span className="sec">{activo ? 'Visible' : 'Oculto'}</span>
+        </div>
+        <p className="sec" id="ajuste-idiomas-ayuda">El selector va en la cabecera y en el menú de celular. Solo aparece cuando el inicio en inglés (/en) está publicado; si una página no tiene versión en el otro idioma, lleva a su inicio.</p>
+      </div>
       <Nota aviso={g.aviso} />
     </Tarjeta>
   );

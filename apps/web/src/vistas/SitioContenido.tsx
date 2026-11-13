@@ -5,12 +5,14 @@
 // HU-1505 · Casilla «Ficticio» y distintivo por elemento, contador de ficticios visibles del sitio y aviso con «Ocultar
 // todos los ficticios» (RN-16-3). Portada y Llamada final, con los ajustes del sitio (SUP-178).
 // HU-1514 · En Testimonios, el Sector se elige de una lista: «General» y los sectores de las landings (CP-157).
+// HU-1510 · Selector «Español / Inglés»: cada idioma tiene sus elementos y su orden (REQ-069).
 import { moverBloque } from '@aptio/schema/sitio-bloques';
 import { type CampoContenido, type Coleccion, COLECCIONES, COLECCIONES_CONTENIDO, camposDe, validarDatos } from '@aptio/schema/sitio-contenido';
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { SECTOR_GENERAL } from '@aptio/schema/sitio-sectores';
 import { api, type ElementoSitio, ErrorApi, type FicticiosSitio } from '../api';
+import { type IdiomaConsola, SelectorIdiomaSitio } from './IdiomaSitio';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
@@ -28,6 +30,7 @@ const titulo = (c: Coleccion, datos: Record<string, string | number>) => String(
 
 export function SitioContenido() {
   const [coleccion, setColeccion] = useState<Coleccion>('cifras');
+  const [idioma, setIdioma] = useState<IdiomaConsola>('es');
   const [elementos, setElementos] = useState<ElementoSitio[] | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
@@ -51,9 +54,9 @@ export function SitioContenido() {
 
   useEffect(() => {
     let vigente = true;
-    api.elementosSitio(coleccion).then((l) => { if (vigente) setElementos(l); }, (e: unknown) => { if (vigente) setError(mensajeDe(e, 'No se pudo cargar el contenido')); });
+    api.elementosSitio(coleccion, idioma).then((l) => { if (vigente) setElementos(l); }, (e: unknown) => { if (vigente) setError(mensajeDe(e, 'No se pudo cargar el contenido')); });
     return () => { vigente = false; };
-  }, [coleccion]);
+  }, [coleccion, idioma]);
 
   // Tras mover, el foco sigue al elemento movido (la flecha usada o, en un extremo, la otra).
   useEffect(() => {
@@ -67,14 +70,24 @@ export function SitioContenido() {
     (preferido && !preferido.disabled ? preferido : otro)?.focus();
   }, [elementos]);
 
-  function elegir(c: Coleccion) {
-    if (c === coleccion) return;
+  function limpiar() {
     setElementos(null);
     setError('');
-    setColeccion(c);
     setAviso(null);
     setNuevo(false);
     setBorrando(null);
+  }
+
+  function elegir(c: Coleccion) {
+    if (c === coleccion) return;
+    limpiar();
+    setColeccion(c);
+  }
+
+  function elegirIdioma(i: IdiomaConsola) {
+    limpiar();
+    setIdioma(i);
+    setAnuncio(i === 'en' ? 'Contenido en inglés.' : 'Contenido en español.');
   }
 
   // Flechas izquierda y derecha, Inicio y Fin entre pestañas (patrón ARIA de pestañas).
@@ -106,7 +119,7 @@ export function SitioContenido() {
   async function mover(x: ElementoSitio, paso: -1 | 1) {
     if (!elementos) return;
     const ids = moverBloque(elementos.map((y) => y.id), x.id, paso);
-    const nuevos = await hacer(() => api.ordenarElementos(coleccion, ids), 'No se pudo cambiar el orden');
+    const nuevos = await hacer(() => api.ordenarElementos(coleccion, ids, idioma), 'No se pudo cambiar el orden');
     if (!nuevos) return;
     foco.current = `${x.id}:${paso === -1 ? 'subir' : 'bajar'}`;
     setElementos(nuevos);
@@ -146,7 +159,7 @@ export function SitioContenido() {
   }
 
   async function agregar(datos: Record<string, string | number>): Promise<boolean> {
-    const r = await hacer(() => api.agregarElemento(coleccion, datos), 'No se pudo agregar');
+    const r = await hacer(() => api.agregarElemento(coleccion, datos, idioma), 'No se pudo agregar');
     if (!r) return false;
     setElementos((l) => [...(l ?? []), r]);
     setNuevo(false);
@@ -180,6 +193,7 @@ export function SitioContenido() {
           <button type="button" className="boton" disabled={ocupado} onClick={() => void ocultarFicticios()}>Ocultar todos los ficticios</button>
         </div>
       ) : null}
+      <SelectorIdiomaSitio idioma={idioma} alCambiar={elegirIdioma} etiqueta="Idioma del contenido" ocupado={ocupado} />
       <div className="opciones" role="tablist" aria-label="Colecciones de contenido" ref={pestanas}>
         {COLECCIONES.map((c) => (
           <button key={c} type="button" role="tab" id={`pestana-${c}`} className="opcion" aria-selected={coleccion === c} aria-controls="panel-contenido"
@@ -189,7 +203,7 @@ export function SitioContenido() {
       <p className="sr" role="status" aria-live="polite">{anuncio}</p>
       <section className="tarjeta" role="tabpanel" id="panel-contenido" aria-labelledby={`pestana-${coleccion}`}>
         <div className="tarjeta-cabeza">
-          <h2>{info.nombre}</h2>
+          <h2>{info.nombre}{idioma === 'en' ? ' · Inglés' : ''}</h2>
           <div className="elemento-acciones">
             {elementos ? <span className="chip">{visibles} visibles</span> : null}
             <button type="button" className="boton primario" disabled={nuevo || !elementos} onClick={() => { setNuevo(true); setAviso(null); }}>Agregar</button>
@@ -197,7 +211,7 @@ export function SitioContenido() {
         </div>
         {error ? <div className="nota error" role="alert">{error}</div> : null}
         {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
-        {nuevo ? <FormularioElemento key={`nuevo-${coleccion}`} id="nuevo" coleccion={coleccion} ocupado={ocupado} etiqueta={`Nuevo elemento de ${info.nombre}`} sectores={sectores} alGuardar={agregar} alCancelar={() => setNuevo(false)} /> : null}
+        {nuevo ? <FormularioElemento key={`nuevo-${coleccion}-${idioma}`} id="nuevo" coleccion={coleccion} ocupado={ocupado} etiqueta={`Nuevo elemento de ${info.nombre}`} sectores={sectores} alGuardar={agregar} alCancelar={() => setNuevo(false)} /> : null}
         {!elementos ? (!error ? <p className="sec" role="status">Cargando…</p> : null)
           : elementos.length === 0 && !nuevo ? <p className="nota">Aún no hay elementos en {info.nombre}. Agrega el primero con «Agregar».</p>
           : (

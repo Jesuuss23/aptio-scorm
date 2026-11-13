@@ -89,7 +89,7 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('ajustes del sitio (HU-
     expect(r.status).toBe(200);
     expect(r.body).toEqual({
       dominio: null, nombre: 'Aptio SCORM', logo: null, favicon: null, analitica: { ga4: null, gtm: null, metaPixel: null },
-      whatsapp: { visible: false, numero: null, mensaje: null }, correoLeads: null, mantenimiento: { activo: false, mensaje: null, desde: null }, actualizadoEn: null,
+      whatsapp: { visible: false, numero: null, mensaje: null }, correoLeads: null, mantenimiento: { activo: false, mensaje: null, desde: null }, mostrarSelectorIdioma: true, actualizadoEn: null,
     });
     expect((await como('admin').get('/sitio/ajustes')).status).toBe(403);
     expect((await como('admin').patch('/sitio/ajustes', { nombre: 'X' })).status).toBe(403);

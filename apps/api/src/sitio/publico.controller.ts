@@ -2,7 +2,8 @@ import { Controller, Get, Header, Query } from '@nestjs/common';
 import { ApiNotFoundResponse, ApiOkResponse, ApiProduces, ApiTags, ApiTooManyRequestsResponse } from '@nestjs/swagger';
 import { Publico } from '../comun/roles.js';
 import { ConsultaPaginaPublicaDto, PaginaPublicaDto } from './sitio.dto.js';
-import { NavegacionPublicaDto } from './navegacion.dto.js';
+import { idiomaDeFila } from '@aptio/schema/sitio-contenido';
+import { ConsultaNavegacionDto, NavegacionPublicadaDto } from './navegacion.dto.js';
 import { NavegacionService } from './navegacion.service.js';
 import { SitioService } from './sitio.service.js';
 
@@ -21,11 +22,11 @@ export class PublicoController {
     return this.sitio.publica(q.ruta, q.idioma ?? 'es');
   }
 
-  /** HU-1506 · CP-118: menú y pie con solo lo visible. La cabecera y el menú de celular usan la misma lista. */
+  /** HU-1506 · CP-118: menú y pie con solo lo visible. La cabecera y el menú de celular usan la misma lista. HU-1510 · Por idioma. */
   @Get('navegacion')
-  @ApiOkResponse({ type: NavegacionPublicaDto })
-  navegacionPublica(): Promise<NavegacionPublicaDto> {
-    return this.navegacion.publica();
+  @ApiOkResponse({ type: NavegacionPublicadaDto })
+  navegacionPublica(@Query() q: ConsultaNavegacionDto): Promise<NavegacionPublicadaDto> {
+    return this.navegacion.publica(idiomaDeFila({ idioma: q.idioma ?? null }));
   }
 
   @Get('sitemap.xml')

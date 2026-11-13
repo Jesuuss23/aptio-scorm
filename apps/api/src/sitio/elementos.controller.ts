@@ -3,11 +3,14 @@ import {
   ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNoContentResponse, ApiNotFoundResponse, ApiOkResponse, ApiTags,
   ApiUnauthorizedResponse, ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
-import type { Coleccion } from '@aptio/schema/sitio-contenido';
+import { type Coleccion, idiomaDeFila } from '@aptio/schema/sitio-contenido';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { ConsultaElementosDto, ElementoSitioCambioDto, ElementoSitioDto, ElementoSitioEntradaDto, FicticiosOcultadosDto, FicticiosSitioDto, OrdenElementosDto } from './elementos.dto.js';
 import { ElementosService } from './elementos.service.js';
+
+/** HU-1510 · El idioma pedido (ya validado por el DTO); sin él, español. */
+const idiomaSitio = (idioma: string | undefined) => idiomaDeFila({ idioma: idioma ?? null });
 
 /** HU-1504 · Contenido del sitio (REQ-066, PNT-27): solo el superadmin; 403 al resto y 401 sin sesión. */
 @ApiTags('Sitio web')
@@ -23,21 +26,21 @@ export class ElementosController {
   @ApiOkResponse({ type: ElementoSitioDto, isArray: true, description: 'Visibles y ocultos, por orden' })
   @ApiUnprocessableEntityResponse({ description: 'Colección desconocida' })
   listar(@Query() q: ConsultaElementosDto): Promise<ElementoSitioDto[]> {
-    return this.elementos.listar(q.coleccion as Coleccion);
+    return this.elementos.listar(q.coleccion as Coleccion, idiomaSitio(q.idioma));
   }
 
   @Post()
   @ApiCreatedResponse({ type: ElementoSitioDto, description: 'Al final y oculto (RN-16-2, CP-115)' })
   @ApiUnprocessableEntityResponse({ description: 'DATOS_NO_VALIDOS: campos de la colección o texto plano (RN-16-7)' })
   agregar(@UsuarioActual() u: UsuarioSesion, @Body() dto: ElementoSitioEntradaDto): Promise<ElementoSitioDto> {
-    return this.elementos.agregar(u, dto.coleccion as Coleccion, dto.datos, dto.ficticio ?? false);
+    return this.elementos.agregar(u, dto.coleccion as Coleccion, dto.datos, dto.ficticio ?? false, idiomaSitio(dto.idioma));
   }
 
   @Patch()
   @ApiOkResponse({ type: ElementoSitioDto, isArray: true, description: 'La colección en el orden nuevo' })
   @ApiUnprocessableEntityResponse({ description: 'ORDEN_INVALIDO: faltan, sobran o se repiten elementos' })
   ordenar(@UsuarioActual() u: UsuarioSesion, @Body() dto: OrdenElementosDto): Promise<ElementoSitioDto[]> {
-    return this.elementos.ordenar(u, dto.coleccion as Coleccion, dto.orden);
+    return this.elementos.ordenar(u, dto.coleccion as Coleccion, dto.orden, idiomaSitio(dto.idioma));
   }
 
   @Patch(':elementoId')

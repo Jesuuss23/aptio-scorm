@@ -798,10 +798,12 @@ model SitioElemento {
   /// HU-1505 · Dato inventado: bloquea publicar en producción mientras esté visible (RN-16-3).
   ficticio      Boolean  @default(false)
   datos         Json
+  /// HU-1510 · es | en: cada idioma tiene sus elementos y su propio orden.
+  idioma        String   @default("es")
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt
 
-  @@index([coleccion, orden])
+  @@index([coleccion, idioma, orden])
 }
 
 /// HU-1506 · Enlaces del menú principal y del pie (REQ-066, PNT-25). El menú es plano; el pie tiene
@@ -819,10 +821,12 @@ model SitioEnlace {
   /// Posición 0, 1, 2… sin huecos entre hermanos (misma zona y mismo padre).
   orden         Int
   visible       Boolean       @default(false)
+  /// HU-1510 · es | en: cada idioma tiene su menú y su pie, con su propio orden.
+  idioma        String        @default("es")
   creadoEn      DateTime      @default(now())
   actualizadoEn DateTime      @updatedAt
 
-  @@index([zona, padreId, orden])
+  @@index([zona, idioma, padreId, orden])
 }
 
 /// HU-1507 · Versión publicada del sitio (REQ-068, RN-16-5): instantánea inmutable del sitio completo. El sitio público

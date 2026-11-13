@@ -106,13 +106,13 @@ export class VersionesService {
     return aDto(await this.nuevaVersion(u, 'restauracion', { instantanea, restauradaDe: numero }));
   }
 
-  /** La vista previa de una página con lo que hay ahora en el panel (publicado o no), con el menú y el pie actuales. */
+  /** La vista previa de una página con lo que hay ahora en el panel (publicado o no), con el menú y el pie actuales de su idioma. */
   async vistaPrevia(paginaId: string): Promise<VistaPreviaPaginaDto> {
     const p = await this.bd.sitioPagina.findUnique({ where: { id: paginaId }, include: { bloques: true } });
     if (!p) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La página no existe' });
     const colecciones = coleccionesDeBloques(p.bloques.filter((b) => b.visible).map((b) => b.tipo));
     const elementos = colecciones.length ? await this.bd.sitioElemento.findMany({ where: { coleccion: { in: colecciones }, visible: true } }) : [];
-    const enlaces = await this.bd.sitioEnlace.findMany({ where: { visible: true } });
+    const enlaces = await this.bd.sitioEnlace.findMany({ where: { visible: true, idioma: p.idioma === 'en' ? 'en' : 'es' } });
     // En la vista previa los ficticios salen marcados aunque el entorno sea producción: es para revisar, no para el público.
     const pagina = armarPagina(p, elementos, 'pruebas');
     const navegacion: NavegacionPublica = navegacionPublica(enlaces);

@@ -43,6 +43,8 @@ describe.skipIf((!hayS3 || !hayBase) && !process.env.CI)('pre-render del sitio (
     // HU-1514 · Las 4 landings publicadas del ejemplo suben; la de borrador (Sector público) no.
     expect(await texto(claveVersion(v.numero, 'sectores/mineria-y-energia/index.html'))).toContain('Minería y energía');
     expect(await almacen.info(claveVersion(v.numero, 'sectores/sector-publico/index.html'))).toBeNull();
+    // HU-1510 · El inicio en inglés del ejemplo sube en en/index.html, con su idioma.
+    expect(await texto(claveVersion(v.numero, 'en/index.html'))).toMatch(/^<!doctype html><html lang="en">/);
 
     const inicio = await texto(claveVersion(v.numero, 'index.html'));
     expect(inicio).toMatch(/^<!doctype html><html lang="es">/);
