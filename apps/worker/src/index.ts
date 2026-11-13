@@ -33,6 +33,8 @@ import { crearExtractor, TAREA_EXTRAER } from './material.js';
 import { crearExportador } from './exportar.js';
 import { crearProcesador, type TrabajoEnCola } from './procesar.js';
 import { crearTranscriptor, TAREA_TRANSCRIBIR } from './transcribir.js';
+import { crearGrabacion, crearLimpieza } from './grabacion.js';
+import { TAREA_GRABACION, TAREA_LIMPIAR } from '@aptio/schema/grabacion';
 import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
 
 const redis = crearRedis();
@@ -73,7 +75,12 @@ const traducir = crearTraductor({ bd: prisma, redis, proveedor: proveedorDesdeEn
 const revisarCalidad = crearRevisorCalidad({ bd: prisma, redis, proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 // La exportación SCORM 1.2 (HU-1202) lee los recursos del almacenamiento y guarda el ZIP como recurso PAQUETE.
 const exportar = crearExportador({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
+// El audio del cliente (HU-0704): la grabación como narración (cola voz) y la limpieza de ruido (cola media), con ffmpeg.
+const grabacion = crearGrabacion({ bd: prisma, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime), calcular: calculadorBocasDesdeEntorno(process.env) });
+const limpiarAudio = crearLimpieza({ bd: prisma, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
 const despachar = (trabajo: TrabajoEnCola) => {
+  if (trabajo.data.tarea === TAREA_GRABACION && trabajo.data.grabacion) return grabacion(trabajo);
+  if (trabajo.data.tarea === TAREA_LIMPIAR) return limpiarAudio(trabajo);
   if (trabajo.data.tarea === TAREA_EXPORTAR) return exportar(trabajo);
   if (trabajo.data.tarea === TAREA_EXTRAER) return extraer(trabajo);
   if (trabajo.data.tarea === TAREA_TRANSCRIBIR) return transcribir(trabajo);

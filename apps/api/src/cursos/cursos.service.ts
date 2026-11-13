@@ -11,6 +11,7 @@ import { type Prisma, recalcularReglas } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
 import { erroresExtras, TIPOS_IMAGEN } from '@aptio/schema/biblioteca';
+import { esGrabacion } from '@aptio/schema/grabacion';
 import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
 import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
@@ -128,6 +129,7 @@ export class CursosService {
     const orden = pantallasDe(c.documento as unknown as CursoDoc);
     const posicion = new Map(orden.map((p, i) => [p.id, i]));
     const textos = new Map(orden.map((p) => [p.id, p.narracion?.texto as Texto | undefined]));
+    const pistas = new Map(orden.map((p) => [p.id, (p.narracion as unknown as { porIdioma?: Record<string, { grabacion?: NarracionDto['grabacion'] }> } | undefined)?.porIdioma]));
     filas.sort((a, b) => (posicion.get(a.pantallaId) ?? 1e9) - (posicion.get(b.pantallaId) ?? 1e9) || a.idioma.localeCompare(b.idioma));
     return Promise.all(filas.map(async (n) => {
       const r = recursos.find((x) => x.id === n.audioRecursoId);
@@ -136,6 +138,8 @@ export class CursosService {
       return {
         pantallaId: n.pantallaId, idioma: n.idioma, origen: n.origen, estado: n.estado,
         ...(texto ? { texto } : {}), ...(n.voz ? { voz: n.voz } : {}),
+        // HU-0704 · La grabación del cliente: material, versión del audio y quién autorizó usarla y cuándo (RN-07-4).
+        ...(n.origen === 'grabacion' && pistas.get(n.pantallaId)?.[n.idioma]?.grabacion ? { grabacion: pistas.get(n.pantallaId)![n.idioma]!.grabacion! } : {}),
         ...(r?.duracionMs ? { duracionS: Math.round(r.duracionMs / 100) / 10 } : {}),
         ...(r ? { audioUrl: await this.almacenes.almacen.urlDescarga(r.claveS3, r.nombre) } : {}),
         ...(vtt ? { subtitulosUrl: await this.almacenes.almacen.urlDescarga(vtt.claveS3, vtt.nombre) } : {}),
@@ -352,7 +356,8 @@ export class CursosService {
         n.texto = t;
         for (const [idioma, audio] of Object.entries(n.porIdioma)) {
           const texto = t[idioma as 'es' | 'en'];
-          if (!texto) continue;
+          // HU-0704 · Una grabación del cliente no se regenera al corregir su texto: el audio es el que grabó el cliente.
+          if (!texto || esGrabacion(audio as { voz?: { proveedor?: string } })) continue;
           if (texto !== antes[idioma as 'es' | 'en']) narracionCambiada.push(idioma);
           // RN-06-8: los tiempos siguen la narración en español (SUP-47).
           if (idioma === 'es' && antes.es && texto !== antes.es) {

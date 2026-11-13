@@ -5,9 +5,11 @@ import { CalidadController } from './calidad.controller.js';
 import { CalidadService } from './calidad.service.js';
 import { CursosController } from './cursos.controller.js';
 import { CursosService } from './cursos.service.js';
+import { GrabacionController } from './grabacion.controller.js';
+import { GrabacionService } from './grabacion.service.js';
 import { PropuestasController } from './propuestas.controller.js';
 import { PropuestasService } from './propuestas.service.js';
 
-/** M05 · Revisión del curso (HU-0501, HU-0502), M07 · narraciones (HU-0701), regeneración en cascada (HU-0503) y propuestas de la IA (HU-0504). */
-@Module({ imports: [RecursosModule, TrabajosModule], controllers: [CursosController, PropuestasController, CalidadController], providers: [CursosService, PropuestasService, CalidadService], exports: [CursosService] })
+/** M05 · Revisión del curso (HU-0501, HU-0502), M07 · narraciones (HU-0701), regeneración en cascada (HU-0503) y propuestas de la IA (HU-0504) y audio del cliente (HU-0704). */
+@Module({ imports: [RecursosModule, TrabajosModule], controllers: [CursosController, PropuestasController, CalidadController, GrabacionController], providers: [CursosService, PropuestasService, CalidadService, GrabacionService], exports: [CursosService] })
 export class CursosModule {}

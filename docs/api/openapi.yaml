@@ -2393,13 +2393,59 @@ paths:
           $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
-  /cursos/{cursoId}/narraciones/{pantallaId}/{idioma}/audio-cliente:
+  /cursos/{cursoId}/audios-cliente:
+    get:
+      tags:
+      - Personaje y voz
+      summary: Listar audios del cliente
+      operationId: get_cursos_cursoId_audios_cliente
+      description: >-
+        HU-0704. Los audios del cliente del proyecto del curso ya transcritos, con la transcripción unida (el texto que
+        tendrá la narración), la URL firmada del original y, si se pidió limpiar, el estado de la limpieza y la URL de la
+        versión limpia. Roles del equipo; el revisor del cliente recibe 403.
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AudioCliente'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/narraciones/{pantallaId}/grabacion:
     post:
       tags:
       - Personaje y voz
-      summary: Usar audio del cliente
-      operationId: post_cursos_cursoId_narraciones_pantallaId_idioma_audio_cliente
-      description: Limpia ruido, re-locuta o calcula la boca desde la grabación
+      summary: Usar la grabación del cliente con boca automática
+      operationId: post_cursos_cursoId_narraciones_pantallaId_grabacion
+      description: >-
+        HU-0704 (CP-074, REQ-023, RN-07-4). La grabación del cliente pasa a ser la narración en español de la pantalla.
+        Exige `autorizado` en true (si no, 422 `AUTORIZACION_REQUERIDA`) y un audio del proyecto del curso, listo y
+        transcrito (si no, 422 `AUDIO_NO_VALIDO`; también si se pide `usarLimpio` sin la versión limpia lista). En una
+        versión del curso, el texto de la narración pasa a ser la transcripción y la pista `es` queda con
+        `voz.proveedor` cliente, `grabacion` (material, audio usado, quién autorizó y cuándo) y estado pendiente; la
+        pantalla vuelve a borrador. El worker (cola voz, tarea GRABACION) pasa el audio a MP3 con ffmpeg, calcula la boca
+        con el calculador de la etapa 7 y arma el WebVTT con los segmentos reales de la transcripción; el MP3 queda como
+        recurso propio del curso (origen SUBIDO, licencia «Grabación del cliente») sin fecha de borrado. La narración
+        queda GENERANDO hasta entonces y luego ACTUALIZADA. La regeneración con la voz de la IA no toca una grabación.
+        Roles del equipo; el revisor del cliente recibe 403. 409 `VERSION_CAMBIO` si la versión cambió.
       parameters:
       - name: cursoId
         in: path
@@ -2412,33 +2458,110 @@ paths:
         required: true
         schema:
           type: string
-      - name: idioma
-        in: path
-        required: true
-        schema:
-          type: string
-          enum:
-          - es
-          - en
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AudioClienteEntrada'
+              $ref: '#/components/schemas/GrabacionEntrada'
       responses:
         '202':
-          description: OK
+          description: Narración cambiada; el worker deja su audio, su boca y sus subtítulos
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Trabajo202'
+                $ref: '#/components/schemas/GrabacionResultado'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /cursos/{cursoId}/narraciones/{pantallaId}/relocutar:
+    post:
+      tags:
+      - Personaje y voz
+      summary: Re-locutar con voz IA
+      operationId: post_cursos_cursoId_narraciones_pantallaId_relocutar
+      description: >-
+        HU-0704. La transcripción del audio del cliente pasa al texto de la narración en español con la voz del kit (o
+        la que ya tenía la pista si era de la IA); si la pista era una grabación, deja de serlo. Crea una versión, la
+        narración queda DESACTUALIZADA y se encola la regeneración en cascada (HU-0503). `textoAnterior` sirve para
+        «↶ Deshacer» con `PATCH /cursos/{cursoId}/pantallas/{pantallaId}` y motivo deshacer. 422 `AUDIO_NO_VALIDO` y
+        `SIN_CAMBIOS` como arriba. Roles del equipo; el revisor del cliente recibe 403.
+      parameters:
+      - name: cursoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: pantallaId
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RelocucionEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GrabacionResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /materiales/{materialId}/limpiar:
+    post:
+      tags:
+      - Personaje y voz
+      summary: Limpiar el ruido del audio del cliente
+      operationId: post_materiales_materialId_limpiar
+      description: >-
+        HU-0704 (REQ-024). Encola en la cola media la reducción de ruido y la normalización a −16 LUFS con ffmpeg
+        (afftdn y loudnorm). El resultado es un audio nuevo ligado al material, con la misma retención que el original,
+        que no se pisa; el estado se ve en `GET /cursos/{cursoId}/audios-cliente`. Sin ffmpeg en el worker la limpieza
+        queda en error con un mensaje claro y no se guarda nada. Si ya está lista o en curso, responde su estado.
+        422 `AUDIO_NO_VALIDO` si el material no es un audio listo y transcrito. Roles del equipo; el revisor recibe 403.
+      parameters:
+      - name: materialId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Limpieza en cola o ya hecha
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LimpiezaResultado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
   /voz/muestra:
@@ -5679,6 +5802,8 @@ components:
           enum:
           - tts
           - grabacion
+        grabacion:
+          $ref: '#/components/schemas/GrabacionNarracion'
         voz:
           type: string
         estado:
@@ -5746,21 +5871,138 @@ components:
           type: integer
           minimum: 0
           description: Narraciones DESACTUALIZADA o con error que entran en el pedido.
-    AudioClienteEntrada:
+    GrabacionEntrada:
       type: object
       required:
-      - recursoId
-      - accion
+      - materialId
       properties:
+        materialId:
+          type: string
+          format: uuid
+          description: Material de audio del proyecto, ya transcrito
+        autorizado:
+          type: boolean
+          description: El cliente autorizó usar esta grabación (RN-07-4). Sin true, 422 AUTORIZACION_REQUERIDA.
+        usarLimpio:
+          type: boolean
+          description: Usar la versión limpia en vez del original
+        version:
+          type: integer
+          minimum: 1
+          description: Versión del curso leída (bloqueo optimista)
+    RelocucionEntrada:
+      type: object
+      required:
+      - materialId
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+    GrabacionResultado:
+      type: object
+      required:
+      - version
+      - estado
+      - regenerando
+      properties:
+        version:
+          type: integer
+        estado:
+          type: string
+          enum:
+          - GENERANDO
+          - DESACTUALIZADA
+        regenerando:
+          type: array
+          items:
+            type: string
+        textoAnterior:
+          type: string
+          description: Re-locutar, el texto de la narración antes del cambio (para Deshacer)
+    GrabacionNarracion:
+      type: object
+      required:
+      - materialId
+      - autorizadoPor
+      - autorizadoEn
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        recursoOrigenId:
+          type: string
+          format: uuid
+        version:
+          type: string
+          enum:
+          - original
+          - limpio
+        autorizadoPor:
+          type: string
+        autorizadoEn:
+          type: string
+          format: date-time
+    AudioCliente:
+      type: object
+      required:
+      - materialId
+      - recursoId
+      - nombre
+      - duracionS
+      - texto
+      - url
+      - limpieza
+      properties:
+        materialId:
+          type: string
+          format: uuid
         recursoId:
           type: string
           format: uuid
-        accion:
+        nombre:
+          type: string
+        duracionS:
+          type: number
+          nullable: true
+        texto:
+          type: string
+          description: La transcripción unida
+        url:
+          type: string
+          format: uri
+        limpieza:
+          type: object
+          nullable: true
+          required:
+          - estado
+          properties:
+            estado:
+              type: string
+              enum:
+              - procesando
+              - listo
+              - error
+            recursoId:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+            error:
+              type: string
+    LimpiezaResultado:
+      type: object
+      required:
+      - estado
+      properties:
+        estado:
           type: string
           enum:
-          - usar-con-boca
-          - limpiar
-          - relocutar-ia
+          - procesando
+          - listo
     MuestraVoz:
       type: object
       required:

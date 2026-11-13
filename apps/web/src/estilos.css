@@ -2125,3 +2125,62 @@ ul.fila-chips {
 .video-opcion input[type='text'] { flex: 1; min-width: 0; padding: 8px 10px; border: 1px solid var(--color-borde); border-radius: var(--radio-control); font-size: var(--texto-base); }
 .video-opcion input[type='radio'] { width: 20px; height: 20px; }
 .video-obligatoria { display: flex; align-items: center; gap: 8px; font-size: var(--texto-sm); }
+
+/* HU-0704 · Personaje y voz: la tarjeta «Audio del cliente» y las narraciones con Ana; en el celular, una columna. */
+.voz-pagina {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.voz-columna {
+  min-width: 0;
+}
+.voz-cliente {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.voz-cliente h2 {
+  margin: 0;
+}
+.voz-cliente-campos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.voz-comparar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.voz-comparar > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.voz-comparar audio {
+  width: 100%;
+  height: 36px;
+}
+.voz-version {
+  display: flex;
+  gap: 16px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.voz-version legend {
+  font-size: var(--texto-sm);
+  margin-bottom: 4px;
+}
+.voz-autorizacion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@media (min-width: 1100px) {
+  .voz-pagina {
+    grid-template-columns: minmax(340px, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}

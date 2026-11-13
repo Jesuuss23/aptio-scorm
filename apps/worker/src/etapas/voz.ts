@@ -9,12 +9,15 @@
 // HU-0804 · Con `regenerarVoz.idioma: 'en'` dice el inglés de cada pantalla narrada que ya lo tiene, con `kit.voces.en`
 // o, sin ella, `en-US-Neural2-F` a la velocidad del español, y el diccionario del cliente en inglés. Guarda
 // `porIdioma.en`, la Narracion en inglés y `pNN-en.mp3`; el español no se toca. Las anclas siguen la voz en español.
+// HU-0704 · Una pista que es una grabación del cliente (`voz.proveedor: 'cliente'`) no se dice con la voz de la IA ni
+// se cuenta aquí: conserva su audio, su boca, sus subtítulos y su recurso en el curso.
 import { createHash, randomUUID } from 'node:crypto';
 import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, type Sintetizador, VozNoDisponible } from '@aptio/ai';
 import { Prisma } from '@aptio/db';
 import { validarCurso } from '@aptio/schema';
 import { duracionLegible, type NarracionLista, type VozCurso } from '@aptio/schema/generacion';
 import { marcasPalabra, mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, recalcularAnclas } from '@aptio/schema/tiempos';
+import { esGrabacion } from '@aptio/schema/grabacion';
 import { aplicarPronunciacion, type TerminoPronunciacion } from '@aptio/schema/voz';
 import { conProcedencia } from '../procedencia.js';
 import { type ContextoEtapa, type EjecutorEtapa, GeneracionCancelada } from '../generar.js';
@@ -87,7 +90,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
     const vozKit = (proyecto.cliente.kit?.voces as Partial<Record<IdiomaVoz, VozDoc>> | null | undefined)?.en;
 
     // En inglés: solo las pantallas narradas que ya tienen su inglés (las demás se listan en Idiomas).
-    const conNarracion = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto[idioma]?.trim() && p.narracion.porIdioma.es);
+    const conNarracion = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto[idioma]?.trim() && p.narracion.porIdioma.es && !esGrabacion(p.narracion.porIdioma[idioma]));
     /** La voz de la pantalla: la del curso o, en inglés sin voz todavía, la del kit o la predeterminada a la velocidad del español. */
     const vozDe = (p: PantallaDoc): VozDoc => {
       const propia = p.narracion!.porIdioma[idioma]?.voz;
@@ -211,7 +214,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
       const sinAncla: { pantallaId: string; id: string }[] = [];
       for (const p of pantallasDe(doc)) {
         const n = listas.get(p.id);
-        if (!n || !p.narracion?.porIdioma.es || p.narracion.texto[idioma]?.trim() !== n.texto) continue;
+        if (!n || !p.narracion?.porIdioma.es || esGrabacion(p.narracion.porIdioma[idioma]) || p.narracion.texto[idioma]?.trim() !== n.texto) continue;
         // En inglés, la primera voz crea su pista en el curso.
         const es = (p.narracion.porIdioma[idioma] ??= { estado: 'pendiente', voz: { proveedor: n.proveedor, voz: n.voz, velocidad: n.velocidad }, hashTexto: n.hash });
         // Con otro audio, la boca y los subtítulos anteriores ya no sirven (los rehacen las etapas 7 y 8) y la narración
@@ -229,7 +232,12 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         es.hashTexto = n.hash;
         usados.add(n.recursoId);
       }
-      const otros = doc.recursos.filter((r) => !(r.tipo === 'audio' && r.idioma === idioma));
+      // El audio de una grabación del cliente se queda en el curso (HU-0704).
+      const grabados = new Set(pantallasDe(doc).flatMap((p) => {
+        const pista = p.narracion?.porIdioma[idioma];
+        return esGrabacion(pista) && pista?.recursoAudioId ? [pista.recursoAudioId] : [];
+      }));
+      const otros = doc.recursos.filter((r) => !(r.tipo === 'audio' && r.idioma === idioma) || grabados.has(r.id));
       doc.recursos = [
         ...otros,
         ...[...listas.values()].filter((n) => usados.has(n.recursoId)).map((n) => ({

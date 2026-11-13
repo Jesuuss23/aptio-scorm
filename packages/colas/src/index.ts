@@ -27,6 +27,11 @@ export interface DatosTrabajo {
   traduccion?: { cursoId: string };
   /** HU-0505 · El curso que revisa el control de calidad (IA-12); `trabajoId` es entonces el TrabajoIA. */
   calidad?: { cursoId: string };
+  /**
+   * HU-0704 · Una grabación del cliente como narración en español de `pantallaId` (`trabajoId` es entonces el curso):
+   * el material de audio, el recurso que se usa (original o limpio) y quién autorizó usarla y cuándo (RN-07-4).
+   */
+  grabacion?: { materialId: string; recursoId: string; version: 'original' | 'limpio'; autorizadoPor: string; autorizadoEn: string };
 }
 
 export type EstadoTrabajo = 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';

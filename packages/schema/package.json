@@ -40,6 +40,7 @@
     "./disparadores": "./src/disparadores.ts",
     "./marcadores": "./src/marcadores.ts",
     "./pausas": "./src/pausas.ts",
-    "./biblioteca": "./src/biblioteca.ts"
+    "./biblioteca": "./src/biblioteca.ts",
+    "./grabacion": "./src/grabacion.ts"
   }
 }

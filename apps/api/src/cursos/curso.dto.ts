@@ -115,6 +115,14 @@ export class FiltroNarracionesDto {
 }
 
 /** HU-0701 · Una narración del curso: estado, duración, voz y el audio (URL firmada de 15 minutos). */
+export class GrabacionNarracionDto {
+  @ApiProperty({ format: 'uuid' }) materialId: string;
+  @ApiPropertyOptional({ format: 'uuid' }) recursoOrigenId?: string;
+  @ApiPropertyOptional({ enum: ['original', 'limpio'] }) version?: string;
+  @ApiProperty() autorizadoPor: string;
+  @ApiProperty({ format: 'date-time' }) autorizadoEn: string;
+}
+
 export class NarracionDto {
   @ApiProperty() pantallaId: string;
   @ApiProperty({ enum: ['es', 'en'] }) idioma: string;
@@ -126,4 +134,6 @@ export class NarracionDto {
   @ApiPropertyOptional({ format: 'uri' }) audioUrl?: string;
   @ApiPropertyOptional({ type: 'array', items: { type: 'array', items: {} }, description: "[[ms, 'A'..'X'], …]" }) bocas?: unknown[];
   @ApiPropertyOptional({ format: 'uri', description: 'HU-0801 · WebVTT de la narración (URL firmada de 15 minutos)' }) subtitulosUrl?: string;
+  @ApiPropertyOptional({ type: () => GrabacionNarracionDto, description: 'HU-0704 · Origen grabacion: el audio del cliente y su autorización (RN-07-4)' }) grabacion?: GrabacionNarracionDto;
 }
+

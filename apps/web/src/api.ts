@@ -288,6 +288,27 @@ export interface Narracion {
   bocas?: unknown[];
   /** HU-0801 · WebVTT firmado. */
   subtitulosUrl?: string;
+  /** HU-0704 · Origen grabacion: el material, la versión del audio y quién autorizó usarla y cuándo. */
+  grabacion?: { materialId: string; recursoOrigenId?: string; version?: 'original' | 'limpio'; autorizadoPor: string; autorizadoEn: string };
+}
+
+/** HU-0704 · Un audio del cliente transcrito, con su versión limpia si se pidió. */
+export interface AudioCliente {
+  materialId: string;
+  recursoId: string;
+  nombre: string;
+  duracionS: number | null;
+  texto: string;
+  url: string;
+  limpieza: { estado: 'procesando' | 'listo' | 'error'; recursoId?: string; url?: string; error?: string } | null;
+}
+
+/** HU-0704 · Respuesta de usar o re-locutar la grabación. */
+export interface ResultadoGrabacion {
+  version: number;
+  estado: 'GENERANDO' | 'DESACTUALIZADA';
+  regenerando: string[];
+  textoAnterior?: string;
 }
 
 /** HU-0502 · Resultado de editar o aprobar. */
@@ -513,6 +534,12 @@ export const api = {
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),
   editarCliente: (id: string, datos: Partial<ClienteEntrada>) => pedir<Cliente>(`/clientes/${id}`, json(datos, 'PATCH')),
   narraciones: (cursoId: string, idioma: 'es' | 'en' = 'es') => pedir<Narracion[]>(`/cursos/${cursoId}/narraciones?idioma=${idioma}`),
+  /** HU-0704 · Audio del cliente: listar, usar como narración (RN-07-4), limpiar ruido y re-locutar con la voz del kit. */
+  audiosCliente: (cursoId: string) => pedir<AudioCliente[]>(`/cursos/${cursoId}/audios-cliente`),
+  usarGrabacion: (cursoId: string, pantallaId: string, datos: { materialId: string; autorizado: boolean; usarLimpio?: boolean; version: number }) =>
+    pedir<ResultadoGrabacion>(`/cursos/${cursoId}/narraciones/${pantallaId}/grabacion`, json(datos)),
+  relocutar: (cursoId: string, pantallaId: string, datos: { materialId: string; version: number }) => pedir<ResultadoGrabacion>(`/cursos/${cursoId}/narraciones/${pantallaId}/relocutar`, json(datos)),
+  limpiarAudio: (materialId: string) => pedir<{ estado: 'procesando' | 'listo' }>(`/materiales/${materialId}/limpiar`, { method: 'POST' }),
   regenerarNarraciones: (cursoId: string, datos: { pantallaIds?: string[]; soloDesactualizadas?: boolean; idiomas?: ('es' | 'en')[] } = {}) =>
     pedir<Regeneracion>(`/cursos/${cursoId}/narraciones/regenerar`, json(datos)),
   observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
