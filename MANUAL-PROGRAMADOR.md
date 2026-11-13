@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.59 · actualizado con la séptima entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.60 · actualizado con la octava entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -48,6 +48,7 @@ packages/
   almacen/    S3 cifrado con KMS, URLs firmadas, tipos permitidos, saneo de SVG (@aptio/almacen)
   ui/         tokens visuales, estilos base y estructura de la interfaz (@aptio/ui)
   player/     reproductor único del curso: vista previa y paquete, con las 8 interacciones (@aptio/player)
+  sitio/      HTML pre-renderizado del sitio comercial, fuentes, cabeceras y Lighthouse (@aptio/sitio)
 docs/         especificación: módulos, historias, API, ADR, diseño, ESTADO.md
 ```
 
@@ -65,6 +66,7 @@ docs/         especificación: módulos, historias, API, ADR, diseño, ESTADO.md
 | `pnpm web:e2e` | Playwright contra la API simulada de `apps/web/e2e/api-simulada.ts` |
 | `pnpm ia:casos` | Valida las salidas grabadas del caso LOTO contra sus esquemas |
 | `pnpm openapi:lint` | Lint del contrato `docs/api/openapi.yaml` (hoy: 0 errores y 7 avisos aceptados) |
+| `pnpm sitio:lighthouse` | Lighthouse de la portada pre-renderizada en celular: LCP < 2,5 s, SEO ≥ 90 y accesibilidad ≥ 90 (informe en `packages/sitio/lighthouse/`) |
 | `pnpm db:migrate` / `db:seed` / `db:generate` | Migraciones, datos de ejemplo y cliente de Prisma |
 
 Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test pnpm ci`.
@@ -90,6 +92,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - **Superadmin (ADR-011):** `SUPERADMIN` no tiene organización (`organizacionId` null). Las rutas de la fase comercial (`/sitio/*`, y más adelante `/ventas/*`) llevan `@Roles('SUPERADMIN')` en el controlador (`apps/api/src/sitio/`); en la web, el grupo «Sitio web» de `menu.ts` se muestra solo a `VEN_SITIO` y `App.tsx` lleva al superadmin a `/sitio` desde cualquier otra ruta.
 - **Rutas públicas:** `/publico/*` lleva `@Publico()` y pasa por `LimitePublicoMiddleware` (60 peticiones por minuto por IP, 429 DEMASIADAS_SOLICITUDES). En las pruebas, `app.get(LimitePublicoService).reiniciar()` vacía las ventanas.
 - **Versiones del sitio (HU-1507):** `SitioVersion` (migración `20261113140000_sitio_versiones`) guarda instantáneas inmutables del sitio completo. Las funciones puras viven en `@aptio/schema/sitio-versiones` (`armarPagina`, `armarInstantanea`, `hayPendientes` con JSON canónico, `ficticiosDeInstantanea`, `paginaServida`, `leerInstantanea`); `@aptio/db` lee las tablas con `armarInstantaneaActual`, `ultimaVersion` y `crearVersion` (transacción con número siguiente y reintento ante P2002), que usan `VersionesService` de la API y `publicarProgramadas` del worker (origen `programada`). `VersionesController` expone `POST /sitio/publicar`, `GET /sitio/versiones`, `POST /sitio/versiones/{numero}/restaurar` y `GET /sitio/paginas/{paginaId}/vista-previa`; `SitioService` crea una versión con origen `pagina` al publicar o retirar una página, y `/publico/paginas`, `/publico/navegacion` y el sitemap leen `ultimaVersion`. En la web, `vistas/publicacion-sitio.ts` (hook `usePublicacionSitio`), `SitioVersiones.tsx` (`AccionPublicar`, `AvisosPublicacion`, `TarjetaVersiones`) y `SitioVistaPrevia.tsx`. Como las versiones son globales, el CI corre Vitest con `pnpm --workspace-concurrency=1 test` y las pruebas de la API publican antes de mirar el sitio público.
+- **Sitio público pre-renderizado (HU-1508, DA-08):** el paquete `@aptio/sitio` arma el HTML con `react-dom/server` (`renderToStaticMarkup`) y `createElement`, sin JSX, porque la API y el worker consumen los paquetes como fuente TypeScript. `renderizarSitio(instantanea, opciones)` devuelve cada página (`index.html` por ruta, inglés bajo `en/`), `404.html`, `sitemap.xml` y `robots.txt`; las opciones salen de `opcionesRenderDesdeEnv` (`SITIO_ENTORNO`, `SITIO_URL`, `SITIO_BASE`). Los estilos están en `estilos.ts` (CSS crítico en línea) y los textos fijos de los bloques en `textos.ts`. Las fuentes vienen de @fontsource y se publican como `{familia}-{peso}-{sha8}.woff2` (`fuentes()`, `leerFuente`). `servir.ts` traduce la ruta pedida (`resolverPedido`, que rechaza todo lo que no sea minúsculas, números y guiones) y da las cabeceras (`cabecerasSitio`, `noModificado`). En el worker, `apps/worker/src/sitio-prerender.ts` atiende la tarea `sitio-prerender` de la cola `mantenimiento` (`TAREA_PRERENDER`, `idPrerender(n)` en `@aptio/colas`): sube `sitio/v{n}/…`, las fuentes que falten y al final el puntero `sitio/actual.json`, que solo avanza; el estado queda en `SitioVersion.prerenderEstado`, `prerenderEn` y `prerenderError` (migración `20261113150000_sitio_prerender`). En la API, `PrerenderService` encola desde `VersionesService.nuevaVersion` (si Redis no responde en 2 s, la versión queda en error) y `SitioPublicoController` sirve `GET /s/*` fuera del prefijo (`setGlobalPrefix` con `exclude`), con `SitioPublicoService`, que guarda el puntero 5 s y los archivos por versión en memoria. Vite reenvía `/s/` a la API. `pnpm sitio:lighthouse` mide la portada de ejemplo (usa `CHROME_PATH` o el Chromium de Playwright).
 - **Menú y pie (HU-1506):** `SitioEnlace` (migración `20261113130000_sitio_enlaces`) guarda el menú (`zona` `menu`, sin padre) y el pie (`zona` `pie`: columnas sin padre y enlaces con `padreId`, borrado en cascada). Las reglas viven en `@aptio/schema/sitio-navegacion`: `validarRuta`, `validarTextoEnlace`, `validarUbicacion`, `hermanosDe`, `arbolNavegacion` y `navegacionPublica`; el orden reutiliza `validarOrden` de `sitio-bloques`, por grupo de hermanos (`zona` y `padreId`). `NavegacionService` y `NavegacionController` sirven `/sitio/navegacion`, y `PublicoController` suma `GET /publico/navegacion`. La web lo muestra en `SitioNavegacion.tsx`, dentro de `SitioPaginas.tsx`, y la API simulada acepta la opción `enlacesSitio`.
 - **Datos ficticios (HU-1505):** `entornoSitio`, `ficticiosVisibles`, `bloqueaPublicacion` y `elementosParaPublico` viven en `@aptio/schema/sitio-ficticios`. La API lee el entorno con `entornoActual()` (`apps/api/src/sitio/entorno-sitio.ts`, en cada uso, así las pruebas cambian `process.env.SITIO_ENTORNO`) y el worker pasa el entorno a `publicarProgramadas(bd, ahora, entorno)`. En la API simulada, la opción `entornoSitio` (por defecto `produccion`).
 - **Contenido del sitio (HU-1504):** las colecciones y sus campos (`COLECCIONES_CONTENIDO`), `validarDatos` (texto plano, RN-16-7), `mezclarDatos` y `elementosDeBloque` viven en `@aptio/schema/sitio-contenido`; las usan `ElementosService`, `SitioService.publica`, `SitioContenido.tsx` y la API simulada. Sumar un campo es agregarlo ahí (sin migración, `datos` es JSON) y al texto de `DatosElemento` del OpenAPI.
@@ -350,8 +353,9 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
   - el cliente de PostgreSQL 16 para las copias de seguridad (se instala si falta);
   - Vitest, `ia:casos` y lint de OpenAPI.
 - **Flujos de la web:** Playwright con Chromium.
+- **Sitio público (Lighthouse):** `pnpm sitio:lighthouse` con el Google Chrome del runner; sube el informe como artefacto.
 
-Para que un PR en rojo no se pueda fusionar, el administrador del repositorio debe exigir ambos controles en la protección de `main`.
+Para que un PR en rojo no se pueda fusionar, el administrador del repositorio debe exigir los tres controles en la protección de `main`.
 
 ## 10. Variables de entorno principales
 
@@ -363,7 +367,8 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `AWS_*`, `S3_BUCKET_NAME`, `KMS_KEY_ID` | api, worker | Almacenamiento cifrado |
 | `SMTP_URL`, `CORREO_REMITENTE` | api, worker | Invitaciones, recuperación de clave, aviso de comentario nuevo (api) y aviso del límite de gasto (worker) |
 | `S3_BUCKET_RESPALDOS` | worker, `respaldo:restaurar` | Bucket de las copias de seguridad (por defecto `aptio-scorm-respaldos`) |
-| `SITIO_URL` | api | Dominio del sitio comercial para el sitemap (por defecto `https://aptioscorm.com`, hasta la HU-1509) |
+| `SITIO_URL` | api, worker | Dominio del sitio comercial para el canonical y el sitemap (por defecto `https://aptioscorm.com`, hasta la HU-1509) |
+| `SITIO_BASE` | api, worker | Base de las rutas del sitio pre-renderizado (por defecto `/s`; vacío en producción detrás de la CDN, HU-1508) |
 | `SITIO_ENTORNO` | api, worker | `pruebas` o `produccion` (por defecto). En producción, los datos ficticios visibles bloquean publicar (HU-1505) |
 | `PG_BIN_DIR` | worker, `respaldo:restaurar` | Carpeta de `pg_dump` y `pg_restore` de la versión del servidor (en CI, `/usr/lib/postgresql/16/bin`) |
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
@@ -432,6 +437,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.60 | 2026-11-13 | HU-1508: el paquete `@aptio/sitio`, la tarea `sitio-prerender` del worker y el puntero `sitio/actual.json`, la migración `20261113150000_sitio_prerender`, `PrerenderService`, `GET /s/*` fuera del prefijo con `SitioPublicoService`, `SITIO_BASE`, el proxy `/s/` de Vite, `pnpm sitio:lighthouse` y su trabajo en el CI. |
 | 0.59 | 2026-11-13 | HU-1507: `SitioVersion` y la migración `20261113140000_sitio_versiones`, `@aptio/schema/sitio-versiones`, `armarInstantaneaActual`, `ultimaVersion` y `crearVersion` en `@aptio/db`, `VersionesService` y `VersionesController`, el sitio público desde la última versión, la versión `programada` del worker, las vistas `SitioVersiones` y `SitioVistaPrevia`, y Vitest en serie en el CI. |
 | 0.58 | 2026-11-13 | HU-1506: `SitioEnlace` y la migración `20261113130000_sitio_enlaces`, `@aptio/schema/sitio-navegacion`, `NavegacionService` y `NavegacionController` (`/sitio/navegacion`), `GET /publico/navegacion`, `SitioNavegacion.tsx` en Páginas y `enlacesSitio` en la API simulada. |
 | 0.53 | 2026-11-13 | HU-1501: el módulo `sitio` de la API con `GET /sitio/paginas` solo para SUPERADMIN, el grupo «Sitio web» en `menu.ts`, `VEN_SITIO` y `SitioResumen.tsx`, y las pruebas `sitio.e2e.test.ts` y `sitio.spec.ts`. |

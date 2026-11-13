@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.59 · actualizado con la séptima entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.60 · actualizado con la octava entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -734,6 +734,14 @@ La tarjeta **Versiones**, al final de Páginas, lista las últimas 50 con su nú
 
 Para volver atrás, pulsa **Restaurar** en una versión anterior y confirma con **Sí, restaurar**. El sitio vuelve a mostrar exactamente esa versión y se guarda como una versión nueva (por ejemplo, restaurar la 1 cuando el sitio está en la 3 crea la 4). Lo que estás editando en el panel **no cambia**: por eso, después de restaurar, puede aparecer **Cambios sin publicar**. En el sitio real no se puede restaurar una versión que tenga datos ficticios.
 
+**Ver el sitio.** En la tarjeta **Versiones**, el botón **Ver el sitio** abre en otra pestaña el sitio tal como lo ve el público. Después de cada publicación el sitio se prepara solo y el distintivo de la tarjeta lo indica:
+
+- **Preparando el sitio:** el sitio se está preparando; en unos segundos muestra la versión nueva. La tarjeta se actualiza sola.
+- **Sitio listo:** el público ya ve la versión que dice **En el sitio**.
+- **Error al preparar el sitio:** el público sigue viendo la versión anterior. La tarjeta muestra el motivo; se vuelve a intentar con la próxima publicación.
+
+El sitio público carga rápido en el celular y se puede recorrer con el teclado. En el celular el menú se abre con el botón **Menú**. Los enlaces a otros sitios se abren en otra pestaña. Una dirección que no existe muestra **Página no encontrada** con el botón **Ir al inicio**. Los cambios pueden tardar hasta un minuto en verse. En el sitio de pruebas, arriba aparece un aviso y cada dato ficticio lleva la marca «Dato de ejemplo».
+
 Si otra persona escribe la dirección del sitio web en el navegador, ve «Página no encontrada».
 
 ## 9. Preguntas frecuentes
@@ -827,6 +835,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.60 | 2026-11-13 | «Ver el sitio» y el estado del sitio público en la tarjeta Versiones (8.28): preparando, listo o error; el sitio rápido, con menú de celular y página no encontrada. |
 | 0.59 | 2026-11-13 | Publicar cambios, versiones, restaurar y vista previa en Escritorio y Celular (8.28). Los cambios de bloques, contenido, menú y pie llegan al sitio al publicar. |
 | 0.58 | 2026-11-13 | Menú principal y pie de página (8.28): agregar, editar, mostrar u ocultar, ordenar y borrar enlaces y columnas, y la línea «En el sitio». |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
