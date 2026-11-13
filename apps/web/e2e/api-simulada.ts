@@ -135,6 +135,8 @@ export interface OpcionesSimulacion {
   comentarios?: ComentarioSim[];
   /** HU-1502 · Páginas del sitio con que arranca la simulación. */
   paginasSitio?: PaginaSitioSim[];
+  /** HU-1503 · Bloques de las páginas del sitio. */
+  bloquesSitio?: BloqueSitioSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -362,10 +364,16 @@ export interface PaginaSitioSim {
   id: string; ruta: string; idioma: 'es' | 'en'; titulo: string; estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
   publicarEn: string | null; publicadaEn: string | null; creadoEn: string; actualizadoEn: string;
 }
+/** HU-1503 · Bloque de una página del sitio en la simulación. */
+export interface BloqueSitioSim {
+  id: string; paginaId: string; tipo: string; orden: number; visible: boolean; ajustes: Record<string, unknown> | null; creadoEn: string; actualizadoEn: string;
+}
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [] }: OpcionesSimulacion) {
   const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ ...p }));
+  const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
+  let bloquesCreados = 0;
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -587,6 +595,38 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       }
       const p = paginasSim.find((x) => x.id === ruta.split('/')[3]);
       if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La página no existe' });
+      // HU-1503 · Bloques: al final y ocultos; reordenar con la lista completa; borrar compacta el orden.
+      const enBloques = ruta.match(/^\/sitio\/paginas\/[^/]+\/bloques(?:\/([^/]+))?$/);
+      if (enBloques) {
+        const propios = () => bloquesSim.filter((x) => x.paginaId === p.id).sort((a, c) => a.orden - c.orden);
+        const bloqueId = enBloques[1];
+        if (!bloqueId && metodo === 'GET') return responder(200, propios());
+        if (!bloqueId && metodo === 'POST') {
+          const b = req.postDataJSON() as { tipo: string };
+          const nuevo: BloqueSitioSim = { id: `00000000-0000-4000-9000-${String(++bloquesCreados).padStart(12, '0')}`, paginaId: p.id, tipo: b.tipo, orden: propios().length, visible: false, ajustes: null, creadoEn: ahora, actualizadoEn: ahora };
+          bloquesSim.push(nuevo);
+          return responder(201, nuevo);
+        }
+        if (!bloqueId && metodo === 'PATCH') {
+          const { orden } = req.postDataJSON() as { orden: string[] };
+          const actuales = propios();
+          if (orden.length !== actuales.length || new Set(orden).size !== orden.length || !orden.every((id) => actuales.some((x) => x.id === id))) {
+            return responder(422, { codigo: 'ORDEN_INVALIDO', mensaje: 'Falta un bloque de la página en la lista' });
+          }
+          orden.forEach((id, i) => { actuales.find((x) => x.id === id)!.orden = i; });
+          return responder(200, propios());
+        }
+        const bloque = bloquesSim.find((x) => x.id === bloqueId && x.paginaId === p.id);
+        if (!bloque) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El bloque no existe en esta página' });
+        if (metodo === 'DELETE') {
+          bloquesSim.splice(bloquesSim.indexOf(bloque), 1);
+          propios().forEach((x, i) => { x.orden = i; });
+          return responder(204);
+        }
+        bloque.visible = (req.postDataJSON() as { visible: boolean }).visible;
+        bloque.actualizadoEn = ahora;
+        return responder(200, bloque);
+      }
       if (metodo === 'DELETE') {
         if (p.estado !== 'BORRADOR') return responder(422, { codigo: 'PAGINA_NO_BORRADOR', mensaje: 'Solo se borra una página en borrador: pásala a borrador primero' });
         paginasSim.splice(paginasSim.indexOf(p), 1);

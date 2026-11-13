@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RUTA_SITIO } from '@aptio/db';
-import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { TIPOS_BLOQUE } from '@aptio/schema/sitio-bloques';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
 
 export const IDIOMAS_SITIO = ['es', 'en'] as const;
 export const ESTADOS_PAGINA = ['BORRADOR', 'PROGRAMADA', 'PUBLICADA'] as const;
@@ -47,12 +48,48 @@ export class PaginaSitioCambioDto extends CamposAccion {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(120) titulo?: string;
 }
 
+/** HU-1503 · Bloque de una página (REQ-066). Nace oculto (RN-16-2). */
+export class BloqueSitioDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ format: 'uuid' }) paginaId: string;
+  @ApiProperty({ enum: TIPOS_BLOQUE }) tipo: string;
+  @ApiProperty({ minimum: 0, description: 'Posición 0, 1, 2… sin huecos' }) orden: number;
+  @ApiProperty() visible: boolean;
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true, description: 'Datos propios del bloque; ocultarlo no los borra (CP-112)' })
+  ajustes: Record<string, unknown> | null;
+  @ApiProperty({ format: 'date-time' }) creadoEn: string;
+  @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
+}
+
+export class BloqueSitioEntradaDto {
+  @ApiProperty({ enum: TIPOS_BLOQUE, description: 'Catálogo cerrado; va al final y oculto' })
+  @IsIn(TIPOS_BLOQUE, { message: 'tipo no está en el catálogo de bloques' }) tipo: string;
+  @ApiPropertyOptional({ type: 'object', additionalProperties: true, description: 'Datos del bloque (hasta 20 000 caracteres en JSON)' })
+  @IsOptional() @IsObject() ajustes?: Record<string, unknown>;
+}
+
+export class OrdenBloquesDto {
+  @ApiProperty({ type: [String], format: 'uuid', description: 'Todos los bloques de la página, una vez cada uno, en el orden nuevo' })
+  @IsArray() @ArrayMaxSize(100) @IsUUID('all', { each: true }) orden: string[];
+}
+
+export class BloqueSitioCambioDto {
+  @ApiProperty({ description: 'Mostrar u ocultar; los ajustes no cambian (CP-112)' }) @IsBoolean() visible: boolean;
+}
+
+/** HU-1503 · Bloque tal como lo ve el sitio público: solo visibles y en su orden. */
+export class BloquePublicoDto {
+  @ApiProperty({ enum: TIPOS_BLOQUE }) tipo: string;
+  @ApiProperty({ type: 'object', additionalProperties: true, nullable: true }) ajustes: Record<string, unknown> | null;
+}
+
 /** HU-1502 · Lo que ve el sitio público de una página publicada. */
 export class PaginaPublicaDto {
   @ApiProperty() ruta: string;
   @ApiProperty({ enum: IDIOMAS_SITIO }) idioma: string;
   @ApiProperty() titulo: string;
   @ApiProperty({ format: 'date-time' }) publicadaEn: string;
+  @ApiProperty({ type: [BloquePublicoDto], description: 'HU-1503 · Solo los visibles, en orden (CP-112, CP-113)' }) bloques: BloquePublicoDto[];
 }
 
 export class ConsultaPaginaPublicaDto {

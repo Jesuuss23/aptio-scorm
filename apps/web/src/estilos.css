@@ -2636,3 +2636,126 @@ ul.fila-chips {
   align-items: center;
   gap: 12px;
 }
+
+/* HU-1503 · Editor de página por bloques (PNT-26). */
+.editor-pagina {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .editor-pagina {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.tarjeta-cabeza {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.tarjeta-cabeza h2 {
+  margin: 0;
+}
+.selector-pagina {
+  min-width: 220px;
+}
+.lista-bloques {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.bloque-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  background: var(--color-superficie);
+}
+.bloque-fila.oculto {
+  border-style: dashed;
+}
+.bloque-fila.oculto b {
+  text-decoration: line-through;
+}
+.bloque-orden {
+  display: flex;
+  gap: 4px;
+}
+.boton.icono {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  justify-content: center;
+}
+.bloque-texto {
+  flex: 1 1 160px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bloque-fila .confirmar-fila {
+  flex-basis: 100%;
+}
+.interruptor {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 1px solid var(--color-texto-sec);
+  border-radius: 999px;
+  background: var(--color-superficie);
+  cursor: pointer;
+}
+.interruptor span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-texto-sec);
+  transition: left 0.15s;
+}
+.interruptor[aria-checked='true'] {
+  background: var(--color-validado);
+  border-color: var(--color-validado);
+}
+.interruptor[aria-checked='true'] span {
+  left: 21px;
+  background: var(--color-superficie);
+}
+.interruptor:focus-visible {
+  outline: 2px solid var(--color-cobalto);
+  outline-offset: 2px;
+}
+.interruptor:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .interruptor span {
+    transition: none;
+  }
+}
+.datos-pagina {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+}
+.datos-pagina dt {
+  color: var(--color-texto-sec);
+}
+.datos-pagina dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

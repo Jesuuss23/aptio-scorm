@@ -753,7 +753,26 @@ model SitioPagina {
   publicadaEn   DateTime?
   creadoEn      DateTime     @default(now())
   actualizadoEn DateTime     @updatedAt
+  bloques       SitioBloque[]
 
   @@unique([ruta, idioma])
   @@index([estado, publicarEn])
+}
+
+/// Bloque de una página del sitio comercial (HU-1503, REQ-066). El tipo sale
+/// del catálogo cerrado `TIPOS_BLOQUE` de `@aptio/schema`; nace oculto (RN-16-2).
+model SitioBloque {
+  id            String      @id @default(uuid()) @db.Uuid
+  paginaId      String      @db.Uuid
+  pagina        SitioPagina @relation(fields: [paginaId], references: [id], onDelete: Cascade)
+  tipo          String
+  /// Posición 0, 1, 2… sin huecos dentro de la página.
+  orden         Int
+  visible       Boolean     @default(false)
+  /// Datos propios del bloque; ocultarlo no los borra (CP-112).
+  ajustes       Json?
+  creadoEn      DateTime    @default(now())
+  actualizadoEn DateTime    @updatedAt
+
+  @@index([paginaId, orden])
 }

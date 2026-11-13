@@ -22,6 +22,7 @@ import { Rentabilidad } from './vistas/Rentabilidad';
 import { ConexionesIA } from './vistas/ConexionesIA';
 import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
+import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
 
@@ -76,7 +77,9 @@ export function App() {
   const vista = resolverVista(camino);
   const ruta = !vista
     ? ['Inicio', 'Página no encontrada']
-    : vista.id
+    : vista.sub === 'editor-pagina'
+      ? [vista.grupo, 'Páginas', vista.nombre]
+      : vista.id
       ? vista.sub
         ? [vista.grupo, 'Proyectos', titulo || 'Proyecto', vista.nombre]
         : [vista.grupo, vista.activo === '/' ? 'Proyectos' : 'Clientes y kits', titulo || vista.nombre]
@@ -98,7 +101,9 @@ export function App() {
       alSalir={salir}
       pie={veConexiones && conexiones ? <MedidorCostoIA resumen={conexiones} /> : null}
     >
-      {vista?.sub === 'vista-previa' ? (
+      {vista?.sub === 'editor-pagina' && veSitio ? (
+        <EditorPaginaSitio key={vista.id} paginaId={vista.id!} />
+      ) : vista?.sub === 'vista-previa' ? (
         <VistaPrevia key={vista.id + busqueda} proyectoId={vista.id!} alCargar={alCargar} prueba={new URLSearchParams(busqueda)} />
       ) : vista?.sub === 'entrega' ? (
         <EntregaVista key={vista.id} proyectoId={vista.id!} rol={usuario.rol} alCargar={alCargar} />
@@ -132,7 +137,7 @@ export function App() {
         <Rentabilidad rol={usuario.rol} />
       ) : vista?.activo === '/nuevo' && puedeCrear ? (
         <NuevoScorm />
-      ) : vista?.id ? (
+      ) : vista?.activo === '/clientes' && vista.id ? (
         <ClienteDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/clientes' ? (
         <Clientes rol={usuario.rol} />

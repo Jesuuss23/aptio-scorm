@@ -593,6 +593,17 @@ export interface PaginaSitio {
 export type AccionPagina = 'borrador' | 'programar' | 'publicar';
 export interface PaginaSitioEntrada { ruta: string; idioma: 'es' | 'en'; titulo: string }
 export interface PaginaSitioCambio { ruta?: string; titulo?: string; accion?: AccionPagina; publicarEn?: string }
+/** HU-1503 · Bloque de una página del sitio (REQ-066). Nace oculto (RN-16-2). */
+export interface BloqueSitio {
+  id: string;
+  paginaId: string;
+  tipo: string;
+  orden: number;
+  visible: boolean;
+  ajustes: Record<string, unknown> | null;
+  creadoEn: string;
+  actualizadoEn: string;
+}
 export type { Operacion };
 export interface ConexionIA {
   tarea: 'TEXTO' | 'PANTALLAS' | 'TRADUCCION' | 'CALIDAD' | 'VOZ' | 'IMAGEN' | 'BOCA' | 'TRANSCRIPCION';
@@ -628,6 +639,11 @@ export const api = {
   crearPaginaSitio: (datos: PaginaSitioEntrada) => pedir<PaginaSitio>('/sitio/paginas', json(datos)),
   cambiarPaginaSitio: (id: string, datos: PaginaSitioCambio) => pedir<PaginaSitio>(`/sitio/paginas/${id}`, json(datos, 'PATCH')),
   borrarPaginaSitio: (id: string) => pedir<void>(`/sitio/paginas/${id}`, { method: 'DELETE' }),
+  bloquesPagina: (paginaId: string) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`),
+  agregarBloque: (paginaId: string, tipo: string) => pedir<BloqueSitio>(`/sitio/paginas/${paginaId}/bloques`, json({ tipo })),
+  ordenarBloques: (paginaId: string, orden: string[]) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`, json({ orden }, 'PATCH')),
+  mostrarBloque: (paginaId: string, bloqueId: string, visible: boolean) => pedir<BloqueSitio>(`/sitio/paginas/${paginaId}/bloques/${bloqueId}`, json({ visible }, 'PATCH')),
+  borrarBloque: (paginaId: string, bloqueId: string) => pedir<void>(`/sitio/paginas/${paginaId}/bloques/${bloqueId}`, { method: 'DELETE' }),
   respaldar: () => pedir<{ encolado: boolean }>('/operacion/respaldar', { method: 'POST' }),
   guardarConexionIA: (tarea: ConexionIA['tarea'], datos: ConexionEntrada) => pedir<ConexionIA>(`/conexiones-ia/${tarea.toLowerCase()}`, json(datos, 'PUT')),
   probarConexionIA: (tarea: ConexionIA['tarea']) => pedir<PruebaConexion>(`/conexiones-ia/${tarea.toLowerCase()}/probar`, { method: 'POST' }),
