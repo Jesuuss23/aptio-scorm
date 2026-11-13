@@ -11,6 +11,7 @@ import { navegacionPublica, type NavegacionPublica } from './sitio-navegacion.js
 import { ajustesPublicados, type AjustesSitio, type SitioPublicado } from './sitio-ajustes.js';
 import { sectorPublicado, type SectorPublicado, testimoniosDeSector } from './sitio-sectores.js';
 import { type Redireccion, seoPublicado, type SeoPublicado } from './sitio-seo.js';
+import { leerBloqueados } from './sitio-seo-ia.js';
 
 export const ORIGENES_VERSION = ['publicacion', 'pagina', 'programada', 'restauracion'] as const;
 export type OrigenVersion = (typeof ORIGENES_VERSION)[number];
@@ -50,6 +51,10 @@ export interface Instantanea {
   redirecciones?: { desde: string; hacia: string }[];
   /** HU-1512 · Las reglas extra de robots.txt, ya validadas; falta si no hay. */
   robotsExtra?: string;
+  /** HU-1513 · El contenido de `/llms.txt`; falta si está vacío (el sitio responde 404). */
+  llmsTxt?: string;
+  /** HU-1513 · CP-126 · Los rastreadores de IA bloqueados en robots.txt; falta si todos están permitidos. */
+  rastreadoresBloqueados?: string[];
 }
 
 /** Filas tal como salen de la base (solo los campos que usa la armadora). */
@@ -127,6 +132,8 @@ export function armarInstantanea(datos: {
   paginas: readonly FilaPagina[]; elementos: readonly FilaElemento[]; enlaces: readonly FilaEnlace[]; ajustes?: AjustesSitio | null;
   /** HU-1512 · Solo entran las activas, por origen. */
   redirecciones?: readonly Redireccion[]; robotsExtra?: string | null;
+  /** HU-1513 · Solo entran con contenido o con algún bloqueado, para no marcar cambios sobre las versiones de antes. */
+  llmsTxt?: string | null; rastreadoresBloqueados?: readonly string[] | null;
 }, entorno: EntornoSitio): Instantanea {
   const paginas = datos.paginas
     .filter((p) => p.estado === 'PUBLICADA')
@@ -134,6 +141,7 @@ export function armarInstantanea(datos: {
     .map((p) => armarPagina(p, datos.elementos, entorno));
   // Sin fila de ajustes la instantánea queda igual que antes de la HU-1509 (no marca cambios pendientes).
   const en = navegacionPublica(delIdioma(datos.enlaces, 'en'));
+  const bloqueados = leerBloqueados(datos.rastreadoresBloqueados);
   const redirecciones = (datos.redirecciones ?? []).filter((r) => r.activa).map((r) => ({ desde: r.desde, hacia: r.hacia })).sort((a, b) => a.desde.localeCompare(b.desde));
   return {
     formato: 1, paginas, navegacion: navegacionPublica(delIdioma(datos.enlaces, 'es')),
@@ -141,6 +149,8 @@ export function armarInstantanea(datos: {
     ...(datos.ajustes ? { sitio: ajustesPublicados(datos.ajustes) } : {}),
     ...(redirecciones.length ? { redirecciones } : {}),
     ...(datos.robotsExtra?.trim() ? { robotsExtra: datos.robotsExtra.trim() } : {}),
+    ...(datos.llmsTxt?.trim() ? { llmsTxt: datos.llmsTxt.trim() } : {}),
+    ...(bloqueados.length ? { rastreadoresBloqueados: bloqueados } : {}),
   };
 }
 

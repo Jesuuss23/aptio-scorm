@@ -690,6 +690,36 @@ export interface ProblemaSeo {
 }
 /** HU-1512 · Sitio web › SEO (PNT-29). */
 export interface SeoSitio { robotsExtra: string; robotsVistaPrevia: string; redirecciones: RedireccionSitio[]; problemas: ProblemaSeo[] }
+/** HU-1513 · Sitio web › SEO para IA (PNT-30). */
+export type EstadoMencionIa = 'sin_revisar' | 'si' | 'no';
+export type AsistenteIaId = 'chatgpt' | 'claude' | 'gemini' | 'perplexity';
+export interface PreguntaIa {
+  id: string;
+  pregunta: string;
+  /** Lo marca el superadmin a mano; `revisadoEn` es la fecha de la última marca Sí o No. */
+  menciones: Record<AsistenteIaId, { estado: EstadoMencionIa; revisadoEn: string | null }>;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+/** Una propuesta de IA-19 (CP-127): una página nueva o una pregunta frecuente; solo se vuelve borrador. */
+export interface PropuestaIaSitio {
+  id: string;
+  tipo: 'pagina' | 'pregunta';
+  datos: { titulo?: string; ruta?: string; metaTitulo?: string; metaDescripcion?: string; pregunta?: string; respuesta?: string; pagina?: string; motivo: string };
+  estado: 'pendiente' | 'borrador_creado' | 'descartada';
+  /** La página en borrador o la pregunta oculta que creó «Crear borrador». */
+  creadoId?: string;
+  creadoEn: string;
+}
+export interface SeoIaSitio {
+  llmsTxt: string;
+  rastreadores: { nombre: string; permitido: boolean }[];
+  asistentes: { id: AsistenteIaId; nombre: string }[];
+  preguntas: PreguntaIa[];
+  propuestas: PropuestaIaSitio[];
+  paginasFaq: { conFaq: number; publicadas: number };
+}
+export interface PropuestasPedidas { nuevas: number; observaciones: string[]; propuestas: PropuestaIaSitio[]; trabajoId: string }
 /** HU-1504 · Elemento de contenido del sitio (cifras, testimonios, logos…). Nace oculto (RN-16-2). */
 export interface ElementoSitio {
   id: string;
@@ -790,6 +820,14 @@ export const api = {
   crearRedireccion: (datos: { desde: string; hacia: string; activa?: boolean }) => pedir<RedireccionSitio>('/sitio/seo/redirecciones', json(datos)),
   cambiarRedireccion: (id: string, cambio: { desde?: string; hacia?: string; activa?: boolean }) => pedir<RedireccionSitio>(`/sitio/seo/redirecciones/${id}`, json(cambio, 'PATCH')),
   borrarRedireccion: (id: string) => pedir<void>(`/sitio/seo/redirecciones/${id}`, { method: 'DELETE' }),
+  seoIaSitio: () => pedir<SeoIaSitio>('/sitio/seo-ia'),
+  guardarSeoIaSitio: (cambios: { llmsTxt?: string; rastreadores?: Record<string, boolean> }) => pedir<SeoIaSitio>('/sitio/seo-ia', json(cambios, 'PATCH')),
+  crearPreguntaIa: (pregunta: string) => pedir<PreguntaIa>('/sitio/seo-ia/preguntas', json({ pregunta })),
+  cambiarPreguntaIa: (id: string, cambio: { pregunta?: string; menciones?: Partial<Record<AsistenteIaId, EstadoMencionIa>> }) => pedir<PreguntaIa>(`/sitio/seo-ia/preguntas/${id}`, json(cambio, 'PATCH')),
+  borrarPreguntaIa: (id: string) => pedir<void>(`/sitio/seo-ia/preguntas/${id}`, { method: 'DELETE' }),
+  proponerContenidoIa: () => pedir<PropuestasPedidas>('/sitio/seo-ia/proponer', { method: 'POST' }),
+  crearBorradorPropuestaIa: (id: string) => pedir<PropuestaIaSitio>(`/sitio/seo-ia/propuestas/${id}/borrador`, { method: 'POST' }),
+  descartarPropuestaIa: (id: string) => pedir<PropuestaIaSitio>(`/sitio/seo-ia/propuestas/${id}/descartar`, { method: 'POST' }),
   blogSitio: () => pedir<BlogSitio>('/sitio/blog'),
   guardarBlogSitio: (cambios: CambiosBlogSitio) => pedir<BlogSitio>('/sitio/blog', json(cambios, 'PATCH')),
   sincronizarBlog: () => pedir<{ encolado: boolean }>('/sitio/blog/sincronizar', { method: 'POST' }),

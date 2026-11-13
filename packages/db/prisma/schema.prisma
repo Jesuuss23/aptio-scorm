@@ -357,10 +357,11 @@ enum TareaProveedor {
 
 model TrabajoIA {
   id             String         @id @default(uuid()) @db.Uuid
-  organizacionId String         @db.Uuid
+  /// HU-1513 · null = gasto de la plataforma (tareas del superadmin, p. ej. IA-19), sin organización ni proyecto.
+  organizacionId String?        @db.Uuid
   proyectoId     String?        @db.Uuid
   generacionId   String?        @db.Uuid
-  tarea          String // IA-01 … IA-14
+  tarea          String // IA-01 … IA-19
   tipo           TareaProveedor
   proveedor      String
   modelo         String
@@ -382,7 +383,7 @@ model TrabajoIA {
   proyecto     Proyecto?    @relation(fields: [proyectoId], references: [id])
   generacion   Generacion?  @relation(fields: [generacionId], references: [id])
   propuestas   Propuesta[]
-  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  organizacion Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
   @@index([proyectoId, creadoEn])
   @@index([tipo, creadoEn])
@@ -885,8 +886,42 @@ model SitioSeo {
   id              String   @id @default("seo")
   /// Reglas extra de robots.txt (solo `Allow:`, `Disallow:` y comentarios).
   robotsExtra     String   @default("")
+  /// HU-1513 · Contenido de `/llms.txt` (texto plano, hasta 20 000 caracteres); vacío = el sitio responde 404.
+  llmsTxt         String   @default("")
+  /// HU-1513 · Rastreadores de IA bloqueados en robots.txt (del catálogo de `@aptio/schema/sitio-seo-ia`); vacío = todos permitidos.
+  rastreadoresBloqueados String[] @default([])
   actualizadoPorId String? @db.Uuid
   actualizadoEn   DateTime @updatedAt
+}
+
+/// HU-1513 · Pregunta objetivo del SEO para IA (REQ-072, PNT-30): lo que la gente le pregunta a un asistente. El
+/// superadmin marca a mano si cada asistente menciona la marca al responder.
+model SitioPreguntaIa {
+  id            String   @id @default(uuid()) @db.Uuid
+  pregunta      String
+  /// { chatgpt | claude | gemini | perplexity: { estado: sin_revisar | si | no, revisadoEn: ISO | null } }
+  menciones     Json     @default("{}")
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+/// HU-1513 · Propuesta de contenido de la IA (IA-19, CP-127). Nada se publica solo: «Crear borrador» crea una página en
+/// borrador o una pregunta frecuente oculta, y la propuesta guarda cuál.
+model SitioPropuestaIa {
+  id            String   @id @default(uuid()) @db.Uuid
+  /// pagina | pregunta
+  tipo          String
+  /// pagina: { titulo, ruta, metaTitulo, metaDescripcion, motivo }; pregunta: { pregunta, respuesta, pagina?, motivo }
+  datos         Json
+  /// pendiente | borrador_creado | descartada
+  estado        String   @default("pendiente")
+  /// La página o el elemento que creó «Crear borrador».
+  creadoId      String?  @db.Uuid
+  trabajoId     String?  @db.Uuid
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([estado, creadoEn])
 }
 
 /// HU-1511 · Conexión del sitio con el WordPress del blog (REQ-070, PNT-28, RN-16-8): una sola fila (`id` = "blog").

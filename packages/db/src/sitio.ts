@@ -18,9 +18,10 @@ export async function armarInstantaneaActual(bd: Bd, entorno: EntornoSitio): Pro
   const enlaces = await bd.sitioEnlace.findMany({ where: { visible: true } });
   const ajustes = await leerAjustesSitio(bd);
   // HU-1512 · Las redirecciones activas y las reglas extra de robots.txt viajan en la versión, como el resto del sitio.
+  // HU-1513 · También llms.txt y los rastreadores de IA bloqueados.
   const redirecciones = await bd.sitioRedireccion.findMany({ where: { activa: true } });
   const seo = await bd.sitioSeo.findUnique({ where: { id: ID_SEO } });
-  return armarInstantanea({ paginas, elementos, enlaces, ajustes, redirecciones, robotsExtra: seo?.robotsExtra ?? null }, entorno);
+  return armarInstantanea({ paginas, elementos, enlaces, ajustes, redirecciones, robotsExtra: seo?.robotsExtra ?? null, llmsTxt: seo?.llmsTxt ?? null, rastreadoresBloqueados: seo?.rastreadoresBloqueados ?? null }, entorno);
 }
 
 /** HU-1512 · La fila única de los ajustes SEO del sitio (reglas extra de robots.txt). */

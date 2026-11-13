@@ -13,6 +13,7 @@ import { enlaceWhatsapp, NOMBRE_POR_DEFECTO, type SitioPublicado } from '@aptio/
 import type { SectorPublicado } from '@aptio/schema/sitio-sectores';
 import { type ArticuloPublico, type BlogPublico, categoriaInicial, ULTIMOS_BLOG } from '@aptio/schema/sitio-blog';
 import { rutaServida, tituloDePagina } from '@aptio/schema/sitio-seo';
+import { robotsDeRastreadores } from '@aptio/schema/sitio-seo-ia';
 import { alternasDe, type Instantanea, navegacionDe, type PaginaServida, paginaServida } from '@aptio/schema/sitio-versiones';
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
@@ -506,18 +507,23 @@ export function sitemapXml(inst: Pick<Instantanea, 'paginas'>, sitioUrl: string)
 /**
  * robots.txt: en producción permite todo y apunta al sitemap (HU-1511: y al del blog de WordPress, `wp-sitemap.xml`);
  * en pruebas no deja indexar nada. HU-1512 · En producción suma las reglas extra del superadmin (ya validadas:
- * `@aptio/schema/sitio-seo`), dentro del grupo `User-agent: *`.
+ * `@aptio/schema/sitio-seo`), dentro del grupo `User-agent: *`. HU-1513 · CP-126 · Cada rastreador de IA bloqueado
+ * lleva su propio grupo con `Disallow: /`, después del grupo general (en pruebas ya está todo bloqueado).
  */
-export function robotsTxt(op: OpcionesRender, robotsExtra?: string | null): string {
+export function robotsTxt(op: OpcionesRender, robotsExtra?: string | null, rastreadoresBloqueados?: readonly string[] | null): string {
   const blog = op.blog?.url ? `Sitemap: ${op.blog.url}/wp-sitemap.xml\n` : '';
   const extra = robotsExtra?.trim() ? `${robotsExtra.trim()}\n` : '';
+  const rastreadores = robotsDeRastreadores(rastreadoresBloqueados);
   return op.entorno === 'produccion'
-    ? `User-agent: *\nAllow: /\n${extra}\nSitemap: ${sinBarra(op.sitioUrl)}/sitemap.xml\n${blog}`
+    ? `User-agent: *\nAllow: /\n${extra}\n${rastreadores ? `${rastreadores}\n` : ''}Sitemap: ${sinBarra(op.sitioUrl)}/sitemap.xml\n${blog}`
     : 'User-agent: *\nDisallow: /\n';
 }
 
 /** HU-1512 · Archivo de la versión con sus redirecciones 301 (no se sirve: lo lee quien atiende `/s/*` antes del 404). */
 export const ARCHIVO_REDIRECCIONES = '_redirecciones.json';
+
+/** HU-1513 · `/llms.txt`: solo existe en la versión si el superadmin publicó contenido (si no, 404). */
+export const ARCHIVO_LLMS = 'llms.txt';
 
 export interface ArchivoSitio { archivo: string; contenido: string; mime: string }
 
@@ -533,7 +539,8 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     ...paginas,
     { archivo: '404.html', contenido: renderizar404(inst, op), mime: html },
     { archivo: 'sitemap.xml', contenido: sitemapXml(inst, op.sitioUrl), mime: 'application/xml; charset=utf-8' },
-    { archivo: 'robots.txt', contenido: robotsTxt(op, inst.robotsExtra), mime: 'text/plain; charset=utf-8' },
+    { archivo: 'robots.txt', contenido: robotsTxt(op, inst.robotsExtra, inst.rastreadoresBloqueados), mime: 'text/plain; charset=utf-8' },
+    ...(inst.llmsTxt?.trim() ? [{ archivo: ARCHIVO_LLMS, contenido: `${inst.llmsTxt.trim()}\n`, mime: 'text/plain; charset=utf-8' }] : []),
     ...(inst.redirecciones?.length ? [{ archivo: ARCHIVO_REDIRECCIONES, contenido: JSON.stringify(inst.redirecciones), mime: 'application/json' }] : []),
   ];
 }

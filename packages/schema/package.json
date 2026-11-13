@@ -54,6 +54,7 @@
     "./sitio-navegacion": "./src/sitio-navegacion.ts",
     "./sitio-sectores": "./src/sitio-sectores.ts",
     "./sitio-seo": "./src/sitio-seo.ts",
+    "./sitio-seo-ia": "./src/sitio-seo-ia.ts",
     "./sitio-versiones": "./src/sitio-versiones.ts"
   }
 }

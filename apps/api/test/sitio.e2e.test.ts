@@ -1064,3 +1064,4 @@ await import('./sitio-sectores.casos.js');
 await import('./sitio-idiomas.casos.js');
 await import('./sitio-blog.casos.js');
 await import('./sitio-seo.casos.js');
+await import('./sitio-seo-ia.casos.js');

@@ -1,5 +1,5 @@
 export {
-  ARCHIVO_REDIRECCIONES, archivoDeRuta, datosEstructurados, jsonLdSeguro, type ArchivoSitio, CARPETA_BLOG, CARPETA_MARCA, cssBlog, conDominio, landingsDe, type LandingPublica, type Marca, marcaDe, type OpcionesRender, renderizar404, renderizarMantenimiento, renderizarPagina, renderizarSitio, robotsTxt, rutaPublica, sinJsonLd, sitemapXml,
+  ARCHIVO_LLMS, ARCHIVO_REDIRECCIONES, archivoDeRuta, datosEstructurados, jsonLdSeguro, type ArchivoSitio, CARPETA_BLOG, CARPETA_MARCA, cssBlog, conDominio, landingsDe, type LandingPublica, type Marca, marcaDe, type OpcionesRender, renderizar404, renderizarMantenimiento, renderizarPagina, renderizarSitio, robotsTxt, rutaPublica, sinJsonLd, sitemapXml,
 } from './render.js';
 export { CARPETA_FUENTES, type Fuente, fuentes, leerFuente } from './fuentes.js';
 export { blogDeEjemplo, instantaneaDeEjemplo } from './ejemplo.js';

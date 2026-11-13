@@ -1140,6 +1140,240 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /sitio/seo-ia:
+    get:
+      tags:
+      - Sitio web
+      summary: SEO para IA — llms.txt, rastreadores, preguntas objetivo y sugerencias (HU-1513, PNT-30)
+      operationId: get_sitio_seo_ia
+      description: |-
+        Solo SUPERADMIN. `rastreadores` es el catálogo cerrado (GPTBot, ClaudeBot, Google-Extended, PerplexityBot y
+        CCBot) con `permitido`; todos se permiten por defecto. `preguntas` trae la marca de cada asistente
+        (`si`, `no` o `sin_revisar`), que el superadmin pone a mano: no hay comprobación automática. `propuestas` son
+        solo las pendientes. `paginasFaq` cuenta las páginas publicadas con datos estructurados FAQPage.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeoIaSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Sitio web
+      summary: Guardar llms.txt o permitir y bloquear rastreadores de IA (HU-1513, CP-126)
+      operationId: patch_sitio_seo_ia
+      description: |-
+        Solo SUPERADMIN. `llmsTxt` es texto plano de hasta 20 000 caracteres, sin HTML; vacío quita el archivo (el sitio
+        responde 404 en `/s/llms.txt`). `rastreadores` cambia solo los que llegan: `false` bloquea y robots.txt suma el
+        grupo `User-agent: {nombre}` con `Disallow: /` (en pruebas robots.txt sigue bloqueando todo). Ambos llegan al
+        sitio con «Publicar cambios». Auditoría SITIO_LLMS_EDITADO y SITIO_RASTREADORES_EDITADOS. 422 NO_VALIDO
+        (con `detalles`) o SIN_CAMBIOS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeoIaCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeoIaSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/seo-ia/preguntas:
+    post:
+      tags:
+      - Sitio web
+      summary: Agregar una pregunta objetivo (HU-1513)
+      operationId: post_sitio_seo_ia_preguntas
+      description: |-
+        Solo SUPERADMIN. De 5 a 200 caracteres, sin HTML. 409 PREGUNTA_REPETIDA si ya existe (sin distinguir mayúsculas
+        ni tildes). Hasta 50 (422 LIMITE_PREGUNTAS). Auditoría SITIO_PREGUNTA_IA_CREADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreguntaIaEntrada'
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreguntaIa'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/seo-ia/preguntas/{preguntaId}:
+    parameters:
+    - name: preguntaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Sitio web
+      summary: Cambiar una pregunta objetivo o marcar sus menciones (HU-1513, CP-126)
+      operationId: patch_sitio_seo_ia_pregunta
+      description: |-
+        Solo SUPERADMIN. `menciones` cambia solo los asistentes que llegan; `si` y `no` guardan la fecha de la revisión
+        y `sin_revisar` la borra. Cambiar el texto de la pregunta conserva sus menciones. Auditoría
+        SITIO_PREGUNTA_IA_EDITADA o SITIO_PREGUNTA_IA_REVISADA. 422 NO_VALIDO, o SIN_CAMBIOS si no llega ningún campo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreguntaIaCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreguntaIa'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Borrar una pregunta objetivo (HU-1513)
+      operationId: delete_sitio_seo_ia_pregunta
+      description: Solo SUPERADMIN. Se borra con sus menciones. Auditoría SITIO_PREGUNTA_IA_BORRADA.
+      responses:
+        '204':
+          description: Borrada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /sitio/seo-ia/proponer:
+    post:
+      tags:
+      - Sitio web
+      summary: Pedir a la IA propuestas de contenido (HU-1513, IA-19, CP-127)
+      operationId: post_sitio_seo_ia_proponer
+      description: |-
+        Solo SUPERADMIN. Ejecuta IA-19 en la misma solicitud con las preguntas objetivo, las páginas y las preguntas
+        frecuentes del sitio. La salida se valida contra `IA-19.salida.schema.json` y las reglas del sitio (hasta 3
+        intentos); si no valida, nada se guarda (502 PROPUESTA_NO_VALIDA). Las propuestas que repiten una ruta, una
+        pregunta frecuente u otra propuesta pendiente no entran. Las nuevas quedan `pendiente`: nada se crea ni se
+        publica hasta «Crear borrador». El consumo se registra como TrabajoIA de la plataforma (sin organización) y
+        respeta su límite de gasto del mes (422 LIMITE_GASTO). 422 SIN_PREGUNTAS si no hay preguntas objetivo. Auditoría
+        SITIO_PROPUESTAS_IA_PEDIDAS.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropuestasIaPedidas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '502':
+          description: PROPUESTA_NO_VALIDA o IA_NO_DISPONIBLE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /sitio/seo-ia/propuestas/{propuestaId}/borrador:
+    parameters:
+    - name: propuestaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Sitio web
+      summary: Crear el borrador de una propuesta de la IA (HU-1513, CP-127)
+      operationId: post_sitio_seo_ia_propuesta_borrador
+      description: |-
+        Solo SUPERADMIN. Una propuesta `pagina` crea una página en BORRADOR con su ruta, meta título y meta descripción;
+        una `pregunta` crea una pregunta frecuente oculta. Nada se publica: el superadmin la revisa, la completa y la
+        publica o la muestra. La propuesta pasa a `borrador_creado` con `creadoId`. 409 PROPUESTA_RESUELTA o RUTA_EN_USO.
+        Auditoría SITIO_PROPUESTA_IA_BORRADOR.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropuestaIa'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/seo-ia/propuestas/{propuestaId}/descartar:
+    parameters:
+    - name: propuestaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - Sitio web
+      summary: Descartar una propuesta de la IA (HU-1513)
+      operationId: post_sitio_seo_ia_propuesta_descartar
+      description: Solo SUPERADMIN. La propuesta pasa a `descartada` y no crea nada. 409 PROPUESTA_RESUELTA. Auditoría SITIO_PROPUESTA_IA_DESCARTADA.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropuestaIa'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
   /sitio/paginas/{paginaId}/vista-previa:
     parameters:
     - name: paginaId
@@ -1466,6 +1700,10 @@ paths:
         /s/{hacia}` (CP-124); la página publicada manda sobre la redirección. Cada página lleva su título, meta
         descripción, canonical, Open Graph y un bloque JSON-LD (`application/ld+json`, no se ejecuta); con «Indexar»
         apagado lleva `noindex`, sale del sitemap y no tiene hreflang (CP-125). robots.txt suma las reglas extra.
+
+        HU-1513 · `llms.txt` sirve el texto de Sitio web › SEO para IA (`text/plain`, con la caché de las páginas); si
+        está vacío, la 404. robots.txt suma un grupo `User-agent: {nombre}` con `Disallow: /` por cada rastreador de IA
+        bloqueado (CP-126).
       parameters:
       - name: ruta
         in: path
@@ -6183,6 +6421,174 @@ components:
             # Panel interno
             Disallow: /panel
           description: 'Una regla por línea: Allow: /ruta, Disallow: /ruta o # comentario'
+    PreguntaIa:
+      type: object
+      description: HU-1513 · Una pregunta objetivo con la marca de cada asistente
+      required: [id, pregunta, menciones, creadoEn, actualizadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        pregunta:
+          type: string
+          example: mejor herramienta para crear cursos SCORM con IA
+        menciones:
+          type: object
+          description: 'Por asistente (chatgpt, claude, gemini, perplexity): si menciona la marca. Lo marca el superadmin a mano'
+          additionalProperties:
+            type: object
+            required: [estado, revisadoEn]
+            properties:
+              estado:
+                type: string
+                enum: [si, 'no', sin_revisar]
+              revisadoEn:
+                type: string
+                format: date-time
+                nullable: true
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    PreguntaIaEntrada:
+      type: object
+      additionalProperties: false
+      required: [pregunta]
+      properties:
+        pregunta:
+          type: string
+          minLength: 5
+          maxLength: 200
+    PreguntaIaCambio:
+      type: object
+      additionalProperties: false
+      properties:
+        pregunta:
+          type: string
+          minLength: 5
+          maxLength: 200
+        menciones:
+          type: object
+          example:
+            chatgpt: si
+            gemini: 'no'
+          additionalProperties:
+            type: string
+            enum: [si, 'no', sin_revisar]
+    PropuestaIa:
+      type: object
+      description: HU-1513 · Una propuesta de contenido de la IA (IA-19)
+      required: [id, tipo, datos, estado, creadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [pagina, pregunta]
+        datos:
+          type: object
+          description: 'pagina: titulo, ruta, metaTitulo, metaDescripcion y motivo. pregunta: pregunta, respuesta, pagina (opcional) y motivo'
+          additionalProperties:
+            type: string
+        estado:
+          type: string
+          enum: [pendiente, borrador_creado, descartada]
+        creadoId:
+          type: string
+          format: uuid
+          description: La página en borrador o la pregunta oculta que creó «Crear borrador»
+        creadoEn:
+          type: string
+          format: date-time
+    PropuestasIaPedidas:
+      type: object
+      required: [nuevas, observaciones, propuestas, trabajoId]
+      properties:
+        nuevas:
+          type: integer
+          description: Cuántas propuestas nuevas se guardaron
+        observaciones:
+          type: array
+          description: Lo que la IA pide completar o verificar antes de publicar
+          items:
+            type: string
+        propuestas:
+          type: array
+          description: Todas las pendientes
+          items:
+            $ref: '#/components/schemas/PropuestaIa'
+        trabajoId:
+          type: string
+          format: uuid
+          description: El registro del consumo (TrabajoIA de la plataforma)
+    SeoIaSitio:
+      type: object
+      description: HU-1513 · Sitio web › SEO para IA (PNT-30)
+      required: [llmsTxt, rastreadores, asistentes, preguntas, propuestas, paginasFaq]
+      properties:
+        llmsTxt:
+          type: string
+          maxLength: 20000
+          description: El contenido de /llms.txt. Vacío, el sitio responde 404
+        rastreadores:
+          type: array
+          items:
+            type: object
+            required: [nombre, permitido]
+            properties:
+              nombre:
+                type: string
+                enum: [GPTBot, ClaudeBot, Google-Extended, PerplexityBot, CCBot]
+              permitido:
+                type: boolean
+        asistentes:
+          type: array
+          items:
+            type: object
+            required: [id, nombre]
+            properties:
+              id:
+                type: string
+                enum: [chatgpt, claude, gemini, perplexity]
+              nombre:
+                type: string
+                example: ChatGPT
+        preguntas:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreguntaIa'
+        propuestas:
+          type: array
+          description: Solo las pendientes, de la más nueva a la más vieja
+          items:
+            $ref: '#/components/schemas/PropuestaIa'
+        paginasFaq:
+          type: object
+          required: [conFaq, publicadas]
+          properties:
+            conFaq:
+              type: integer
+              description: Páginas publicadas con datos estructurados FAQPage
+            publicadas:
+              type: integer
+    SeoIaCambio:
+      type: object
+      additionalProperties: false
+      properties:
+        llmsTxt:
+          type: string
+          maxLength: 20000
+          description: Texto plano, sin HTML. Vacío quita el archivo
+        rastreadores:
+          type: object
+          example:
+            GPTBot: false
+          description: 'Por rastreador: true permite y false bloquea. Los que no llegan no cambian'
+          additionalProperties:
+            type: boolean
     ComprobacionDominio:
       type: object
       required:

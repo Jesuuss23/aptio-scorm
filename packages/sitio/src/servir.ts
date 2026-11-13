@@ -8,14 +8,14 @@ import { CARPETA_FUENTES } from './fuentes.js';
 import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { esArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import { esArchivoBlog } from '@aptio/schema/sitio-blog';
-import { archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
+import { ARCHIVO_LLMS, archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
 
 export type Pedido =
   | { tipo: 'pagina'; archivo: string; ruta: string }
   | { tipo: 'fuente'; archivo: string }
   | { tipo: 'marca'; archivo: string }
   | { tipo: 'blog'; archivo: string }
-  | { tipo: 'sitemap' | 'robots'; archivo: string };
+  | { tipo: 'sitemap' | 'robots' | 'llms'; archivo: string };
 
 const SEGMENTO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FUENTE = /^[a-z0-9-]+-[0-9a-f]{8}\.woff2$/;
@@ -25,6 +25,8 @@ export function resolverPedido(ruta: string): Pedido | null {
   const limpia = ruta.split(/[?#]/)[0]!.replace(/\/+$/, '') || '/';
   if (limpia === '/sitemap.xml') return { tipo: 'sitemap', archivo: 'sitemap.xml' };
   if (limpia === '/robots.txt') return { tipo: 'robots', archivo: 'robots.txt' };
+  // HU-1513 · Solo existe si la versión publicada trae contenido; si no, quien sirve responde 404.
+  if (limpia === '/llms.txt') return { tipo: 'llms', archivo: ARCHIVO_LLMS };
   const partes = limpia.split('/').slice(1).filter((p) => p !== '');
   if (partes.length === 2 && partes[0] === CARPETA_FUENTES) return FUENTE.test(partes[1]!) ? { tipo: 'fuente', archivo: partes[1]! } : null;
   if (partes.length === 2 && partes[0] === CARPETA_MARCA) return esArchivoMarca(partes[1]!) ? { tipo: 'marca', archivo: partes[1]! } : null;
@@ -40,6 +42,7 @@ export const TIPOS_MIME = {
   blog: 'image/jpeg',
   sitemap: 'application/xml; charset=utf-8',
   robots: 'text/plain; charset=utf-8',
+  llms: 'text/plain; charset=utf-8',
 } as const;
 
 /** Sin JavaScript ni recursos de fuera: la política permite solo estilos en línea y fuentes propias. */

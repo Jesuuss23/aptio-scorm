@@ -1,0 +1,28 @@
+{
+  "propuestas": [
+    {
+      "tipo": "pagina",
+      "titulo": "SCORM 1.2 vs. cmi5",
+      "ruta": "/scorm-vs-cmi5",
+      "metaTitulo": "SCORM 1.2 vs. cmi5: cuál elegir para tu LMS",
+      "metaDescripcion": "Compara SCORM 1.2 y cmi5 en una tabla: seguimiento, compatibilidad con cada LMS y cuándo conviene cada uno para tus cápsulas.",
+      "motivo": "Ninguna página del sitio responde a la comparación entre estándares; una respuesta corta con tabla y preguntas frecuentes es fácil de citar."
+    },
+    {
+      "tipo": "pregunta",
+      "pregunta": "¿Cuánto cuesta producir una cápsula SCORM?",
+      "respuesta": "Depende de la duración y de cuántas interacciones lleva. Revisa los planes en la página de precios: ahí está el rango vigente de cada uno.",
+      "pagina": "/",
+      "motivo": "Es una de las preguntas objetivo y el inicio no la responde con una frase directa que un asistente pueda citar."
+    },
+    {
+      "tipo": "pregunta",
+      "pregunta": "¿Se puede convertir un PDF en un curso SCORM?",
+      "respuesta": "Sí. Subes el documento, la herramienta propone la estructura y las pantallas, tu equipo las revisa y al final exportas el paquete SCORM.",
+      "motivo": "Responde a la pregunta objetivo sobre convertir un PDF con pasos claros y sin prometer cifras."
+    }
+  ],
+  "observaciones": [
+    "Las respuestas no incluyen precios ni cifras: complétalas con datos reales antes de mostrarlas."
+  ]
+}

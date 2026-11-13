@@ -1,6 +1,6 @@
 # Prompts de IA · versión 1
 
-Plantillas de las tareas IA-01 a IA-18 (`docs/06-ia.md`). Cada una tiene su esquema de salida en `../esquemas/` y su salida esperada para el caso LOTO en `../casos/loto/salidas/`.
+Plantillas de las tareas IA-01 a IA-19 (`docs/06-ia.md`). Cada una tiene su esquema de salida en `../esquemas/` y su salida esperada para el caso LOTO en `../casos/loto/salidas/`.
 
 Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confiables).
 
@@ -24,6 +24,7 @@ Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confia
 | [IA-16](IA-16.v2.md) | Propuesta de retoque (v2 sobre bloques, HU-0504) | Revisión / Editor (bajo pedido) | `ANTHROPIC_MODEL_PANTALLAS` | 0.6 |
 | [IA-17](IA-17.v2.md) | Corrección de alineación (v2 con alertas y rutas permitidas, HU-1002) | Alineación pedagógica (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
 | [IA-18](IA-18.v1.md) | Extracción de kit | Clientes y kits (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.2 |
+| [IA-19](IA-19.v1.md) | Propuestas de contenido para SEO de IA (HU-1513; sin bloque común: es de la plataforma) | Sitio web › SEO para IA (bajo pedido) | `ANTHROPIC_MODEL_TEXTO` | 0.3 |
 
 ## Cómo se usan
 
