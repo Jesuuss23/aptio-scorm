@@ -18,7 +18,7 @@ import type { AjustesSitioDto, ComprobacionDominioDto } from './ajustes.dto.js';
 export const PLAZO_MANTENIMIENTO_MS = 5000;
 const PLAZO_TLS_MS = 5000;
 
-const CAMPOS_PUBLICADOS = ['dominio', 'nombre', 'whatsapp'] as const;
+const CAMPOS_PUBLICADOS = ['dominio', 'nombre', 'whatsapp', 'mostrarSelectorIdioma'] as const;
 
 /**
  * HU-1509 · Ajustes del sitio (REQ-073, PNT-38): una sola fila. Nombre, dominio, logo, favicon y WhatsApp salen al sitio

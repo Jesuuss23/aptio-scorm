@@ -69,20 +69,23 @@ export function validarTextoEnlace(entrada: unknown): ResultadoTexto {
 export interface UbicacionEnlace {
   zona: string;
   padreId: string | null;
+  /** HU-1510 · es | en; sin el campo, es. */
+  idioma?: string | null;
 }
 
-export type ErrorUbicacion = 'ZONA_INVALIDA' | 'MENU_SIN_NIVELES' | 'PADRE_DE_OTRA_ZONA' | 'PROFUNDIDAD_INVALIDA';
+export type ErrorUbicacion = 'ZONA_INVALIDA' | 'MENU_SIN_NIVELES' | 'PADRE_DE_OTRA_ZONA' | 'PROFUNDIDAD_INVALIDA' | 'PADRE_DE_OTRO_IDIOMA';
 
 /**
  * Revisa dónde va un enlace: el menú es plano (sin padre) y el pie tiene dos niveles, columna y enlace. El padre debe
- * ser una columna del pie (un enlace del pie sin padre a su vez).
+ * ser una columna del pie (un enlace del pie sin padre a su vez) y, si se indica `idioma`, del mismo idioma (HU-1510).
  */
-export function validarUbicacion(zona: unknown, padre: UbicacionEnlace | null): ErrorUbicacion | null {
+export function validarUbicacion(zona: unknown, padre: UbicacionEnlace | null, idioma?: string): ErrorUbicacion | null {
   if (!esZonaNavegacion(zona)) return 'ZONA_INVALIDA';
   if (padre === null) return null;
   if (zona === 'menu') return 'MENU_SIN_NIVELES';
   if (padre.zona !== 'pie') return 'PADRE_DE_OTRA_ZONA';
   if (padre.padreId !== null) return 'PROFUNDIDAD_INVALIDA';
+  if (idioma !== undefined && (padre.idioma === 'en' ? 'en' : 'es') !== idioma) return 'PADRE_DE_OTRO_IDIOMA';
   return null;
 }
 

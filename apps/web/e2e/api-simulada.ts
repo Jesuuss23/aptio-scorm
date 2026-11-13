@@ -394,18 +394,18 @@ export interface BloqueSitioSim {
 }
 /** HU-1504 · Elemento de contenido del sitio en la simulación. */
 export interface ElementoSitioSim {
-  id: string; coleccion: string; orden: number; visible: boolean; ficticio?: boolean; datos: Record<string, string | number>; creadoEn: string; actualizadoEn: string;
+  id: string; coleccion: string; idioma?: 'es' | 'en'; orden: number; visible: boolean; ficticio?: boolean; datos: Record<string, string | number>; creadoEn: string; actualizadoEn: string;
 }
 /** HU-1506 · Enlace del menú o del pie en la simulación. */
 export interface EnlaceSitioSim {
-  id: string; zona: 'menu' | 'pie'; padreId: string | null; texto: string; ruta: string | null; orden: number; visible: boolean; creadoEn?: string; actualizadoEn?: string;
+  id: string; zona: 'menu' | 'pie'; padreId: string | null; idioma?: 'es' | 'en'; texto: string; ruta: string | null; orden: number; visible: boolean; creadoEn?: string; actualizadoEn?: string;
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
 export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio }: OpcionesSimulacion) {
-  const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...e }));
+  const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
-  const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
+  const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
   const ficticiosVisiblesSim = () => elementosSim.filter((e) => e.ficticio && e.visible);
   let elementosCreados = 0;
   const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null, ...p }));
@@ -717,16 +717,19 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const metodo = req.method();
       const dto = (e: (typeof enlacesSim)[number]) => ({ ...e, externo: e.ruta ? esEnlaceExterno(e.ruta) : false });
-      const grupo = (zona: string, padreId: string | null) => enlacesSim.filter((e) => e.zona === zona && e.padreId === padreId).sort((a, b) => a.orden - b.orden);
+      // HU-1510 · Cada idioma tiene su menú y su pie, con el orden aparte.
+      const idiomaPedido = (v: unknown) => (v === 'en' ? 'en' : 'es') as 'es' | 'en';
+      const grupo = (zona: string, padreId: string | null, idioma: string) => enlacesSim.filter((e) => e.zona === zona && e.padreId === padreId && e.idioma === idioma).sort((a, b) => a.orden - b.orden);
       const datosInvalidos = (mensaje: string, campo: string) => responder(422, { codigo: 'DATOS_NO_VALIDOS', mensaje, detalles: [{ campo, mensaje }] });
       if (ruta === '/sitio/navegacion' && metodo === 'GET') {
-        const a = arbolNavegacion(enlacesSim);
+        const a = arbolNavegacion(enlacesSim.filter((e) => e.idioma === idiomaPedido(new URL(req.url()).searchParams.get('idioma'))));
         return responder(200, { menu: a.menu.map(dto), pie: a.pie.map((c) => ({ ...dto(c), enlaces: c.enlaces.map(dto) })) });
       }
       if (ruta === '/sitio/navegacion' && metodo === 'POST') {
-        const b = req.postDataJSON() as { zona: string; padreId?: string; texto: string; ruta?: string };
+        const b = req.postDataJSON() as { zona: string; padreId?: string; idioma?: string; texto: string; ruta?: string };
         const padre = b.padreId ? enlacesSim.find((e) => e.id === b.padreId) ?? null : null;
-        const ubicacion = validarUbicacion(b.zona, b.padreId ? padre ?? { zona: 'pie', padreId: 'x' } : null);
+        const idioma = b.idioma === undefined && padre ? padre.idioma : idiomaPedido(b.idioma);
+        const ubicacion = validarUbicacion(b.zona, b.padreId ? padre ?? { zona: 'pie', padreId: 'x' } : null, idioma);
         if (ubicacion) return responder(422, { codigo: 'UBICACION_INVALIDA', mensaje: 'Ubicación no válida', detalles: [{ tipo: ubicacion }] });
         const t = validarTextoEnlace(b.texto);
         if (!t.ok) return datosInvalidos(t.mensaje, 'texto');
@@ -734,24 +737,25 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         const r = columna && !b.ruta?.trim() ? null : validarRuta(b.ruta);
         if (r && !r.ok) return datosInvalidos(r.mensaje, 'ruta');
         const ahora = new Date().toISOString();
-        const e = { id: `00000000-0000-4000-9400-${String(++enlacesCreados).padStart(12, '0')}`, zona: b.zona as 'menu' | 'pie', padreId: b.padreId ?? null, texto: t.texto, ruta: r ? r.ruta : null, orden: grupo(b.zona, b.padreId ?? null).length, visible: false, creadoEn: ahora, actualizadoEn: ahora };
+        const e = { id: `00000000-0000-4000-9400-${String(++enlacesCreados).padStart(12, '0')}`, zona: b.zona as 'menu' | 'pie', padreId: b.padreId ?? null, idioma, texto: t.texto, ruta: r ? r.ruta : null, orden: grupo(b.zona, b.padreId ?? null, idioma).length, visible: false, creadoEn: ahora, actualizadoEn: ahora };
         enlacesSim.push(e);
         return responder(201, dto(e));
       }
       if (ruta === '/sitio/navegacion' && metodo === 'PATCH') {
-        const { zona, padreId, orden } = req.postDataJSON() as { zona: string; padreId?: string; orden: string[] };
-        const actuales = grupo(zona, padreId ?? null);
+        const { zona, padreId, orden, idioma: i } = req.postDataJSON() as { zona: string; padreId?: string; orden: string[]; idioma?: string };
+        const idioma = idiomaPedido(i);
+        const actuales = grupo(zona, padreId ?? null, idioma);
         if (orden.length !== actuales.length || new Set(orden).size !== orden.length || !orden.every((id) => actuales.some((x) => x.id === id))) {
           return responder(422, { codigo: 'ORDEN_INVALIDO', mensaje: 'Falta un enlace del grupo en la lista' });
         }
         orden.forEach((id, i) => { actuales.find((x) => x.id === id)!.orden = i; });
-        return responder(200, grupo(zona, padreId ?? null).map(dto));
+        return responder(200, grupo(zona, padreId ?? null, idioma).map(dto));
       }
       const e = enlacesSim.find((x) => x.id === ruta.split('/')[3]);
       if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El enlace no existe' });
       if (metodo === 'DELETE') {
         for (const x of [e, ...enlacesSim.filter((h) => h.padreId === e.id)]) enlacesSim.splice(enlacesSim.indexOf(x), 1);
-        grupo(e.zona, e.padreId).forEach((x, i) => { x.orden = i; });
+        grupo(e.zona, e.padreId, e.idioma).forEach((x, i) => { x.orden = i; });
         return responder(204);
       }
       const b = req.postDataJSON() as { texto?: string; ruta?: string | null; visible?: boolean };
@@ -773,35 +777,40 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const ahora = new Date().toISOString();
       const metodo = req.method();
-      const de = (c: string) => elementosSim.filter((e) => e.coleccion === c).sort((a, b) => a.orden - b.orden);
+      // HU-1510 · Cada idioma tiene sus elementos y su orden.
+      const idiomaDe = (v: unknown) => (v === 'en' ? 'en' : 'es') as 'es' | 'en';
+      const de = (c: string, idioma: string) => elementosSim.filter((e) => e.coleccion === c && (e.idioma ?? 'es') === idioma).sort((a, b) => a.orden - b.orden);
       const invalido = (r: ReturnType<typeof validarDatos>) => (r.ok ? null : responder(422, { codigo: 'DATOS_NO_VALIDOS', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores }));
       if (ruta === '/sitio/elementos' && metodo === 'GET') {
-        const c = new URL(req.url()).searchParams.get('coleccion') ?? '';
-        return esColeccion(c) ? responder(200, de(c)) : responder(422, { codigo: 'NO_VALIDO', mensaje: 'coleccion no válida' });
+        const q = new URL(req.url()).searchParams;
+        const c = q.get('coleccion') ?? '';
+        return esColeccion(c) ? responder(200, de(c, idiomaDe(q.get('idioma')))) : responder(422, { codigo: 'NO_VALIDO', mensaje: 'coleccion no válida' });
       }
       if (ruta === '/sitio/elementos' && metodo === 'POST') {
-        const b = req.postDataJSON() as { coleccion: string; datos: Record<string, unknown> };
+        const b = req.postDataJSON() as { coleccion: string; datos: Record<string, unknown>; idioma?: string };
+        const idioma = idiomaDe(b.idioma);
         if (!esColeccion(b.coleccion)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'coleccion no válida' });
         const r = validarDatos(b.coleccion, b.datos);
         if (!r.ok) return invalido(r);
-        const e: ElementoSitioSim = { id: `00000000-0000-4000-9200-${String(++elementosCreados).padStart(12, '0')}`, coleccion: b.coleccion, orden: de(b.coleccion).length, visible: false, ficticio: false, datos: r.datos, creadoEn: ahora, actualizadoEn: ahora };
+        const e: ElementoSitioSim = { id: `00000000-0000-4000-9200-${String(++elementosCreados).padStart(12, '0')}`, coleccion: b.coleccion, idioma, orden: de(b.coleccion, idioma).length, visible: false, ficticio: false, datos: r.datos, creadoEn: ahora, actualizadoEn: ahora };
         elementosSim.push(e);
         return responder(201, e);
       }
       if (ruta === '/sitio/elementos' && metodo === 'PATCH') {
-        const { coleccion, orden } = req.postDataJSON() as { coleccion: string; orden: string[] };
-        const actuales = de(coleccion);
+        const { coleccion, orden, idioma: i } = req.postDataJSON() as { coleccion: string; orden: string[]; idioma?: string };
+        const idioma = idiomaDe(i);
+        const actuales = de(coleccion, idioma);
         if (orden.length !== actuales.length || new Set(orden).size !== orden.length || !orden.every((id) => actuales.some((x) => x.id === id))) {
           return responder(422, { codigo: 'ORDEN_INVALIDO', mensaje: 'Falta un elemento de la colección en la lista' });
         }
         orden.forEach((id, i) => { actuales.find((x) => x.id === id)!.orden = i; });
-        return responder(200, de(coleccion));
+        return responder(200, de(coleccion, idioma));
       }
       const e = elementosSim.find((x) => x.id === ruta.split('/')[3]);
       if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El elemento no existe' });
       if (metodo === 'DELETE') {
         elementosSim.splice(elementosSim.indexOf(e), 1);
-        de(e.coleccion).forEach((x, i) => { x.orden = i; });
+        de(e.coleccion, e.idioma ?? 'es').forEach((x, i) => { x.orden = i; });
         return responder(204);
       }
       const b = req.postDataJSON() as { datos?: Record<string, unknown>; visible?: boolean };
@@ -824,7 +833,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La página no existe' });
         const armada = armarPagina({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) }, filasElementos(), 'pruebas');
         return responder(200, {
-          estado: p.estado, entorno: entornoSitio, navegacion: navegacionPublica(enlacesSim),
+          estado: p.estado, entorno: entornoSitio, navegacion: navegacionPublica(enlacesSim.filter((e) => e.idioma === (p.idioma === 'en' ? 'en' : 'es'))),
           pagina: { ...armada, bloques: armada.bloques.map((b) => ({ tipo: b.tipo, ajustes: b.ajustes, ...(b.elementos ? { elementos: b.elementos.map((e) => ({ datos: e.datos, ...(e.ficticio ? { ficticio: true } : {}) })) } : {}) })) },
         });
       }

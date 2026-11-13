@@ -368,13 +368,14 @@ paths:
       - Sitio web
       summary: Elementos de una colección de contenido, visibles y ocultos, por orden (HU-1504)
       operationId: get_sitio_elementos
-      description: Solo SUPERADMIN. 422 si `coleccion` falta o no es una de las 7.
+      description: Solo SUPERADMIN. 422 si `coleccion` falta o no es una de las 7. HU-1510 · Solo los del idioma pedido (`es` por defecto); 422 con otro idioma.
       parameters:
       - name: coleccion
         in: query
         required: true
         schema:
           $ref: '#/components/schemas/ColeccionContenido'
+      - $ref: '#/components/parameters/IdiomaSitio'
       responses:
         '200':
           description: OK
@@ -398,7 +399,8 @@ paths:
       description: |-
         Solo SUPERADMIN. `datos` lleva solo los campos de la colección (`@aptio/schema/sitio-contenido`), en texto plano:
         con etiquetas HTML, campos de más o faltantes responde 422 DATOS_NO_VALIDOS con `detalles` por campo (RN-16-7).
-        Nace con `visible` en false (RN-16-2). Auditoría SITIO_ELEMENTO_AGREGADO.
+        Nace con `visible` en false (RN-16-2). Auditoría SITIO_ELEMENTO_AGREGADO. HU-1510 · `idioma` (`es` por defecto): va al
+        final de su colección en ese idioma; cada idioma tiene su orden.
       requestBody:
         required: true
         content:
@@ -838,7 +840,9 @@ paths:
       - Sitio web
       summary: Menú principal y pie de página completos (HU-1506, PNT-25)
       operationId: get_sitio_navegacion
-      description: Solo SUPERADMIN. Visibles y ocultos, en su orden; cada columna del pie trae sus `enlaces`.
+      description: Solo SUPERADMIN. Visibles y ocultos, en su orden; cada columna del pie trae sus `enlaces`. HU-1510 · Del idioma pedido (`es` por defecto); cada idioma tiene su menú y su pie.
+      parameters:
+      - $ref: '#/components/parameters/IdiomaSitio'
       responses:
         '200':
           description: OK
@@ -860,7 +864,8 @@ paths:
         caracteres (RN-16-7). `ruta` es interna (`/precios`, `/#testimonios`) o `https://`; se rechazan `javascript:`,
         `http:`, `data:` y el resto (422 DATOS_NO_VALIDOS con `detalles[].campo`). La ruta es opcional solo en una columna
         del pie. El menú no tiene padre y el pie tiene dos niveles: 422 UBICACION_INVALIDA con `detalles[0].tipo`
-        MENU_SIN_NIVELES, PADRE_DE_OTRA_ZONA, PROFUNDIDAD_INVALIDA o PADRE_INEXISTENTE. Auditoría SITIO_ENLACE_AGREGADO.
+        MENU_SIN_NIVELES, PADRE_DE_OTRA_ZONA, PROFUNDIDAD_INVALIDA, PADRE_INEXISTENTE o PADRE_DE_OTRO_IDIOMA. Auditoría
+        SITIO_ENLACE_AGREGADO. HU-1510 · `idioma` (`es` por defecto); sin él, un enlace de una columna toma el de su columna.
       requestBody:
         required: true
         content:
@@ -1001,14 +1006,18 @@ paths:
       summary: Menú y pie del sitio con solo lo visible (HU-1506, CP-118)
       operationId: get_publico_navegacion
       security: []
-      description: Sin sesión. HU-1507 · Sale de la última versión publicada (sin versiones, `menu` y `pie` vacíos). `menu` lo usan la cabecera y el menú de celular. En `pie` solo salen las columnas visibles con al menos un enlace visible; una columna oculta oculta sus enlaces. `externo` es true en las rutas `https://` (abrir con `rel="noopener"`). Mismo límite de 60 peticiones por minuto en `/publico/*`.
+      description: Sin sesión. HU-1507 · Sale de la última versión publicada (sin versiones, `menu` y `pie` vacíos). `menu` lo usan la cabecera y el menú de celular. En `pie` solo salen las columnas visibles con al menos un enlace visible; una columna oculta oculta sus enlaces. `externo` es true en las rutas `https://` (abrir con `rel="noopener"`). Mismo límite de 60 peticiones por minuto en `/publico/*`. HU-1510 · La navegación del idioma pedido (`es` por defecto) y `mostrarSelectorIdioma` de la versión publicada.
+      parameters:
+      - $ref: '#/components/parameters/IdiomaSitio'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NavegacionPublica'
+                $ref: '#/components/schemas/NavegacionPublicada'
+        '422':
+          $ref: '#/components/responses/NoValido'
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
   /publico/sitemap.xml:
@@ -4519,6 +4528,13 @@ components:
           schema:
             type: string
   parameters:
+    IdiomaSitio:
+      name: idioma
+      in: query
+      required: false
+      description: HU-1510 · Idioma del contenido o de la navegación; cada idioma tiene su orden
+      schema:
+        $ref: '#/components/schemas/IdiomaSitio'
     SiNoCoincide:
       name: If-None-Match
       in: header
@@ -4835,6 +4851,13 @@ components:
       properties:
         visible:
           type: boolean
+    IdiomaSitio:
+      type: string
+      enum:
+      - es
+      - en
+      default: es
+      description: HU-1510 · Idioma del sitio; las filas sin idioma (anteriores a la HU-1510) son español
     ColeccionContenido:
       type: string
       description: Colecciones de contenido del sitio (HU-1504, `@aptio/schema/sitio-contenido`)
@@ -4851,6 +4874,7 @@ components:
       required:
       - id
       - coleccion
+      - idioma
       - orden
       - visible
       - ficticio
@@ -4863,6 +4887,8 @@ components:
           format: uuid
         coleccion:
           $ref: '#/components/schemas/ColeccionContenido'
+        idioma:
+          $ref: '#/components/schemas/IdiomaSitio'
         orden:
           type: integer
           minimum: 0
@@ -4904,6 +4930,8 @@ components:
         ficticio:
           type: boolean
           default: false
+        idioma:
+          $ref: '#/components/schemas/IdiomaSitio'
     ElementoSitioCambio:
       type: object
       additionalProperties: false
@@ -4920,6 +4948,7 @@ components:
       - id
       - zona
       - padreId
+      - idioma
       - texto
       - ruta
       - externo
@@ -4928,6 +4957,8 @@ components:
       - creadoEn
       - actualizadoEn
       properties:
+        idioma:
+          $ref: '#/components/schemas/IdiomaSitio'
         id:
           type: string
           format: uuid
@@ -5004,6 +5035,8 @@ components:
           type: string
           format: uuid
           description: Solo en el pie, la columna del enlace; sin padre, en el pie se crea una columna
+        idioma:
+          $ref: '#/components/schemas/IdiomaSitio'
         texto:
           type: string
           maxLength: 60
@@ -5038,6 +5071,8 @@ components:
         padreId:
           type: string
           format: uuid
+        idioma:
+          $ref: '#/components/schemas/IdiomaSitio'
         orden:
           type: array
           maxItems: 200
@@ -5198,6 +5233,18 @@ components:
           $ref: '#/components/schemas/PaginaPublica'
         navegacion:
           $ref: '#/components/schemas/NavegacionPublica'
+    NavegacionPublicada:
+      type: object
+      description: HU-1510 · La navegación publicada de un idioma con el ajuste del selector ES · EN
+      allOf:
+      - $ref: '#/components/schemas/NavegacionPublica'
+      - type: object
+        required:
+        - mostrarSelectorIdioma
+        properties:
+          mostrarSelectorIdioma:
+            type: boolean
+            description: El sitio publicado muestra el selector ES · EN (Ajustes del sitio)
     NavegacionPublica:
       type: object
       required:
@@ -5254,6 +5301,7 @@ components:
       - whatsapp
       - correoLeads
       - mantenimiento
+      - mostrarSelectorIdioma
       - actualizadoEn
       properties:
         dominio:
@@ -5327,6 +5375,10 @@ components:
               type: string
               format: date-time
               nullable: true
+        mostrarSelectorIdioma:
+          type: boolean
+          default: true
+          description: HU-1510 · El sitio muestra el selector ES · EN en la cabecera y el menú de celular; sale al sitio con «Publicar cambios»
         actualizadoEn:
           type: string
           format: date-time
@@ -5374,6 +5426,9 @@ components:
             mensaje:
               type: string
               nullable: true
+        mostrarSelectorIdioma:
+          type: boolean
+          description: HU-1510 · Mostrar el selector ES · EN; auditoría SITIO_AJUSTES_ACTUALIZADOS con `publicar` true
     ComprobacionDominio:
       type: object
       required:
@@ -5422,6 +5477,8 @@ components:
       properties:
         coleccion:
           $ref: '#/components/schemas/ColeccionContenido'
+        idioma:
+          $ref: '#/components/schemas/IdiomaSitio'
         orden:
           type: array
           maxItems: 500

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma, type SitioElemento } from '@aptio/db';
 import { ordenAlFinal, validarOrden } from '@aptio/schema/sitio-bloques';
-import { type Coleccion, type DatosContenido, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
+import { type Coleccion, type DatosContenido, type IdiomaSitio, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
 import { ficticiosVisibles } from '@aptio/schema/sitio-ficticios';
 import { entornoActual } from './entorno-sitio.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
@@ -9,7 +9,7 @@ import type { UsuarioSesion } from '../comun/roles.js';
 import type { ElementoSitioCambioDto, ElementoSitioDto, FicticiosOcultadosDto, FicticiosSitioDto } from './elementos.dto.js';
 
 const aDto = (e: SitioElemento): ElementoSitioDto => ({
-  id: e.id, coleccion: e.coleccion, orden: e.orden, visible: e.visible, ficticio: e.ficticio, datos: e.datos as DatosContenido,
+  id: e.id, coleccion: e.coleccion, idioma: e.idioma, orden: e.orden, visible: e.visible, ficticio: e.ficticio, datos: e.datos as DatosContenido,
   creadoEn: e.creadoEn.toISOString(), actualizadoEn: e.actualizadoEn.toISOString(),
 });
 
@@ -32,18 +32,19 @@ export class ElementosService {
     return this.baseDatos.cliente;
   }
 
-  async listar(coleccion: Coleccion): Promise<ElementoSitioDto[]> {
-    const filas = await this.bd.sitioElemento.findMany({ where: { coleccion }, orderBy: { orden: 'asc' } });
+  /** HU-1510 · Cada idioma tiene sus elementos y su propio orden (0, 1, 2… dentro de la colección y el idioma). */
+  async listar(coleccion: Coleccion, idioma: IdiomaSitio = 'es'): Promise<ElementoSitioDto[]> {
+    const filas = await this.bd.sitioElemento.findMany({ where: { coleccion, idioma }, orderBy: { orden: 'asc' } });
     return filas.map(aDto);
   }
 
-  async agregar(u: UsuarioSesion, coleccion: Coleccion, entrada: Record<string, unknown>, ficticio = false): Promise<ElementoSitioDto> {
+  async agregar(u: UsuarioSesion, coleccion: Coleccion, entrada: Record<string, unknown>, ficticio = false, idioma: IdiomaSitio = 'es'): Promise<ElementoSitioDto> {
     const datos = this.validos(coleccion, entrada, false);
     const e = await this.bd.$transaction(async (tx) => {
-      const actuales = await tx.sitioElemento.findMany({ where: { coleccion }, select: { id: true, orden: true, visible: true } });
-      return tx.sitioElemento.create({ data: { coleccion, orden: ordenAlFinal(actuales), visible: false, ficticio, datos } });
+      const actuales = await tx.sitioElemento.findMany({ where: { coleccion, idioma }, select: { id: true, orden: true, visible: true } });
+      return tx.sitioElemento.create({ data: { coleccion, idioma, orden: ordenAlFinal(actuales), visible: false, ficticio, datos } });
     });
-    await this.auditar(u, 'SITIO_ELEMENTO_AGREGADO', e.id, { coleccion, orden: e.orden, ficticio, datos });
+    await this.auditar(u, 'SITIO_ELEMENTO_AGREGADO', e.id, { coleccion, idioma, orden: e.orden, ficticio, datos });
     return aDto(e);
   }
 
@@ -69,15 +70,15 @@ export class ElementosService {
     return aDto(e);
   }
 
-  async ordenar(u: UsuarioSesion, coleccion: Coleccion, ids: string[]): Promise<ElementoSitioDto[]> {
+  async ordenar(u: UsuarioSesion, coleccion: Coleccion, ids: string[], idioma: IdiomaSitio = 'es'): Promise<ElementoSitioDto[]> {
     const r = await this.bd.$transaction(async (tx) => {
-      const actuales = await tx.sitioElemento.findMany({ where: { coleccion }, orderBy: { orden: 'asc' } });
+      const actuales = await tx.sitioElemento.findMany({ where: { coleccion, idioma }, orderBy: { orden: 'asc' } });
       const error = validarOrden(actuales, ids);
       if (error) throw new UnprocessableEntityException({ codigo: 'ORDEN_INVALIDO', mensaje: MENSAJE_ORDEN[error.tipo], detalles: [error] });
       await Promise.all(ids.map((id, orden) => tx.sitioElemento.update({ where: { id }, data: { orden } })));
-      return { antes: actuales.map((e) => e.id), despues: await tx.sitioElemento.findMany({ where: { coleccion }, orderBy: { orden: 'asc' } }) };
+      return { antes: actuales.map((e) => e.id), despues: await tx.sitioElemento.findMany({ where: { coleccion, idioma }, orderBy: { orden: 'asc' } }) };
     });
-    if (r.antes.join() !== ids.join()) await this.auditar(u, 'SITIO_ELEMENTOS_REORDENADOS', null, { coleccion, antes: r.antes, despues: ids });
+    if (r.antes.join() !== ids.join()) await this.auditar(u, 'SITIO_ELEMENTOS_REORDENADOS', null, { coleccion, idioma, antes: r.antes, despues: ids });
     return r.despues.map(aDto);
   }
 
@@ -85,13 +86,13 @@ export class ElementosService {
     const e = await this.buscar(id);
     await this.bd.$transaction(async (tx) => {
       await tx.sitioElemento.delete({ where: { id } });
-      const resto = await tx.sitioElemento.findMany({ where: { coleccion: e.coleccion }, orderBy: { orden: 'asc' }, select: { id: true, orden: true } });
+      const resto = await tx.sitioElemento.findMany({ where: { coleccion: e.coleccion, idioma: e.idioma }, orderBy: { orden: 'asc' }, select: { id: true, orden: true } });
       await Promise.all(resto.map((r, orden) => (r.orden === orden ? null : tx.sitioElemento.update({ where: { id: r.id }, data: { orden } }))));
     });
-    await this.auditar(u, 'SITIO_ELEMENTO_BORRADO', id, { coleccion: e.coleccion, visible: e.visible, datos: e.datos });
+    await this.auditar(u, 'SITIO_ELEMENTO_BORRADO', id, { coleccion: e.coleccion, idioma: e.idioma, visible: e.visible, datos: e.datos });
   }
 
-  /** HU-1505 · Ficticios visibles del sitio, con el entorno (RN-16-3). */
+  /** HU-1505 · Ficticios visibles del sitio, con el entorno (RN-16-3). HU-1510: de los dos idiomas. */
   async ficticios(): Promise<FicticiosSitioDto> {
     const filas = await this.bd.sitioElemento.findMany({ where: { ficticio: true, visible: true } });
     return { entorno: entornoActual(), ficticios: ficticiosVisibles(filas).map(aDto) };

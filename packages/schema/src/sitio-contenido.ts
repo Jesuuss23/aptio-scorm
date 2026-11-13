@@ -112,6 +112,20 @@ const tieneControl = (s: string) => [...s].some((ch) => {
 });
 
 /** RN-16-7 · Texto plano: sin etiquetas HTML ni caracteres de control (salvo salto de línea y tabulador). */
+/** HU-1510 · Idiomas del sitio: cada elemento y enlace es de uno; el español es el principal (y el de las filas viejas). */
+export const IDIOMAS_SITIO = ['es', 'en'] as const;
+export type IdiomaSitio = (typeof IDIOMAS_SITIO)[number];
+export const IDIOMA_PRINCIPAL: IdiomaSitio = 'es';
+export function esIdiomaSitio(v: unknown): v is IdiomaSitio {
+  return typeof v === 'string' && (IDIOMAS_SITIO as readonly string[]).includes(v);
+}
+/** El idioma de una fila; sin el campo (filas o instantáneas de antes de la HU-1510), español. */
+export const idiomaDeFila = (f: { idioma?: string | null }): IdiomaSitio => (f.idioma === 'en' ? 'en' : 'es');
+/** Las filas de un idioma: el orden y la compactación de Contenido, el menú y el pie se hacen dentro de cada uno. */
+export function delIdioma<T extends { idioma?: string | null }>(filas: readonly T[], idioma: string): T[] {
+  return filas.filter((f) => idiomaDeFila(f) === idioma);
+}
+
 export function esTextoPlano(s: string): boolean {
   return !ETIQUETA.test(s) && !tieneControl(s);
 }

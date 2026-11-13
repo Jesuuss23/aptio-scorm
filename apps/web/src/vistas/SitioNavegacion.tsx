@@ -3,10 +3,12 @@
 // interruptor para mostrar u ocultar y borrar con confirmación. El pie tiene columnas con sus enlaces: ocultar una
 // columna oculta todos sus enlaces. Lo nuevo entra oculto (RN-16-2). La línea «En el sitio» muestra lo que ve el
 // visitante en la cabecera y en el menú de celular, que usan la misma lista (CP-118).
+// HU-1510 · Selector «Español / Inglés»: cada idioma tiene su menú y su pie, con el orden aparte (REQ-069).
 import { moverBloque } from '@aptio/schema/sitio-bloques';
 import { navegacionPublica, validarRuta, validarTextoEnlace } from '@aptio/schema/sitio-navegacion';
 import { type FormEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { api, type EnlaceSitio, ErrorApi, type NavegacionSitio as Navegacion } from '../api';
+import { type IdiomaConsola, SelectorIdiomaSitio } from './IdiomaSitio';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
@@ -14,6 +16,7 @@ type Nuevo = { zona: 'menu' | 'pie'; padreId: string | null } | null;
 const claveNuevo = (n: NonNullable<Nuevo>) => `${n.zona}-${n.padreId ?? 'raiz'}`;
 
 export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) {
+  const [idioma, setIdioma] = useState<IdiomaConsola>('es');
   const [nav, setNav] = useState<Navegacion | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
@@ -25,8 +28,20 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
   const contenedor = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api.navegacionSitio().then(setNav, (e: unknown) => setError(mensajeDe(e, 'No se pudo cargar el menú y el pie')));
-  }, []);
+    let vigente = true;
+    api.navegacionSitio(idioma).then((n) => { if (vigente) setNav(n); }, (e: unknown) => { if (vigente) setError(mensajeDe(e, 'No se pudo cargar el menú y el pie')); });
+    return () => { vigente = false; };
+  }, [idioma]);
+
+  function elegirIdioma(i: IdiomaConsola) {
+    setNav(null);
+    setError('');
+    setAviso(null);
+    setNuevo(null);
+    setBorrando(null);
+    setIdioma(i);
+    setAnuncio(i === 'en' ? 'Menú y pie en inglés.' : 'Menú y pie en español.');
+  }
 
   // Tras mover, el foco sigue al enlace movido (la flecha que se usó o, si quedó en un extremo, la otra).
   useEffect(() => {
@@ -45,7 +60,7 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
     setAviso(null);
     try {
       const r = await accion();
-      setNav(await api.navegacionSitio());
+      setNav(await api.navegacionSitio(idioma));
       alCambiar?.();
       return r;
     } catch (e) {
@@ -59,7 +74,7 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
   async function mover(e: EnlaceSitio, hermanos: EnlaceSitio[], paso: -1 | 1) {
     const ids = moverBloque(hermanos.map((x) => x.id), e.id, paso);
     foco.current = `${e.id}:${paso === -1 ? 'subir' : 'bajar'}`;
-    const nuevos = await hacer(() => api.ordenarEnlaces(e.zona, e.padreId, ids), 'No se pudo cambiar el orden');
+    const nuevos = await hacer(() => api.ordenarEnlaces(e.zona, e.padreId, ids, idioma), 'No se pudo cambiar el orden');
     if (!nuevos) return void (foco.current = null);
     setAnuncio(`«${e.texto}» quedó en la posición ${nuevos.findIndex((x) => x.id === e.id) + 1} de ${nuevos.length}.`);
   }
@@ -78,7 +93,7 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
   }
 
   async function agregar(n: NonNullable<Nuevo>, texto: string, ruta: string | null): Promise<boolean> {
-    const r = await hacer(() => api.agregarEnlace({ zona: n.zona, texto, ...(n.padreId ? { padreId: n.padreId } : {}), ...(ruta ? { ruta } : {}) }), 'No se pudo agregar');
+    const r = await hacer(() => api.agregarEnlace({ zona: n.zona, idioma, texto, ...(n.padreId ? { padreId: n.padreId } : {}), ...(ruta ? { ruta } : {}) }), 'No se pudo agregar');
     if (!r) return false;
     setNuevo(null);
     setAviso({ tipo: 'ok', texto: `«${r.texto}» se agregó al final, oculto. Actívalo cuando esté listo.` });
@@ -92,8 +107,10 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
     setAviso({ tipo: 'ok', texto: `«${e.texto}» se borró.` });
   }
 
-  if (error) return <div className="nota error" role="alert">{error}</div>;
-  if (!nav) return <p className="sec" role="status">Cargando el menú y el pie…</p>;
+  const selector = <SelectorIdiomaSitio idioma={idioma} alCambiar={elegirIdioma} etiqueta="Idioma del menú y el pie" ocupado={ocupado} />;
+  if (error) return <>{selector}<div className="nota error" role="alert">{error}</div></>;
+  if (!nav) return <>{selector}<p className="sec" role="status">Cargando el menú y el pie…</p></>;
+  const enIngles = idioma === 'en';
   const publico = navegacionPublica([...nav.menu, ...nav.pie, ...nav.pie.flatMap((c) => c.enlaces)]);
 
   const fila = (e: EnlaceSitio, hermanos: EnlaceSitio[], i: number, extra?: ReactNode) => {
@@ -141,14 +158,15 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
 
   return (
     <div className="navegacion-sitio" ref={contenedor}>
+      {selector}
       {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
       <p className="sr" aria-live="polite">{anuncio}</p>
       <section className="tarjeta" aria-labelledby="menu-principal-titulo">
         <div className="tarjeta-cabeza">
-          <h2 id="menu-principal-titulo">Menú principal</h2>
+          <h2 id="menu-principal-titulo">Menú principal{enIngles ? ' · Inglés' : ''}</h2>
           <span className="chip">{nav.menu.filter((e) => e.visible).length} visibles</span>
         </div>
-        <p className="sec">Enlaces de la cabecera. El menú de celular usa la misma lista y el mismo orden.</p>
+        <p className="sec">Enlaces de la cabecera{enIngles ? ' de las páginas en inglés (/en…)' : ''}. El menú de celular usa la misma lista y el mismo orden.</p>
         {nav.menu.length === 0 ? <p className="nota">Aún no hay enlaces en el menú.</p> : (
           <ol className="lista-bloques" aria-label="Enlaces del menú principal">{nav.menu.map((e, i) => fila(e, nav.menu, i))}</ol>
         )}
@@ -160,7 +178,7 @@ export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) 
       </section>
       <section className="tarjeta" aria-labelledby="pie-pagina-titulo">
         <div className="tarjeta-cabeza">
-          <h2 id="pie-pagina-titulo">Pie de página</h2>
+          <h2 id="pie-pagina-titulo">Pie de página{enIngles ? ' · Inglés' : ''}</h2>
           <span className="chip">{nav.pie.filter((c) => c.visible).length} columnas visibles</span>
         </div>
         <p className="sec">Columnas del pie con sus enlaces. Ocultar una columna oculta todos sus enlaces.</p>

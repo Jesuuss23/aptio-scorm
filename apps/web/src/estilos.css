@@ -3014,3 +3014,6 @@ ul.fila-chips {
   outline: 2px solid var(--color-texto);
   outline-offset: 2px;
 }
+
+/* HU-1510 · Selector «Español / Inglés» de Contenido y de Menú y pie. */
+.selector-idioma-sitio { margin-bottom: 12px; }

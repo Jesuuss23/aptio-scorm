@@ -1,14 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { COLECCIONES } from '@aptio/schema/sitio-contenido';
+import { COLECCIONES, IDIOMAS_SITIO } from '@aptio/schema/sitio-contenido';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsUUID } from 'class-validator';
 
 const MENSAJE_COLECCION = `coleccion debe ser una de: ${COLECCIONES.join(', ')}`;
+const MENSAJE_IDIOMA = 'idioma debe ser es o en';
 
 /** HU-1504 · Elemento de contenido del sitio (REQ-066). Nace oculto (RN-16-2, CP-115). */
 export class ElementoSitioDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ enum: COLECCIONES }) coleccion: string;
-  @ApiProperty({ minimum: 0, description: 'Posición 0, 1, 2… sin huecos dentro de la colección' }) orden: number;
+  @ApiProperty({ enum: IDIOMAS_SITIO, description: 'HU-1510 · Idioma del elemento' }) idioma: string;
+  @ApiProperty({ minimum: 0, description: 'Posición 0, 1, 2… sin huecos dentro de la colección y el idioma' }) orden: number;
   @ApiProperty() visible: boolean;
   @ApiProperty({ description: 'HU-1505 · Dato inventado: si está visible, bloquea publicar en producción (RN-16-3)' }) ficticio: boolean;
   @ApiProperty({ type: 'object', additionalProperties: true, description: 'Campos de la colección (`@aptio/schema/sitio-contenido`)' })
@@ -19,12 +21,14 @@ export class ElementoSitioDto {
 
 export class ConsultaElementosDto {
   @ApiProperty({ enum: COLECCIONES }) @IsIn(COLECCIONES, { message: MENSAJE_COLECCION }) coleccion: string;
+  @ApiPropertyOptional({ enum: IDIOMAS_SITIO, default: 'es', description: 'HU-1510 · Idioma del contenido; cada idioma tiene su orden' }) @IsOptional() @IsIn(IDIOMAS_SITIO, { message: MENSAJE_IDIOMA }) idioma?: string;
 }
 
 export class ElementoSitioEntradaDto {
   @ApiProperty({ enum: COLECCIONES }) @IsIn(COLECCIONES, { message: MENSAJE_COLECCION }) coleccion: string;
   @ApiProperty({ type: 'object', additionalProperties: true, description: 'Solo texto plano (RN-16-7)' }) @IsObject() datos: Record<string, unknown>;
   @ApiPropertyOptional({ default: false, description: 'HU-1505 · Marca el dato como inventado' }) @IsOptional() @IsBoolean() ficticio?: boolean;
+  @ApiPropertyOptional({ enum: IDIOMAS_SITIO, default: 'es', description: 'HU-1510 · Idioma del contenido; cada idioma tiene su orden' }) @IsOptional() @IsIn(IDIOMAS_SITIO, { message: MENSAJE_IDIOMA }) idioma?: string;
 }
 
 export class ElementoSitioCambioDto {
@@ -46,6 +50,7 @@ export class FicticiosOcultadosDto extends FicticiosSitioDto {
 
 export class OrdenElementosDto {
   @ApiProperty({ enum: COLECCIONES }) @IsIn(COLECCIONES, { message: MENSAJE_COLECCION }) coleccion: string;
-  @ApiProperty({ type: [String], format: 'uuid', description: 'Todos los elementos de la colección, una vez cada uno, en el orden nuevo' })
+  @ApiPropertyOptional({ enum: IDIOMAS_SITIO, default: 'es', description: 'HU-1510 · Idioma del contenido; cada idioma tiene su orden' }) @IsOptional() @IsIn(IDIOMAS_SITIO, { message: MENSAJE_IDIOMA }) idioma?: string;
+  @ApiProperty({ type: [String], format: 'uuid', description: 'Todos los elementos de la colección en ese idioma, una vez cada uno, en el orden nuevo' })
   @IsArray() @ArrayMaxSize(500) @IsUUID('all', { each: true }) orden: string[];
 }

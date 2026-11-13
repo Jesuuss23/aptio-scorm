@@ -23,6 +23,8 @@ export interface AjustesSitio {
   whatsapp: { visible: boolean; numero: string | null; mensaje: string | null };
   correoLeads: string | null;
   mantenimiento: { activo: boolean; mensaje: string | null; desde: string | null };
+  /** HU-1510 · Selector ES · EN en la cabecera y el menú de celular (el EN sale solo si hay inglés publicado). */
+  mostrarSelectorIdioma: boolean;
 }
 
 export const NOMBRE_POR_DEFECTO = 'Aptio SCORM';
@@ -33,6 +35,7 @@ export const AJUSTES_POR_DEFECTO: AjustesSitio = {
   whatsapp: { visible: false, numero: null, mensaje: null },
   correoLeads: null,
   mantenimiento: { activo: false, mensaje: null, desde: null },
+  mostrarSelectorIdioma: true,
 };
 
 export const LIMITES_AJUSTES = { nombre: 60, mensajeWhatsapp: 200, mensajeMantenimiento: 280, correo: 254, marcaBytes: 200 * 1024 } as const;
@@ -63,6 +66,7 @@ export function leerAjustes(v: unknown): AjustesSitio {
     whatsapp: { ...d.whatsapp, ...(o.whatsapp ?? {}) },
     correoLeads: typeof o.correoLeads === 'string' ? o.correoLeads : null,
     mantenimiento: { ...d.mantenimiento, ...(o.mantenimiento ?? {}) },
+    mostrarSelectorIdioma: typeof o.mostrarSelectorIdioma === 'boolean' ? o.mostrarSelectorIdioma : d.mostrarSelectorIdioma,
   };
 }
 
@@ -74,6 +78,7 @@ export interface CambiosAjustes {
   whatsapp?: Partial<AjustesSitio['whatsapp']>;
   correoLeads?: string | null;
   mantenimiento?: { activo?: boolean; mensaje?: string | null };
+  mostrarSelectorIdioma?: boolean;
 }
 
 export type ResultadoAjustes = { ok: true; ajustes: AjustesSitio } | { ok: false; errores: ErrorCampo[] };
@@ -144,6 +149,7 @@ export function aplicarCambiosAjustes(actual: AjustesSitio, c: CambiosAjustes, a
       a.mantenimiento.desde = c.mantenimiento.activo ? ahora.toISOString() : null;
     }
   }
+  if (c.mostrarSelectorIdioma !== undefined) a.mostrarSelectorIdioma = c.mostrarSelectorIdioma;
   return errores.length ? { ok: false, errores } : { ok: true, ajustes: a };
 }
 
@@ -154,12 +160,15 @@ export interface SitioPublicado {
   logo: ArchivoMarca | null;
   favicon: ArchivoMarca | null;
   whatsapp: { numero: string; mensaje: string | null } | null;
+  /** HU-1510 · Solo cuando el selector está apagado; sin el campo, se muestra (así las versiones de antes no cambian). */
+  mostrarSelectorIdioma?: false;
 }
 
 export function ajustesPublicados(a: AjustesSitio): SitioPublicado {
   return {
     nombre: a.nombre, dominio: a.dominio, logo: a.logo, favicon: a.favicon,
     whatsapp: a.whatsapp.visible && a.whatsapp.numero ? { numero: a.whatsapp.numero, mensaje: a.whatsapp.mensaje } : null,
+    ...(a.mostrarSelectorIdioma ? {} : { mostrarSelectorIdioma: false as const }),
   };
 }
 

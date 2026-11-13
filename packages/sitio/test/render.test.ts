@@ -30,7 +30,7 @@ describe('sitio público pre-renderizado (HU-1508)', () => {
       expect(n.slice(1).map((x, i) => x - n[i]!).filter((salto) => salto > 1)).toEqual([]);
     }
     const html = renderizarPagina(instantaneaDeEjemplo(), '/', 'es', op)!;
-    expect(html).toMatch(/<details class="menu-celular"><summary>Menú<\/summary><nav class="nav-celular" aria-label="Principal \(menú\)">/);
+    expect(html).toMatch(/<details class="menu-celular"><summary>Menú<\/summary><div class="nav-celular"><nav aria-label="Principal \(menú\)">/);
     expect(html).toContain('<a href="https://blog.aptioscorm.com" target="_blank" rel="noopener">Blog</a>');
     expect(html).toContain('<a href="/s/funcionalidades/personaje">Producto</a>');
     expect(html).toContain('<a href="/s/#testimonios">Casos</a>');
