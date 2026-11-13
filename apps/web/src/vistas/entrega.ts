@@ -17,7 +17,12 @@ export const MODOS_IDIOMA: { id: ModoIdiomaExportacion; nombre: string }[] = [
 export const esFaltaIngles = (e: string): boolean => /^Faltan \d+ textos en inglés/.test(e);
 export const esAvisoIngles = (a: string): boolean => /\(Desborde\)|^Sin voz en inglés/.test(a);
 /** Nombre del formato en el historial. */
-export const NOMBRE_FORMATO: Record<string, string> = { SCORM12: 'SCORM 1.2', HTML: 'HTML' };
+export const NOMBRE_FORMATO: Record<string, string> = { SCORM12: 'SCORM 1.2', HTML: 'HTML', KIT_GAMIFICACION: 'Kit de gamificación' };
+/** HU-1205 · Idioma de las insignias del kit: el del curso o los dos nombres. */
+export const IDIOMAS_KIT: { id: ModoIdiomaExportacion; nombre: string }[] = [
+  { id: 'unico', nombre: 'Idioma del curso' },
+  { id: 'mismo-paquete', nombre: 'ES + EN' },
+];
 
 export const PERFILES: { id: PerfilExportacion; nombre: string; recomendacion: string }[] = [
   { id: 'generico', nombre: 'Genérico (cualquier LMS)', recomendacion: 'Cumple SCORM 1.2 de forma estricta, sin ajustes para ningún LMS. Si el LMS del cliente es desconocido, prueba antes el paquete en SCORM Cloud.' },

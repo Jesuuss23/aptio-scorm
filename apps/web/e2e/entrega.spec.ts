@@ -5,7 +5,10 @@
 // de esquema deshabilita Exportar; con pantallas sin aprobar se confirma antes (RN-12-3); cambiar el LMS vuelve a validar.
 // HU-1203 · Formato HTML autocontenido: sin LMS destino ni límite de subida, con la misma confirmación y el formato en el historial.
 // HU-0804 · Idioma «ES + EN en el mismo paquete»: sin todo el inglés no se exporta; los desbordes y la voz solo advierten.
-import { codigoReproductor, construirScorm12 } from '@aptio/exporters';
+// HU-1205 · CP-095 · «Kit de gamificación para el LMS»: empieza en el LMS del cliente, «Exportar kit» lo pide con el LMS y
+// el idioma elegidos, el historial muestra su avance y se descarga el ZIP real del kit; axe WCAG 2.2 A/AA sin violaciones.
+import AxeBuilder from '@axe-core/playwright';
+import { codigoReproductor, construirKitGamificacion, construirScorm12 } from '@aptio/exporters';
 import { expect, type Page, test } from '@playwright/test';
 import JSZip from 'jszip';
 import { readFileSync } from 'node:fs';
@@ -16,6 +19,7 @@ const PROYECTO = '00000000-0000-4000-8000-000000000701';
 const CURSO = '00000000-0000-4000-8000-000000000990';
 const URL_ENTREGA = `/proyectos/${PROYECTO}/entrega`;
 const DESCARGA = 'https://s3-descarga.prueba/paquete.zip?X-Amz-Expires=900';
+const DESCARGA_KIT = 'https://s3-descarga.prueba/kit.zip?X-Amz-Expires=900';
 
 type Validacion = Record<string, unknown> & { errores: string[]; advertencias: string[] };
 const VALIDACION: Validacion = {
@@ -41,7 +45,7 @@ const PESADA: Validacion = {
 type Exp = { id: string; cursoId: string; formato: string; perfilLms: string; modoIdioma: string; versionCurso: number; estado: string; bytes: number | null; informe: unknown; motivo: string | null; nombreArchivo: string | null; descargaUrl: string | null; creadoEn: string };
 
 /** Exportaciones simuladas: cada una pasa a EN_CURSO y a COMPLETADO en las consultas siguientes, como el worker. */
-async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { falla?: boolean; validacion?: Validacion; bilingue?: () => Validacion } = {}) {
+async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { falla?: boolean; validacion?: Validacion; bilingue?: () => Validacion; zipKit?: Uint8Array } = {}) {
   const lista: Exp[] = [{
     id: '00000000-0000-4000-8000-00000000e001', cursoId: CURSO, formato: 'SCORM12', perfilLms: 'generico', modoIdioma: 'unico', versionCurso: 1, estado: 'COMPLETADO',
     bytes: 2_400_000, informe: { errores: [], advertencias: [] }, motivo: null, nombreArchivo: 'bloqueo-y-etiquetado-scorm12-v1.zip', descargaUrl: null, creadoEn: '2026-11-10T09:00:00.000Z',
@@ -61,6 +65,7 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
     if (e.estado === 'EN_COLA' && n >= 1) e.estado = 'EN_CURSO';
     else if (e.estado === 'EN_CURSO' && n >= 2) {
       if (opciones.falla) Object.assign(e, { estado: 'ERROR', motivo: 'No se pudo leer el recurso «ana.svg»: NoSuchKey' });
+      else if (e.formato === 'KIT_GAMIFICACION') Object.assign(e, { estado: 'COMPLETADO', bytes: opciones.zipKit?.byteLength ?? 1, nombreArchivo: `bloqueo-y-etiquetado-kit-${e.perfilLms}-v3.zip`, informe: { errores: [], advertencias: [], lms: e.perfilLms, insignias: 3 } });
       else Object.assign(e, { estado: 'COMPLETADO', bytes: zip.byteLength, nombreArchivo: 'bloqueo-y-etiquetado-scorm12-v3.zip', informe: { errores: [], advertencias: ['Falta el archivo de «p01-es.mp3»: el paquete muestra su texto alternativo.'] } });
     }
   };
@@ -77,9 +82,12 @@ async function simularExportaciones(page: Page, zip: Uint8Array, opciones: { fal
   });
   await page.route('**/api/v1/exportaciones/*', (r) => {
     const e = lista.find((x) => r.request().url().endsWith(x.id));
-    return e ? r.fulfill({ json: { ...e, descargaUrl: e.estado === 'COMPLETADO' ? DESCARGA : null } }) : r.fulfill({ status: 404, json: { codigo: 'NO_ENCONTRADO', mensaje: 'Exportación no encontrada' } });
+    return e ? r.fulfill({ json: { ...e, descargaUrl: e.estado === 'COMPLETADO' ? (e.formato === 'KIT_GAMIFICACION' ? DESCARGA_KIT : DESCARGA) : null } }) : r.fulfill({ status: 404, json: { codigo: 'NO_ENCONTRADO', mensaje: 'Exportación no encontrada' } });
   });
-  await page.route('https://s3-descarga.prueba/**', (r) => r.fulfill({
+  await page.route('https://s3-descarga.prueba/kit.zip*', (r) => r.fulfill({
+    body: Buffer.from(opciones.zipKit ?? new Uint8Array()), headers: { 'content-type': 'application/zip', 'content-disposition': 'attachment; filename="bloqueo-y-etiquetado-kit-chamilo-v3.zip"' },
+  }));
+  await page.route('https://s3-descarga.prueba/paquete.zip*', (r) => r.fulfill({
     body: Buffer.from(zip), headers: { 'content-type': 'application/zip', 'content-disposition': 'attachment; filename="bloqueo-y-etiquetado-scorm12-v3.zip"' },
   }));
   return { pedidos, validaciones };
@@ -143,6 +151,46 @@ test('CP-091 · exportar desde Entrega: el perfil cambia las recomendaciones, se
   expect(contenido.file('index.html')).not.toBeNull();
 });
 
+test('HU-1205 · CP-095 · el kit de gamificación empieza en el LMS del cliente, se exporta y se descarga desde el historial', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  const zipKit = (await construirKitGamificacion({ curso: cursoPaquete(), lms: 'chamilo', idioma: 'ambos', png: () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]) })).zip;
+  const { pedidos } = await simularExportaciones(page, zip, { zipKit });
+  await page.goto(URL_ENTREGA);
+
+  const kit = page.getByRole('region', { name: 'Kit de gamificación para el LMS' });
+  await expect(kit).toContainText('una por cápsula, una por módulo y una del curso, en PNG y SVG');
+  // El proyecto tiene Moodle: el kit empieza ahí; se cambia a Chamilo y a los dos idiomas.
+  const lms = kit.getByRole('group', { name: 'LMS del kit' });
+  await expect(lms.getByRole('button', { name: 'Moodle 4.5+' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(kit.getByText('La guía trae los pasos de Moodle 4.5+.', { exact: false })).toBeVisible();
+  await lms.getByRole('button', { name: 'Chamilo' }).click();
+  await expect(kit.getByText('La guía trae los pasos de Chamilo.', { exact: false })).toBeVisible();
+  await expect(kit.getByText('verifícalos con la versión del cliente', { exact: false })).toBeVisible();
+  await kit.getByRole('group', { name: 'Idioma del kit' }).getByRole('button', { name: 'ES + EN' }).click();
+  // El LMS del kit no cambia el del paquete.
+  await expect(page.getByRole('group', { name: 'LMS destino' }).getByRole('button', { name: 'Moodle 4.5+' })).toHaveAttribute('aria-pressed', 'true');
+
+  const resultado = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22a', 'wcag22aa']).include('.kit-gamificacion').analyze();
+  expect(resultado.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+
+  await kit.getByRole('button', { name: 'Exportar kit' }).click();
+  await expect(kit.getByRole('status')).toContainText('Kit pedido para Chamilo con la versión 3 del curso');
+  expect(pedidos).toEqual([{ formato: 'KIT_GAMIFICACION', perfilLms: 'chamilo', modoIdioma: 'mismo-paquete' }]);
+  const fila = page.getByRole('region', { name: 'Historial de exportaciones' }).getByRole('row').nth(1);
+  await expect(fila).toContainText('Kit de gamificación · ES + EN');
+  await expect(fila).toContainText('Chamilo');
+  await expect(fila).toContainText('Listo', { timeout: 10_000 });
+
+  const descarga = page.waitForEvent('download');
+  await fila.getByRole('button', { name: 'Descargar bloqueo-y-etiquetado-kit-chamilo-v3.zip' }).click();
+  const archivo = await descarga;
+  expect(archivo.suggestedFilename()).toBe('bloqueo-y-etiquetado-kit-chamilo-v3.zip');
+  const contenido = await JSZip.loadAsync(readFileSync((await archivo.path())!));
+  expect(Object.keys(contenido.files).filter((n) => n.startsWith('insignias/png/'))).toHaveLength(3);
+  expect(JSON.parse(await contenido.file('plan.json')!.async('string'))).toMatchObject({ lms: 'chamilo', notaMinima: 70 });
+  expect(await contenido.file('guia-chamilo.html')!.async('string')).toContain('Verificar con la versión del cliente');
+});
+
 test('si la exportación falla, el historial muestra el motivo y no ofrece Descargar', async ({ page }) => {
   await simularApi(page, { conSesion: true, conProyectos: true });
   await simularExportaciones(page, zip, { falla: true });
@@ -164,6 +212,7 @@ test('el revisor del cliente ve la entrega sin el botón Exportar', async ({ pag
   await expect(page.getByText('Solo administración, diseño instruccional y producción exportan.')).toBeVisible();
   await expect(page.getByText('El historial y la descarga son del equipo de producción.')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Verificación automática' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Kit de gamificación para el LMS' })).toHaveCount(0);
   await page.goto(`/proyectos/${PROYECTO}`);
   await expect(page.getByRole('link', { name: 'Revisión' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Exportar SCORM' })).toHaveCount(0);

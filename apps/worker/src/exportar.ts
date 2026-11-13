@@ -7,12 +7,15 @@
 // organización que los revisó; el paquete mismo se registra con proveedor `aptio` (REQ-062, SUP-64).
 // HU-0804 · Con `modoIdioma: 'mismo-paquete'` el paquete lleva español e inglés; los créditos van en español e incluyen
 // los recursos de los dos idiomas.
+// HU-1205 · Con formato KIT_GAMIFICACION arma el kit para el LMS del cliente (insignias SVG y PNG, plan y guía del LMS de
+// `perfilLms`) con la paleta, la tipografía y el logo del kit de marca, y lo nombra `<proyecto>-kit-<lms>-v<n>.zip`.
 import { createHash, randomUUID } from 'node:crypto';
 import { type EventoTrabajo, publicarEvento } from '@aptio/colas';
 import type { Prisma, PrismaClient } from '@aptio/db';
-import { armarCreditos, codigoReproductor, construirHtml, construirScorm12 } from '@aptio/exporters';
+import { armarCreditos, codigoReproductor, construirHtml, construirKitGamificacion, construirScorm12, LMS_KIT, type LmsKit } from '@aptio/exporters';
 import type { CursoReproductor, KitReproductor } from '@aptio/player';
 import type { Redis } from 'ioredis';
+import { pngDesdeSvg } from './insignias.js';
 import { conProcedencia, procedenciaPaquete } from './procedencia.js';
 import type { TrabajoEnCola } from './procesar.js';
 
@@ -26,15 +29,23 @@ export interface DependenciasExportar {
   subir: (clave: string, cuerpo: Uint8Array, mime: string) => Promise<void>;
   /** El reproductor empaquetado; por defecto se arma una vez por proceso. */
   reproductor?: () => Promise<string>;
+  /** HU-1205 · SVG → PNG de las insignias; por defecto, @resvg/resvg-js. */
+  png?: (svg: string, lado: number) => Uint8Array | Promise<Uint8Array>;
 }
 
-/** Nombre del archivo que se descarga: `<proyecto>-scorm12-v<versión>.zip` o `<proyecto>-html-v<versión>.zip`, sin tildes ni espacios. */
-export function nombrePaquete(proyecto: string, version: number, formato: string = 'SCORM12'): string {
+/**
+ * Nombre del archivo que se descarga, sin tildes ni espacios: `<proyecto>-scorm12-v<versión>.zip`,
+ * `<proyecto>-html-v<versión>.zip` o, con el kit de gamificación, `<proyecto>-kit-<lms>-v<versión>.zip`.
+ */
+export function nombrePaquete(proyecto: string, version: number, formato: string = 'SCORM12', lms = 'generico'): string {
   const base = proyecto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'curso';
-  return `${base}-${formato === 'HTML' ? 'html' : 'scorm12'}-v${version}.zip`;
+  const tipo = formato === 'HTML' ? 'html' : formato === 'KIT_GAMIFICACION' ? `kit-${lms}` : 'scorm12';
+  return `${base}-${tipo}-v${version}.zip`;
 }
 
-export function crearExportador({ bd, redis, leer, subir, reproductor = codigoReproductor }: DependenciasExportar) {
+const esLmsKit = (x: string): x is LmsKit => (LMS_KIT as readonly string[]).includes(x);
+
+export function crearExportador({ bd, redis, leer, subir, reproductor = codigoReproductor, png = pngDesdeSvg }: DependenciasExportar) {
   return async function exportar(trabajo: TrabajoEnCola): Promise<{ recursoId: string }> {
     const { trabajoId: exportacionId, organizacionId, tarea } = trabajo.data;
     const emitir = (estado: EventoTrabajo['estado'], progreso: number, mensaje?: string) =>
@@ -54,6 +65,40 @@ export function crearExportador({ bd, redis, leer, subir, reproductor = codigoRe
       const documento = version?.documento ?? (exp.curso.version === exp.versionCurso ? exp.curso.documento : null);
       if (!documento) throw new Error(`No se encontró la versión ${exp.versionCurso} del curso`);
       const curso = documento as unknown as CursoReproductor;
+      if (exp.formato === 'KIT_GAMIFICACION') {
+        // HU-1205 · Kit de gamificación: insignias con la marca del cliente, plan y guía del LMS elegido.
+        const proyecto = exp.curso.proyecto;
+        const k = proyecto.cliente.kit;
+        let logo: { datos: Uint8Array; mime: string } | null = null;
+        if (k?.logoRecursoId) {
+          const r = await bd.recurso.findFirst({ where: { id: k.logoRecursoId, organizacionId }, select: { claveS3: true, mime: true } });
+          if (r) logo = { datos: await leer(r.claveS3), mime: r.mime };
+        }
+        const lms = esLmsKit(exp.perfilLms) ? exp.perfilLms : 'generico';
+        const idioma = exp.modoIdioma === 'mismo-paquete' ? 'ambos' : curso.idiomas[0] === 'en' ? 'en' : 'es';
+        const organizacion = await bd.organizacion.findUnique({ where: { id: organizacionId }, select: { nombre: true } });
+        await emitir('EN_CURSO', 30);
+        const kitArmado = await construirKitGamificacion({
+          curso, lms, idioma, png, proyecto: proyecto.nombre, organizacion: organizacion?.nombre ?? '',
+          marca: { nombreCliente: proyecto.cliente.nombre, paleta: (k?.paleta ?? null) as Record<string, string> | null, tipografias: (k?.tipografias ?? null) as { titulos?: string } | null, logo },
+        });
+        const recursoId = randomUUID();
+        const claveS3 = `org/${organizacionId}/${proyecto.clienteId}/${recursoId}`;
+        await subir(claveS3, kitArmado.zip, MIME_ZIP);
+        const informe = { errores: [] as string[], advertencias: kitArmado.advertencias, idioma, lms, insignias: kitArmado.plan.insignias.length, archivos: kitArmado.archivos.length };
+        await bd.$transaction([
+          bd.recurso.create({
+            data: conProcedencia({
+              id: recursoId, organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'PAQUETE', origen: 'GENERADO',
+              claveS3, mime: MIME_ZIP, bytes: BigInt(kitArmado.zip.byteLength), hash: createHash('sha256').update(kitArmado.zip).digest('hex'),
+              nombre: nombrePaquete(proyecto.nombre, exp.versionCurso, exp.formato, lms), ...procedenciaPaquete(exp.formato),
+            }),
+          }),
+          bd.exportacion.update({ where: { id: exp.id }, data: { estado: 'COMPLETADO', bytes: BigInt(kitArmado.zip.byteLength), informe: informe as Prisma.InputJsonValue, recursoId, motivo: null } }),
+        ]);
+        await emitir('COMPLETADO', 100);
+        return { recursoId };
+      }
 
       // Los recursos del curso son filas de Recurso (uuid); el material del cliente (documento) nunca va en el paquete.
       const ids = curso.recursos.filter((r) => r.tipo !== 'documento' && UUID.test(r.id)).map((r) => r.id);

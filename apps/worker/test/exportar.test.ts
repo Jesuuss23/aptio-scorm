@@ -3,6 +3,8 @@
 // HU-1406 · CP-107 · Con voz de Google y una ilustración generada, `datos.js` lleva los créditos con la frase exacta;
 // el paquete se registra con proveedor `aptio` (REQ-062).
 // HU-0804 · ES + EN en el mismo paquete: entran los recursos de los dos idiomas y los créditos van en español.
+// HU-1205 · KIT_GAMIFICACION: insignias PNG reales de 512 px con @resvg/resvg-js, la paleta y el logo del kit, el plan
+// y la guía del LMS de la exportación.
 // PostgreSQL real; el almacenamiento es un mapa en memoria (la API e2e usa S3 de LocalStack).
 import { createHash, randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -49,7 +51,7 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
   };
 
   /** Lo que hace la API al exportar: la Exportacion en cola, ligada a la versión del curso. */
-  const exportacion = (versionCurso: number, formato: 'SCORM12' | 'HTML' = 'SCORM12', modoIdioma = 'unico') => prisma.exportacion.create({
+  const exportacion = (versionCurso: number, formato: 'SCORM12' | 'HTML' | 'KIT_GAMIFICACION' = 'SCORM12', modoIdioma = 'unico') => prisma.exportacion.create({
     data: { organizacionId: e.ids.orgId, cursoId, versionCurso, formato, perfilLms: formato === 'HTML' ? 'generico' : 'moodle', modoIdioma, creadoPorId: e.ids.usuarioId },
   });
   const correr = (id: string, r: Redis = redis) => crearExportador({ bd: prisma, redis: r, leer, subir })({
@@ -146,6 +148,41 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     expect(Object.keys(contenido.files).some((n) => n.endsWith('.pdf'))).toBe(false);
   }, 60_000);
 
+  it('HU-1205 · KIT_GAMIFICACION: insignias PNG de 512 px con la paleta y el logo del kit, plan con nota 70 y guía de Moodle', async () => {
+    const logo = randomUUID();
+    await recurso(logo, 'SVG', 'logo.svg', 'image/svg+xml', new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10" fill="#0B3D91"/></svg>'));
+    await prisma.kitMarca.update({ where: { clienteId: e.ids.clienteId }, data: { logoRecursoId: logo } });
+    try {
+      const exp = await exportacion(3, 'KIT_GAMIFICACION');
+      const { recursoId } = await correr(exp.id);
+      const r = await prisma.recurso.findUniqueOrThrow({ where: { id: recursoId } });
+      expect(r).toMatchObject({ tipo: 'PAQUETE', mime: MIME_ZIP, nombre: 'bloqueo-y-etiquetado-kit-moodle-v3.zip', proveedor: 'aptio', modelo: 'kit-gamificacion v1' });
+      expect(await prisma.exportacion.findUniqueOrThrow({ where: { id: exp.id } })).toMatchObject({
+        estado: 'COMPLETADO', formato: 'KIT_GAMIFICACION', recursoId, informe: { lms: 'moodle', idioma: 'es', insignias: 3, archivos: 9, advertencias: [] },
+      });
+      const zip = await JSZip.loadAsync(almacen.get(r.claveS3)!);
+      const pngs = Object.keys(zip.files).filter((n) => n.startsWith('insignias/png/'));
+      expect(pngs).toHaveLength(3);
+      for (const n of pngs) {
+        const b = await zip.file(n)!.async('uint8array');
+        expect([...b.slice(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+        // IHDR: ancho y alto en los bytes 16 a 23.
+        const v = new DataView(b.buffer, b.byteOffset);
+        expect([v.getUint32(16), v.getUint32(20)]).toEqual([512, 512]);
+        expect(b.byteLength).toBeGreaterThan(2000);
+      }
+      const svg = await zip.file('insignias/svg/ins-curso.svg')!.async('string');
+      expect(svg).toContain('#0B3D91');
+      expect(svg).toContain('font-family="Montserrat,');
+      expect(svg).toContain('href="data:image/svg+xml;base64,');
+      expect(JSON.parse(await zip.file('plan.json')!.async('string'))).toMatchObject({ lms: 'moodle', notaMinima: 70 });
+      expect(await zip.file('guia-moodle.html')!.async('string')).toContain('Verificar con la versión del cliente');
+      expect(await zip.file('LEEME.txt')!.async('string')).toContain('Preparado y revisado por AulasEducativas.');
+    } finally {
+      await prisma.kitMarca.update({ where: { clienteId: e.ids.clienteId }, data: { logoRecursoId: null } });
+    }
+  }, 60_000);
+
   it('HU-0804 · ES + EN en el mismo paquete: lleva la voz en inglés, abre en español y los créditos la incluyen', async () => {
     const vozEn = randomUUID();
     await recurso(vozEn, 'AUDIO', 'p01-en.mp3', 'audio/mpeg', new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 1]),
@@ -201,5 +238,6 @@ describe.skipIf(!baseLista && !process.env.CI)('exportar SCORM 1.2 (HU-1202)', (
     expect(nombrePaquete('Inducción · Seguridad   2026', 7)).toBe('induccion-seguridad-2026-scorm12-v7.zip');
     expect(nombrePaquete('¡¿?!', 1)).toBe('curso-scorm12-v1.zip');
     expect(nombrePaquete('Inducción · Seguridad', 2, 'HTML')).toBe('induccion-seguridad-html-v2.zip');
+    expect(nombrePaquete('Inducción · Seguridad', 2, 'KIT_GAMIFICACION', 'canvas')).toBe('induccion-seguridad-kit-canvas-v2.zip');
   });
 });
