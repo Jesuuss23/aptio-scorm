@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.65 · actualizado con la tercera entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.66 · actualizado con la cuarta entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -860,6 +860,34 @@ La **Vista previa en Google** cambia mientras escribes. Pulsa **Guardar SEO**; s
 
 Las redirecciones y las reglas de robots.txt llegan al sitio con **Publicar cambios**. En el sitio de pruebas los buscadores siguen bloqueados.
 
+### 8.34 SEO para IA (solo superadmin)
+
+Cada vez más personas preguntan a un asistente de IA (ChatGPT, Claude, Gemini, Perplexity) en lugar de buscar en Google. **Sitio web › SEO para IA** reúne lo que ayuda a que esos asistentes encuentren y citen el sitio. Tiene cuatro tarjetas:
+
+**Preguntas objetivo.** Son las preguntas con las que quieres que un asistente mencione la marca, por ejemplo «mejor herramienta para crear cursos SCORM con IA».
+
+- Escribe la pregunta en **Nueva pregunta objetivo** y pulsa **Agregar pregunta**. Lleva de 5 a 200 caracteres, no se puede repetir y la lista admite hasta 50.
+- Para saber si te mencionan, haz tú la pregunta en cada asistente y marca el resultado en su lista: **Sí**, **No** o **Sin revisar**. La herramienta guarda la fecha de la revisión y no consulta a los asistentes por su cuenta.
+- **Borrar** pide confirmación.
+
+**Rastreadores de IA.** Son los programas con los que cada empresa de IA lee los sitios: GPTBot, ClaudeBot, Google-Extended, PerplexityBot y CCBot. Todos están permitidos. Apaga el interruptor de uno para bloquearlo: el sitio se lo indica en robots.txt. Cumplir esa indicación depende de cada empresa.
+
+**llms.txt.** Es un archivo de texto que resume el sitio para los asistentes de IA. Empieza vacío y, mientras lo esté, el sitio no lo tiene.
+
+- **Armar con las páginas publicadas** escribe un borrador con el nombre del sitio y el título, la dirección y la descripción de cada página publicada. No usa IA ni tiene costo.
+- Corrige el texto a mano si hace falta (hasta 20 000 caracteres, solo texto; el contador dice cuántos llevas) y pulsa **Guardar llms.txt**.
+- Para quitar el archivo, borra todo el texto y guarda.
+
+**Sugerencias de la IA.** Pulsa **✦ Proponer contenido** (arriba a la derecha) y la IA revisa tus preguntas objetivo y las páginas del sitio, y propone páginas nuevas o preguntas frecuentes que ayudarían a responderlas. Necesitas al menos una pregunta objetivo.
+
+- Cada sugerencia dice qué es (**Página nueva** o **Pregunta frecuente**), su texto y **por qué** la propone.
+- **Crear borrador** crea la página en borrador o la pregunta frecuente oculta; **Crear borradores** lo hace con todas. **Descartar** la quita de la lista.
+- **Nada se publica solo.** La página queda en borrador, con su ruta, meta título y meta descripción, para que la completes en el editor (el aviso trae el enlace **Abrir el borrador**). La pregunta queda oculta en **Contenido › Preguntas**, para que revises la respuesta y la muestres.
+- Si la IA pide revisar algo antes de publicar (por ejemplo, completar cifras reales), lo ves en una nota bajo la lista.
+- La tarjeta también dice cuántas páginas publicadas usan los datos estructurados de preguntas frecuentes (FAQPage), que los asistentes leen con facilidad; se eligen en la pestaña SEO de cada página.
+
+Los cambios en los rastreadores y en llms.txt llegan al sitio con **Publicar cambios**. En el sitio de pruebas todos los rastreadores siguen bloqueados.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -951,6 +979,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.66 | 2026-11-13 | SEO para IA (8.34): preguntas objetivo con la marca de cada asistente, permitir o bloquear rastreadores de IA, llms.txt con «Armar con las páginas publicadas» y las sugerencias de la IA con «Crear borrador» y «Descartar». |
 | 0.65 | 2026-11-13 | SEO (8.33): la pestaña SEO del editor con meta título y descripción con contador, URL canónica, datos estructurados, «Indexar en buscadores» y la vista previa en Google; Sitio web › SEO con los problemas, las redirecciones 301 y robots.txt; la ruta de una página publicada ya se puede cambiar. |
 | 0.64 | 2026-11-13 | Blog (8.32): conectar WordPress, «Sincronizar ahora» y su error, ordenar y ocultar categorías, ocultar artículos y «Editar en WordPress», y en el sitio el filtro por categoría, «Últimos artículos» del pie y la categoría inicial de cada landing. |
 | 0.63 | 2026-11-13 | Sitio en inglés (8.31): páginas en `/en`, el selector Español / Inglés en Contenido y en Menú principal y Pie de página, el selector ES · EN del sitio y la tarjeta Idiomas de Ajustes del sitio con «Mostrar selector ES/EN». |

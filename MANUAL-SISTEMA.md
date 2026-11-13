@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.65 · actualizado con la tercera entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.66 · actualizado con la cuarta entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -453,6 +453,16 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Problemas:** `GET /sitio/seo` analiza todas las páginas y las redirecciones: sin descripción (alta), descripción o título largos (media), sin indexar (baja), redirección sin destino (alta, o media si la página no está publicada) y redirección tapada por una página (baja). Google Search Console y el puntaje de auditoría quedan para después (SUP-224).
 - **Auditoría:** SITIO_ROBOTS_EDITADO, SITIO_REDIRECCION_CREADA, _EDITADA y _BORRADA; los cambios de SEO de una página van en SITIO_PAGINA_EDITADA.
 
+### 3.24 SEO para IA (HU-1513)
+
+- **Datos (REQ-072):** `SitioSeo` suma `llmsTxt` y `rastreadoresBloqueados`; `SitioPreguntaIa` guarda las preguntas objetivo con la marca de cada asistente y `SitioPropuestaIa`, las propuestas de IA-19 (pendiente, borrador creado o descartada). `TrabajoIA.organizacionId` pasa a ser opcional para el consumo de la plataforma. llms.txt y los rastreadores entran en la instantánea solo cuando no están vacíos y llegan al sitio con «Publicar cambios».
+- **Rastreadores (CP-126):** catálogo cerrado de GPTBot, ClaudeBot, Google-Extended, PerplexityBot y CCBot, todos permitidos por defecto. Cada bloqueado suma a robots.txt su grupo `User-agent` con `Disallow: /`; en pruebas robots.txt bloquea todo. Que el rastreador lo respete depende de su operador (SUP-231).
+- **llms.txt:** texto plano de hasta 20 000 caracteres, sin HTML. `GET /s/llms.txt` lo sirve como `text/plain` con la caché de las páginas, o la 404 si está vacío. «Armar con las páginas publicadas» se calcula en el navegador con las páginas publicadas e indexables, sin IA (SUP-232).
+- **Menciones:** las marca el superadmin a mano (sí, no o sin revisar, con fecha) para ChatGPT, Claude, Gemini y Perplexity. No hay comprobación automática (ADR-010, SUP-230).
+- **Propuestas (IA-19, CP-127):** `POST /sitio/seo-ia/proponer` ejecuta IA-19 dentro de la solicitud, con las preguntas objetivo, las páginas y las preguntas frecuentes como datos neutralizados. La salida valida contra su esquema y las reglas del sitio (3 intentos; si no, 502 y nada se guarda) y las repetidas se descartan. «Crear borrador» crea una página en BORRADOR o una pregunta frecuente oculta: nada se publica sin revisión humana (SUP-233).
+- **Costo:** el consumo es un `TrabajoIA` sin organización, fuera del costo y del límite de las organizaciones. El modelo y el límite mensual de la plataforma salen de la conexión de texto sin organización (`ConfigProveedor`), que todavía no tiene pantalla; al llegar al límite responde 422 LIMITE_GASTO (SUP-234).
+- **Auditoría:** SITIO_LLMS_EDITADO, SITIO_RASTREADORES_EDITADOS, SITIO_PREGUNTA_IA_CREADA, _EDITADA, _REVISADA y _BORRADA, SITIO_PROPUESTAS_IA_PEDIDAS, SITIO_PROPUESTA_IA_BORRADOR y _DESCARTADA, y LIMITE_GASTO_ALCANZADO.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -590,6 +600,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.66 | 2026-11-13 | SEO para IA (3.24): llms.txt y los rastreadores de IA en la versión, las preguntas objetivo con menciones marcadas a mano, IA-19 dentro de la API con el consumo y el límite de la plataforma, y las propuestas que solo crean borradores. |
 | 0.65 | 2026-11-13 | SEO técnico (3.23): los campos de SEO de la página, las redirecciones 301 y robots en la versión, la 301 automática al cambiar la ruta, Open Graph, JSON-LD y noindex, el analizador de problemas y la auditoría. |
 | 0.64 | 2026-11-13 | Blog desde WordPress (3.22): la copia de lectura, la sincronización con su frecuencia, sus límites y su error, el blog fuera de las versiones con re-render, la sección sin JavaScript, «Últimos artículos» y la auditoría. |
 | 0.63 | 2026-11-13 | Sitio en español e inglés (3.21): idioma por elemento y enlace con orden aparte, el menú y el pie de cada idioma en la versión, el selector ES · EN, `hreflang` y sitemap solo entre páginas publicadas en los dos idiomas, y los ficticios en inglés. |
