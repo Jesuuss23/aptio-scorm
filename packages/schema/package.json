@@ -45,6 +45,7 @@
     "./extraccion-kit": "./src/extraccion-kit.ts",
     "./rentabilidad": "./src/rentabilidad.ts",
     "./conexiones": "./src/conexiones.ts",
-    "./operacion": "./src/operacion.ts"
+    "./operacion": "./src/operacion.ts",
+    "./sitio-bloques": "./src/sitio-bloques.ts"
   }
 }

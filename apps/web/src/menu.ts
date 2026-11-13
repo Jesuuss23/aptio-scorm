@@ -14,7 +14,7 @@ export const MENU: GrupoMenu[] = [
 export const GRUPO_SITIO = 'Sitio web';
 
 /** Vista a partir de la ruta: grupo de la ruta, nombre, ítem activo del menú y parámetro. */
-export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' | 'alineacion' | 'navegacion' | 'video' | 'voz' } | null {
+export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' | 'alineacion' | 'navegacion' | 'video' | 'voz' | 'editor-pagina' } | null {
   if (camino === '/') return { grupo: 'Inicio', nombre: 'Proyectos', activo: '/' };
   if (camino === '/nuevo') return { grupo: 'Inicio', nombre: 'Nuevo SCORM', activo: '/nuevo' };
   const proyecto = camino.match(/^\/proyectos\/([0-9a-f-]{36})$/i);
@@ -39,6 +39,8 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (voz) return { grupo: 'Inicio', nombre: 'Personaje y voz', activo: '/', id: voz[1]!, sub: 'voz' };
   if (camino === '/sitio') return { grupo: 'Sitio web', nombre: 'Resumen', activo: '/sitio' };
   if (camino === '/sitio/paginas') return { grupo: 'Sitio web', nombre: 'Páginas', activo: '/sitio/paginas' };
+  const editorPagina = camino.match(/^\/sitio\/paginas\/([0-9a-f-]{36})$/i);
+  if (editorPagina) return { grupo: 'Sitio web', nombre: 'Editor de página', activo: '/sitio/paginas', id: editorPagina[1]!, sub: 'editor-pagina' };
   if (camino === '/conexiones-ia') return { grupo: 'Empresa', nombre: 'Conexiones IA', activo: '/conexiones-ia' };
   if (camino === '/operacion') return { grupo: 'Empresa', nombre: 'Operación', activo: '/operacion' };
   if (camino === '/rentabilidad') return { grupo: 'Empresa', nombre: 'Rentabilidad', activo: '/rentabilidad' };

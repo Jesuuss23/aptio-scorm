@@ -202,6 +202,150 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /sitio/paginas/{paginaId}/bloques:
+    parameters:
+    - name: paginaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Sitio web
+      summary: Bloques de una página, visibles y ocultos, por orden (HU-1503)
+      operationId: get_sitio_paginas_id_bloques
+      description: Solo SUPERADMIN. 404 si la página no existe.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BloqueSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    post:
+      tags:
+      - Sitio web
+      summary: Agregar un bloque del catálogo al final, oculto (HU-1503, RN-16-2)
+      operationId: post_sitio_paginas_id_bloques
+      description: Solo SUPERADMIN. Tipo fuera del catálogo o campos de más dan 422; ajustes de más de 20 000 caracteres en JSON, 422 AJUSTES_GRANDES. Auditoría SITIO_BLOQUE_AGREGADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloqueSitioEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BloqueSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    patch:
+      tags:
+      - Sitio web
+      summary: Reordenar los bloques con la lista completa de ids (HU-1503, CP-113)
+      operationId: patch_sitio_paginas_id_bloques
+      description: |-
+        Solo SUPERADMIN. `orden` lleva todos los bloques de la página, una vez cada uno. Si falta, se repite o es de otra
+        página, 422 ORDEN_INVALIDO con `detalles[0].tipo` FALTANTE, DUPLICADO o AJENO. Auditoría SITIO_BLOQUES_REORDENADOS
+        (solo si el orden cambió).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenBloques'
+      responses:
+        '200':
+          description: Bloques en el orden nuevo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BloqueSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/paginas/{paginaId}/bloques/{bloqueId}:
+    parameters:
+    - name: paginaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    - name: bloqueId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Sitio web
+      summary: Mostrar u ocultar un bloque sin tocar sus ajustes (HU-1503, CP-112)
+      operationId: patch_sitio_paginas_id_bloques_id
+      description: Solo SUPERADMIN. 404 si el bloque no es de esa página. Auditoría SITIO_BLOQUE_MOSTRADO o SITIO_BLOQUE_OCULTADO (solo si cambia).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BloqueSitioCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BloqueSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Borrar un bloque y compactar el orden (HU-1503)
+      operationId: delete_sitio_paginas_id_bloques_id
+      description: Solo SUPERADMIN. El resto queda en 0, 1, 2… sin huecos. Auditoría SITIO_BLOQUE_BORRADO con el tipo y los ajustes borrados.
+      responses:
+        '204':
+          description: Borrado
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /publico/paginas:
     get:
       tags:
@@ -209,7 +353,7 @@ paths:
       summary: Una página publicada del sitio (HU-1502, CP-110)
       operationId: get_publico_paginas
       security: []
-      description: Sin sesión. 200 solo si la página está PUBLICADA; borrador, programada o inexistente dan 404 (CP-110). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
+      description: Sin sesión. 200 solo si la página está PUBLICADA, con `bloques` visibles en su orden (HU-1503, CP-112, CP-113); borrador, programada o inexistente dan 404 sin bloques (CP-110, RN-16-4). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
       parameters:
       - name: ruta
         in: query
@@ -3718,6 +3862,111 @@ components:
       - programar
       - publicar
       description: borrador (limpia publicarEn), programar (exige publicarEn futuro) o publicar (ahora)
+    TipoBloque:
+      type: string
+      description: Catálogo cerrado de bloques del sitio (HU-1503, `@aptio/schema/sitio-bloques`)
+      enum:
+      - hero
+      - confianza
+      - metricas
+      - logos
+      - pasos
+      - funcionalidades
+      - lms
+      - planes
+      - testimonios
+      - faq
+      - cta
+      - fhero
+      - comparacion
+      - precios
+      - comparativa
+      - bloglista
+      - sectores
+      - agendador
+    BloqueSitio:
+      type: object
+      required:
+      - id
+      - paginaId
+      - tipo
+      - orden
+      - visible
+      - ajustes
+      - creadoEn
+      - actualizadoEn
+      properties:
+        id:
+          type: string
+          format: uuid
+        paginaId:
+          type: string
+          format: uuid
+        tipo:
+          $ref: '#/components/schemas/TipoBloque'
+        orden:
+          type: integer
+          minimum: 0
+          description: Posición 0, 1, 2… sin huecos
+        visible:
+          type: boolean
+          description: Nace en false (RN-16-2)
+        ajustes:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Datos propios del bloque; ocultarlo no los borra (CP-112)
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    BloqueSitioEntrada:
+      type: object
+      additionalProperties: false
+      required:
+      - tipo
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoBloque'
+        ajustes:
+          type: object
+          additionalProperties: true
+          description: Hasta 20 000 caracteres en JSON
+    OrdenBloques:
+      type: object
+      additionalProperties: false
+      required:
+      - orden
+      properties:
+        orden:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+          description: Todos los bloques de la página, una vez cada uno, en el orden nuevo
+    BloqueSitioCambio:
+      type: object
+      additionalProperties: false
+      required:
+      - visible
+      properties:
+        visible:
+          type: boolean
+    BloquePublico:
+      type: object
+      required:
+      - tipo
+      - ajustes
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoBloque'
+        ajustes:
+          type: object
+          nullable: true
+          additionalProperties: true
     PaginaPublica:
       type: object
       required:
@@ -3725,6 +3974,7 @@ components:
       - idioma
       - titulo
       - publicadaEn
+      - bloques
       properties:
         ruta:
           type: string
@@ -3738,6 +3988,11 @@ components:
         publicadaEn:
           type: string
           format: date-time
+        bloques:
+          type: array
+          description: Solo los visibles, en orden (HU-1503)
+          items:
+            $ref: '#/components/schemas/BloquePublico'
     Operacion:
       type: object
       required:

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, NotFoundException, UnprocessableEntityEx
 import { ConfigService } from '@nestjs/config';
 import { Prisma, type SitioPagina } from '@aptio/db';
 import { rutaSitioValida } from '@aptio/db';
+import { bloquesPublicos } from '@aptio/schema/sitio-bloques';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { AccionPagina, PaginaPublicaDto, PaginaSitioCambioDto, PaginaSitioDto, PaginaSitioEntradaDto } from './sitio.dto.js';
@@ -94,10 +95,13 @@ export class SitioService {
   /** CP-110 · El sitio público solo ve las publicadas; borrador, programada o inexistente dan 404. */
   async publica(ruta: string, idioma = 'es'): Promise<PaginaPublicaDto> {
     const p = rutaSitioValida(ruta) && (idioma === 'es' || idioma === 'en')
-      ? await this.bd.sitioPagina.findUnique({ where: { ruta_idioma: { ruta, idioma } } })
+      ? await this.bd.sitioPagina.findUnique({ where: { ruta_idioma: { ruta, idioma } }, include: { bloques: true } })
       : null;
+    // RN-16-4 · Si la página no está publicada no se expone nada, tampoco sus bloques.
     if (!p || p.estado !== 'PUBLICADA' || !p.publicadaEn) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'Página no encontrada' });
-    return { ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: p.publicadaEn.toISOString() };
+    // HU-1503 · Los bloques se ven al instante hasta que la HU-1507 sume versiones (SUP-172).
+    const bloques = bloquesPublicos(p.bloques).map((b) => ({ tipo: b.tipo, ajustes: (b.ajustes as Record<string, unknown> | null) ?? null }));
+    return { ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: p.publicadaEn.toISOString(), bloques };
   }
 
   /** CP-110 y CP-111 · Solo las publicadas. El inglés va bajo `/en` hasta que la HU-1510 sume hreflang (SUP-168). */

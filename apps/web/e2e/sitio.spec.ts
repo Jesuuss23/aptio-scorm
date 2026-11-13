@@ -120,3 +120,83 @@ test('el Resumen cuenta las páginas por estado', async ({ page }) => {
   await page.getByRole('link', { name: 'Ir a Páginas' }).click();
   await expect(page).toHaveURL('/sitio/paginas');
 });
+
+// HU-1503 · Editor de página (PNT-26): Páginas › Editar, estado vacío, agregar bloques (entran ocultos), mostrar y
+// ocultar con el chip «N visibles», reordenar con flechas por teclado, borrar con confirmación y axe sin violaciones.
+test('el superadmin edita los bloques de una página: agrega, muestra, reordena con teclado y borra', async ({ page }) => {
+  const fecha = '2026-11-10T15:00:00.000Z';
+  const pag = (id: string, ruta: string, titulo: string) => ({ id, ruta, idioma: 'es' as const, titulo, estado: 'PUBLICADA' as const, publicarEn: null, publicadaEn: fecha, creadoEn: fecha, actualizadoEn: fecha });
+  const INICIO = '00000000-0000-4000-8000-000000000001';
+  const PRECIOS = '00000000-0000-4000-8000-000000000002';
+  const bloque = (n: number, tipo: string, visible: boolean) => ({ id: `00000000-0000-4000-9100-00000000000${n}`, paginaId: INICIO, tipo, orden: n, visible, ajustes: null, creadoEn: fecha, actualizadoEn: fecha });
+  await simularApi(page, {
+    conSesion: true, rol: 'SUPERADMIN',
+    paginasSitio: [pag(INICIO, '/', 'Inicio'), pag(PRECIOS, '/precios', 'Precios')],
+    bloquesSitio: [bloque(0, 'hero', true), bloque(1, 'metricas', true), bloque(2, 'logos', true), bloque(3, 'testimonios', true)],
+  });
+  await page.goto('/sitio/paginas');
+  await page.getByRole('button', { name: 'Editar Precios' }).click();
+  await expect(page).toHaveURL(`/sitio/paginas/${PRECIOS}`);
+  await expect(page.getByRole('heading', { level: 1, name: 'Editor de página' })).toBeVisible();
+  await expect(page.getByText('Esta página aún no tiene bloques. Agrega uno para empezar.')).toBeVisible();
+  await expect(page.getByText('0 visibles')).toBeVisible();
+
+  // Agregar: entra al final y oculto (RN-16-2).
+  const agregar = page.getByRole('form', { name: 'Agregar bloque' });
+  await agregar.getByLabel('Tipo de bloque').selectOption({ label: 'Planes y precios' });
+  await agregar.getByRole('button', { name: 'Agregar bloque' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '«Planes y precios» se agregó al final, oculto.' })).toBeVisible();
+  const interruptor = page.getByRole('switch', { name: 'Mostrar bloque Planes y precios' });
+  await expect(interruptor).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText('Datos: Planes')).toBeVisible();
+  await expect(page.getByText('0 visibles')).toBeVisible();
+  await interruptor.click();
+  await expect(interruptor).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByText('1 visibles')).toBeVisible();
+
+  // Selector de página: pasa a Inicio con sus cuatro bloques.
+  await page.getByLabel('Página a editar').selectOption({ label: 'Inicio (/)' });
+  await expect(page).toHaveURL(`/sitio/paginas/${INICIO}`);
+  const lista = page.getByRole('list', { name: 'Bloques de la página' });
+  const nombres = () => lista.getByRole('listitem').locator('b').allTextContents();
+  await expect.poll(nombres).toEqual(['Portada', 'Cifras', 'Logos de clientes', 'Testimonios']);
+  await expect(page.getByText('4 visibles')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Subir Portada' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Bajar Testimonios' })).toBeDisabled();
+
+  // CP-112 · Ocultar Testimonios: sigue en la lista, tachado, y el chip baja.
+  await page.getByRole('switch', { name: 'Mostrar bloque Testimonios' }).press('Space');
+  await expect(page.getByRole('switch', { name: 'Mostrar bloque Testimonios' })).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText('3 visibles')).toBeVisible();
+  await expect(lista.getByRole('listitem').filter({ hasText: 'Testimonios' })).toContainText('Oculto');
+
+  // CP-113 · Logos sobre Cifras con el teclado; el foco sigue al bloque movido.
+  const subirLogos = page.getByRole('button', { name: 'Subir Logos de clientes' });
+  await subirLogos.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(nombres).toEqual(['Portada', 'Logos de clientes', 'Cifras', 'Testimonios']);
+  await expect(subirLogos).toBeFocused();
+  await expect(page.getByText('«Logos de clientes» quedó en la posición 2 de 4.')).toBeAttached();
+  const axe = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.failureSummary).join(' | ')}`)).toEqual([]);
+
+  // Borrar con confirmación.
+  await page.getByRole('button', { name: 'Borrar Cifras' }).click();
+  const confirmar = page.getByRole('group', { name: 'Confirmar el borrado de Cifras' });
+  await expect(confirmar).toBeVisible();
+  const axeConfirmar = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axeConfirmar.violations.map((v) => v.id)).toEqual([]);
+  await confirmar.getByRole('button', { name: 'Sí, borrar' }).click();
+  await expect.poll(nombres).toEqual(['Portada', 'Logos de clientes', 'Testimonios']);
+  await expect(page.getByText('2 visibles')).toBeVisible();
+
+  // Volver a Páginas.
+  await page.getByRole('button', { name: 'Volver a Páginas' }).click();
+  await expect(page).toHaveURL('/sitio/paginas');
+});
+
+test('el editor de página es solo del superadmin', async ({ page }) => {
+  await simularApi(page, { conSesion: true, rol: 'ADMINISTRADOR' });
+  await page.goto('/sitio/paginas/00000000-0000-4000-8000-000000000001');
+  await expect(page.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible();
+});

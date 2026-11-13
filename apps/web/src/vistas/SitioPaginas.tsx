@@ -1,8 +1,10 @@
 // HU-1502 · Sitio web › Páginas (PNT-25, M16): las páginas del sitio comercial con su estado (borrador, programada,
 // publicada). Nueva página, Publicar, Programar con fecha y hora de Lima, Pasar a borrador y Borrar (solo borradores).
-// Solo el superadmin (ADR-011). Bloques, SEO y landings de sector llegan con sus historias.
+// Solo el superadmin (ADR-011). HU-1503 · «Editar» abre el editor de bloques (PNT-26). SEO y landings de sector llegan
+// con sus historias.
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { navegar } from '../ruta';
 import { type AccionPagina, api, ErrorApi, type PaginaSitio, type PaginaSitioCambio } from '../api';
 import { ESTADO_PAGINA, fechaHoraLima, limaAIso, MENSAJE_RUTA, minimoProgramable, NOMBRE_IDIOMA, RUTA_SITIO } from './sitio-paginas';
 
@@ -128,6 +130,7 @@ function FilaPagina({ pagina: p, abierto, ocupado, alAbrir, alAccion, alPrograma
         <td>{fecha}</td>
         <td>
           <div className="acciones-fila">
+            <button type="button" className="boton" onClick={() => navegar(`/sitio/paginas/${p.id}`)} aria-label={`Editar ${p.titulo}`}>Editar</button>
             {p.estado !== 'PUBLICADA' ? <button type="button" className="boton" disabled={ocupado} onClick={() => alAccion('publicar')} aria-label={`Publicar ${p.titulo}`}>Publicar</button> : null}
             <button type="button" className="boton" disabled={ocupado} aria-expanded={abierto === 'programar'} onClick={() => alAbrir(abierto === 'programar' ? null : 'programar')} aria-label={`Programar ${p.titulo}`}>Programar</button>
             {p.estado !== 'BORRADOR' ? <button type="button" className="boton" disabled={ocupado} onClick={() => alAccion('borrador')} aria-label={`Pasar a borrador ${p.titulo}`}>Pasar a borrador</button> : null}

@@ -3,6 +3,8 @@
 // HU-1502 · CP-110 y CP-111: páginas con estados (borrador, programada, publicada), el sitio público con su 404 y el
 // sitemap, la publicación programada con un reloj controlado, auditoría y el límite de 60 peticiones por minuto en
 // /publico/*. PostgreSQL real.
+// HU-1503 · CP-112 y CP-113: bloques por página (ocultar conserva los datos, reordenar), cascada RN-16-4, validaciones,
+// permisos y auditoría.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -113,7 +115,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       expect(pub.body.publicadaEn).toEqual(expect.any(String));
       const ok = await publica(ruta('precios'));
       expect(ok.status).toBe(200);
-      expect(ok.body).toEqual({ ruta: ruta('precios'), idioma: 'es', titulo: 'Precios', publicadaEn: pub.body.publicadaEn });
+      expect(ok.body).toEqual({ ruta: ruta('precios'), idioma: 'es', titulo: 'Precios', publicadaEn: pub.body.publicadaEn, bloques: [] });
       const sm = await request(servidor).get('/api/v1/publico/sitemap.xml');
       expect(sm.headers['content-type']).toMatch(/^application\/xml/);
       expect(sm.text).toContain(`<loc>https://aptioscorm.com${ruta('precios')}</loc>`);
@@ -244,6 +246,157 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       expect((await sa().get('/sitio/paginas')).status).toBe(200);
       reiniciarLimite();
       expect((await request(servidor).get('/api/v1/publico/sitemap.xml')).status).toBe(200);
+    });
+  });
+  describe('editor de página por bloques (HU-1503)', () => {
+    const ruta = (n: string) => `/prueba-${sufijo}-b-${n}`;
+    const enviar = (m: 'get' | 'post' | 'patch' | 'delete', r: string, b?: object, c = cookies.SUPERADMIN) => {
+      const req = request(servidor)[m](`/api/v1${r}`);
+      if (c) req.set('Cookie', c);
+      return b ? req.send(b) : req;
+    };
+    const publica = (r: string) => request(servidor).get('/api/v1/publico/paginas').query({ ruta: r, idioma: 'es' });
+    const reiniciarLimite = () => app.get(LimitePublicoService).reiniciar();
+    const nuevaPagina = async (n: string) => (await enviar('post', '/sitio/paginas', { ruta: ruta(n), titulo: `Inicio ${n}` })).body.id as string;
+    const agregar = async (pagina: string, tipo: string, ajustes?: object) => {
+      const r = await enviar('post', `/sitio/paginas/${pagina}/bloques`, { tipo, ...(ajustes ? { ajustes } : {}) });
+      if (r.status !== 201) throw new Error(`agregar ${tipo}: ${r.status} ${JSON.stringify(r.body)}`);
+      return r.body as { id: string; tipo: string; orden: number; visible: boolean };
+    };
+    const mostrar = (pagina: string, bloque: string, visible: boolean) => enviar('patch', `/sitio/paginas/${pagina}/bloques/${bloque}`, { visible });
+
+    it('un bloque nuevo va al final y oculto (RN-16-2); la lista sale por orden', async () => {
+      const p = await nuevaPagina('nuevo');
+      expect((await enviar('get', `/sitio/paginas/${p}/bloques`)).body).toEqual([]);
+      const a = await agregar(p, 'hero');
+      const b = await agregar(p, 'cta');
+      expect([a.orden, a.visible, b.orden, b.visible]).toEqual([0, false, 1, false]);
+      const lista = await enviar('get', `/sitio/paginas/${p}/bloques`);
+      expect(lista.status).toBe(200);
+      expect(lista.body.map((x: { tipo: string }) => x.tipo)).toEqual(['hero', 'cta']);
+    });
+
+    it('CP-112: ocultar Testimonios lo saca del sitio y conserva sus datos', async () => {
+      reiniciarLimite();
+      const p = await nuevaPagina('cp112');
+      const hero = await agregar(p, 'hero');
+      const datos = { titulo: 'Lo que dicen', items: [{ autor: 'Ana', texto: 'Muy útil' }] };
+      const testi = await agregar(p, 'testimonios', datos);
+      await mostrar(p, hero.id, true);
+      expect((await mostrar(p, testi.id, true)).body.visible).toBe(true);
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      expect((await publica(ruta('cp112'))).body.bloques).toEqual([{ tipo: 'hero', ajustes: null }, { tipo: 'testimonios', ajustes: datos }]);
+
+      const oculto = await mostrar(p, testi.id, false);
+      expect(oculto.status).toBe(200);
+      expect(oculto.body).toMatchObject({ visible: false, ajustes: datos });
+      expect((await publica(ruta('cp112'))).body.bloques).toEqual([{ tipo: 'hero', ajustes: null }]);
+      const admin = (await enviar('get', `/sitio/paginas/${p}/bloques`)).body as { id: string; ajustes: unknown }[];
+      expect(admin.find((x) => x.id === testi.id)?.ajustes).toEqual(datos);
+    });
+
+    it('CP-113: mover Logos sobre Cifras cambia el orden en el sitio', async () => {
+      reiniciarLimite();
+      const p = await nuevaPagina('cp113');
+      const bloques = [await agregar(p, 'hero'), await agregar(p, 'metricas'), await agregar(p, 'logos'), await agregar(p, 'cta')];
+      for (const b of bloques) await mostrar(p, b.id, true);
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      const tipos = async () => ((await publica(ruta('cp113'))).body.bloques as { tipo: string }[]).map((b) => b.tipo);
+      expect(await tipos()).toEqual(['hero', 'metricas', 'logos', 'cta']);
+      const [hero, cifras, logos, cta] = bloques.map((b) => b.id) as [string, string, string, string];
+      const r = await enviar('patch', `/sitio/paginas/${p}/bloques`, { orden: [hero, logos, cifras, cta] });
+      expect(r.status).toBe(200);
+      expect(r.body.map((b: { tipo: string; orden: number }) => [b.tipo, b.orden])).toEqual([['hero', 0], ['logos', 1], ['metricas', 2], ['cta', 3]]);
+      expect(await tipos()).toEqual(['hero', 'logos', 'metricas', 'cta']);
+    });
+
+    it('RN-16-4: si la página vuelve a borrador no se expone ni ella ni sus bloques', async () => {
+      reiniciarLimite();
+      const p = await nuevaPagina('cascada');
+      await mostrar(p, (await agregar(p, 'hero')).id, true);
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      expect((await publica(ruta('cascada'))).body.bloques).toHaveLength(1);
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'borrador' });
+      const r = await publica(ruta('cascada'));
+      expect(r.status).toBe(404);
+      expect(r.body.bloques).toBeUndefined();
+    });
+
+    it('rechaza tipos fuera del catálogo y órdenes con bloques faltantes, repetidos o ajenos (422)', async () => {
+      const p = await nuevaPagina('validar');
+      const otra = await nuevaPagina('validar-otra');
+      const [a, b] = [await agregar(p, 'hero'), await agregar(p, 'faq')];
+      const ajeno = await agregar(otra, 'cta');
+      const tipo = await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo: 'video' });
+      const extra = await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo: 'hero', orden: 3 });
+      const grandes = await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo: 'hero', ajustes: { t: 'x'.repeat(20_001) } });
+      const ordenes = [[a.id], [a.id, a.id, b.id], [a.id, b.id, ajeno.id], [b.id, ajeno.id]];
+      const res = [];
+      for (const orden of ordenes) {
+        const r = await enviar('patch', `/sitio/paginas/${p}/bloques`, { orden });
+        res.push([r.status, r.body.codigo, r.body.detalles?.[0]?.tipo]);
+      }
+      expect([tipo.status, extra.status, grandes.status, grandes.body.codigo]).toEqual([422, 422, 422, 'AJUSTES_GRANDES']);
+      expect(res).toEqual([[422, 'ORDEN_INVALIDO', 'FALTANTE'], [422, 'ORDEN_INVALIDO', 'DUPLICADO'], [422, 'ORDEN_INVALIDO', 'AJENO'], [422, 'ORDEN_INVALIDO', 'AJENO']]);
+      expect((await enviar('patch', `/sitio/paginas/${p}/bloques/${b.id}`, {})).status).toBe(422);
+      // Un bloque de otra página no se toca desde esta: 404.
+      expect((await mostrar(p, ajeno.id, true)).status).toBe(404);
+      expect((await enviar('get', '/sitio/paginas/00000000-0000-4000-8000-000000000000/bloques')).status).toBe(404);
+      expect((await enviar('get', '/sitio/paginas/no-es-uuid/bloques')).status).toBe(400);
+      expect((await enviar('get', `/sitio/paginas/${p}/bloques`)).body.map((x: { id: string }) => x.id)).toEqual([a.id, b.id]);
+    });
+
+    it('borrar un bloque compacta el orden; borrar la página borra sus bloques', async () => {
+      const p = await nuevaPagina('borrar');
+      const [a, b, c] = [await agregar(p, 'hero'), await agregar(p, 'faq'), await agregar(p, 'cta')];
+      expect((await enviar('delete', `/sitio/paginas/${p}/bloques/${b.id}`)).status).toBe(204);
+      const lista = (await enviar('get', `/sitio/paginas/${p}/bloques`)).body as { id: string; orden: number }[];
+      expect(lista.map((x) => [x.id, x.orden])).toEqual([[a.id, 0], [c.id, 1]]);
+      expect((await agregar(p, 'logos')).orden).toBe(2);
+      expect((await enviar('delete', `/sitio/paginas/${p}`)).status).toBe(204);
+      expect(await prisma.sitioBloque.count({ where: { paginaId: p } })).toBe(0);
+    });
+
+    it('solo el superadmin: 403 a los roles de organización y 401 sin sesión', async () => {
+      const p = await nuevaPagina('permisos');
+      const b = await agregar(p, 'hero');
+      const estados = [];
+      for (const rol of ROLES_ORGANIZACION) {
+        const c = cookies[rol]!;
+        estados.push([rol,
+          (await enviar('get', `/sitio/paginas/${p}/bloques`, undefined, c)).status,
+          (await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo: 'cta' }, c)).status,
+          (await enviar('patch', `/sitio/paginas/${p}/bloques`, { orden: [b.id] }, c)).status,
+          (await enviar('patch', `/sitio/paginas/${p}/bloques/${b.id}`, { visible: true }, c)).status,
+          (await enviar('delete', `/sitio/paginas/${p}/bloques/${b.id}`, undefined, c)).status]);
+      }
+      expect(estados).toEqual(ROLES_ORGANIZACION.map((rol) => [rol, 403, 403, 403, 403, 403]));
+      expect([
+        (await enviar('get', `/sitio/paginas/${p}/bloques`, undefined, '')).status,
+        (await enviar('patch', `/sitio/paginas/${p}/bloques/${b.id}`, { visible: true }, '')).status,
+      ]).toEqual([401, 401]);
+      expect((await prisma.sitioBloque.findUniqueOrThrow({ where: { id: b.id } })).visible).toBe(false);
+    });
+
+    it('cada cambio de bloques queda en la auditoría', async () => {
+      const p = await nuevaPagina('auditoria');
+      const [a, b] = [await agregar(p, 'hero'), await agregar(p, 'testimonios', { titulo: 'T' })];
+      await mostrar(p, b.id, true);
+      await mostrar(p, b.id, true); // sin cambio: no audita
+      await mostrar(p, b.id, false);
+      await enviar('patch', `/sitio/paginas/${p}/bloques`, { orden: [b.id, a.id] });
+      await enviar('patch', `/sitio/paginas/${p}/bloques`, { orden: [b.id, a.id] }); // mismo orden: no audita
+      await enviar('delete', `/sitio/paginas/${p}/bloques/${a.id}`);
+      const filas = await prisma.auditoria.findMany({
+        where: { entidadId: { in: [p, a.id, b.id] }, accion: { startsWith: 'SITIO_BLOQUE' } }, orderBy: { creadoEn: 'asc' },
+      });
+      expect(filas.map((f) => [f.accion, f.entidad, f.organizacionId])).toEqual([
+        ['SITIO_BLOQUE_AGREGADO', 'SitioBloque', null], ['SITIO_BLOQUE_AGREGADO', 'SitioBloque', null],
+        ['SITIO_BLOQUE_MOSTRADO', 'SitioBloque', null], ['SITIO_BLOQUE_OCULTADO', 'SitioBloque', null],
+        ['SITIO_BLOQUES_REORDENADOS', 'SitioPagina', null], ['SITIO_BLOQUE_BORRADO', 'SitioBloque', null],
+      ]);
+      expect(filas[4]!.datos).toMatchObject({ antes: [a.id, b.id], despues: [b.id, a.id] });
+      expect(filas[5]!.datos).toMatchObject({ tipo: 'hero', nombre: 'Portada' });
     });
   });
 });
