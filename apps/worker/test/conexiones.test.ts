@@ -4,7 +4,8 @@ import { proveedorSimulado, type ProveedorTexto, sintetizadorDesdeEntorno } from
 import { prisma } from '@aptio/db';
 import { inicioMesLima } from '@aptio/schema/conexiones';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { gastoDelMes } from '../src/conexiones.js';
+import { avisoLimitePendiente, configurarAvisoLimite, gastoDelMes, LimiteGastoAlcanzado, vigilarLimite } from '../src/conexiones.js';
+import type { Correo } from '../src/correo.js';
 import { EJECUTORES } from '../src/etapas/index.js';
 import { crearEtapaVoz } from '../src/etapas/voz.js';
 import { conModeloDe, tareaRegistrada } from '../src/ia.js';
@@ -117,6 +118,39 @@ describe.skipIf(!baseLista && !process.env.CI)('conexiones IA en el worker', () 
     await conexion('TEXTO', { proveedor: 'anthropic', modelo: 'claude-opus-5-5', limiteGastoMensualUsd: 10 });
     await tareaRegistrada(prisma, contexto, p, 'IA-01', variables);
     expect(pedidos).toHaveLength(1);
+  });
+
+  it('HU-1403 · al llegar al límite avisa por correo a administración una vez por límite y mes, y un fallo SMTP no cambia nada', async () => {
+    const sufijo = Math.random().toString(36).slice(2, 8);
+    for (const [nombre, activo] of [['admin', true], ['admin2', true], ['admin-inactivo', false]] as const) {
+      await prisma.usuario.create({ data: { nombre, email: `${nombre}-${sufijo}@limite.test`, rol: 'ADMINISTRADOR', activo, organizacionId: e.ids.orgId } });
+    }
+    const enviados: Correo[] = [];
+    // El segundo administrador tiene el buzón caído: su envío falla y el resto sigue.
+    configurarAvisoLimite(async (c) => {
+      if (c.para.startsWith('admin2-')) throw new Error('SMTP 554');
+      enviados.push(c);
+    });
+    try {
+      await conexion('TRADUCCION', { proveedor: 'anthropic', modelo: 'claude-opus-5-5', limiteGastoMensualUsd: 0 });
+      await expect(vigilarLimite(prisma, e.ids.orgId, 'TRADUCCION')).rejects.toBeInstanceOf(LimiteGastoAlcanzado);
+      await avisoLimitePendiente();
+      expect(enviados.map((c) => c.para)).toEqual([`admin-${sufijo}@limite.test`]);
+      expect(enviados[0]).toMatchObject({ asunto: 'Aptio SCORM · «Traducción al inglés» llegó a su límite de gasto del mes', texto: expect.stringContaining('USD 0.00 de 0.00') });
+      expect(enviados[0]!.texto).not.toContain('LIMITE_GASTO');
+      // El segundo tope del mes con el mismo límite no vuelve a avisar.
+      await expect(vigilarLimite(prisma, e.ids.orgId, 'TRADUCCION')).rejects.toBeInstanceOf(LimiteGastoAlcanzado);
+      await avisoLimitePendiente();
+      expect(enviados).toHaveLength(1);
+      // Con un límite nuevo, sí.
+      await conexion('TRADUCCION', { proveedor: 'anthropic', modelo: 'claude-opus-5-5', limiteGastoMensualUsd: 0.5 });
+      await prisma.trabajoIA.create({ data: { organizacionId: e.ids.orgId, tarea: 'IA-10', tipo: 'TRADUCCION', proveedor: 'anthropic', modelo: 'claude-opus-5-5', costoUsd: 1, estado: 'COMPLETADO' } });
+      await expect(vigilarLimite(prisma, e.ids.orgId, 'TRADUCCION')).rejects.toBeInstanceOf(LimiteGastoAlcanzado);
+      await avisoLimitePendiente();
+      expect(enviados).toHaveLength(2);
+    } finally {
+      configurarAvisoLimite(null);
+    }
   });
 
   it('CP-100 · en la generación la etapa queda en error LIMITE_GASTO y «Continuar» sigue al subir el límite', async () => {

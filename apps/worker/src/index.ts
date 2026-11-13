@@ -2,7 +2,12 @@
 // Variables del worker y, como respaldo, las de packages/db (DATABASE_URL), igual que la API.
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
-import { COLAS, crearRedis, type DatosTrabajo, opcionesRedis, prefijoColas, TAREA_EXPORTAR } from '@aptio/colas';
+import {
+  COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO,
+} from '@aptio/colas';
+import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
+import { configurarAvisoLimite } from './conexiones.js';
+import { correoDesdeEntorno } from './correo.js';
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
 import { prisma } from '@aptio/db';
@@ -40,6 +45,8 @@ import { TAREA_GRABACION, TAREA_LIMPIAR } from '@aptio/schema/grabacion';
 import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
 
 const redis = crearRedis();
+// HU-1403 · Aviso por correo al llegar al límite de gasto (no detiene ni demora el trabajo).
+configurarAvisoLimite(correoDesdeEntorno(process.env));
 const procesar = crearProcesador({
   bd: prisma,
   redis,
@@ -109,19 +116,34 @@ const trabajadores = COLAS.map(
     }),
 );
 
-// Mantenimiento: borrado diario de documentos del cliente vencidos (HU-1404). Fuera de COLAS: no es un trabajo de IA.
+// Mantenimiento: borrado diario de documentos del cliente vencidos (HU-1404) y copia de seguridad diaria con su purga
+// de 14 días (HU-1403). Fuera de COLAS: no son trabajos de IA. El worker procesa uno a la vez.
 const mantenimiento = new Queue(COLA_MANTENIMIENTO, { connection: opcionesRedis(), prefix: prefijoColas() });
 await mantenimiento.upsertJobScheduler(TAREA_BORRADO, { pattern: PATRON_BORRADO, tz: 'America/Lima' }, { name: TAREA_BORRADO });
+await mantenimiento.upsertJobScheduler(TAREA_RESPALDO, { pattern: PATRON_RESPALDO, tz: 'America/Lima' }, { name: TAREA_RESPALDO, data: { origen: 'programado' } });
 const mantenedor = new Worker(
   COLA_MANTENIMIENTO,
-  async () => {
+  async (job) => {
+    if (job.name === TAREA_RESPALDO) return respaldar(job.data as DatosRespaldo);
     const r = await borrarDocumentosVencidos(prisma, almacen);
     if (r.documentos > 0) console.log(`Borrados ${r.documentos} documentos vencidos de ${r.proyectos} proyectos`);
     return r;
   },
   { connection: opcionesRedis(), prefix: prefijoColas() },
 );
-mantenedor.on('failed', (_job, err) => console.error(`[${COLA_MANTENIMIENTO}] borrado de documentos falló: ${err.message}`));
+mantenedor.on('failed', (job, err) => console.error(`[${COLA_MANTENIMIENTO}] ${job?.name ?? 'tarea'} falló: ${err.message}`));
+
+async function respaldar(datos: DatosRespaldo) {
+  const r = await crearRespaldo({
+    prisma, almacen, databaseUrl: process.env.DATABASE_URL ?? '', bucketRespaldos: bucketRespaldosDesdeEnv(),
+    origen: datos.origen ?? 'programado', solicitadoPorId: datos.solicitadoPorId ?? null,
+  });
+  if (r.estado === 'FALLIDO') console.error(`[${COLA_MANTENIMIENTO}] la copia de seguridad falló: ${r.error}`);
+  else console.log(`Copia de seguridad ${r.ubicacion} lista: ${r.objetos} objetos, ${r.tamanoBytes} bytes`);
+  const p = await purgarRespaldos({ prisma, almacen, bucketRespaldos: bucketRespaldosDesdeEnv() });
+  if (p.carpetas) console.log(`Purgadas ${p.carpetas} copias de más de 14 días`);
+  return { id: r.id, estado: r.estado };
+}
 
 for (const t of trabajadores) {
   t.on('failed', (job, err) => console.error(`[${t.name}] trabajo ${job?.data.trabajoId} falló: ${err.message}`));

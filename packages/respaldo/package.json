@@ -1,0 +1,26 @@
+{
+  "name": "@aptio/respaldo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Copias de seguridad diarias de PostgreSQL y S3, su retención y su restauración (HU-1403, CP-108)",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "restaurar": "tsx src/cli-restaurar.ts",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aptio/almacen": "workspace:*",
+    "@aptio/db": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1165.0",
+    "dotenv": "^18.0.9"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

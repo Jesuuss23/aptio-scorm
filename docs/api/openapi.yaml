@@ -86,6 +86,63 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+  /operacion:
+    get:
+      tags:
+      - Plataforma
+      summary: Errores por proveedor, colas, tiempo y costo por etapa y copias de seguridad (HU-1403)
+      operationId: get_operacion
+      description: |-
+        Empresa › Operación (M15, observabilidad mínima). Solo ADMINISTRADOR (403 al resto, 401 sin sesión).
+        Errores por proveedor de la organización en las últimas 24 h y en los últimos 7 días de Lima, desde TrabajoIA y
+        los trabajos fallidos de BullMQ sin TrabajoIA (proveedor `cola:<nombre>`); lo detenido por LIMITE_GASTO se cuenta
+        aparte. Colas de la plataforma (null si Redis no responde en 2 s). Tiempo y costo promedio de las 11 etapas en 30
+        días (organización). Copias de seguridad de la plataforma de los últimos 14 días.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Operacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /operacion/respaldar:
+    post:
+      tags:
+      - Plataforma
+      summary: Respaldar ahora (HU-1403)
+      operationId: post_operacion_respaldar
+      description: |-
+        Encola una copia de seguridad manual en la cola `mantenimiento` (volcado de PostgreSQL y copia de los objetos de
+        S3 al bucket de respaldos) y deja RESPALDO_SOLICITADO en la auditoría. Solo ADMINISTRADOR. 409 RESPALDO_EN_CURSO si
+        una copia está corriendo o la manual sigue pendiente; 503 COLAS_NO_DISPONIBLES si Redis no responde.
+      responses:
+        '202':
+          description: Copia en cola
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - encolado
+                properties:
+                  encolado:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '503':
+          description: La cola de mantenimiento no responde
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /trabajos/simulados:
     post:
       tags:
@@ -3372,6 +3429,200 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    Operacion:
+      type: object
+      required:
+      - generadoEn
+      - errores
+      - colas
+      - etapas
+      - respaldos
+      properties:
+        generadoEn:
+          type: string
+          format: date-time
+        errores:
+          type: object
+          required:
+          - desde24h
+          - desde7d
+          - porProveedor
+          properties:
+            desde24h:
+              type: string
+              format: date-time
+            desde7d:
+              type: string
+              format: date-time
+              description: 00:00 de Lima de hace 6 días (7 días contando hoy).
+            porProveedor:
+              type: array
+              items:
+                $ref: '#/components/schemas/ErroresProveedor'
+        colas:
+          type: array
+          nullable: true
+          description: null si Redis no respondió a tiempo.
+          items:
+            $ref: '#/components/schemas/EstadoCola'
+        etapas:
+          type: object
+          required:
+          - desde
+          - porEtapa
+          properties:
+            desde:
+              type: string
+              format: date-time
+            porEtapa:
+              type: array
+              items:
+                $ref: '#/components/schemas/ResumenEtapa'
+        respaldos:
+          type: object
+          required:
+          - retencionDias
+          - ultimoExitoso
+          - enCurso
+          - lista
+          properties:
+            retencionDias:
+              type: integer
+              example: 14
+            ultimoExitoso:
+              type: string
+              format: date-time
+              nullable: true
+            enCurso:
+              type: boolean
+            lista:
+              type: array
+              items:
+                $ref: '#/components/schemas/Respaldo'
+    ErroresProveedor:
+      type: object
+      required:
+      - proveedor
+      - errores24h
+      - errores7d
+      - trabajos7d
+      - detenidosPorLimite7d
+      - ultimoError
+      properties:
+        proveedor:
+          type: string
+          description: anthropic, google, elevenlabs…, `sin-proveedor` o `cola:<nombre>` para lo que falló en la plataforma.
+        errores24h:
+          type: integer
+        errores7d:
+          type: integer
+        trabajos7d:
+          type: integer
+        detenidosPorLimite7d:
+          type: integer
+          description: Trabajos detenidos por LIMITE_GASTO (no son errores del proveedor).
+        ultimoError:
+          type: object
+          nullable: true
+          required:
+          - mensaje
+          - en
+          properties:
+            mensaje:
+              type: string
+              maxLength: 300
+            en:
+              type: string
+              format: date-time
+    EstadoCola:
+      type: object
+      required:
+      - nombre
+      - pendientes
+      - activos
+      - fallidos
+      properties:
+        nombre:
+          type: string
+          enum:
+          - ia
+          - voz
+          - media
+          - export
+          - mantenimiento
+        pendientes:
+          type: integer
+          description: En espera, con demora o con prioridad.
+        activos:
+          type: integer
+        fallidos:
+          type: integer
+    ResumenEtapa:
+      type: object
+      required:
+      - etapa
+      - nombre
+      - ejecuciones
+      - duracionPromedioMs
+      - costoPromedioUsd
+      - costoTotalUsd
+      properties:
+        etapa:
+          type: string
+        nombre:
+          type: string
+        ejecuciones:
+          type: integer
+        duracionPromedioMs:
+          type: integer
+          nullable: true
+        costoPromedioUsd:
+          type: number
+        costoTotalUsd:
+          type: number
+    Respaldo:
+      type: object
+      required:
+      - id
+      - fecha
+      - estado
+      - origen
+      - tamanoBytes
+      - duracionMs
+      - objetos
+      - error
+      properties:
+        id:
+          type: string
+          format: uuid
+        fecha:
+          type: string
+          format: date-time
+        estado:
+          type: string
+          enum:
+          - EN_CURSO
+          - EXITOSO
+          - FALLIDO
+          - EXPIRADO
+        origen:
+          type: string
+          enum:
+          - programado
+          - manual
+        tamanoBytes:
+          type: integer
+          format: int64
+          nullable: true
+        duracionMs:
+          type: integer
+          nullable: true
+        objetos:
+          type: integer
+          nullable: true
+        error:
+          type: string
+          nullable: true
     Salud:
       type: object
       required:

@@ -2595,3 +2595,30 @@ ul.fila-chips {
 .contador-comentarios {
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- HU-1403 · Empresa › Operación ---- */
+.operacion {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.operacion .tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.operacion .fila-titulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.operacion td.con-error {
+  color: var(--color-error);
+  font-weight: 700;
+}
+.operacion td .chip {
+  margin-left: 8px;
+}

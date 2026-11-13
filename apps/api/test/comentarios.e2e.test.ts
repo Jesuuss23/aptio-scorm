@@ -11,6 +11,8 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
+import { ComentariosService } from '../src/comentarios/comentarios.service.js';
+import { type Correo, CorreoService } from '../src/correo/correo.service.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -26,6 +28,8 @@ describe.skipIf(!hayBase && !process.env.CI)('comentarios del revisor del client
   const orgs: string[] = [];
   const ids = { revisor: '', curso: '', ajeno: '', comentario: '' };
   const cookies: Record<string, string> = {};
+  const enviados: Correo[] = [];
+  const avisos = () => app.get(ComentariosService).avisoPendiente;
   const como = (quien: string) => ({
     get: (ruta: string) => request(servidor).get(`/api/v1${ruta}`).set('Cookie', cookies[quien]!),
     post: (ruta: string, datos: object) => request(servidor).post(`/api/v1${ruta}`).set('Cookie', cookies[quien]!).send(datos),
@@ -47,12 +51,24 @@ describe.skipIf(!hayBase && !process.env.CI)('comentarios del revisor del client
     ids.revisor = (await crear('Lucía Paredes', Rol.REVISOR_CLIENTE, org, { clienteId: minera })).id;
     await crear('Revisor banco', Rol.REVISOR_CLIENTE, org, { clienteId: banco });
     const fuera = await crear('Admin ajeno', Rol.ADMINISTRADOR, otra);
+    // HU-1403 · Para el aviso por correo: otra DI con el buzón caído, una inactiva y una de otra organización.
+    await crear('Diseño dos', Rol.DISENADOR_INSTRUCCIONAL);
+    await crear('DI inactiva', Rol.DISENADOR_INSTRUCCIONAL, org, { activo: false });
+    await crear('DI ajena', Rol.DISENADOR_INSTRUCCIONAL, otra);
     const proyecto = (await prisma.proyecto.create({ data: { organizacionId: org, clienteId: minera, nombre: 'Bloqueo y etiquetado', creadoPorId: di.id } })).id;
     const proyectoAjeno = (await prisma.proyecto.create({ data: { organizacionId: otra, clienteId: ajeno, nombre: 'Ajeno', creadoPorId: fuera.id } })).id;
     ids.curso = (await prisma.curso.create({ data: { organizacionId: org, proyectoId: proyecto, versionEsquema: '0.2.0', documento: loto } })).id;
     ids.ajeno = (await prisma.curso.create({ data: { organizacionId: otra, proyectoId: proyectoAjeno, versionEsquema: '0.2.0', documento: loto } })).id;
 
-    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const modulo = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(CorreoService)
+      .useValue({
+        enviar: async (m: Correo) => {
+          if (m.para === correo('Diseño dos')) throw new Error('SMTP 554 buzón no disponible');
+          enviados.push(m);
+        },
+      })
+      .compile();
     app = configurarApp(modulo.createNestApplication());
     await app.init();
     servidor = app.getHttpServer();
@@ -87,11 +103,28 @@ describe.skipIf(!hayBase && !process.env.CI)('comentarios del revisor del client
     expect(pantalla(curso.documento as unknown as Doc, 'p05').estado).toBe(pantalla(loto as Doc, 'p05').estado);
   });
 
+  it('HU-1403 · el comentario del cliente avisa por correo al equipo del curso, y un buzón caído no lo impide', async () => {
+    await avisos();
+    // Quien creó el proyecto (diseño instruccional) lo recibe; la DI con el buzón caído falla sin afectar el 201.
+    expect(enviados.map((m) => m.para)).toEqual([correo('Diseño instruccional')]);
+    expect(enviados[0]).toMatchObject({
+      asunto: 'Aptio SCORM · Nuevo comentario del cliente en «Bloqueo y etiquetado»',
+      texto: expect.stringContaining('Lucía Paredes (revisión del cliente) comentó la pantalla p05'),
+    });
+    expect(enviados[0]!.texto).toContain('Cambien la foto: ese candado no es el que usamos.');
+    expect(enviados[0]!.texto).toMatch(/\/proyectos\/[0-9a-f-]+\/revision\?pantalla=p05/);
+    // Un comentario del equipo no avisa.
+    enviados.length = 0;
+    await como('Producción').post(`/cursos/${ids.curso}/comentarios`, { pantallaId: 'p06', texto: 'Nota interna.' }).expect(201);
+    await avisos();
+    expect(enviados).toHaveLength(0);
+  });
+
   it('el equipo también comenta y todos ven la lista en orden, con el rol del autor', async () => {
     await como('Producción').post(`/cursos/${ids.curso}/comentarios`, { pantallaId: 'p05', texto: 'Listo, la cambio por la del kit.' }).expect(201);
     const lista = await como('Lucía Paredes').get(`/cursos/${ids.curso}/comentarios`).expect(200);
-    expect(lista.body.map((c: { autor: { rol: string } }) => c.autor.rol)).toEqual(['REVISOR_CLIENTE', 'PRODUCTOR']);
-    expect((await como('Diseño instruccional').get(`/cursos/${ids.curso}/comentarios`).expect(200)).body).toHaveLength(2);
+    expect(lista.body.map((c: { autor: { rol: string } }) => c.autor.rol)).toEqual(['REVISOR_CLIENTE', 'PRODUCTOR', 'PRODUCTOR']);
+    expect((await como('Diseño instruccional').get(`/cursos/${ids.curso}/comentarios`).expect(200)).body).toHaveLength(3);
   });
 
   it('valida el texto plano de 1 a 1000 caracteres y que la pantalla sea del curso (422)', async () => {
