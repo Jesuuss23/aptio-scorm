@@ -7,12 +7,14 @@ import { createHash } from 'node:crypto';
 import { CARPETA_FUENTES } from './fuentes.js';
 import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { esArchivoMarca } from '@aptio/schema/sitio-ajustes';
-import { archivoDeRuta, CARPETA_MARCA, type OpcionesRender } from './render.js';
+import { esArchivoBlog } from '@aptio/schema/sitio-blog';
+import { archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
 
 export type Pedido =
   | { tipo: 'pagina'; archivo: string }
   | { tipo: 'fuente'; archivo: string }
   | { tipo: 'marca'; archivo: string }
+  | { tipo: 'blog'; archivo: string }
   | { tipo: 'sitemap' | 'robots'; archivo: string };
 
 const SEGMENTO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -26,6 +28,7 @@ export function resolverPedido(ruta: string): Pedido | null {
   const partes = limpia.split('/').slice(1).filter((p) => p !== '');
   if (partes.length === 2 && partes[0] === CARPETA_FUENTES) return FUENTE.test(partes[1]!) ? { tipo: 'fuente', archivo: partes[1]! } : null;
   if (partes.length === 2 && partes[0] === CARPETA_MARCA) return esArchivoMarca(partes[1]!) ? { tipo: 'marca', archivo: partes[1]! } : null;
+  if (partes.length === 2 && partes[0] === CARPETA_BLOG) return esArchivoBlog(partes[1]!) ? { tipo: 'blog', archivo: partes[1]! } : null;
   if (partes.length > 8 || !partes.every((p) => SEGMENTO.test(p))) return null;
   return { tipo: 'pagina', archivo: archivoDeRuta(limpia) };
 }
@@ -34,6 +37,7 @@ export const TIPOS_MIME = {
   pagina: 'text/html; charset=utf-8',
   fuente: 'font/woff2',
   marca: 'image/svg+xml',
+  blog: 'image/jpeg',
   sitemap: 'application/xml; charset=utf-8',
   robots: 'text/plain; charset=utf-8',
 } as const;
@@ -43,6 +47,8 @@ export const POLITICA_CONTENIDO = "default-src 'none'; style-src 'unsafe-inline'
 
 /** Tipo de un archivo de marca por su extensión. */
 export const mimeMarca = (archivo: string) => (archivo.endsWith('.png') ? 'image/png' : 'image/svg+xml');
+/** HU-1511 · Tipo de una imagen copiada del blog por su extensión. */
+export const mimeBlog = (archivo: string) => (archivo.endsWith('.png') ? 'image/png' : archivo.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
 
 /**
  * Cabeceras de cada respuesta. HU-1509: la marca (con su hash en el nombre) se guarda un año, como las fuentes; el
@@ -50,9 +56,9 @@ export const mimeMarca = (archivo: string) => (archivo.endsWith('.png') ? 'image
  */
 export function cabecerasSitio(tipo: Pedido['tipo'] | '404' | '503', cuerpo: Uint8Array | string, opciones: { archivo?: string | undefined; privada?: boolean } = {}): Record<string, string> {
   const etag = `"${createHash('sha1').update(cuerpo).digest('base64url')}"`;
-  const tipoContenido = tipo === '404' || tipo === '503' ? TIPOS_MIME.pagina : tipo === 'marca' ? mimeMarca(opciones.archivo ?? '') : TIPOS_MIME[tipo];
+  const tipoContenido = tipo === '404' || tipo === '503' ? TIPOS_MIME.pagina : tipo === 'marca' ? mimeMarca(opciones.archivo ?? '') : tipo === 'blog' ? mimeBlog(opciones.archivo ?? '') : TIPOS_MIME[tipo];
   const base = { 'Content-Type': tipoContenido, ETag: etag, 'X-Content-Type-Options': 'nosniff' };
-  if (tipo === 'fuente' || tipo === 'marca') {
+  if (tipo === 'fuente' || tipo === 'marca' || tipo === 'blog') {
     return { ...base, 'Cache-Control': 'public, max-age=31536000, immutable', ...(tipo === 'fuente' ? { 'Access-Control-Allow-Origin': '*' } : { 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'" }) };
   }
   const cache = opciones.privada || tipo === '503' ? 'private, no-store' : tipo === '404' ? 'public, max-age=0, s-maxage=30' : 'public, max-age=0, s-maxage=60, must-revalidate';
@@ -79,6 +85,8 @@ export const claveVersion = (numero: number, archivo: string) => `sitio/v${numer
 export const claveFuente = (archivo: string) => `sitio/fuentes/${archivo}`;
 /** HU-1509 · El logo y el favicon, con su hash en el nombre: no dependen de la versión. */
 export const claveMarca = (archivo: string) => `sitio/marca/${archivo}`;
+/** HU-1511 · Las imágenes destacadas copiadas del blog, con su hash en el nombre. */
+export const claveBlog = (archivo: string) => `sitio/blog/${archivo}`;
 export interface PunteroSitio { version: number; generadoEn: string }
 
 export const SITIO_URL_POR_DEFECTO = 'https://aptioscorm.com';

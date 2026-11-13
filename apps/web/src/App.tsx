@@ -24,6 +24,7 @@ import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
 import { SitioAjustes } from './vistas/SitioAjustes';
+import { SitioBlog } from './vistas/SitioBlog';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -133,6 +134,8 @@ export function App() {
         <SitioPaginas />
       ) : vista?.activo === '/sitio/contenido' && veSitio ? (
         <SitioContenido />
+      ) : vista?.activo === '/sitio/blog' && veSitio ? (
+        <SitioBlog />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
         <SitioAjustes />
       ) : vista?.activo === '/operacion' && veOperacion ? (

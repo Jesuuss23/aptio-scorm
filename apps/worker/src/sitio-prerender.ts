@@ -6,7 +6,7 @@
  * auditoría (SITIO_PRERENDER_LISTO o SITIO_PRERENDER_ERROR).
  */
 import type { Almacen } from '@aptio/almacen';
-import type { Prisma, PrismaClient } from '@aptio/db';
+import { leerBlogPublico, type Prisma, type PrismaClient } from '@aptio/db';
 import { leerInstantanea } from '@aptio/schema/sitio-versiones';
 import { CLAVE_ACTUAL, claveFuente, claveVersion, fuentes, leerFuente, opcionesRenderDesdeEnv, type PunteroSitio, renderizarSitio } from '@aptio/sitio';
 
@@ -20,12 +20,17 @@ export async function leerPuntero(almacen: Almacen): Promise<PunteroSitio | null
   }
 }
 
+/** Las opciones del render. HU-1511 · El blog no va en la instantánea: sale de la copia de WordPress del momento. */
+export async function opcionesPrerender(bd: PrismaClient, env: NodeJS.ProcessEnv = process.env) {
+  return { ...opcionesRenderDesdeEnv(env), blog: await leerBlogPublico(bd) };
+}
+
 export interface ResultadoPrerender { numero: number; estado: 'listo' | 'error' | 'omitido'; archivos: number; puntero: boolean; error?: string }
 
 export async function prerenderizarVersion(bd: PrismaClient, almacen: Almacen, numero: number, env: NodeJS.ProcessEnv = process.env): Promise<ResultadoPrerender> {
   const v = await bd.sitioVersion.findUnique({ where: { numero } });
   if (!v) return { numero, estado: 'omitido', archivos: 0, puntero: false };
-  const op = opcionesRenderDesdeEnv(env);
+  const op = await opcionesPrerender(bd, env);
   try {
     const archivos = renderizarSitio(leerInstantanea(v.instantanea), op);
     for (const a of archivos) await almacen.subir(claveVersion(numero, a.archivo), a.contenido, a.mime);

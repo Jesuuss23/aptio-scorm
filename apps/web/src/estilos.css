@@ -3017,3 +3017,61 @@ ul.fila-chips {
 
 /* HU-1510 · Selector «Español / Inglés» de Contenido y de Menú y pie. */
 .selector-idioma-sitio { margin-bottom: 12px; }
+
+/* HU-1511 · Sitio web › Blog (PNT-28): la tabla de artículos a la izquierda y la conexión y las categorías a la derecha. */
+.blog-sitio > .blog-articulos {
+  flex: 2 1 560px;
+  min-width: 0;
+}
+.blog-lateral {
+  display: grid;
+  gap: 20px;
+  flex: 1 1 340px;
+}
+.blog-lateral .tarjeta {
+  display: grid;
+  gap: 12px;
+}
+.blog-lateral .tarjeta > .sec,
+.blog-lateral .tarjeta > .nota,
+.blog-estado p {
+  margin: 0;
+}
+.blog-estado {
+  display: grid;
+  gap: 8px;
+}
+.blog-articulos th[scope='row'] {
+  font-weight: 400;
+  text-align: left;
+}
+.blog-articulos tr.oculto b {
+  text-decoration: line-through;
+}
+.blog-editar {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  min-height: 24px;
+  margin-top: 4px;
+  font-size: var(--texto-sm);
+}
+.blog-categoria {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+}
+/* En el celular la tabla deja el autor y la fecha para que el interruptor «Mostrar» quede a la vista. */
+@media (max-width: 640px) {
+  .blog-meta {
+    display: none;
+  }
+}
+.blog-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.blog-nota {
+  display: block;
+  margin-top: 4px;
+}

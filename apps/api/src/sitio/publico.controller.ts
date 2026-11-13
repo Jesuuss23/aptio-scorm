@@ -5,6 +5,8 @@ import { ConsultaPaginaPublicaDto, PaginaPublicaDto } from './sitio.dto.js';
 import { idiomaDeFila } from '@aptio/schema/sitio-contenido';
 import { ConsultaNavegacionDto, NavegacionPublicadaDto } from './navegacion.dto.js';
 import { NavegacionService } from './navegacion.service.js';
+import { BlogPublicoDto, ConsultaBlogPublicoDto } from './blog.dto.js';
+import { BlogService } from './blog.service.js';
 import { SitioService } from './sitio.service.js';
 
 /** HU-1502 · Sitio público sin sesión (CP-110): solo lo publicado. Límite de 60 peticiones por minuto por IP. */
@@ -13,7 +15,7 @@ import { SitioService } from './sitio.service.js';
 @Controller('publico')
 @Publico()
 export class PublicoController {
-  constructor(private readonly sitio: SitioService, private readonly navegacion: NavegacionService) {}
+  constructor(private readonly sitio: SitioService, private readonly navegacion: NavegacionService, private readonly blog: BlogService) {}
 
   @Get('paginas')
   @ApiOkResponse({ type: PaginaPublicaDto })
@@ -27,6 +29,14 @@ export class PublicoController {
   @ApiOkResponse({ type: NavegacionPublicadaDto })
   navegacionPublica(@Query() q: ConsultaNavegacionDto): Promise<NavegacionPublicadaDto> {
     return this.navegacion.publica(idiomaDeFila({ idioma: q.idioma ?? null }));
+  }
+
+  /** HU-1511 · CP-123 y CP-155: los filtros con su número y los artículos visibles de uno, sin categorías ni artículos ocultos. */
+  @Get('blog')
+  @ApiOkResponse({ type: BlogPublicoDto })
+  @ApiNotFoundResponse({ description: 'La categoría no existe o está oculta' })
+  blogPublico(@Query() q: ConsultaBlogPublicoDto): Promise<BlogPublicoDto> {
+    return this.blog.publico(q.categoria);
   }
 
   @Get('sitemap.xml')

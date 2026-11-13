@@ -7,8 +7,8 @@ import type { GrupoMenu } from '@aptio/ui';
 export const MENU: GrupoMenu[] = [
   { nombre: 'Inicio', items: [{ ruta: '/', nombre: 'Proyectos' }, { ruta: '/nuevo', nombre: 'Nuevo SCORM' }] },
   { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }, { ruta: '/conexiones-ia', nombre: 'Conexiones IA' }, { ruta: '/operacion', nombre: 'Operación' }] },
-  // HU-1501 · Solo el superadmin (ADR-011). Páginas, Contenido, Blog y SEO se suman con sus historias.
-  { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }] },
+  // HU-1501 · Solo el superadmin (ADR-011). Páginas, Contenido y Blog (HU-1511); SEO se suma con su historia.
+  { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }, { ruta: '/sitio/blog', nombre: 'Blog' }] },
   // HU-1509 · Configuración del sitio, también solo del superadmin.
   { nombre: 'Configuración', items: [{ ruta: '/sitio/ajustes', nombre: 'Ajustes del sitio' }] },
 ];
@@ -44,6 +44,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (camino === '/sitio') return { grupo: 'Sitio web', nombre: 'Resumen', activo: '/sitio' };
   if (camino === '/sitio/paginas') return { grupo: 'Sitio web', nombre: 'Páginas', activo: '/sitio/paginas' };
   if (camino === '/sitio/contenido') return { grupo: 'Sitio web', nombre: 'Contenido', activo: '/sitio/contenido' };
+  if (camino === '/sitio/blog') return { grupo: 'Sitio web', nombre: 'Blog', activo: '/sitio/blog' };
   if (camino === '/sitio/ajustes') return { grupo: 'Configuración', nombre: 'Ajustes del sitio', activo: '/sitio/ajustes' };
   const editorPagina = camino.match(/^\/sitio\/paginas\/([0-9a-f-]{36})$/i);
   if (editorPagina) return { grupo: 'Sitio web', nombre: 'Editor de página', activo: '/sitio/paginas', id: editorPagina[1]!, sub: 'editor-pagina' };

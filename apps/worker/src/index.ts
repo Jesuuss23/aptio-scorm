@@ -4,8 +4,9 @@ import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
   COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
-  type DatosPrerender, idPrerender, TAREA_PRERENDER,
+  type DatosPrerender, idPrerender, idRehacerPrerender, TAREA_PRERENDER, CADA_BLOG_MS, type DatosBlog, TAREA_BLOG,
 } from '@aptio/colas';
+import { sincronizarBlog } from './blog.js';
 import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
 import { configurarAvisoLimite } from './conexiones.js';
 import { correoDesdeEntorno } from './correo.js';
@@ -129,6 +130,8 @@ await mantenimiento.upsertJobScheduler(TAREA_PUBLICAR_PAGINAS, { every: CADA_PUB
 // HU-1508 · Encola el pre-render de una versión del sitio (un trabajo por versión).
 const encolarPrerender = (numero: number) =>
   mantenimiento.add(TAREA_PRERENDER, { numero } satisfies DatosPrerender, { jobId: idPrerender(numero), removeOnComplete: true, removeOnFail: 100 });
+// HU-1511 · Cada minuto revisa si toca leer WordPress (según la frecuencia elegida); si algo cambió, re-renderiza.
+await mantenimiento.upsertJobScheduler(TAREA_BLOG, { every: CADA_BLOG_MS }, { name: TAREA_BLOG, data: {} satisfies DatosBlog });
 // Al arrancar, la última versión que no quedó lista (anterior a la HU-1508 o con un trabajo perdido) se pre-renderiza.
 const pendiente = await versionPendienteDePrerender(prisma);
 if (pendiente !== null) await encolarPrerender(pendiente);
@@ -140,6 +143,15 @@ const mantenedor = new Worker(
       const r = await prerenderizarVersion(prisma, almacen, (job.data as DatosPrerender).numero);
       if (r.estado === 'error') console.error(`[${COLA_MANTENIMIENTO}] el pre-render de la versión ${r.numero} falló: ${r.error}`);
       else if (r.estado === 'listo') console.log(`Sitio: versión ${r.numero} pre-renderizada (${r.archivos} archivos)${r.puntero ? ', ahora se sirve' : ''}`);
+      return r;
+    }
+    if (job.name === TAREA_BLOG) {
+      const r = await sincronizarBlog(prisma, almacen, job.data as DatosBlog);
+      if (r.estado === 'error') console.error(`[${COLA_MANTENIMIENTO}] el blog no se pudo sincronizar: ${r.error}`);
+      if (r.cambios) {
+        const v = await ultimaVersion(prisma);
+        if (v) await mantenimiento.add(TAREA_PRERENDER, { numero: v.numero } satisfies DatosPrerender, { jobId: idRehacerPrerender(v.numero), removeOnComplete: true, removeOnFail: 100 });
+      }
       return r;
     }
     if (job.name === TAREA_PUBLICAR_PAGINAS) {
