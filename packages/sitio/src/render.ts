@@ -11,6 +11,7 @@ import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import type { EnlacePublico, NavegacionPublica } from '@aptio/schema/sitio-navegacion';
 import { enlaceWhatsapp, NOMBRE_POR_DEFECTO, type SitioPublicado } from '@aptio/schema/sitio-ajustes';
 import type { SectorPublicado } from '@aptio/schema/sitio-sectores';
+import { type ArticuloPublico, type BlogPublico, categoriaInicial, ULTIMOS_BLOG } from '@aptio/schema/sitio-blog';
 import { alternasDe, type Instantanea, navegacionDe, type PaginaServida, paginaServida } from '@aptio/schema/sitio-versiones';
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
@@ -24,7 +25,15 @@ export interface OpcionesRender {
   base: string;
   /** Año del pie (por defecto, el actual). */
   anio?: number;
+  /**
+   * HU-1511 · La copia del blog de WordPress que se ve ahora (RN-16-8). No entra en la versión: se suma en cada render,
+   * así un artículo nuevo sale con la siguiente sincronización (CP-154). Sin ella, no hay sección Blog ni «Últimos artículos».
+   */
+  blog?: BlogPublico | null;
 }
+
+/** HU-1511 · Carpeta pública de las imágenes destacadas copiadas del blog (`sitio/blog/` en el bucket). */
+export const CARPETA_BLOG = '_blog';
 
 /** HU-1509 · Carpeta pública del logo y el favicon (`sitio/marca/` en el bucket). */
 export const CARPETA_MARCA = '_marca';
@@ -129,7 +138,7 @@ export function landingsDe(inst: Pick<Instantanea, 'paginas'>, idioma: string): 
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
-function Pie({ pie, base, idioma, anio, nombre, landings }: { pie: NavegacionPublica['pie']; base: string; idioma: Idioma; anio: number; nombre: string; landings: LandingPublica[] }) {
+function Pie({ pie, base, idioma, anio, nombre, landings, ultimos }: { pie: NavegacionPublica['pie']; base: string; idioma: Idioma; anio: number; nombre: string; landings: LandingPublica[]; ultimos: ArticuloPublico[] }) {
   const t = INTERFAZ[idioma];
   const T = TEXTOS[idioma];
   return h('footer', { className: 'sfoot', 'aria-label': t.pie },
@@ -140,7 +149,10 @@ function Pie({ pie, base, idioma, anio, nombre, landings }: { pie: NavegacionPub
           h('h2', null, c.ruta ? h(Enlace, { e: { texto: c.titulo, ruta: c.ruta, externo: c.externo ?? false }, base }) : c.titulo),
           h('ul', null, c.enlaces.map((e) => h('li', { key: e.ruta + e.texto }, h(Enlace, { e, base })))))),
         landings.length ? h('div', null, h('h2', null, T.SECCIONES.sectores.etiqueta),
-          h('ul', null, landings.map((l) => h('li', { key: l.ruta }, h('a', { href: `${base}${l.ruta}` }, l.nombre))))) : null),
+          h('ul', null, landings.map((l) => h('li', { key: l.ruta }, h('a', { href: `${base}${l.ruta}` }, l.nombre))))) : null,
+        // HU-1511 · CP-155: solo artículos visibles de categorías visibles.
+        ultimos.length ? h('div', null, h('h2', null, T.SECCIONES.blog.ultimos),
+          h('ul', null, ultimos.map((a) => h('li', { key: a.id }, h('a', { href: a.enlace }, a.titulo))))) : null),
       h('p', { className: 'bottom' }, `© ${anio} ${nombre}. ${t.derechos}`)));
 }
 
@@ -158,7 +170,59 @@ function Encabezado({ etiqueta, titulo, bajada, id }: { etiqueta?: string; titul
   return h('div', { className: 'sh' }, etiqueta ? h('span', { className: 'tagp' }, etiqueta) : null, h('h2', { id }, titulo), bajada ? h('p', null, bajada) : null);
 }
 
-interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[] }
+interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined }
+
+const fechaBlog = (iso: string, idioma: Idioma) => new Date(iso).toLocaleDateString(idioma === 'en' ? 'en-US' : 'es-PE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Lima' });
+
+function TarjetaBlog({ a, blog, base, idioma }: { a: ArticuloPublico; blog: BlogPublico; base: string; idioma: Idioma }) {
+  const T = TEXTOS[idioma].SECCIONES.blog;
+  const nombres = a.categorias.map((slug) => blog.categorias.find((c) => c.slug === slug)?.nombre).filter(Boolean).join(' · ');
+  return h('li', null, h('article', { className: 'bcard' },
+    a.imagen ? h('img', { src: `${base}/${CARPETA_BLOG}/${a.imagen.archivo}`, alt: '', loading: 'lazy', decoding: 'async', ...(a.imagen.ancho && a.imagen.alto ? { width: a.imagen.ancho, height: a.imagen.alto } : {}) }) : null,
+    h('div', { className: 'cuerpo' },
+      nombres ? h('p', { className: 'bcat' }, nombres) : null,
+      h('h3', null, h('a', { href: a.enlace }, a.titulo)),
+      a.extracto ? h('p', null, a.extracto) : null,
+      h('p', { className: 'bmeta' }, a.autor ? `${T.por} ${a.autor} · ` : '', h('time', { dateTime: a.fecha }, fechaBlog(a.fecha, idioma))))));
+}
+
+/**
+ * HU-1511 · CP-123 · Sección Blog con filtro por categoría sin JavaScript: un botón de radio por filtro (Todas y cada
+ * categoría visible con su número de artículos) y una lista por filtro con hasta `porPagina` artículos; el CSS de la
+ * página (`cssBlog`) muestra la lista del radio marcado. En una landing empieza en su categoría inicial (CP-159).
+ */
+function SeccionBlog({ blog, c, id }: { blog: BlogPublico; c: Contexto; id: string }) {
+  const T = TEXTOS[c.idioma].SECCIONES.blog;
+  const inicial = categoriaInicial(blog, c.sector?.blogCategoria) ?? 'todas';
+  const filtros = [{ slug: 'todas', nombre: T.todas, cantidad: blog.articulos.length }, ...blog.categorias];
+  const nombre = `blog-${c.clave}`;
+  const idFiltro = (slug: string) => `bf-${c.clave}-${slug}`;
+  const conFiltros = blog.categorias.length > 0;
+  return h('section', { className: 'bg-ice', id: 'blog', 'aria-labelledby': id }, h('div', { className: 'in' },
+    h(Encabezado, { id, etiqueta: T.etiqueta, titulo: T.titulo, bajada: T.texto }),
+    h('div', { className: 'blog-filtro', role: conFiltros ? 'group' : undefined, 'aria-label': conFiltros ? T.filtrar : undefined },
+      conFiltros ? filtros.map((f) => h('input', { key: f.slug, type: 'radio', className: `bf bf-${f.slug}`, id: idFiltro(f.slug), name: nombre, value: f.slug, defaultChecked: f.slug === inicial })) : null,
+      conFiltros ? h('ul', { className: 'filtros' }, filtros.map((f) => h('li', { key: f.slug },
+        h('label', { htmlFor: idFiltro(f.slug), className: `e-${f.slug}` }, f.nombre, ' ', h('span', { className: 'n' }, `(${f.cantidad})`),
+          h('span', { className: 'sr' }, ` ${f.cantidad === 1 ? T.articulo : T.articulos}`))))) : null,
+      h('div', { className: 'listas' }, filtros.filter((f) => conFiltros || f.slug === 'todas').map((f) => {
+        const lista = (f.slug === 'todas' ? blog.articulos : blog.articulos.filter((a) => a.categorias.includes(f.slug))).slice(0, blog.porPagina);
+        return h('ul', { key: f.slug, className: `lista l-${f.slug}`, 'aria-label': f.nombre }, lista.map((a) => h(TarjetaBlog, { key: a.id, a, blog, base: c.base, idioma: c.idioma })));
+      }))),
+    blog.url ? h('p', { className: 'blog-todos' }, h('a', { className: 'btn', href: blog.url }, T.verTodos)) : null));
+}
+
+/** El CSS del filtro del blog para las categorías de la copia: muestra la lista del radio marcado y resalta su etiqueta. */
+export function cssBlog(blog: BlogPublico | null | undefined): string {
+  if (!blog?.articulos.length) return '';
+  const slugs = ['todas', ...blog.categorias.map((c) => c.slug)];
+  const sel = (f: (s: string) => string) => slugs.map(f).join(',');
+  if (slugs.length === 1) return '.blog-filtro .l-todas{display:grid}';
+  return `${sel((s) => `.bf-${s}:checked~.listas .l-${s}`)}{display:grid}`
+    + `${sel((s) => `.bf-${s}:checked~.filtros .e-${s}`)}{background:var(--b700);border-color:var(--b700);color:#fff}`
+    + `${sel((s) => `.bf-${s}:checked~.filtros .e-${s} .n`)}{color:#fff}`
+    + `${sel((s) => `.bf-${s}:focus-visible~.filtros .e-${s}`)}{outline:3px solid var(--orange);outline-offset:2px}`;
+}
 
 const Fic = ({ e, idioma }: { e: Elemento; idioma: Idioma }) => (e.ficticio ? h('span', { className: 'fic' }, INTERFAZ[idioma].ficticio) : null);
 
@@ -255,14 +319,18 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
         h('ul', { className: 'fcards' }, c.landings.map((l) => h('li', { key: l.ruta },
           h('a', { className: 'fcard sector', href: `${c.base}${l.ruta}` },
             h('h3', null, l.nombre), h('p', null, l.titulo), h('span', { className: 'more' }, T.SECCIONES.sectores.verSolucion)))))));
+    case 'bloglista':
+      // HU-1511 · Sin copia del blog o sin artículos visibles, el bloque no sale.
+      if (!c.blog?.articulos.length) return null;
+      return h(SeccionBlog, { blog: c.blog, c, id });
     default:
-      // Planes (S13), precios, comparativa, blog y agendador llegan con su historia (SUP-193).
+      // Planes (S13), precios, comparativa y agendador llegan con su historia (SUP-193).
       return null;
   }
 }
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, children }: {
-  titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; children?: ReactNode;
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', children }: {
+  titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -277,7 +345,7 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       h('meta', { name: 'theme-color', content: '#004ECC' }),
       favicon ? h('link', { rel: 'icon', href: `${base}/${CARPETA_MARCA}/${favicon.archivo}`, type: favicon.mime }) : null,
       lista.filter((f) => f.precargar).map((f) => h('link', { key: f.archivo, rel: 'preload', href: `${base}/${CARPETA_FUENTES}/${f.archivo}`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })),
-      h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO } })),
+      h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO + cssExtra } })),
     h('body', null, children));
 }
 
@@ -288,7 +356,7 @@ function Marco({ nav, op, idioma, actual, marca, landings, selector = null, chil
     op.entorno === 'pruebas' ? h('p', { className: 'aviso-pruebas' }, t.pruebas) : null,
     h(Cabecera, { menu: nav.menu, base: op.base, idioma, actual, marca, selector }),
     h('main', { id: 'contenido', tabIndex: -1 }, children),
-    h(Pie, { pie: nav.pie, base: op.base, idioma, anio: op.anio ?? new Date().getFullYear(), nombre: marca.nombre, landings }),
+    h(Pie, { pie: nav.pie, base: op.base, idioma, anio: op.anio ?? new Date().getFullYear(), nombre: marca.nombre, landings, ultimos: (op.blog?.articulos ?? []).slice(0, ULTIMOS_BLOG) }),
     marca.whatsapp ? h('a', { className: 'whatsapp', href: enlaceWhatsapp(marca.whatsapp), target: '_blank', rel: 'noopener', 'aria-label': `${t.whatsapp} ${t.pestanaNueva}` }, WHATSAPP) : null);
 }
 
@@ -320,7 +388,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
   let hayH1 = false;
   const bloques = p.bloques.map((b, n) => {
     const portada = b.tipo === 'hero' || b.tipo === 'fhero';
-    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings });
+    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog });
     if (nodo && portada) hayH1 = true;
     return nodo ? h(Fragment, { key: n }, nodo) : null;
   });
@@ -332,6 +400,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     titulo: p.sector ? p.sector.metaTitulo : p.ruta === '/' ? `${marca.nombre} · ${p.titulo}` : `${p.titulo} · ${marca.nombre}`,
     descripcion: p.sector?.portada.texto ?? TEXTOS[i].DESCRIPCION,
     canonical: sinBarra(op.sitioUrl) + publica, alternas: alternasHref(inst, p.ruta, op.sitioUrl), idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
+    cssExtra: p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '',
   }, h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: p.ruta, marca, landings, selector: selectorDe(inst, p.ruta, i) }, cuerpo)));
 }
 
@@ -379,10 +448,14 @@ export function sitemapXml(inst: Pick<Instantanea, 'paginas'>, sitioUrl: string)
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.join('\n')}${urls.length ? '\n' : ''}</urlset>\n`;
 }
 
-/** robots.txt: en producción permite todo y apunta al sitemap; en pruebas no deja indexar nada. */
+/**
+ * robots.txt: en producción permite todo y apunta al sitemap (HU-1511: y al del blog de WordPress, `wp-sitemap.xml`);
+ * en pruebas no deja indexar nada.
+ */
 export function robotsTxt(op: OpcionesRender): string {
+  const blog = op.blog?.url ? `Sitemap: ${op.blog.url}/wp-sitemap.xml\n` : '';
   return op.entorno === 'produccion'
-    ? `User-agent: *\nAllow: /\n\nSitemap: ${sinBarra(op.sitioUrl)}/sitemap.xml\n`
+    ? `User-agent: *\nAllow: /\n\nSitemap: ${sinBarra(op.sitioUrl)}/sitemap.xml\n${blog}`
     : 'User-agent: *\nDisallow: /\n';
 }
 

@@ -861,3 +861,60 @@ model SitioAjustes {
   actualizadoPorId String?  @db.Uuid
   actualizadoEn    DateTime @updatedAt
 }
+
+/// HU-1511 · Conexión del sitio con el WordPress del blog (REQ-070, PNT-28, RN-16-8): una sola fila (`id` = "blog").
+/// El sitio no edita artículos: guarda una copia de lectura que sincroniza el worker.
+model SitioBlog {
+  id              String    @id @default("blog")
+  /// https://… del WordPress; null = sin conectar.
+  url             String?
+  /// Cada cuántos minutos se sincroniza: 15, 30 o 60.
+  frecuenciaMin   Int       @default(15)
+  /// Cuántos artículos muestra la sección Blog por filtro.
+  porPagina       Int       @default(6)
+  mostrarImagen   Boolean   @default(true)
+  mostrarAutor    Boolean   @default(true)
+  /// La última sincronización que terminó bien.
+  sincronizadoEn  DateTime?
+  /// El último intento, bien o mal.
+  intentoEn       DateTime?
+  /// El error del último intento (CP-156); null si terminó bien.
+  error           String?
+  actualizadoEn   DateTime  @updatedAt
+}
+
+/// HU-1511 · Copia de una categoría de WordPress con su orden y visibilidad en la sección Blog (CP-155).
+model WpCategoria {
+  /// id de WordPress
+  id             Int      @id
+  nombre         String
+  slug           String
+  orden          Int
+  visible        Boolean  @default(true)
+  sincronizadoEn DateTime
+
+  @@index([orden])
+}
+
+/// HU-1511 · Copia de lectura de un artículo publicado en WordPress (CP-154): solo `publish` y sin clave.
+model WpArticulo {
+  /// id de WordPress
+  id             Int      @id
+  slug           String
+  titulo         String
+  extracto       String
+  /// ids de WpCategoria; un artículo sale en cada una de sus categorías visibles.
+  categorias     Int[]
+  autor          String?
+  fecha          DateTime
+  /// Imagen destacada copiada a `sitio/blog/{archivo}`, con su origen para no bajarla de nuevo.
+  imagen         String?
+  imagenOrigen   String?
+  imagenAncho    Int?
+  imagenAlto     Int?
+  enlace         String
+  visible        Boolean  @default(true)
+  sincronizadoEn DateTime
+
+  @@index([fecha])
+}

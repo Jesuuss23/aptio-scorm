@@ -3,7 +3,8 @@ import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, vali
 import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
-import { cabecerasSitio, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
+import { aplicarCambiosBlog, blogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, enlaceEditarWp, type FilaArticuloBlog, type FilaCategoriaBlog, leerArticuloWp } from '@aptio/schema/sitio-blog';
+import { blogDeEjemplo, cabecerasSitio, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
@@ -159,6 +160,10 @@ export interface OpcionesSimulacion {
   prerenderSitio?: 'listo' | 'en_curso' | 'error';
   /** HU-1509 · Ajustes del sitio ya guardados (sin ellos, la fila no existe y la API devuelve los valores por defecto). */
   ajustesSitio?: Partial<AjustesSitio>;
+  /** HU-1511 · Blog conectado con la copia de ejemplo (9 artículos en 7 categorías; «Noticias internas» y un artículo ocultos). */
+  blogSitio?: boolean;
+  /** HU-1511 · Lo que devuelve WordPress en la próxima sincronización: artículos nuevos de su API REST, o `caido` si no responde. */
+  wordpress?: unknown[] | 'caido';
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -402,7 +407,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -436,6 +441,40 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   });
   const versionDto = ({ instantanea, ...v }: VersionSim) => ({ ...v, paginas: instantanea.paginas.length, prerender: prerenderDto({ instantanea, ...v }) });
   if (versionSitio) nuevaVersionSim('publicacion');
+  // HU-1511 · El blog: la conexión y la copia de WordPress, fuera de las versiones; «Sincronizar ahora» lee `wordpress`.
+  const ejemploBlog = blogSitio ? blogDeEjemplo() : null;
+  let conexionBlog: ConexionBlog = ejemploBlog ? { ...ejemploBlog.conexion } : { ...CONEXION_BLOG_POR_DEFECTO };
+  let estadoBlog: { sincronizadoEn: string | null; intentoEn: string | null; error: string | null } = ejemploBlog
+    ? { sincronizadoEn: '2026-11-13T11:00:00.000Z', intentoEn: '2026-11-13T11:00:00.000Z', error: null } : { sincronizadoEn: null, intentoEn: null, error: null };
+  let categoriasBlog: FilaCategoriaBlog[] = ejemploBlog ? ejemploBlog.categorias.map((c) => ({ ...c })) : [];
+  let articulosBlog: FilaArticuloBlog[] = ejemploBlog ? ejemploBlog.articulos.map((a) => ({ ...a })) : [];
+  const blogPublicoSim = () => {
+    if (!conexionBlog.url) return null;
+    const b = blogPublico(conexionBlog, categoriasBlog, articulosBlog);
+    return b.articulos.length ? b : null;
+  };
+  const blogDto = () => ({
+    ...conexionBlog, ...estadoBlog,
+    categorias: [...categoriasBlog].sort((a, b) => a.orden - b.orden).map((c) => ({ ...c, articulos: articulosBlog.filter((a) => a.categorias.includes(c.id)).length })),
+    articulos: [...articulosBlog].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()).map((a) => ({
+      id: a.id, titulo: a.titulo, extracto: a.extracto, categorias: a.categorias, autor: a.autor, fecha: new Date(a.fecha).toISOString(), enlace: a.enlace,
+      editar: enlaceEditarWp(conexionBlog.url ?? '', a.id), imagen: a.imagen ? `/s/_blog/${a.imagen}` : null, visible: a.visible,
+    })),
+  });
+  const sincronizarBlogSim = () => {
+    const ahora = new Date().toISOString();
+    if (wordpress === 'caido') {
+      estadoBlog = { ...estadoBlog, intentoEn: ahora, error: 'No se pudo conectar con WordPress' };
+      return;
+    }
+    // Las mismas reglas que el worker: solo `publish` y sin clave (CP-154); lo que el superadmin ocultó sigue oculto.
+    for (const a of (wordpress ?? []).map(leerArticuloWp).filter((x) => x !== null)) {
+      const antes = articulosBlog.find((x) => x.id === a.id);
+      const fila: FilaArticuloBlog = { id: a.id, titulo: a.titulo, extracto: a.extracto, categorias: a.categorias, autor: a.autor, fecha: a.fecha.toISOString(), enlace: a.enlace, visible: antes?.visible ?? true, imagen: null, imagenAncho: null, imagenAlto: null };
+      articulosBlog = antes ? articulosBlog.map((x) => (x.id === a.id ? fila : x)) : [...articulosBlog, fila];
+    }
+    estadoBlog = { sincronizadoEn: ahora, intentoEn: ahora, error: null };
+  };
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -498,7 +537,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   await page.route(/^https?:\/\/[^/]+\/s(?:[/?#]|$)/, (route) => {
     const ruta = new URL(route.request().url()).pathname.slice(2) || '/';
     const pedido = resolverPedido(ruta);
-    const op = { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s' } as const;
+    const op = { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s', blog: blogPublicoSim() } as const;
     // HU-1509 · CP-121 · En mantenimiento el visitante recibe el aviso (503); el superadmin con sesión ve el sitio con un aviso arriba.
     const mantenimiento = Boolean(ajustesSim?.mantenimiento.activo) && pedido?.tipo !== 'fuente' && pedido?.tipo !== 'marca';
     const superadmin = sesion && usuario.rol === 'SUPERADMIN';
@@ -671,6 +710,51 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     // HU-1504 · Contenido del sitio: mismas reglas que la API (oculto al final, datos validados, orden completo).
     // HU-1505 · Ficticios visibles y «Ocultar todos los ficticios».
     // HU-1509 · Ajustes del sitio (PNT-38): mismas reglas que la API.
+    // HU-1511 · Sitio web › Blog (PNT-28): mismas reglas que la API; los cambios se ven en /s/ al instante (sin publicar).
+    if (ruta === '/sitio/blog' || ruta.startsWith('/sitio/blog/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const metodo = req.method();
+      if (ruta === '/sitio/blog' && metodo === 'GET') return responder(200, blogDto());
+      if (ruta === '/sitio/blog' && metodo === 'PATCH') {
+        const cambios = req.postDataJSON() as Parameters<typeof aplicarCambiosBlog>[1];
+        const r = aplicarCambiosBlog(conexionBlog, cambios);
+        if (!r.ok) return responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+        if (r.conexion.url !== conexionBlog.url) {
+          categoriasBlog = [];
+          articulosBlog = [];
+          estadoBlog = { sincronizadoEn: null, intentoEn: null, error: null };
+        }
+        conexionBlog = r.conexion;
+        return responder(200, blogDto());
+      }
+      if (ruta === '/sitio/blog/sincronizar') {
+        if (!conexionBlog.url) return responder(422, { codigo: 'SIN_URL', mensaje: 'Guarda primero la URL del WordPress' });
+        sincronizarBlogSim();
+        return responder(202, { encolado: true });
+      }
+      if (ruta === '/sitio/blog/categorias') {
+        const { orden } = req.postDataJSON() as { orden: number[] };
+        if (orden.length !== categoriasBlog.length || new Set(orden).size !== orden.length || orden.some((id) => !categoriasBlog.some((c) => c.id === id))) {
+          return responder(422, { codigo: 'ORDEN_INVALIDO', mensaje: 'Envía todos los ids de las categorías, una vez cada uno' });
+        }
+        categoriasBlog = categoriasBlog.map((c) => ({ ...c, orden: orden.indexOf(c.id) }));
+        return responder(200, blogDto());
+      }
+      const cambio = ruta.match(/^\/sitio\/blog\/(categorias|articulos)\/(\d+)$/);
+      if (cambio && metodo === 'PATCH') {
+        const { visible } = req.postDataJSON() as { visible: boolean };
+        const id = Number(cambio[2]);
+        if (cambio[1] === 'categorias') {
+          if (!categoriasBlog.some((c) => c.id === id)) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La categoría no existe en la copia del blog' });
+          categoriasBlog = categoriasBlog.map((c) => (c.id === id ? { ...c, visible } : c));
+        } else {
+          if (!articulosBlog.some((a) => a.id === id)) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El artículo no existe en la copia del blog' });
+          articulosBlog = articulosBlog.map((a) => (a.id === id ? { ...a, visible } : a));
+        }
+        return responder(200, blogDto());
+      }
+      return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'No existe' });
+    }
     if (ruta === '/sitio/ajustes' || ruta.startsWith('/sitio/ajustes/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const actual = ajustesSim ?? structuredClone(AJUSTES_POR_DEFECTO);

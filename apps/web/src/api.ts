@@ -636,6 +636,20 @@ export interface CambiosAjustesSitio {
   mantenimiento?: { activo?: boolean; mensaje?: string | null };
   mostrarSelectorIdioma?: boolean;
 }
+/** HU-1511 · Sitio web › Blog (REQ-070, PNT-28): la conexión con WordPress y la copia de lectura. */
+export interface CategoriaBlog { id: number; nombre: string; slug: string; orden: number; visible: boolean; articulos: number }
+export interface ArticuloBlog {
+  id: number; titulo: string; extracto: string; categorias: number[]; autor: string | null; fecha: string; enlace: string;
+  /** «Editar en WordPress». */ editar: string;
+  /** La imagen copiada, servida por el sitio (/s/_blog/…). */ imagen: string | null;
+  visible: boolean;
+}
+export interface BlogSitio {
+  url: string | null; frecuenciaMin: number; porPagina: number; mostrarImagen: boolean; mostrarAutor: boolean;
+  sincronizadoEn: string | null; intentoEn: string | null; error: string | null;
+  categorias: CategoriaBlog[]; articulos: ArticuloBlog[];
+}
+export interface CambiosBlogSitio { url?: string | null; frecuenciaMin?: number; porPagina?: number; mostrarImagen?: boolean; mostrarAutor?: boolean }
 export interface ComprobacionDominio { dominio: string; ok: boolean; venceEn: string | null; emisor: string | null; error: string | null }
 export interface VersionesSitio { entorno: 'produccion' | 'pruebas'; actual: number | null; pendientes: boolean; total: number; versiones: VersionSitio[] }
 export interface ElementoVistaPrevia { datos: Record<string, string | number>; ficticio?: boolean }
@@ -747,6 +761,12 @@ export const api = {
   quitarMarcaSitio: (tipo: 'logo' | 'favicon') => pedir<AjustesSitio>(`/sitio/ajustes/marca/${tipo}`, { method: 'DELETE' }),
   correoPruebaSitio: () => pedir<{ para: string }>('/sitio/ajustes/correo-prueba', { method: 'POST' }),
   comprobarDominioSitio: () => pedir<ComprobacionDominio>('/sitio/ajustes/dominio/comprobar', { method: 'POST' }),
+  blogSitio: () => pedir<BlogSitio>('/sitio/blog'),
+  guardarBlogSitio: (cambios: CambiosBlogSitio) => pedir<BlogSitio>('/sitio/blog', json(cambios, 'PATCH')),
+  sincronizarBlog: () => pedir<{ encolado: boolean }>('/sitio/blog/sincronizar', { method: 'POST' }),
+  ordenarCategoriasBlog: (orden: number[]) => pedir<BlogSitio>('/sitio/blog/categorias', json({ orden }, 'PATCH')),
+  mostrarCategoriaBlog: (id: number, visible: boolean) => pedir<BlogSitio>(`/sitio/blog/categorias/${id}`, json({ visible }, 'PATCH')),
+  mostrarArticuloBlog: (id: number, visible: boolean) => pedir<BlogSitio>(`/sitio/blog/articulos/${id}`, json({ visible }, 'PATCH')),
   restaurarVersionSitio: (numero: number) => pedir<VersionSitio>(`/sitio/versiones/${numero}/restaurar`, { method: 'POST' }),
   vistaPreviaPagina: (paginaId: string) => pedir<VistaPreviaPagina>(`/sitio/paginas/${paginaId}/vista-previa`),
   navegacionSitio: (idioma: 'es' | 'en' = 'es') => pedir<NavegacionSitio>(`/sitio/navegacion?idioma=${idioma}`),

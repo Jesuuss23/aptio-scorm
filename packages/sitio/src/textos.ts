@@ -52,6 +52,8 @@ export const SECCIONES = {
   faq: { titulo: 'Preguntas frecuentes', texto: '¿No encuentras tu respuesta? Escríbenos o agenda una llamada.' },
   /** HU-1514 · Bloque «Sectores» del inicio y columna del pie. */
   sectores: { etiqueta: 'Sectores', titulo: 'Pensado para cómo capacita tu sector', verSolucion: 'Ver la solución' },
+  /** HU-1511 · Sección Blog (WordPress) y columna «Últimos artículos» del pie. */
+  blog: { etiqueta: 'Blog', titulo: 'Ideas para producir mejores cápsulas', texto: 'Guías de nuestro equipo de producción. Filtra por tema.', filtrar: 'Filtrar artículos por categoría', todas: 'Todas', verTodos: 'Ver todos los artículos en el blog', ultimos: 'Últimos artículos', por: 'Por', articulos: 'artículos', articulo: 'artículo' },
 } as const;
 
 export const PIE = {
@@ -113,6 +115,7 @@ export const TEXTOS = {
       testimonios: { etiqueta: 'Customer stories', titulo: 'Teams that went from weeks to days' },
       faq: { titulo: 'Frequently asked questions', texto: "Can't find your answer? Write to us or book a call." },
       sectores: { etiqueta: 'Industries', titulo: 'Built for the way your industry trains', verSolucion: 'See the solution' },
+      blog: { etiqueta: 'Blog', titulo: 'Ideas for better microlearning', texto: 'Guides from our production team. Filter by topic.', filtrar: 'Filter articles by category', todas: 'All', verTodos: 'See all articles on the blog', ultimos: 'Latest articles', por: 'By', articulos: 'articles', articulo: 'article' },
     },
     PIE: { marca: 'Microlearning capsules for training teams. A product by AulasEducativas, made in Lima.' },
     DESCRIPCION: 'Aptio SCORM builds 3 to 10 minute microlearning capsules with interactions, a speaking character, subtitles and English, reviewed by your team and ready for any LMS.',

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CLAVE_ACTUAL, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
+import { CLAVE_ACTUAL, claveBlog, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
 import { ajustesPublicados, type AjustesSitio } from '@aptio/schema/sitio-ajustes';
 import { AlmacenService } from '../recursos/almacen.service.js';
 
@@ -53,6 +53,11 @@ export class SitioPublicoService {
     if (pedido?.tipo === 'marca') {
       const m = await this.leer(claveMarca(pedido.archivo), true);
       return m ? { estado: 200, tipo: 'marca', cuerpo: m, archivo: pedido.archivo } : this.noEncontrada(null);
+    }
+    // HU-1511 · La imagen destacada copiada de WordPress (su nombre es su hash: no cambia).
+    if (pedido?.tipo === 'blog') {
+      const b = await this.leer(claveBlog(pedido.archivo), true);
+      return b ? { estado: 200, tipo: 'blog', cuerpo: b, archivo: pedido.archivo } : this.noEncontrada(null);
     }
     const version = await this.version();
     if (version === null) return this.noEncontrada(null);

@@ -28,6 +28,19 @@ export const CADA_PUBLICAR_PAGINAS_MS = 30_000;
 export const TAREA_PRERENDER = 'sitio-prerender';
 export interface DatosPrerender { numero: number }
 export const idPrerender = (numero: number) => `sitio-prerender-v${numero}`;
+/**
+ * HU-1511 · Volver a renderizar la versión vigente porque cambió algo de fuera de la instantánea (el blog). Lleva un id
+ * propio: con el de la versión, BullMQ ignoraría el pedido mientras otro render de esa versión está en curso.
+ */
+export const idRehacerPrerender = (numero: number) => `sitio-prerender-v${numero}-r${Date.now()}`;
+/**
+ * HU-1511 · Sincroniza el blog con WordPress (REQ-070). El worker la revisa cada minuto y solo lee WordPress si pasó la
+ * frecuencia elegida (15, 30 o 60 min); «Sincronizar ahora» la encola con `forzar` y el id fijo `blog-sincronizar-manual`.
+ */
+export const TAREA_BLOG = 'blog-sincronizar';
+export const CADA_BLOG_MS = 60_000;
+export const ID_BLOG_MANUAL = 'blog-sincronizar-manual';
+export interface DatosBlog { forzar?: boolean; solicitadoPorId?: string }
 export interface DatosRespaldo {
   origen: 'programado' | 'manual';
   solicitadoPorId?: string;

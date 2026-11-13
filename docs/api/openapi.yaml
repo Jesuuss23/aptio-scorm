@@ -804,6 +804,195 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '422':
           $ref: '#/components/responses/NoValido'
+  /sitio/blog:
+    get:
+      tags:
+      - Sitio web
+      summary: Conexión con WordPress, estado de la sincronización y copia del blog (HU-1511, PNT-28)
+      operationId: get_sitio_blog
+      description: Solo SUPERADMIN. Sin conectar, `url` null y listas vacías. Las categorías van por orden y los artículos del más nuevo al más viejo, visibles y ocultos.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Sitio web
+      summary: Guardar la conexión y las opciones de la sección Blog (HU-1511)
+      operationId: patch_sitio_blog
+      description: |-
+        Solo SUPERADMIN. `url` es https:// con un dominio público, sin usuario, clave, puerto, parámetros ni IP; se guarda
+        sin / final; vacía o null desconecta (la sección Blog y «Últimos artículos» dejan de salir). Otra URL es otro blog:
+        la copia anterior se borra y se encola la primera sincronización. `frecuenciaMin` es 15, 30 o 60; `porPagina`, de 3
+        a 12. Los cambios que se ven en el sitio (URL, número por filtro, imagen y autor) vuelven a renderizar la versión
+        vigente, sin «Publicar cambios». Auditoría SITIO_BLOG_ACTUALIZADO. 422 NO_VALIDO con `detalles` o SIN_CAMBIOS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlogCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/blog/sincronizar:
+    post:
+      tags:
+      - Sitio web
+      summary: Sincronizar ahora con WordPress (HU-1511, CP-154)
+      operationId: post_sitio_blog_sincronizar
+      description: |-
+        Solo SUPERADMIN. Encola la tarea `blog-sincronizar` sin esperar la frecuencia; si ya hay una pedida esperando o
+        corriendo, esa sirve. El worker lee `/wp-json/wp/v2/categories` y `/wp-json/wp/v2/posts?status=publish&_embed`
+        (hasta 100, 10 s como máximo, sin seguir redirecciones y sin dominios que apunten a la red interna), guarda solo
+        los artículos publicados sin clave (CP-154), copia la imagen destacada de hasta 800 px a `/s/_blog/` y, si algo
+        cambió, vuelve a renderizar la versión vigente. Si WordPress no responde, la copia queda y `error` lo cuenta
+        (CP-156). El resultado se lee con `GET /sitio/blog`. 422 SIN_URL; 503 COLAS_NO_DISPONIBLES.
+      responses:
+        '202':
+          description: Encolada
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - encolado
+                properties:
+                  encolado:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '503':
+          description: COLAS_NO_DISPONIBLES
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /sitio/blog/categorias:
+    patch:
+      tags:
+      - Sitio web
+      summary: Ordenar los filtros del blog con la lista completa de ids (HU-1511)
+      operationId: patch_sitio_blog_categorias
+      description: Solo SUPERADMIN. Todos los ids de la copia, una vez cada uno; si no, 422 ORDEN_INVALIDO. Vuelve a renderizar la versión vigente. Auditoría SITIO_BLOG_CATEGORIAS_ORDENADAS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - orden
+              properties:
+                orden:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/blog/categorias/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      description: id de WordPress
+      schema:
+        type: integer
+    patch:
+      tags:
+      - Sitio web
+      summary: Mostrar u ocultar una categoría del blog (HU-1511, CP-155)
+      operationId: patch_sitio_blog_categoria
+      description: Solo SUPERADMIN. Oculta, no sale como filtro y sus artículos solo salen si tienen otra categoría visible, en la sección y en «Últimos artículos». Vale al instante (re-render de la versión vigente). Auditoría SITIO_BLOG_CATEGORIA_OCULTADA o SITIO_BLOG_CATEGORIA_MOSTRADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisibilidadBlog'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/blog/articulos/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      description: id de WordPress
+      schema:
+        type: integer
+    patch:
+      tags:
+      - Sitio web
+      summary: Mostrar u ocultar un artículo del blog (HU-1511, CP-155)
+      operationId: patch_sitio_blog_articulo
+      description: Solo SUPERADMIN. Lo oculto sigue oculto aunque WordPress lo vuelva a mandar. Vale al instante (re-render de la versión vigente). Auditoría SITIO_BLOG_ARTICULO_OCULTADO o SITIO_BLOG_ARTICULO_MOSTRADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisibilidadBlog'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /sitio/paginas/{paginaId}/vista-previa:
     parameters:
     - name: paginaId
@@ -1020,6 +1209,35 @@ paths:
           $ref: '#/components/responses/NoValido'
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/blog:
+    get:
+      tags:
+      - Sitio público
+      summary: Filtros del blog con su número y los artículos visibles de uno (HU-1511, CP-123, CP-155)
+      operationId: get_publico_blog
+      security: []
+      description: Sin sesión. Sale de la copia de WordPress, no de la versión publicada. `categorias` son las visibles con al menos un artículo visible, en su orden, con su `cantidad`; `articulos` son los del filtro pedido (sin `categoria`, «Todas»), del más nuevo al más viejo, sin ocultos. Sin WordPress conectado, listas vacías. 404 si la categoría no existe o está oculta. Mismo límite de 60 peticiones por minuto en `/publico/*`.
+      parameters:
+      - name: categoria
+        in: query
+        required: false
+        description: Slug de una categoría visible
+        schema:
+          type: string
+          pattern: ^[a-z0-9-]{1,100}$
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlogPublico'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
   /publico/sitemap.xml:
     get:
       tags:
@@ -1092,7 +1310,8 @@ paths:
         llevan `ETag`; con `If-None-Match` igual responde 304. Las páginas y la 404 llevan una CSP sin scripts.
 
         HU-1509 · `_marca/{logo|favicon}-{hash8}.{svg|png}` sirve el logo y el favicon de los ajustes, con la misma caché
-        que las fuentes. Con el modo mantenimiento activo, toda ruta salvo fuentes y marca responde 503 con la página
+        que las fuentes. HU-1511 · `_blog/{sha16}.{jpg|png|webp}` sirve las imágenes destacadas copiadas de WordPress,
+        con la misma caché. Con el modo mantenimiento activo, toda ruta salvo fuentes y marca responde 503 con la página
         «Volvemos pronto» (CP-121), salvo para el superadmin con sesión, que ve el sitio con un aviso arriba y
         `Cache-Control: private, no-store`.
       parameters:
@@ -5429,6 +5648,182 @@ components:
         mostrarSelectorIdioma:
           type: boolean
           description: HU-1510 · Mostrar el selector ES · EN; auditoría SITIO_AJUSTES_ACTUALIZADOS con `publicar` true
+    CategoriaBlog:
+      type: object
+      required: [id, nombre, slug, orden, visible, articulos]
+      properties:
+        id:
+          type: integer
+          description: id de WordPress
+        nombre:
+          type: string
+        slug:
+          type: string
+        orden:
+          type: integer
+          minimum: 0
+        visible:
+          type: boolean
+        articulos:
+          type: integer
+          description: Artículos de la copia en esta categoría, visibles y ocultos
+    ArticuloBlog:
+      type: object
+      required: [id, titulo, extracto, categorias, autor, fecha, enlace, editar, imagen, visible]
+      properties:
+        id:
+          type: integer
+          description: id de WordPress
+        titulo:
+          type: string
+          description: Texto plano
+        extracto:
+          type: string
+          description: Texto plano, hasta 300 caracteres
+        categorias:
+          type: array
+          items:
+            type: integer
+        autor:
+          type: string
+          nullable: true
+        fecha:
+          type: string
+          format: date-time
+        enlace:
+          type: string
+          description: El artículo en WordPress (https://)
+        editar:
+          type: string
+          description: «Editar en WordPress» (`{url}/wp-admin/post.php?post={id}&action=edit`)
+        imagen:
+          type: string
+          nullable: true
+          description: La imagen destacada copiada (`/s/_blog/{sha16}.{ext}`)
+        visible:
+          type: boolean
+    BlogSitio:
+      type: object
+      required: [url, frecuenciaMin, porPagina, mostrarImagen, mostrarAutor, sincronizadoEn, intentoEn, error, categorias, articulos]
+      properties:
+        url:
+          type: string
+          nullable: true
+          description: null = sin conectar
+        frecuenciaMin:
+          type: integer
+          enum: [15, 30, 60]
+        porPagina:
+          type: integer
+          minimum: 3
+          maximum: 12
+        mostrarImagen:
+          type: boolean
+        mostrarAutor:
+          type: boolean
+        sincronizadoEn:
+          type: string
+          format: date-time
+          nullable: true
+          description: La última sincronización que terminó bien
+        intentoEn:
+          type: string
+          format: date-time
+          nullable: true
+        error:
+          type: string
+          nullable: true
+          description: CP-156 · El error del último intento; el sitio sigue con la copia anterior
+        categorias:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategoriaBlog'
+        articulos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArticuloBlog'
+    BlogCambio:
+      type: object
+      properties:
+        url:
+          type: string
+          nullable: true
+        frecuenciaMin:
+          type: integer
+          enum: [15, 30, 60]
+        porPagina:
+          type: integer
+          minimum: 3
+          maximum: 12
+        mostrarImagen:
+          type: boolean
+        mostrarAutor:
+          type: boolean
+    VisibilidadBlog:
+      type: object
+      required: [visible]
+      properties:
+        visible:
+          type: boolean
+    BlogPublico:
+      type: object
+      required: [url, porPagina, categorias, articulos]
+      properties:
+        url:
+          type: string
+          nullable: true
+        porPagina:
+          type: integer
+        categorias:
+          type: array
+          items:
+            type: object
+            required: [slug, nombre, cantidad]
+            properties:
+              slug:
+                type: string
+              nombre:
+                type: string
+              cantidad:
+                type: integer
+        articulos:
+          type: array
+          items:
+            type: object
+            required: [id, titulo, extracto, categorias, fecha, enlace]
+            properties:
+              id:
+                type: integer
+              titulo:
+                type: string
+              extracto:
+                type: string
+              categorias:
+                type: array
+                description: Slugs de sus categorías visibles
+                items:
+                  type: string
+              fecha:
+                type: string
+                format: date-time
+              enlace:
+                type: string
+              autor:
+                type: string
+                description: Si «Mostrar autor» está activo
+              imagen:
+                type: object
+                description: Si «Mostrar imagen» está activo; se sirve en /s/_blog/{archivo}
+                required: [archivo, ancho, alto]
+                properties:
+                  archivo:
+                    type: string
+                  ancho:
+                    type: integer
+                    nullable: true
+                  alto:
+                    type: integer
+                    nullable: true
     ComprobacionDominio:
       type: object
       required:
