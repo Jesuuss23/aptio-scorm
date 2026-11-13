@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.50 · actualizado con la cuarta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.51 · actualizado con la quinta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -72,6 +72,7 @@ Puedes pedir el enlace hasta 3 veces por hora.
   - **Empresa → Clientes y kits:** los clientes y su identidad visual.
   - **Empresa → Rentabilidad:** cuánto cuesta cada SCORM hoy y con el generador, las horas medidas y el gasto en IA por proyecto, cliente y proveedor (solo administración y diseño instruccional).
   - **Empresa → Conexiones IA:** qué proveedor y modelo usa cada tarea de IA, el gasto del mes y su límite (solo administración). Administración ve además, al pie del menú, el medidor **Costo de IA del mes**.
+  - **Empresa → Operación:** errores por proveedor, colas, tiempo y costo por etapa, y las copias de seguridad diarias con **Respaldar ahora** (solo administración).
 - **Arriba**, la ruta de dónde estás (por ejemplo, «Inicio / Proyecto») y tu nombre con tu rol.
 
 Aptio SCORM funciona en computadora, tableta y celular.
@@ -630,7 +631,7 @@ En **Empresa → Conexiones IA** (solo administración) hay una fila por tarea: 
 4. Pulsa **Guardar** en la fila. El cambio vale para lo próximo que se genere: lo ya generado no se rehace.
 5. **Probar** hace una llamada mínima al proveedor y te dice si respondió y cuánto tardó. En el modo simulado responde «simulado, OK» sin costo.
 
-**Cuando una tarea llega a su límite.** Arriba aparece un aviso con las tareas al límite, la fila se marca **Al límite** y el medidor **Costo de IA del mes** del menú se pone en rojo. La IA de esa tarea se detiene antes de gastar: en **Producción**, la generación se queda en la etapa que la usaba con el aviso **Se alcanzó el límite de gasto de IA del mes**. Sube el límite en Conexiones IA, vuelve al proyecto y pulsa **Continuar**: sigue desde esa etapa sin repetir lo hecho. El medidor compara lo gastado en el mes con la suma de los límites que definiste.
+**Cuando una tarea llega a su límite.** Arriba aparece un aviso con las tareas al límite, la fila se marca **Al límite** y el medidor **Costo de IA del mes** del menú se pone en rojo. La IA de esa tarea se detiene antes de gastar: en **Producción**, la generación se queda en la etapa que la usaba con el aviso **Se alcanzó el límite de gasto de IA del mes**. Administración recibe además un correo la primera vez que una tarea llega a su límite en el mes. Sube el límite en Conexiones IA, vuelve al proyecto y pulsa **Continuar**: sigue desde esa etapa sin repetir lo hecho. El medidor compara lo gastado en el mes con la suma de los límites que definiste.
 
 ### 8.25 Comentarios del cliente en Revisión
 
@@ -645,7 +646,20 @@ Un comentario no se edita ni se borra después de publicarlo: si te equivocaste,
 
 **Si eres del equipo.** Arriba ves la cifra **Comentarios abiertos**, y cada miniatura con comentarios sin resolver lleva el contador 💬 con cuántos tiene. El filtro **Con comentarios** deja solo esas pantallas. Tú también puedes comentar. Cuando atiendas un comentario, pulsa **Resolver**: queda **Resuelto** con tu nombre y la fecha. Si hace falta volver a verlo, pulsa **Reabrir**. Resolver y reabrir lo hacen administración, diseño instruccional, diseño gráfico y producción.
 
-Comentar no cambia el estado de la pantalla: una pantalla aprobada sigue aprobada aunque tenga comentarios abiertos. Si el comentario lleva a corregir algo, la corrección sí la vuelve a borrador, como siempre. Por ahora no llega un correo con cada comentario nuevo; ese aviso viene en una próxima entrega.
+Comentar no cambia el estado de la pantalla: una pantalla aprobada sigue aprobada aunque tenga comentarios abiertos. Si el comentario lleva a corregir algo, la corrección sí la vuelve a borrador, como siempre. Cuando el revisor del cliente comenta, quien creó el proyecto y diseño instruccional reciben un correo con el comentario y el enlace a esa pantalla en Revisión. Los comentarios del equipo no envían correo.
+
+### 8.26 Operación y copias de seguridad
+
+En **Empresa → Operación** (solo administración) ves en una sola página cómo va la plataforma. **Actualizar** trae lo último.
+
+1. **Errores por proveedor.** Una fila por proveedor (Claude, Google, ElevenLabs…) con los errores de las últimas 24 horas y de los últimos 7 días, cuántos trabajos hubo y el último error con su fecha. Lo que se detuvo por el límite de gasto no cuenta como error: aparece aparte como «detenidos por el límite». Las filas «Plataforma (cola …)» son fallos de la propia herramienta, como armar un paquete.
+2. **Colas.** Cuántos trabajos esperan, cuántos están en curso y cuántos fallaron en cada cola (IA, voz, medios, paquetes y mantenimiento). Si dice que las colas no responden, avisa a quien administra el servidor.
+3. **Tiempo y costo por etapa.** Para las 11 etapas de la generación, cuántas veces terminaron bien en los últimos 30 días, cuánto tardan en promedio y cuánto cuestan.
+4. **Copias de seguridad.** Todos los días a las 03:00 (hora de Lima) se copia la base de datos y todos los archivos. Ves la última copia exitosa y la lista de los últimos 14 días con su fecha, estado (**Exitosa**, **Fallida** con su motivo, **En curso**), si fue programada o manual, su tamaño, cuánto tardó y cuántos archivos tiene. Las copias de más de 14 días se borran solas.
+
+**Respaldar ahora** pide una copia en ese momento, por ejemplo antes de un cambio grande. Aparece **En curso** y, en unos minutos, **Exitosa**. Mientras haya una en curso, el botón queda desactivado.
+
+Para recuperar una copia, pide a quien administra el servidor que la restaure: se restaura siempre en una base y un lugar de archivos nuevos, nunca encima de los que están en uso.
 
 ## 9. Preguntas frecuentes
 
@@ -731,6 +745,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.51 | 2026-11-13 | Operación y copias de seguridad (4 y 8.26): errores por proveedor, colas, tiempo y costo por etapa, copias diarias con «Respaldar ahora», y los correos del límite de gasto (8.24) y del comentario del cliente (8.25). |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |

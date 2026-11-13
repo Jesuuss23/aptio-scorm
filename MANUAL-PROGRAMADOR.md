@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.50 · actualizado con la cuarta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.51 · actualizado con la quinta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -325,6 +325,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 - La lógica pura de la web va en archivos `*.ts` con su `*.test.ts` en `apps/web/src`; `pnpm --filter web test` corre `vitest run --dir src` (los `e2e/*.spec.ts` quedan fuera).
 - La transcripción se prueba con ffmpeg real sobre un video generado en la misma prueba (`apps/worker/test/transcribir.test.ts`).
 - Accesibilidad: `apps/web/e2e/accesibilidad.spec.ts` recorre el HTML exportado solo con teclado y corre axe (`@axe-core/playwright`, WCAG 2.2 A y AA) en cada pantalla. Antes de axe espera las animaciones, también las del Shadow DOM (`shadowRoot.getAnimations()`), porque a mitad del fundido el contraste baja. El curso con las 8 interacciones está en `packages/player/test/catalogo.ts`. Las pruebas de foco del reproductor usan happy-dom (`// @vitest-environment happy-dom`); ahí `URL` es la del navegador simulado, así que lee archivos con rutas, no con `new URL`.
+- Copias (HU-1403): `packages/respaldo/test` copia y purga contra PostgreSQL y LocalStack con buckets propios; `apps/api/test/respaldo.e2e.test.ts` (CP-108) restaura con `pnpm respaldo:restaurar` en una base nueva y levanta la API con `node --import @swc-node/register/esm-register src/main.ts` sobre ella.
 - **Prohibido** saltarse, desactivar o poner en cuarentena una prueba para obtener verde.
 
 ## 9. Integración continua
@@ -336,6 +337,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
   - migraciones y datos de ejemplo sobre PostgreSQL 16 y Redis 7;
   - LocalStack;
   - ffmpeg (se instala si falta);
+  - el cliente de PostgreSQL 16 para las copias de seguridad (se instala si falta);
   - Vitest, `ia:casos` y lint de OpenAPI.
 - **Flujos de la web:** Playwright con Chromium.
 
@@ -349,7 +351,9 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `REDIS_HOST`, `REDIS_PORT`, `COLAS_PREFIJO` | api, worker | Colas y eventos (el prefijo debe coincidir en ambos) |
 | `SESSION_SECRET`, `SESSION_TTL_HOURS` | api | Firma y vigencia de la cookie de sesión (obligatorio en producción) |
 | `AWS_*`, `S3_BUCKET_NAME`, `KMS_KEY_ID` | api, worker | Almacenamiento cifrado |
-| `SMTP_URL`, `CORREO_REMITENTE` | api | Invitaciones y recuperación de clave |
+| `SMTP_URL`, `CORREO_REMITENTE` | api, worker | Invitaciones, recuperación de clave, aviso de comentario nuevo (api) y aviso del límite de gasto (worker) |
+| `S3_BUCKET_RESPALDOS` | worker, `respaldo:restaurar` | Bucket de las copias de seguridad (por defecto `aptio-scorm-respaldos`) |
+| `PG_BIN_DIR` | worker, `respaldo:restaurar` | Carpeta de `pg_dump` y `pg_restore` de la versión del servidor (en CI, `/usr/lib/postgresql/16/bin`) |
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL_*`, `ANTHROPIC_ESFUERZO` | worker | IA de texto |
 | `GOOGLE_STT_API_KEY`, `GOOGLE_STT_MODELO` | worker | Transcripción |
@@ -411,6 +415,7 @@ Ninguna clave real va al repositorio.
 | 0.43 | 2026-11-12 | HU-0903: `@aptio/schema/pausas`, IA-09 v2 con `cambiosTema`, el worker `pausas.ts` y `PAUSAS_60S` en la API simulada. |
 | 0.44 | 2026-11-13 | HU-0609: `biblioteca.ts` del reproductor, `@aptio/schema/biblioteca`, el enlace de imágenes en `CursosService.editar`, `panel-imagenes.tsx` e `imagenes.spec.ts`. |
 | 0.45 | 2026-11-13 | HU-0704: `@aptio/schema/grabacion`, `GrabacionService`, `src/grabacion.ts` del worker (grabación y limpieza con ffmpeg), la protección en la etapa 6 y `PersonajeVozVista.tsx`. |
+| 0.51 | 2026-11-13 | HU-1403: el paquete `@aptio/respaldo` (copia, purga, restauración y su CLI), la tarea `respaldar` de la cola `mantenimiento`, `correo.ts` y el aviso de límite del worker, el aviso de comentario en `ComentariosService`, el módulo `operacion` de la API, `@aptio/schema/operacion` y `OperacionVista.tsx`. |
 | 0.50 | 2026-11-13 | HU-0506: el módulo `comentarios` de la API (alcance con `CursosService.buscar`), la migración `comentarios_resueltos`, `comentarios.ts` y `PanelComentarios.tsx` en Revisión, y `comentarios` compartibles en la API simulada. |
 | 0.49 | 2026-11-13 | HU-1304: `@aptio/schema/conexiones`, `conexiones.ts` y `conModeloDe` del worker, `sintetizarElevenLabs`, `probarAnthropic`, el módulo `conexiones` de la API, la migración por organización y `ConexionesIA.tsx` con el medidor. |
 | 0.48 | 2026-11-13 | HU-1303: `@aptio/schema/rentabilidad`, el módulo `negocio` de la API, la migración de parámetros por organización y la calculadora y las mediciones en `Rentabilidad.tsx`. |

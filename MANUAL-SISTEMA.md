@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.50 · actualizado con la cuarta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.51 · actualizado con la quinta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -335,7 +335,7 @@ La regla RN-13-1 vive en `@aptio/schema/rentabilidad`, que usan la API y la web 
 Cada organización elige proveedor, modelo y límite mensual por tarea (`ConfigProveedor` con `organizacionId`, único por organización y tarea; migración aditiva). Sin fila guardada se usa el entorno, como antes.
 
 - **En caliente (CP-099, RN-13-2):** el worker lee la conexión al empezar cada trabajo; no hace falta reiniciarlo. En texto, `tareaRegistrada` registra el tipo real (texto, pantallas con IA-15/IA-16, traducción con IA-10, calidad con IA-12) y usa el modelo de la conexión, que debe tener tarifa en `TARIFAS`. En voz, la etapa 6 usa el proveedor activo: la voz del kit si es de ese proveedor o la voz por idioma de la conexión; una narración ya lista se conserva.
-- **Límite (CP-100, RN-04-7):** antes de llamar al proveedor (texto, voz y transcripción) se suma `TrabajoIA.costoUsd` de la organización y el tipo desde el día 1 del mes de Lima. Si llega al límite, el trabajo queda en error con «LIMITE_GASTO: …», se audita LIMITE_GASTO_ALCANZADO y no se llama al proveedor; la generación se continúa con `POST /generaciones/{id}/continuar` después de subirlo. El aviso por correo llega con HU-1403.
+- **Límite (CP-100, RN-04-7):** antes de llamar al proveedor (texto, voz y transcripción) se suma `TrabajoIA.costoUsd` de la organización y el tipo desde el día 1 del mes de Lima. Si llega al límite, el trabajo queda en error con «LIMITE_GASTO: …», se audita LIMITE_GASTO_ALCANZADO y no se llama al proveedor; la generación se continúa con `POST /generaciones/{id}/continuar` después de subirlo. Desde HU-1403, el primer tope del mes con ese límite avisa por correo a cada administración activa (el worker usa `SMTP_URL`; un fallo queda en el registro y no cambia nada).
 - **API (solo administración):** `GET /conexiones-ia` (las 8 tareas con opciones, `claveConfigurada`, costo estimado, gasto del mes, límite y `limiteAlcanzado`, más el total del mes y la suma de límites para el medidor), `PUT /conexiones-ia/{tarea}` (auditoría CONEXION_IA_GUARDADA; 422 PROVEEDOR_NO_VALIDO, MODELO_NO_VALIDO o un campo de clave) y `POST /conexiones-ia/{tarea}/probar` (llamada mínima en modo real, «simulado, OK» en simulado; no se registra en TrabajoIA).
 - **Claves (RN-13-3):** solo en variables de entorno (`ANTHROPIC_API_KEY`, `GOOGLE_TTS_API_KEY`, `ELEVENLABS_API_KEY`); nunca se guardan ni se devuelven (SUP-146 a SUP-150).
 
@@ -346,7 +346,13 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Quién (CP-055):** `GET` y `POST /cursos/{id}/comentarios` los usan el equipo y REVISOR_CLIENTE con el mismo alcance que el curso: el revisor solo en los proyectos de su cliente; otro cliente u otra organización responde 404. El revisor sigue sin poder guardar pantallas (403).
 - **Qué:** texto plano de 1 a 1000 caracteres, recortado y sin caracteres de control salvo saltos de línea y tabulaciones; la pantalla debe existir en el curso (422 PANTALLA_NO_EXISTE). La respuesta trae el autor con su rol para el distintivo «Cliente». El texto no se edita ni se borra.
 - **Resolver:** `PATCH /comentarios/{id}` con `{resuelto}`, solo el equipo (403 al revisor); guarda o limpia `resueltoPorId` y `resueltoEn` (migración aditiva) y audita COMENTARIO_RESUELTO o COMENTARIO_REABIERTO.
-- **Estado de aprobación:** comentar no lo cambia y los comentarios abiertos no bloquean la exportación. El aviso por correo llega con HU-1403 (SUP-151 a SUP-155).
+- **Estado de aprobación:** comentar no lo cambia y los comentarios abiertos no bloquean la exportación. Desde HU-1403, un comentario del revisor del cliente avisa por correo a quien creó el proyecto y a diseño instruccional, sin esperar el envío (SUP-151 a SUP-155, SUP-158).
+
+### 3.10 Observabilidad y copias de seguridad (HU-1403)
+
+- **Copia diaria (CP-108):** la cola `mantenimiento` del worker corre `respaldar` a las 3:00 de Lima (y con «Respaldar ahora», `POST /operacion/respaldar`, id fijo `respaldo-manual`, 409 si hay una corriendo o pendiente). `@aptio/respaldo` crea la fila `Respaldo` (EN_CURSO), hace `pg_dump --format=custom` con la clave en `PGPASSWORD` (nunca en los argumentos), lo sube a `<carpeta>/base.dump` del bucket `S3_BUCKET_RESPALDOS`, copia cada objeto del bucket de recursos a `<carpeta>/objetos/` con el cifrado KMS y sube al final `manifiesto.json`. Termina EXITOSO (tamaño, duración y objetos) o FALLIDO (con el error, y borra lo subido a medias), con auditoría RESPALDO_CREADO o RESPALDO_FALLIDO. Después purga las carpetas de más de 14 días (EXPIRADO, RESPALDOS_PURGADOS).
+- **Restaurar:** `pnpm respaldo:restaurar <AAAA-MM-DD o carpeta> --base postgresql://… --bucket nombre` toma la última copia con manifiesto de ese día de Lima, exige una base vacía, se niega a usar la base o el bucket en uso o el de respaldos, corre `pg_restore --exit-on-error` y copia los objetos al bucket nuevo. La prueba CP-108 levanta la API sobre lo restaurado y comprueba salud, ingreso, proyectos y curso.
+- **Operación (`GET /operacion`, solo administración):** errores por proveedor de la organización (24 h y 7 días de Lima, desde TrabajoIA y los fallos de BullMQ sin TrabajoIA, LIMITE_GASTO aparte), pendientes, activos y fallidos de las 5 colas (null si Redis no responde en 2 s), tiempo y costo promedio de las 11 etapas en 30 días y las copias de 14 días (SUP-156 a SUP-160).
 
 ## 4. Datos
 
@@ -410,6 +416,8 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 | Seguimiento de trabajos | Estado y avance en `GeneracionEtapa`, `MaterialFuente.estado` y `TrabajoIA`. El worker registra en consola los trabajos fallidos con su motivo. |
 | Costos | La suma de `TrabajoIA.costoUsd` por proyecto aparece en la lista de proyectos y en cada generación. |
 | Borrado programado | Cola de mantenimiento con un trabajo diario a las 3:00 (America/Lima). |
+| Copias de seguridad | Cola de mantenimiento a las 3:00 (America/Lima): base y objetos al bucket `S3_BUCKET_RESPALDOS`, 14 días. Estado en Empresa › Operación; restauración con `pnpm respaldo:restaurar` (3.10). |
+| Errores y colas | Empresa › Operación: errores por proveedor en 24 h y 7 días, colas y tiempo y costo por etapa. |
 | Errores visibles al usuario | Siempre con un motivo legible: material en error, etapa en error con «Continuar». |
 
 ## 9. Supuestos y limitaciones vigentes
@@ -471,6 +479,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.43 | 2026-11-12 | Pausas propuestas por la IA (3.3.0.1): `tipo: "pausas-video"`, 422 SIN_TRANSCRIPCION, `marcadorIds` al aplicar y `agregados` y `observaciones` en la respuesta. |
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
+| 0.51 | 2026-11-13 | Observabilidad y copias de seguridad (3.10 y 8): copia diaria con pg_dump y los objetos de S3, purga de 14 días, restauración con resguardos, `GET /operacion` y los avisos por correo. |
 | 0.50 | 2026-11-13 | Comentarios del revisor del cliente (3.9): alcance por cliente y organización, texto plano inmutable, resolver solo el equipo con auditoría y sin cambiar la aprobación. |
 | 0.49 | 2026-11-13 | Conexiones IA y límite de gasto (3.8): conexión por organización leída en caliente, tipo real de cada trabajo, voz de Google o ElevenLabs, LIMITE_GASTO con auditoría y los 3 endpoints sin claves. |
 | 0.48 | 2026-11-13 | Rentabilidad y mediciones (3.7): el cálculo compartido, los parámetros por organización, el promedio de las mediciones con respaldo de supuestos y los permisos. |
