@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.58 · actualizado con la sexta entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.59 · actualizado con la séptima entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -394,7 +394,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 
 - **Datos (REQ-066):** `SitioEnlace` guarda el menú principal (plano) y el pie (columnas y sus enlaces, dos niveles) con `orden` entre hermanos y `visible` en false al crearse (RN-16-2). Borrar una columna borra sus enlaces.
 - **Reglas:** el texto es texto plano de hasta 60 caracteres (RN-16-7). La ruta es interna (`/precios`, `/#testimonios`) o `https://` y se marca `externo`; `javascript:`, `http:`, `data:` y el resto dan 422 (SUP-185). Las rutas `/sitio/navegacion` son solo del superadmin y cada cambio queda en la auditoría (SITIO_ENLACE_*).
-- **Sitio público:** `GET /publico/navegacion` devuelve `{ menu, pie }` solo con lo visible y en su orden. Una columna oculta oculta sus enlaces, y la cabecera y el menú de celular usan la misma lista (CP-118, SUP-183). Los cambios se ven al momento hasta la publicación con versiones (HU-1507, SUP-184).
+- **Sitio público:** `GET /publico/navegacion` devuelve `{ menu, pie }` solo con lo visible y en su orden. Una columna oculta oculta sus enlaces, y la cabecera y el menú de celular usan la misma lista (CP-118, SUP-183). Desde la HU-1507 sale de la última versión publicada (SUP-184).
+
+### 3.17 Vista previa, versiones y restauración (HU-1507)
+
+- **Versiones (REQ-068, RN-16-5):** `SitioVersion` guarda instantáneas inmutables y numeradas del sitio completo: páginas PUBLICADAS con sus bloques y elementos visibles en orden, y el menú y el pie visibles. Las crean «Publicar cambios» (`POST /sitio/publicar`), publicar o retirar una página y la cola al publicar programadas; cada una publica todo lo pendiente (SUP-188). Se conservan todas y el panel lista las 50 últimas (SUP-191).
+- **Sitio público:** `GET /publico/paginas`, `GET /publico/navegacion` y el sitemap leen solo la última versión; sin versiones, 404, navegación vacía y sitemap vacío. En producción la instantánea nunca guarda ficticios y lo servido los vuelve a filtrar.
+- **Restaurar (CP-119):** `POST /sitio/versiones/{numero}/restaurar` crea la versión siguiente con la instantánea de la N; el panel no cambia (SUP-189). 422 VERSION_ACTUAL para la versión actual y, en producción, 409 FICTICIOS_VISIBLES si la instantánea los tiene. Auditoría SITIO_VERSION_PUBLICADA y SITIO_VERSION_RESTAURADA.
+- **Pendientes y vista previa:** `GET /sitio/versiones` compara por contenido la instantánea del panel con la última versión (`pendientes`). `GET /sitio/paginas/{paginaId}/vista-previa` devuelve la página en cualquier estado con el menú y el pie del panel; los ficticios salen marcados (SUP-190).
 
 ## 4. Datos
 
@@ -527,6 +534,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.59 | 2026-11-13 | Vista previa, versiones y restauración (3.17): la tabla `SitioVersion`, el sitio público desde la última versión, publicar, restaurar sin tocar el panel y la vista previa. |
 | 0.58 | 2026-11-13 | Menú y pie administrables (3.16): la tabla `SitioEnlace`, las reglas de rutas y niveles, las rutas `/sitio/navegacion` y `GET /publico/navegacion`. |
 | 0.53 | 2026-11-13 | Superadmin de plataforma (3.11 y 5): rutas `/sitio/*` solo para SUPERADMIN y el grupo «Sitio web» con «Resumen». |
 | 0.52 | 2026-11-13 | Kit de gamificación para el LMS (3.3.0.3): formato KIT_GAMIFICACION en la cola `export`, insignias SVG y PNG con resvg, plan y guía por LMS. |

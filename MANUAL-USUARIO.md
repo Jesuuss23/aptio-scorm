@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.58 · actualizado con la sexta entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.59 · actualizado con la séptima entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -684,9 +684,9 @@ Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Siti
 En **Sitio web › Páginas** están todas las páginas del sitio comercial, con su ruta, idioma, estado y fecha:
 
 1. **Nueva página:** escribe el título, la ruta (empieza con `/` y solo lleva minúsculas, números y guiones, por ejemplo `/precios` o `/sectores/mineria`) y el idioma, y pulsa **Crear borrador**. No puede haber dos páginas con la misma ruta en el mismo idioma.
-2. **Publicar:** la página se ve en el sitio desde ese momento y entra al sitemap.
+2. **Publicar:** la página se ve en el sitio desde ese momento y entra al sitemap. Publicar una página también publica todo lo que tengas pendiente (ver «Publicar cambios y versiones»).
 3. **Programar:** elige el día y la hora **de Lima** y pulsa **Programar publicación**. La página se publica sola a esa hora (en menos de un minuto). La hora tiene que ser futura.
-4. **Pasar a borrador:** la página deja de verse en el sitio y sale del sitemap. Mientras está publicada no se le puede cambiar la ruta.
+4. **Pasar a borrador:** la página deja de verse en el sitio y sale del sitemap (también publica lo pendiente). Mientras está publicada no se le puede cambiar la ruta.
 5. **Borrar:** solo para borradores. Pide confirmación y no se puede deshacer.
 
 Un borrador o una página programada no se ven en el sitio: quien abra su dirección recibe «no encontrada».
@@ -699,7 +699,7 @@ Un borrador o una página programada no se ven en el sitio: quien abra su direcc
 4. **Cambiar el orden** con las flechas ↑ y ↓ (también con el teclado). En el pie, las columnas se ordenan entre sí y los enlaces dentro de su columna.
 5. **Borrar** pide confirmación. Borrar una columna borra también sus enlaces.
 
-La línea **En el sitio** de cada tarjeta muestra lo que ve el visitante en ese momento. Los cambios del menú y del pie se ven en el sitio al momento.
+La línea **En el sitio** de cada tarjeta muestra lo que verá el visitante cuando publiques. Los cambios del menú y del pie llegan al sitio con **Publicar cambios**.
 
 **Editar los bloques de una página.** En Páginas, pulsa **Editar** en la página que quieras. Se abre el **Editor de página** con sus bloques en el orden en que se ven en el sitio (Portada, Cifras, Logos de clientes, Testimonios…). Arriba a la derecha puedes cambiar a otra página.
 
@@ -717,14 +717,22 @@ La línea **En el sitio** de cada tarjeta muestra lo que ve el visitante en ese 
 
 **Datos ficticios.** Si un dato es inventado (por ejemplo, un testimonio de ejemplo), marca su casilla **Ficticio**: aparece el distintivo «Ficticio» y sube el contador **Datos ficticios visibles** de arriba. Mientras haya alguno visible:
 
-- **En el sitio real (producción)** ninguna página se puede publicar: al pulsar **Publicar** aparece la lista de los datos ficticios y el botón **Ocultar todos los ficticios**, que los oculta y publica la página en un solo clic. Una página programada espera y se publica sola cuando ya no queda ninguno. El sitio real nunca muestra un dato ficticio.
+- **En el sitio real (producción)** no se puede publicar: al pulsar **Publicar** o **Publicar cambios** aparece la lista de los datos ficticios y el botón **Ocultar todos los ficticios**, que los oculta y publica la página en un solo clic. Una página programada espera y se publica sola cuando ya no queda ninguno. El sitio real nunca muestra un dato ficticio.
 - **En el sitio de pruebas** la página se publica igual y aparece un aviso con la cantidad.
 
 El mismo botón **Ocultar todos los ficticios** está en Contenido. Ocultarlos no los borra ni les quita la marca.
 
 Las preguntas sin página salen en el bloque Preguntas de todas las páginas; si les pones una ruta (por ejemplo `/precios`), salen además solo en esa página. Los logos por ahora son solo el nombre. Un elemento se ve en el sitio solo si su página está publicada y su bloque está visible.
 
-Si la página ya está publicada, estos cambios se ven en el sitio al momento. Si está en borrador o programada, el sitio no muestra nada de ella. La edición del contenido de cada bloque, la vista previa y el SEO llegarán en próximas entregas.
+Los cambios de bloques y de contenido llegan al sitio con **Publicar cambios**. Si la página está en borrador o programada, el sitio no muestra nada de ella. La edición del contenido de cada bloque y el SEO llegarán en próximas entregas.
+
+**Vista previa.** Debajo de los bloques, en el Editor de página, la **Vista previa** muestra cómo queda la página con lo que hay ahora en el panel, aunque no esté publicada: el menú, los bloques visibles en su orden con los textos de sus elementos y el pie. Los datos ficticios salen marcados «Ficticio». Con **Escritorio (1280 px)** y **Celular (390 px)** cambias el ancho; en Escritorio desliza a los lados para ver toda la página. Se actualiza sola al mostrar, ocultar u ordenar un bloque. Por ahora muestra la estructura de la página; el diseño final de cada bloque llegará con el sitio público.
+
+**Publicar cambios y versiones.** Lo que cambias en bloques, contenido, menú y pie no se ve en el sitio hasta que publicas. Arriba de Páginas y del Editor de página está el distintivo **Cambios sin publicar** (o **Sitio al día**) y el botón **Publicar cambios**, que publica todo el sitio de una vez y guarda una **versión**. Publicar o pasar a borrador una página, o una página programada al llegar su hora, también crea una versión.
+
+La tarjeta **Versiones**, al final de Páginas, lista las últimas 50 con su número, fecha, quién la publicó y cómo (Publicar cambios, una página, programada o restauración). La que ve el público lleva **En el sitio**.
+
+Para volver atrás, pulsa **Restaurar** en una versión anterior y confirma con **Sí, restaurar**. El sitio vuelve a mostrar exactamente esa versión y se guarda como una versión nueva (por ejemplo, restaurar la 1 cuando el sitio está en la 3 crea la 4). Lo que estás editando en el panel **no cambia**: por eso, después de restaurar, puede aparecer **Cambios sin publicar**. En el sitio real no se puede restaurar una versión que tenga datos ficticios.
 
 Si otra persona escribe la dirección del sitio web en el navegador, ve «Página no encontrada».
 
@@ -819,6 +827,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.59 | 2026-11-13 | Publicar cambios, versiones, restaurar y vista previa en Escritorio y Celular (8.28). Los cambios de bloques, contenido, menú y pie llegan al sitio al publicar. |
 | 0.58 | 2026-11-13 | Menú principal y pie de página (8.28): agregar, editar, mostrar u ocultar, ordenar y borrar enlaces y columnas, y la línea «En el sitio». |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
