@@ -578,14 +578,21 @@ export const VEN_OPERACION: Rol[] = ['ADMINISTRADOR'];
 /** HU-1501 · El grupo «Sitio web» es solo del superadmin de plataforma (ADR-011, CP-109). */
 export const VEN_SITIO: Rol[] = ['SUPERADMIN'];
 
-/** HU-1501 · Página del sitio comercial; la lista llega vacía hasta la HU-1502. */
+/** HU-1502 · Página del sitio comercial con su estado (RN-16-6). */
 export interface PaginaSitio {
   id: string;
   ruta: string;
   idioma: 'es' | 'en';
   titulo: string;
   estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
+  publicarEn: string | null;
+  publicadaEn: string | null;
+  creadoEn: string;
+  actualizadoEn: string;
 }
+export type AccionPagina = 'borrador' | 'programar' | 'publicar';
+export interface PaginaSitioEntrada { ruta: string; idioma: 'es' | 'en'; titulo: string }
+export interface PaginaSitioCambio { ruta?: string; titulo?: string; accion?: AccionPagina; publicarEn?: string }
 export type { Operacion };
 export interface ConexionIA {
   tarea: 'TEXTO' | 'PANTALLAS' | 'TRADUCCION' | 'CALIDAD' | 'VOZ' | 'IMAGEN' | 'BOCA' | 'TRANSCRIPCION';
@@ -618,6 +625,9 @@ export const api = {
   conexionesIA: () => pedir<ConexionesIA>('/conexiones-ia'),
   operacion: () => pedir<Operacion>('/operacion'),
   paginasSitio: () => pedir<PaginaSitio[]>('/sitio/paginas'),
+  crearPaginaSitio: (datos: PaginaSitioEntrada) => pedir<PaginaSitio>('/sitio/paginas', json(datos)),
+  cambiarPaginaSitio: (id: string, datos: PaginaSitioCambio) => pedir<PaginaSitio>(`/sitio/paginas/${id}`, json(datos, 'PATCH')),
+  borrarPaginaSitio: (id: string) => pedir<void>(`/sitio/paginas/${id}`, { method: 'DELETE' }),
   respaldar: () => pedir<{ encolado: boolean }>('/operacion/respaldar', { method: 'POST' }),
   guardarConexionIA: (tarea: ConexionIA['tarea'], datos: ConexionEntrada) => pedir<ConexionIA>(`/conexiones-ia/${tarea.toLowerCase()}`, json(datos, 'PUT')),
   probarConexionIA: (tarea: ConexionIA['tarea']) => pedir<PruebaConexion>(`/conexiones-ia/${tarea.toLowerCase()}/probar`, { method: 'POST' }),

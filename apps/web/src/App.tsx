@@ -22,6 +22,7 @@ import { Rentabilidad } from './vistas/Rentabilidad';
 import { ConexionesIA } from './vistas/ConexionesIA';
 import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
+import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
@@ -121,6 +122,8 @@ export function App() {
         <Proyectos rol={usuario.rol} />
       ) : vista?.activo === '/sitio' && veSitio ? (
         <SitioResumen />
+      ) : vista?.activo === '/sitio/paginas' && veSitio ? (
+        <SitioPaginas />
       ) : vista?.activo === '/operacion' && veOperacion ? (
         <OperacionVista />
       ) : vista?.activo === '/conexiones-ia' && veConexiones ? (

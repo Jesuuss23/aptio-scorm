@@ -729,3 +729,31 @@ model Respaldo {
 
   @@index([fecha])
 }
+
+/// HU-1502 · Estado de una página del sitio comercial (RN-16-6): un borrador o una programada responden 404 y no
+/// entran al sitemap; una programada pasa sola a publicada al llegar `publicarEn`.
+enum EstadoPagina {
+  BORRADOR
+  PROGRAMADA
+  PUBLICADA
+}
+
+/// HU-1502 · Página del sitio comercial (M16, ADR-011). De la plataforma, sin organización; solo la administra el
+/// superadmin. Bloques (HU-1503), SEO (HU-1512) y landings de sector (HU-1514) llegan con sus historias.
+model SitioPagina {
+  id            String       @id @default(uuid()) @db.Uuid
+  /// `/` (inicio) o `/segmento[/segmento…]` con minúsculas, números y guiones.
+  ruta          String
+  idioma        String       @default("es")
+  titulo        String
+  estado        EstadoPagina @default(BORRADOR)
+  /// Fecha y hora en que se publica sola (solo en PROGRAMADA).
+  publicarEn    DateTime?
+  /// Última vez que pasó a PUBLICADA.
+  publicadaEn   DateTime?
+  creadoEn      DateTime     @default(now())
+  actualizadoEn DateTime     @updatedAt
+
+  @@unique([ruta, idioma])
+  @@index([estado, publicarEn])
+}

@@ -1,8 +1,9 @@
-// HU-1501 · Sitio web › Resumen (PNT-24, M16). Solo el superadmin de plataforma (ADR-011). Hasta que lleguen las
-// páginas (HU-1502) y la analítica del sitio, la vista muestra el estado vacío con lo que falta para publicar.
+// HU-1501 · Sitio web › Resumen (PNT-24, M16). Solo el superadmin de plataforma (ADR-011). Mientras no llegue la
+// analítica del sitio, muestra cuántas páginas hay en cada estado (HU-1502) y lleva a «Páginas».
 import { Cabecera } from '@aptio/ui';
 import { useEffect, useState } from 'react';
 import { api, ErrorApi, type PaginaSitio } from '../api';
+import { navegar } from '../ruta';
 
 export function SitioResumen() {
   const [paginas, setPaginas] = useState<PaginaSitio[] | null>(null);
@@ -12,7 +13,7 @@ export function SitioResumen() {
     api.paginasSitio().then(setPaginas, (e: unknown) => setError(e instanceof ErrorApi ? e.message : 'No se pudo cargar el sitio'));
   }, []);
 
-  const publicadas = paginas?.filter((p) => p.estado === 'PUBLICADA').length ?? 0;
+  const cuenta = (estado: PaginaSitio['estado']) => paginas?.filter((p) => p.estado === estado).length ?? 0;
   return (
     <>
       <Cabecera titulo="Resumen" subtitulo="Estado del sitio comercial de Aptio SCORM. Solo lo ve el superadmin de la plataforma." />
@@ -23,8 +24,9 @@ export function SitioResumen() {
           {paginas.length === 0 ? (
             <p className="nota">El sitio todavía no tiene páginas. Cuando se creen, aquí verás cuántas están publicadas, programadas o en borrador.</p>
           ) : (
-            <p className="sec">{paginas.length} páginas, {publicadas} publicadas.</p>
+            <p className="sec">{paginas.length} {paginas.length === 1 ? 'página' : 'páginas'}: {cuenta('PUBLICADA')} publicadas, {cuenta('PROGRAMADA')} programadas y {cuenta('BORRADOR')} en borrador.</p>
           )}
+          <p><a href="/sitio/paginas" onClick={(e) => { e.preventDefault(); navegar('/sitio/paginas'); }}>Ir a Páginas</a></p>
         </section>
       )}
     </>

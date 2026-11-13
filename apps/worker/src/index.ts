@@ -3,14 +3,14 @@
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
-  COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO,
+  COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
 } from '@aptio/colas';
 import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
 import { configurarAvisoLimite } from './conexiones.js';
 import { correoDesdeEntorno } from './correo.js';
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
-import { prisma } from '@aptio/db';
+import { prisma, publicarProgramadas } from '@aptio/db';
 import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { crearCascada } from './cascada.js';
@@ -121,15 +121,23 @@ const trabajadores = COLAS.map(
 const mantenimiento = new Queue(COLA_MANTENIMIENTO, { connection: opcionesRedis(), prefix: prefijoColas() });
 await mantenimiento.upsertJobScheduler(TAREA_BORRADO, { pattern: PATRON_BORRADO, tz: 'America/Lima' }, { name: TAREA_BORRADO });
 await mantenimiento.upsertJobScheduler(TAREA_RESPALDO, { pattern: PATRON_RESPALDO, tz: 'America/Lima' }, { name: TAREA_RESPALDO, data: { origen: 'programado' } });
+// HU-1502 · Cada 30 s publica las páginas del sitio programadas que ya llegaron a su hora (CP-111).
+await mantenimiento.upsertJobScheduler(TAREA_PUBLICAR_PAGINAS, { every: CADA_PUBLICAR_PAGINAS_MS }, { name: TAREA_PUBLICAR_PAGINAS });
 const mantenedor = new Worker(
   COLA_MANTENIMIENTO,
   async (job) => {
     if (job.name === TAREA_RESPALDO) return respaldar(job.data as DatosRespaldo);
+    if (job.name === TAREA_PUBLICAR_PAGINAS) {
+      const ids = await publicarProgramadas(prisma);
+      if (ids.length) console.log(`Publicadas ${ids.length} páginas programadas del sitio`);
+      return { publicadas: ids.length };
+    }
     const r = await borrarDocumentosVencidos(prisma, almacen);
     if (r.documentos > 0) console.log(`Borrados ${r.documentos} documentos vencidos de ${r.proyectos} proyectos`);
     return r;
   },
-  { connection: opcionesRedis(), prefix: prefijoColas() },
+  // Dos a la vez: una copia de seguridad larga no debe atrasar la publicación programada (CP-111: antes del minuto).
+  { connection: opcionesRedis(), prefix: prefijoColas(), concurrency: 2 },
 );
 mantenedor.on('failed', (job, err) => console.error(`[${COLA_MANTENIMIENTO}] ${job?.name ?? 'tarea'} falló: ${err.message}`));
 

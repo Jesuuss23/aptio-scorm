@@ -2622,3 +2622,17 @@ ul.fila-chips {
 .operacion td .chip {
   margin-left: 8px;
 }
+
+/* HU-1502 · Sitio web › Páginas: acciones por fila y confirmación del borrado. */
+.acciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.confirmar-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
