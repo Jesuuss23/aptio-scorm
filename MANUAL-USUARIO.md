@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.61 · actualizado con la novena entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.62 · actualizado con la décima entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -772,6 +772,37 @@ El dominio, el nombre, el logo y el favicon llegan al sitio con **Publicar cambi
 4. Tú, con tu sesión de superadmin, sigues viendo el sitio normal, con un aviso arriba que te recuerda que está en mantenimiento.
 5. Para terminar, apaga el interruptor. El cambio se aplica al instante, sin publicar.
 
+### 8.30 Landings por sector (solo superadmin)
+
+Una **landing de sector** es una página del sitio pensada para un sector (por ejemplo «Minería y energía»), con su propia portada, sus testimonios y sus preguntas. Se publica en la dirección `/sectores/` seguida del nombre del sector.
+
+**Crear una landing.**
+
+1. En **Sitio web › Páginas**, pulsa **Nueva landing de sector**.
+2. Escribe el **Sector** y elige el **Idioma**. Debajo ves la dirección que tendrá (por ejemplo `/sectores/mineria-y-energia`).
+3. Pulsa **Crear landing**. Se abre el **Editor de página** con la landing en **borrador** y los bloques de la plantilla ya puestos y **ocultos**: Portada, Cifras, Cómo funciona, Testimonios, Preguntas frecuentes, Blog y Llamada final.
+
+En la lista de Páginas, la columna **Tipo** marca las landings con **Sector** y el nombre del sector; las demás páginas dicen **General**.
+
+**Completar la landing.** En el Editor de página, la tarjeta **Página** tiene la sección **Landing de sector**:
+
+- **Sector:** debajo dice cuántos testimonios de ese sector hay. Si cambias el nombre, avisa cuántos dejan de coincidir. La dirección de la landing no cambia.
+- **Título** y **Texto de la portada:** es lo primero que ve el visitante, en lugar de la portada del inicio.
+- **Meta título:** el título que aparece en la pestaña del navegador y en los buscadores (hasta 70 caracteres).
+- **Categoría inicial del blog** (opcional): el bloque Blog empezará filtrado por esa categoría cuando el blog esté conectado.
+
+Pulsa **Guardar landing**. Solo se acepta texto, sin etiquetas HTML. Luego muestra los bloques que quieras con su interruptor.
+
+**Publicar.** Una landing **sin título y texto de portada o sin meta título no se puede publicar ni programar**: la sección dice qué falta y, si pulsas **Publicar** en Páginas, aparece el mismo aviso. Cuando está completa, dice «Tiene portada y meta título: se puede publicar». Publícala desde Páginas como cualquier otra página.
+
+**Qué muestra la landing en el sitio.**
+
+- **Testimonios:** los que tienen ese sector. Si no hay ninguno, muestra todos los testimonios visibles.
+- **Preguntas:** las asignadas a la dirección de la landing, las del inicio y las que no tienen página.
+- **Bloque Sectores del inicio y columna Sectores del pie:** listan solo las landings **publicadas**, con un enlace a cada una. Una landing en borrador no aparece y su dirección muestra «Página no encontrada».
+
+**Asignar testimonios a un sector.** En **Contenido › Testimonios**, el campo **Sector** de cada testimonio es una lista con **General** (vale para todas las landings) y los sectores de las landings creadas. Elige el sector, pulsa **Guardar** y publica los cambios.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -863,6 +894,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.62 | 2026-11-13 | Landings por sector (8.30): crear una landing, completar portada y meta título, publicarla, el bloque y la columna Sectores, y el sector de los testimonios. |
 | 0.61 | 2026-11-13 | Ajustes del sitio (8.29): dominio con su comprobación, nombre, logo y favicon, botón de WhatsApp, correo de leads, analítica y modo mantenimiento con la página «Volvemos pronto». |
 | 0.60 | 2026-11-13 | «Ver el sitio» y el estado del sitio público en la tarjeta Versiones (8.28): preparando, listo o error; el sitio rápido, con menú de celular y página no encontrada. |
 | 0.59 | 2026-11-13 | Publicar cambios, versiones, restaurar y vista previa en Escritorio y Celular (8.28). Los cambios de bloques, contenido, menú y pie llegan al sitio al publicar. |
