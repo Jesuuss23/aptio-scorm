@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.51 · actualizado con la quinta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.52 · actualizado con la sexta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -395,7 +395,7 @@ Desde el proyecto, **Exportar SCORM** abre **Entrega**. Primero eliges el **form
 - **Pantallas aprobadas.** Si quedan pantallas sin aprobar, al pulsar **Exportar SCORM 1.2** se pide confirmación: **Cancelar** (elegido de entrada) o **Exportar igual**. El enlace **Ir a revisión** te lleva a aprobarlas.
 - **Avance y reanudación** (si caben en lo que guarda el LMS), **archivos que faltan** (el paquete muestra su texto alternativo) y **esquema del curso**. Si el curso no cumple el esquema, el botón Exportar queda deshabilitado y ves qué corregir.
 
-Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**.
+Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**. Más abajo está la tarjeta del **kit de gamificación** para el LMS del cliente (ver 8.27).
 
 ### 8.10 Modo diagnóstico del paquete (para el soporte)
 
@@ -661,6 +661,21 @@ En **Empresa → Operación** (solo administración) ves en una sola página có
 
 Para recuperar una copia, pide a quien administra el servidor que la restaure: se restaura siempre en una base y un lugar de archivos nuevos, nunca encima de los que están en uso.
 
+
+### 8.27 Kit de gamificación para el LMS del cliente
+
+Cuando el cliente quiere gamificar en su propia plataforma, en **Entrega** está la tarjeta **Kit de gamificación para el LMS**.
+
+1. Elige el **LMS del cliente**. Empieza en el que dicen los datos del proyecto; puedes cambiarlo sin tocar el LMS del paquete SCORM.
+2. Elige cómo van los **nombres de las insignias**: en el **idioma del curso** o **ES + EN** (los dos nombres en cada insignia; la guía sale en español).
+3. Pulsa **Exportar kit**. El kit aparece en el **historial** como «Kit de gamificación», con su avance hasta **Listo** y el botón **Descargar**. El archivo se llama `<proyecto>-kit-<lms>-v<versión>.zip`.
+
+Dentro del ZIP encuentras:
+- **Insignias** con los colores, la tipografía y el logo de la marca del cliente, en PNG de 512 × 512 (para subir al LMS) y en SVG. Hay una por cápsula, una por módulo y una del curso: la de cápsula tiene un anillo, la de módulo dos y la del curso tres y una cinta. Si el curso ya tenía sus propias insignias definidas, se usan esas.
+- **La guía** (`guia-<lms>.html`), que abres en el navegador y puedes imprimir o guardar como PDF. Trae el plan (qué insignia se gana con qué y con qué nota mínima, por ejemplo 70 en LOTO), el orden en que se abren las cápsulas, los niveles sugeridos y los pasos en el LMS elegido.
+- `plan.json` con el mismo plan, para quien configure el LMS, y `LEEME.txt` con el contenido y los créditos.
+
+Los nombres de los menús de cada LMS cambian entre versiones: por eso la guía dice «Verificar con la versión del cliente». Revísala con quien administra el LMS antes de configurarlo.
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -746,6 +761,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
 | 0.51 | 2026-11-13 | Operación y copias de seguridad (4 y 8.26): errores por proveedor, colas, tiempo y costo por etapa, copias diarias con «Respaldar ahora», y los correos del límite de gasto (8.24) y del comentario del cliente (8.25). |
+| 0.52 | 2026-11-13 | Kit de gamificación para el LMS del cliente (8.27): insignias con la marca, plan, guía del LMS elegido y descarga desde el historial de Entrega. |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.51 · actualizado con la quinta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.52 · actualizado con la sexta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -126,6 +126,13 @@ sequenceDiagram
 3. `Exportacion.incluirDiagnostico` (por defecto true) llega al paquete; con false el paquete no responde al atajo ni a la consulta.
 4. `GET` y `POST /api/v1/clientes/{id}/fichas-lms` guardan en `FichaCompatibilidad` el LMS, la versión, el límite de subida, las notas y el informe tal cual (un objeto de menos de 256 KB, como dato; SUP-58). La lista va de la más nueva a la más vieja; crean administración, diseño instruccional y producción, y cada creación queda en la auditoría como `FICHA_LMS_CREADA`. La ficha más nueva fija el límite de la validación (3.3.0.1).
 
+
+### 3.3.0.3 Kit de gamificación para el LMS (HU-1205)
+
+1. La tarjeta «Kit de gamificación para el LMS» de Entrega pide `POST /api/v1/cursos/{id}/exportaciones` con `formato: KIT_GAMIFICACION`, `perfilLms` (el LMS de la guía) y `modoIdioma` (`unico` o `mismo-paquete`). Sin `perfilLms`, la API toma el LMS de los datos técnicos del proyecto (`perfilPropuesto`). No hay validación previa (`validar` sigue siendo de SCORM 1.2 y HTML) ni migración: el formato ya existía. Con `mismo-paquete` no se exige el inglés.
+2. La cola `export` lee la versión ligada del curso y el kit de marca del cliente (paleta, tipografías y logo, que se lee del almacenamiento) y llama a `construirKitGamificacion` de `@aptio/exporters`. Las insignias son las de `gamificacion.insignias` o, si no hay, una por cápsula, una por módulo y una del curso por plantilla, sin IA (SUP-161). Los PNG de 512 px los dibuja `@resvg/resvg-js` con las fuentes del servidor (SUP-163).
+3. El ZIP lleva `insignias/svg/`, `insignias/png/`, `plan.json` (nota de `seguimiento.notaMinima` si el curso se completa por la sumativa, niveles y orden de desbloqueo), `guia-<lms>.html` con la nota «Verificar con la versión del cliente» (SUP-162) y `LEEME.txt`. Es determinista para el mismo curso, kit y LMS.
+4. Se guarda como recurso PAQUETE `<proyecto>-kit-<lms>-v<n>.zip` con proveedor `aptio` y modelo `kit-gamificacion v1`; el informe trae `lms`, `insignias`, `archivos` y las advertencias (nombres sin inglés). La descarga es la del historial, con los mismos permisos (M14) y el aislamiento por organización.
 ### 3.3.0.3 HTML autocontenido (HU-1203)
 
 1. Con `formato: HTML`, la API valida sin límite de subida ni `suspend_data` (`limiteMb`, `origenLimite` y `suspendDataCaracteres` en `null`, SUP-60). Crea la Exportacion con perfil `generico` e `incluirDiagnostico: false`.
@@ -480,6 +487,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
 | 0.51 | 2026-11-13 | Observabilidad y copias de seguridad (3.10 y 8): copia diaria con pg_dump y los objetos de S3, purga de 14 días, restauración con resguardos, `GET /operacion` y los avisos por correo. |
+| 0.52 | 2026-11-13 | Kit de gamificación para el LMS (3.3.0.3): formato KIT_GAMIFICACION en la cola `export`, insignias SVG y PNG con resvg, plan y guía por LMS. |
 | 0.50 | 2026-11-13 | Comentarios del revisor del cliente (3.9): alcance por cliente y organización, texto plano inmutable, resolver solo el equipo con auditoría y sin cambiar la aprobación. |
 | 0.49 | 2026-11-13 | Conexiones IA y límite de gasto (3.8): conexión por organización leída en caliente, tipo real de cada trabajo, voz de Google o ElevenLabs, LIMITE_GASTO con auditoría y los 3 endpoints sin claves. |
 | 0.48 | 2026-11-13 | Rentabilidad y mediciones (3.7): el cálculo compartido, los parámetros por organización, el promedio de las mediciones con respaldo de supuestos y los permisos. |
