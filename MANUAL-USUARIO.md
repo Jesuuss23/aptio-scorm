@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.43 · actualizado con la tercera entrega del Sprint 9 (12 de noviembre de 2026)**
+**Versión 0.44 · actualizado con la cuarta entrega del Sprint 9 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -366,6 +366,8 @@ Cada cambio se guarda solo y se puede deshacer. La vista previa y el paquete mue
 
 **Agregar elementos.** El panel de la izquierda tiene tres pestañas: **Diseños**, **Agregar** y **Capas**. En **Agregar** eliges qué poner en la pantalla: título, texto, dato, botón, imagen, insignia, forma o personaje. El elemento aparece ya elegido y el editor pasa a **Libre**, así que lo arrastras de inmediato adonde quieras. Su texto se escribe con doble clic, como cualquier otro. En **Propiedades**, el botón tiene «Al hacer clic»: **Siguiente pantalla** o **Nada**; la imagen se elige entre las del curso y lleva su texto alternativo para quien no la ve. En la vista previa y en el paquete, el botón «Siguiente» lleva a la pantalla que sigue.
 
+**Imágenes propias y biblioteca del kit.** La pestaña **Imágenes** del panel izquierdo tiene tres partes. La **biblioteca del kit** trae 6 ilustraciones (candado, señal de alerta, tablero eléctrico, planta industrial, trofeo y casco) que se ven con los colores de la marca del cliente; un clic la agrega a la pantalla. **Subir imagen propia** acepta PNG, JPEG o WebP de hasta 20 MB y SVG de hasta 2 MB. Debajo, **Imágenes del proyecto** muestra las que ya subiste, para usarlas otra vez. También puedes **arrastrar una imagen desde el escritorio y soltarla sobre la pantalla**: mientras sube verás «Subiendo…», y queda centrada en el punto donde la soltaste, elegida y en modo **Libre**; si el archivo no es una imagen aceptada, la herramienta te dice por qué. Soltar siempre agrega una imagen nueva; para cambiar una imagen por otra, elígela y usa **Imagen** en Propiedades. El texto alternativo de una imagen subida empieza con el nombre del archivo y Propiedades te pide **revisarlo** hasta que lo cambies; si la imagen es solo de adorno, marca **Decorativa** y el lector de pantalla la omite. **↶ Deshacer** quita la imagen de la pantalla, pero sigue en las imágenes del proyecto.
+
 **Capas, ocultar y eliminar.** En **Capas** ves todos los elementos de la pantalla, los del contenido y los que agregaste («· agregado»). Clic en un nombre lo elige; el ojo lo oculta o lo muestra. En el editor lo oculto se ve tenue y con borde punteado para que puedas elegirlo otra vez; en la vista previa y en el paquete no aparece. También puedes usar **Ocultar** y **Mostrar** en la barra o en Propiedades. **Eliminar** (o la tecla Supr) solo está para lo que agregaste: lo que puso la IA no se borra, se oculta.
 
 **Disparadores (avanzado).** Sirven para que algo pase solo en un momento de la pantalla, por ejemplo que un botón oculto aparezca a los 3 segundos. Sin ningún elemento elegido, abre **Avanzado: disparadores** en **Propiedades** y pulsa **+ Nuevo disparador**. Cada disparador tiene:
@@ -654,6 +656,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.41 | 2026-11-12 | Video interactivo (8.19): agregar preguntas en un segundo del video, sus opciones y retroalimentación, obligatoria u opcional, y cómo se ven en la vista previa y en el paquete. |
 | 0.42 | 2026-11-12 | Video interactivo (8.19): la casilla «Impedir adelantar hasta responder» y lo que ve el participante al intentar adelantar. |
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
+| 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
