@@ -1,4 +1,5 @@
 import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
+import { arbolNavegacion, esColumnaPie, esEnlaceExterno, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
@@ -140,6 +141,8 @@ export interface OpcionesSimulacion {
   bloquesSitio?: BloqueSitioSim[];
   /** HU-1504 · Elementos de contenido del sitio. */
   elementosSitio?: ElementoSitioSim[];
+  /** HU-1506 · Enlaces del menú y del pie (columnas sin padre y sus enlaces). */
+  enlacesSitio?: EnlaceSitioSim[];
   /** HU-1505 · Entorno del sitio simulado (por defecto producción, como la API sin `SITIO_ENTORNO`). */
   entornoSitio?: 'produccion' | 'pruebas';
   /** HU-1303 · Mediciones ya registradas. */
@@ -377,9 +380,15 @@ export interface BloqueSitioSim {
 export interface ElementoSitioSim {
   id: string; coleccion: string; orden: number; visible: boolean; ficticio?: boolean; datos: Record<string, string | number>; creadoEn: string; actualizadoEn: string;
 }
+/** HU-1506 · Enlace del menú o del pie en la simulación. */
+export interface EnlaceSitioSim {
+  id: string; zona: 'menu' | 'pie'; padreId: string | null; texto: string; ruta: string | null; orden: number; visible: boolean; creadoEn?: string; actualizadoEn?: string;
+}
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], entornoSitio = 'produccion' }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion' }: OpcionesSimulacion) {
+  const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...e }));
+  let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
   const ficticiosVisiblesSim = () => elementosSim.filter((e) => e.ficticio && e.visible);
   let elementosCreados = 0;
@@ -597,6 +606,63 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       let ocultados = 0;
       if (ruta.endsWith('/ocultar')) for (const e of ficticiosVisiblesSim()) { e.visible = false; ocultados++; }
       return responder(200, { entorno: entornoSitio, ficticios: ficticiosVisiblesSim(), ...(ruta.endsWith('/ocultar') ? { ocultados } : {}) });
+    }
+    // HU-1506 · Menú y pie: mismas reglas que la API (oculto al final del grupo, texto plano, rutas seguras, dos niveles).
+    if (ruta === '/sitio/navegacion' || ruta.startsWith('/sitio/navegacion/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const metodo = req.method();
+      const dto = (e: (typeof enlacesSim)[number]) => ({ ...e, externo: e.ruta ? esEnlaceExterno(e.ruta) : false });
+      const grupo = (zona: string, padreId: string | null) => enlacesSim.filter((e) => e.zona === zona && e.padreId === padreId).sort((a, b) => a.orden - b.orden);
+      const datosInvalidos = (mensaje: string, campo: string) => responder(422, { codigo: 'DATOS_NO_VALIDOS', mensaje, detalles: [{ campo, mensaje }] });
+      if (ruta === '/sitio/navegacion' && metodo === 'GET') {
+        const a = arbolNavegacion(enlacesSim);
+        return responder(200, { menu: a.menu.map(dto), pie: a.pie.map((c) => ({ ...dto(c), enlaces: c.enlaces.map(dto) })) });
+      }
+      if (ruta === '/sitio/navegacion' && metodo === 'POST') {
+        const b = req.postDataJSON() as { zona: string; padreId?: string; texto: string; ruta?: string };
+        const padre = b.padreId ? enlacesSim.find((e) => e.id === b.padreId) ?? null : null;
+        const ubicacion = validarUbicacion(b.zona, b.padreId ? padre ?? { zona: 'pie', padreId: 'x' } : null);
+        if (ubicacion) return responder(422, { codigo: 'UBICACION_INVALIDA', mensaje: 'Ubicación no válida', detalles: [{ tipo: ubicacion }] });
+        const t = validarTextoEnlace(b.texto);
+        if (!t.ok) return datosInvalidos(t.mensaje, 'texto');
+        const columna = esColumnaPie({ zona: b.zona, padreId: b.padreId ?? null });
+        const r = columna && !b.ruta?.trim() ? null : validarRuta(b.ruta);
+        if (r && !r.ok) return datosInvalidos(r.mensaje, 'ruta');
+        const ahora = new Date().toISOString();
+        const e = { id: `00000000-0000-4000-9400-${String(++enlacesCreados).padStart(12, '0')}`, zona: b.zona as 'menu' | 'pie', padreId: b.padreId ?? null, texto: t.texto, ruta: r ? r.ruta : null, orden: grupo(b.zona, b.padreId ?? null).length, visible: false, creadoEn: ahora, actualizadoEn: ahora };
+        enlacesSim.push(e);
+        return responder(201, dto(e));
+      }
+      if (ruta === '/sitio/navegacion' && metodo === 'PATCH') {
+        const { zona, padreId, orden } = req.postDataJSON() as { zona: string; padreId?: string; orden: string[] };
+        const actuales = grupo(zona, padreId ?? null);
+        if (orden.length !== actuales.length || new Set(orden).size !== orden.length || !orden.every((id) => actuales.some((x) => x.id === id))) {
+          return responder(422, { codigo: 'ORDEN_INVALIDO', mensaje: 'Falta un enlace del grupo en la lista' });
+        }
+        orden.forEach((id, i) => { actuales.find((x) => x.id === id)!.orden = i; });
+        return responder(200, grupo(zona, padreId ?? null).map(dto));
+      }
+      const e = enlacesSim.find((x) => x.id === ruta.split('/')[3]);
+      if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El enlace no existe' });
+      if (metodo === 'DELETE') {
+        for (const x of [e, ...enlacesSim.filter((h) => h.padreId === e.id)]) enlacesSim.splice(enlacesSim.indexOf(x), 1);
+        grupo(e.zona, e.padreId).forEach((x, i) => { x.orden = i; });
+        return responder(204);
+      }
+      const b = req.postDataJSON() as { texto?: string; ruta?: string | null; visible?: boolean };
+      if (b.texto !== undefined) {
+        const t = validarTextoEnlace(b.texto);
+        if (!t.ok) return datosInvalidos(t.mensaje, 'texto');
+        e.texto = t.texto;
+      }
+      if (b.ruta !== undefined) {
+        const r = esColumnaPie(e) && !b.ruta?.trim() ? null : validarRuta(b.ruta);
+        if (r && !r.ok) return datosInvalidos(r.mensaje, 'ruta');
+        e.ruta = r ? r.ruta : null;
+      }
+      if (b.visible !== undefined) e.visible = b.visible;
+      e.actualizadoEn = new Date(Date.now() + enlacesCreados++).toISOString();
+      return responder(200, dto(e));
     }
     if (ruta === '/sitio/elementos' || ruta.startsWith('/sitio/elementos/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });

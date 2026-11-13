@@ -351,3 +351,93 @@ test('CP-117: en pruebas se publica con aviso y Contenido ofrece ocultarlos', as
   await expect(page.getByRole('status').filter({ hasText: 'Se ocultaron 2 datos ficticios.' })).toBeVisible();
   await expect(region).toHaveCount(0);
 });
+
+// HU-1506 · CP-118: menú principal y pie de página en «Sitio web › Páginas» (PNT-25). Agregar (nace oculto), editar,
+// reordenar con teclado (el foco sigue al enlace), ocultar «Casos» y ver que sale de «En el sitio», columna del pie que
+// oculta sus enlaces, ruta insegura rechazada y borrar con confirmación. axe WCAG 2.2 A/AA.
+const enlaceSim = (n: number, zona: 'menu' | 'pie', texto: string, ruta: string | null, orden: number, padreId: string | null = null) =>
+  ({ id: `00000000-0000-4000-9500-00000000000${n}`, zona, padreId, texto, ruta, orden, visible: true });
+
+test('CP-118: el enlace «Casos» oculto no aparece en el menú del sitio; el pie se administra por columnas', async ({ page }) => {
+  const legal = enlaceSim(4, 'pie', 'Legal', null, 0);
+  await simularApi(page, {
+    conSesion: true, rol: 'SUPERADMIN',
+    enlacesSitio: [
+      enlaceSim(1, 'menu', 'Producto', '/funcionalidades/personaje', 0), enlaceSim(2, 'menu', 'Precios', '/precios', 1),
+      enlaceSim(3, 'menu', 'Blog', 'https://blog.aptioscorm.com', 2),
+      legal, enlaceSim(5, 'pie', 'Privacidad', '/privacidad', 0, legal.id), enlaceSim(6, 'pie', 'Términos', '/terminos', 1, legal.id),
+    ],
+  });
+  await page.goto('/sitio/paginas');
+  const menuSitio = page.getByRole('region', { name: 'Menú principal' });
+  const enSitio = menuSitio.getByLabel('En el sitio: menú principal');
+  await expect(enSitio).toHaveText('En el sitio: Producto · Precios · Blog');
+  await expect(menuSitio.getByText('Externo')).toHaveCount(1);
+
+  // Agregar «Casos»: una ruta insegura se rechaza; con una ruta interna entra al final y oculto.
+  await menuSitio.getByRole('button', { name: 'Agregar enlace al menú' }).click();
+  const nuevo = menuSitio.getByRole('form', { name: 'Nuevo enlace del menú' });
+  await expect(nuevo.getByLabel('Texto')).toBeFocused();
+  await nuevo.getByLabel('Texto').fill('Casos');
+  await nuevo.getByLabel('Ruta').fill('javascript:alert(1)');
+  await nuevo.getByRole('button', { name: 'Agregar' }).click();
+  await expect(nuevo.getByRole('alert')).toHaveText('La ruta empieza con / o con https://');
+  await nuevo.getByLabel('Ruta').fill('/#testimonios');
+  await nuevo.getByRole('button', { name: 'Agregar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '«Casos» se agregó al final, oculto.' })).toBeVisible();
+  const casos = menuSitio.getByRole('switch', { name: 'Mostrar Casos' });
+  await expect(casos).toHaveAttribute('aria-checked', 'false');
+  await expect(enSitio).toHaveText('En el sitio: Producto · Precios · Blog');
+
+  // Mostrarlo, subirlo con el teclado (el foco sigue al enlace) y editar su texto.
+  await casos.click();
+  await expect(casos).toHaveAttribute('aria-checked', 'true');
+  await expect(enSitio).toHaveText('En el sitio: Producto · Precios · Blog · Casos');
+  await menuSitio.getByRole('button', { name: 'Subir Casos' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(menuSitio.getByRole('button', { name: 'Subir Casos' })).toBeFocused();
+  await expect(enSitio).toHaveText('En el sitio: Producto · Precios · Casos · Blog');
+  const editar = menuSitio.getByRole('form', { name: 'Editar Casos' });
+  await editar.getByLabel('Texto').fill('Casos de éxito');
+  await editar.getByRole('button', { name: 'Guardar' }).click();
+  await expect(enSitio).toHaveText('En el sitio: Producto · Precios · Casos de éxito · Blog');
+  await menuSitio.getByRole('form', { name: 'Editar Casos de éxito' }).getByLabel('Texto').fill('Casos');
+  await menuSitio.getByRole('form', { name: 'Editar Casos de éxito' }).getByRole('button', { name: 'Guardar' }).click();
+
+  // CP-118: «Casos» oculto no aparece en el sitio (cabecera y menú de celular usan la misma lista); no se borra.
+  await menuSitio.getByRole('switch', { name: 'Mostrar Casos' }).click();
+  await expect(menuSitio.getByRole('switch', { name: 'Mostrar Casos' })).toHaveAttribute('aria-checked', 'false');
+  await expect(enSitio).toHaveText('En el sitio: Producto · Precios · Blog');
+  await expect(menuSitio.getByRole('form', { name: 'Editar Casos' })).toBeVisible();
+
+  // Pie: ocultar la columna «Legal» oculta sus enlaces; agregar una columna nueva con un enlace.
+  const pie = page.getByRole('region', { name: 'Pie de página' });
+  const enPie = pie.getByLabel('En el sitio: pie de página');
+  await expect(enPie).toHaveText('En el sitio: Legal (Privacidad, Términos)');
+  await pie.getByRole('switch', { name: 'Mostrar Términos' }).click();
+  await expect(enPie).toHaveText('En el sitio: Legal (Privacidad)');
+  await pie.getByRole('switch', { name: 'Mostrar columna Legal' }).click();
+  await expect(enPie).toHaveText('En el sitio: el pie no muestra columnas');
+  await expect(pie.getByText('La columna está oculta: ninguno de sus enlaces se ve en el sitio.')).toBeVisible();
+  await pie.getByRole('button', { name: 'Agregar columna al pie' }).click();
+  const columna = pie.getByRole('form', { name: 'Nueva columna del pie' });
+  await columna.getByLabel('Título').fill('Empresa');
+  await columna.getByRole('button', { name: 'Agregar' }).click();
+  await pie.getByRole('button', { name: 'Agregar enlace a la columna Empresa' }).click();
+  const hijo = pie.getByRole('form', { name: 'Nuevo enlace de la columna Empresa' });
+  await hijo.getByLabel('Texto').fill('Nosotros');
+  await hijo.getByLabel('Ruta').fill('/nosotros');
+  await hijo.getByRole('button', { name: 'Agregar' }).click();
+  await pie.getByRole('switch', { name: 'Mostrar columna Empresa' }).click();
+  await pie.getByRole('switch', { name: 'Mostrar Nosotros' }).click();
+  await expect(enPie).toHaveText('En el sitio: Empresa (Nosotros)');
+
+  const axe = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axe.violations.map((v) => v.id)).toEqual([]);
+
+  // Borrar con confirmación: la columna «Legal» se va con sus enlaces.
+  await pie.getByRole('button', { name: 'Borrar columna Legal' }).click();
+  await pie.getByRole('group', { name: 'Confirmar el borrado de columna Legal' }).getByRole('button', { name: 'Sí, borrar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '«Legal» se borró.' })).toBeVisible();
+  await expect(pie.getByRole('switch', { name: 'Mostrar Privacidad' })).toHaveCount(0);
+});

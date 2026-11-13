@@ -609,6 +609,22 @@ export interface ElementoSitio {
 }
 /** HU-1505 · Ficticios visibles del sitio y el entorno (RN-16-3). */
 export interface FicticiosSitio { entorno: 'produccion' | 'pruebas'; ficticios: ElementoSitio[] }
+/** HU-1506 · Enlace del menú, columna del pie (sin padre) o enlace de una columna del pie. Nace oculto (RN-16-2). */
+export interface EnlaceSitio {
+  id: string;
+  zona: 'menu' | 'pie';
+  padreId: string | null;
+  texto: string;
+  ruta: string | null;
+  externo: boolean;
+  orden: number;
+  visible: boolean;
+  creadoEn: string;
+  actualizadoEn: string;
+}
+export type ColumnaPieSitio = EnlaceSitio & { enlaces: EnlaceSitio[] };
+export interface NavegacionSitio { menu: EnlaceSitio[]; pie: ColumnaPieSitio[] }
+export interface EnlaceSitioEntrada { zona: 'menu' | 'pie'; padreId?: string; texto: string; ruta?: string }
 /** HU-1503 · Bloque de una página del sitio (REQ-066). Nace oculto (RN-16-2). */
 export interface BloqueSitio {
   id: string;
@@ -662,6 +678,11 @@ export const api = {
   borrarElemento: (id: string) => pedir<void>(`/sitio/elementos/${id}`, { method: 'DELETE' }),
   ficticiosSitio: () => pedir<FicticiosSitio>('/sitio/ficticios'),
   ocultarFicticios: () => pedir<FicticiosSitio & { ocultados: number }>('/sitio/ficticios/ocultar', { method: 'POST' }),
+  navegacionSitio: () => pedir<NavegacionSitio>('/sitio/navegacion'),
+  agregarEnlace: (datos: EnlaceSitioEntrada) => pedir<EnlaceSitio>('/sitio/navegacion', json(datos)),
+  cambiarEnlace: (id: string, cambio: { texto?: string; ruta?: string | null; visible?: boolean }) => pedir<EnlaceSitio>(`/sitio/navegacion/${id}`, json(cambio, 'PATCH')),
+  ordenarEnlaces: (zona: 'menu' | 'pie', padreId: string | null, orden: string[]) => pedir<EnlaceSitio[]>('/sitio/navegacion', json({ zona, ...(padreId ? { padreId } : {}), orden }, 'PATCH')),
+  borrarEnlace: (id: string) => pedir<void>(`/sitio/navegacion/${id}`, { method: 'DELETE' }),
   bloquesPagina: (paginaId: string) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`),
   agregarBloque: (paginaId: string, tipo: string) => pedir<BloqueSitio>(`/sitio/paginas/${paginaId}/bloques`, json({ tipo })),
   ordenarBloques: (paginaId: string, orden: string[]) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`, json({ orden }, 'PATCH')),

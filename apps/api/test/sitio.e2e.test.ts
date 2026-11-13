@@ -9,6 +9,8 @@
 // cascada página → bloque → elemento, texto plano (RN-16-7), orden, permisos y auditoría.
 // HU-1505 · CP-116 y CP-117: ficticios visibles bloquean publicar en producción (409 con la lista) y en pruebas se
 // publica con aviso; «Ocultar todos los ficticios», la segunda defensa del sitio público, permisos y auditoría.
+// HU-1506 · CP-118: menú y pie administrables (orden entre hermanos, ocultar en cascada por columna, rutas y texto
+// plano), GET /publico/navegacion, permisos y auditoría.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -700,6 +702,179 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       }
       expect(estados).toEqual(ROLES_ORGANIZACION.map((rol) => [rol, 403, 403]));
       expect([(await enviar('get', '/sitio/ficticios', undefined, '')).status, (await enviar('post', '/sitio/ficticios/ocultar', undefined, '')).status]).toEqual([401, 401]);
+    });
+  });
+
+  describe('menú y pie administrables (HU-1506)', () => {
+    const marca = `zz-${sufijo}`;
+    const creados: string[] = [];
+    const enviar = (m: 'get' | 'post' | 'patch' | 'delete', r: string, b?: object, c = cookies.SUPERADMIN) => {
+      const req = request(servidor)[m](`/api/v1${r}`);
+      if (c) req.set('Cookie', c);
+      return b ? req.send(b) : req;
+    };
+    const reiniciarLimite = () => app.get(LimitePublicoService).reiniciar();
+    type Enlace = { id: string; zona: string; padreId: string | null; texto: string; ruta: string | null; externo: boolean; orden: number; visible: boolean };
+    const enlace = async (zona: string, texto: string, ruta?: string, padreId?: string) => {
+      const r = await enviar('post', '/sitio/navegacion', { zona, texto: `${texto} ${marca}`, ...(ruta ? { ruta } : {}), ...(padreId ? { padreId } : {}) });
+      if (r.status !== 201) throw new Error(`enlace ${texto}: ${r.status} ${JSON.stringify(r.body)}`);
+      creados.push(r.body.id);
+      return r.body as Enlace;
+    };
+    const mostrar = (id: string, visible = true) => enviar('patch', `/sitio/navegacion/${id}`, { visible });
+    const propios = <T extends { texto?: string; titulo?: string }>(l: T[]) => l.filter((x) => (x.texto ?? x.titulo)?.endsWith(marca));
+    const publica = async () => {
+      reiniciarLimite();
+      const r = await request(servidor).get('/api/v1/publico/navegacion');
+      expect(r.status).toBe(200);
+      return r.body as { menu: { texto: string; ruta: string; externo: boolean }[]; pie: { titulo: string; enlaces: { texto: string }[] }[] };
+    };
+    const grupo = async (zona: string, padreId: string | null) =>
+      (await prisma.sitioEnlace.findMany({ where: { zona, padreId }, orderBy: { orden: 'asc' } })).map((e) => e.id);
+
+    afterAll(async () => {
+      await prisma.auditoria.deleteMany({ where: { entidad: 'SitioEnlace', usuario: { email: { endsWith: `-${sufijo}@sitio.test` } } } });
+      await prisma.sitioEnlace.deleteMany({ where: { id: { in: creados } } });
+    });
+
+    it('un enlace nuevo va al final de su grupo y oculto, con su ruta interna o externa', async () => {
+      const a = await enlace('menu', 'Producto', '/funcionalidades/personaje');
+      const b = await enlace('menu', 'Blog', 'https://blog.aptioscorm.com');
+      expect(a).toMatchObject({ zona: 'menu', padreId: null, visible: false, externo: false });
+      expect(b).toMatchObject({ visible: false, externo: true, orden: a.orden + 1 });
+      const col = await enlace('pie', 'Legal');
+      const hijo = await enlace('pie', 'Privacidad', '/privacidad', col.id);
+      expect(col).toMatchObject({ padreId: null, ruta: null });
+      expect(hijo).toMatchObject({ padreId: col.id, orden: 0 });
+      const todo = (await enviar('get', '/sitio/navegacion')).body as { menu: Enlace[]; pie: (Enlace & { enlaces: Enlace[] })[] };
+      expect(propios(todo.menu).map((x) => x.id)).toEqual([a.id, b.id]);
+      expect(todo.pie.find((c) => c.id === col.id)!.enlaces.map((x) => x.id)).toEqual([hijo.id]);
+      expect(propios((await publica()).menu)).toEqual([]);
+    });
+
+    it('CP-118: el enlace «Casos» oculto no aparece en la navegación pública', async () => {
+      const producto = await enlace('menu', 'Producto', '/funcionalidades/personaje');
+      const casos = await enlace('menu', 'Casos', '/#testimonios');
+      await mostrar(producto.id);
+      await mostrar(casos.id);
+      expect(propios((await publica()).menu).map((x) => x.texto)).toEqual([`Producto ${marca}`, `Casos ${marca}`]);
+      const r = await mostrar(casos.id, false);
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ visible: false, texto: `Casos ${marca}`, ruta: '/#testimonios' });
+      expect(propios((await publica()).menu)).toEqual([{ texto: `Producto ${marca}`, ruta: '/funcionalidades/personaje', externo: false }]);
+      // Ocultar no borra: mostrarlo lo restituye igual (REQ-066).
+      await mostrar(casos.id);
+      expect(propios((await publica()).menu).map((x) => x.texto)).toEqual([`Producto ${marca}`, `Casos ${marca}`]);
+      await mostrar(casos.id, false);
+      await mostrar(producto.id, false);
+    });
+
+    it('una columna oculta del pie oculta todos sus enlaces', async () => {
+      const col = await enlace('pie', 'Empresa');
+      const a = await enlace('pie', 'Nosotros', '/nosotros', col.id);
+      const b = await enlace('pie', 'Empleo', '/empleo', col.id);
+      await mostrar(a.id);
+      await mostrar(b.id);
+      expect(propios((await publica()).pie)).toEqual([]); // la columna nace oculta
+      await mostrar(col.id);
+      expect(propios((await publica()).pie)).toEqual([{ titulo: `Empresa ${marca}`, enlaces: [{ texto: `Nosotros ${marca}`, ruta: '/nosotros', externo: false }, { texto: `Empleo ${marca}`, ruta: '/empleo', externo: false }] }]);
+      await mostrar(b.id, false);
+      expect(propios((await publica()).pie)[0]!.enlaces.map((x) => x.texto)).toEqual([`Nosotros ${marca}`]);
+      await mostrar(col.id, false);
+      expect(propios((await publica()).pie)).toEqual([]);
+      expect((await prisma.sitioEnlace.findUniqueOrThrow({ where: { id: a.id } })).visible).toBe(true);
+    });
+
+    it('reordena solo entre hermanos (422 ORDEN_INVALIDO si faltan, se repiten o son de otro grupo)', async () => {
+      const col = await enlace('pie', 'Producto');
+      const x = await enlace('pie', 'Uno', '/uno', col.id);
+      const y = await enlace('pie', 'Dos', '/dos', col.id);
+      const z = await enlace('pie', 'Tres', '/tres', col.id);
+      const r = await enviar('patch', '/sitio/navegacion', { zona: 'pie', padreId: col.id, orden: [z.id, x.id, y.id] });
+      expect(r.status).toBe(200);
+      expect((r.body as Enlace[]).map((e) => [e.id, e.orden])).toEqual([[z.id, 0], [x.id, 1], [y.id, 2]]);
+      const menu = await grupo('menu', null);
+      const malos = [
+        { zona: 'pie', padreId: col.id, orden: [z.id, x.id] },
+        { zona: 'pie', padreId: col.id, orden: [z.id, x.id, x.id] },
+        { zona: 'pie', padreId: col.id, orden: [z.id, x.id, y.id, menu[0] ?? col.id] },
+      ];
+      for (const b of malos) {
+        const res = await enviar('patch', '/sitio/navegacion', b);
+        expect(res.status).toBe(422);
+        expect(res.body.codigo).toBe('ORDEN_INVALIDO');
+      }
+      expect((await enviar('patch', '/sitio/navegacion', { zona: 'menu', padreId: col.id, orden: [] })).body.codigo).toBe('UBICACION_INVALIDA');
+      // Borrar compacta a los hermanos; borrar la columna borra sus enlaces.
+      expect((await enviar('delete', `/sitio/navegacion/${x.id}`)).status).toBe(204);
+      expect(await grupo('pie', col.id)).toEqual([z.id, y.id]);
+      expect((await prisma.sitioEnlace.findMany({ where: { id: { in: [z.id, y.id] } }, orderBy: { orden: 'asc' } })).map((e) => e.orden)).toEqual([0, 1]);
+      expect((await enviar('delete', `/sitio/navegacion/${col.id}`)).status).toBe(204);
+      expect(await prisma.sitioEnlace.count({ where: { id: { in: [col.id, y.id, z.id] } } })).toBe(0);
+      const columnas = await prisma.sitioEnlace.findMany({ where: { zona: 'pie', padreId: null }, orderBy: { orden: 'asc' } });
+      expect(columnas.map((c) => c.orden)).toEqual(columnas.map((_, i) => i));
+    });
+
+    it('rechaza rutas inseguras, texto con HTML y niveles de más (422)', async () => {
+      const col = await enlace('pie', 'Legal');
+      const hijo = await enlace('pie', 'Términos', '/terminos', col.id);
+      const casos: [object, string][] = [
+        [{ zona: 'menu', texto: 'X', ruta: 'javascript:alert(1)' }, 'DATOS_NO_VALIDOS'],
+        [{ zona: 'menu', texto: 'X', ruta: 'http://aptioscorm.com' }, 'DATOS_NO_VALIDOS'],
+        [{ zona: 'menu', texto: 'X', ruta: 'data:text/html,hola' }, 'DATOS_NO_VALIDOS'],
+        [{ zona: 'menu', texto: 'X' }, 'DATOS_NO_VALIDOS'],
+        [{ zona: 'menu', texto: '<b>X</b>', ruta: '/x' }, 'DATOS_NO_VALIDOS'],
+        [{ zona: 'pie', texto: 'X', padreId: col.id }, 'DATOS_NO_VALIDOS'],
+        [{ zona: 'menu', texto: 'X', ruta: '/x', padreId: col.id }, 'UBICACION_INVALIDA'],
+        [{ zona: 'pie', texto: 'X', ruta: '/x', padreId: hijo.id }, 'UBICACION_INVALIDA'],
+        [{ zona: 'pie', texto: 'X', ruta: '/x', padreId: '00000000-0000-4000-8000-000000000000' }, 'UBICACION_INVALIDA'],
+      ];
+      for (const [b, codigo] of casos) {
+        const r = await enviar('post', '/sitio/navegacion', b);
+        expect([JSON.stringify(b), r.status, r.body.codigo]).toEqual([JSON.stringify(b), 422, codigo]);
+      }
+      expect((await enviar('post', '/sitio/navegacion', { zona: 'cabecera', texto: 'X', ruta: '/x' })).status).toBe(422);
+      const r = await enviar('patch', `/sitio/navegacion/${hijo.id}`, { ruta: 'javascript:alert(1)' });
+      expect([r.status, r.body.codigo, r.body.detalles?.[0]?.campo]).toEqual([422, 'DATOS_NO_VALIDOS', 'ruta']);
+      expect((await enviar('patch', `/sitio/navegacion/${hijo.id}`, {})).body.codigo).toBe('SIN_CAMBIOS');
+      expect((await enviar('patch', `/sitio/navegacion/${hijo.id}`, { ruta: null })).status).toBe(422);
+      expect((await enviar('patch', `/sitio/navegacion/${col.id}`, { ruta: '/legal' })).body.ruta).toBe('/legal');
+      expect((await enviar('patch', `/sitio/navegacion/${col.id}`, { ruta: null })).body.ruta).toBeNull();
+      expect((await enviar('patch', '/sitio/navegacion/no-es-uuid', { visible: true })).status).toBe(400);
+      expect((await enviar('patch', '/sitio/navegacion/00000000-0000-4000-8000-000000000000', { visible: true })).status).toBe(404);
+    });
+
+    it('solo el superadmin administra el menú (403 a la organización, 401 sin sesión); el público entra sin sesión', async () => {
+      const x = await enlace('menu', 'Privado', '/privado');
+      const estados = [];
+      for (const rol of ROLES_ORGANIZACION) {
+        estados.push([rol, (await enviar('get', '/sitio/navegacion', undefined, cookies[rol])).status, (await enviar('patch', `/sitio/navegacion/${x.id}`, { visible: true }, cookies[rol])).status]);
+      }
+      expect(estados).toEqual(ROLES_ORGANIZACION.map((rol) => [rol, 403, 403]));
+      expect([(await enviar('get', '/sitio/navegacion', undefined, '')).status, (await enviar('post', '/sitio/navegacion', { zona: 'menu', texto: 'X', ruta: '/x' }, '')).status]).toEqual([401, 401]);
+      expect((await prisma.sitioEnlace.findUniqueOrThrow({ where: { id: x.id } })).visible).toBe(false);
+      await publica();
+    });
+
+    it('cada cambio del menú y del pie queda en la auditoría', async () => {
+      await enlace('menu', 'Antes', '/antes');
+      const x = await enlace('menu', 'Auditado', '/auditado');
+      await mostrar(x.id);
+      await mostrar(x.id); // sin cambio: no audita
+      await enviar('patch', `/sitio/navegacion/${x.id}`, { texto: `Auditado dos ${marca}`, ruta: '/auditado-dos' });
+      await mostrar(x.id, false);
+      const menu = await grupo('menu', null);
+      await enviar('patch', '/sitio/navegacion', { zona: 'menu', orden: [x.id, ...menu.filter((id) => id !== x.id)] });
+      await enviar('delete', `/sitio/navegacion/${x.id}`);
+      const filas = await prisma.auditoria.findMany({ where: { entidad: 'SitioEnlace', entidadId: x.id }, orderBy: { creadoEn: 'asc' } });
+      expect(filas.map((f) => [f.accion, f.organizacionId])).toEqual([
+        ['SITIO_ENLACE_AGREGADO', null], ['SITIO_ENLACE_MOSTRADO', null], ['SITIO_ENLACE_EDITADO', null],
+        ['SITIO_ENLACE_OCULTADO', null], ['SITIO_ENLACE_BORRADO', null],
+      ]);
+      expect(filas[2]!.datos).toMatchObject({ antes: { ruta: '/auditado' }, despues: { texto: `Auditado dos ${marca}`, ruta: '/auditado-dos' } });
+      // «Auditado» estaba al final del menú: subirlo al principio queda como SITIO_ENLACES_REORDENADOS.
+      const r = await prisma.auditoria.findFirst({ where: { entidad: 'SitioEnlace', accion: 'SITIO_ENLACES_REORDENADOS', entidadId: null }, orderBy: { creadoEn: 'desc' } });
+      expect(r?.datos).toMatchObject({ zona: 'menu', padreId: null, despues: [x.id, ...menu.filter((id) => id !== x.id)] });
     });
   });
 });

@@ -4,11 +4,13 @@
 // con sus historias.
 // HU-1505 · En producción, publicar con datos ficticios visibles da 409: se muestra la lista con «Ocultar todos los
 // ficticios», que los oculta y vuelve a publicar en un clic (CP-116). En pruebas se publica con aviso (CP-117).
+// HU-1506 · Debajo de la tabla, las tarjetas «Menú principal» y «Pie de página» (CP-118).
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { type Coleccion, COLECCIONES_CONTENIDO } from '@aptio/schema/sitio-contenido';
 import { navegar } from '../ruta';
 import { type AccionPagina, api, ErrorApi, type PaginaSitio, type PaginaSitioCambio } from '../api';
+import { NavegacionSitio } from './SitioNavegacion';
 import { ESTADO_PAGINA, fechaHoraLima, limaAIso, MENSAJE_RUTA, minimoProgramable, NOMBRE_IDIOMA, RUTA_SITIO } from './sitio-paginas';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
@@ -147,6 +149,7 @@ export function SitioPaginas() {
           )}
         </section>
       )}
+      <NavegacionSitio />
     </>
   );
 }
