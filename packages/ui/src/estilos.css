@@ -316,6 +316,10 @@ a.ap-item[aria-current='page'] .ap-paso:not(:empty) {
   .ap-app {
     flex-direction: column;
   }
+  /* HU-1509 · En el celular el subtítulo queda sobre el gris de la página: #64748b da 4,39:1 (WCAG 1.4.3 pide 4,5:1). */
+  .ap-cabecera p {
+    color: #526070;
+  }
   .ap-lateral {
     width: auto;
     height: auto;

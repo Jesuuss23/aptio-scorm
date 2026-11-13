@@ -9,9 +9,13 @@ export const MENU: GrupoMenu[] = [
   { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }, { ruta: '/conexiones-ia', nombre: 'Conexiones IA' }, { ruta: '/operacion', nombre: 'Operación' }] },
   // HU-1501 · Solo el superadmin (ADR-011). Páginas, Contenido, Blog y SEO se suman con sus historias.
   { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }] },
+  // HU-1509 · Configuración del sitio, también solo del superadmin.
+  { nombre: 'Configuración', items: [{ ruta: '/sitio/ajustes', nombre: 'Ajustes del sitio' }] },
 ];
 
 export const GRUPO_SITIO = 'Sitio web';
+/** Los grupos del menú que solo ve el superadmin (ADR-011). */
+export const GRUPOS_SUPERADMIN = [GRUPO_SITIO, 'Configuración'];
 
 /** Vista a partir de la ruta: grupo de la ruta, nombre, ítem activo del menú y parámetro. */
 export function resolverVista(camino: string): { grupo: string; nombre: string; activo: string; id?: string; sub?: 'vista-previa' | 'revision' | 'editor' | 'entrega' | 'idiomas' | 'alineacion' | 'navegacion' | 'video' | 'voz' | 'editor-pagina' } | null {
@@ -40,6 +44,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (camino === '/sitio') return { grupo: 'Sitio web', nombre: 'Resumen', activo: '/sitio' };
   if (camino === '/sitio/paginas') return { grupo: 'Sitio web', nombre: 'Páginas', activo: '/sitio/paginas' };
   if (camino === '/sitio/contenido') return { grupo: 'Sitio web', nombre: 'Contenido', activo: '/sitio/contenido' };
+  if (camino === '/sitio/ajustes') return { grupo: 'Configuración', nombre: 'Ajustes del sitio', activo: '/sitio/ajustes' };
   const editorPagina = camino.match(/^\/sitio\/paginas\/([0-9a-f-]{36})$/i);
   if (editorPagina) return { grupo: 'Sitio web', nombre: 'Editor de página', activo: '/sitio/paginas', id: editorPagina[1]!, sub: 'editor-pagina' };
   if (camino === '/conexiones-ia') return { grupo: 'Empresa', nombre: 'Conexiones IA', activo: '/conexiones-ia' };

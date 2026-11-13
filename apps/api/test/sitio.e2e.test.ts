@@ -1048,3 +1048,8 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
     });
   });
 });
+
+// HU-1508 y HU-1509 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
+// en serie, para no pisarse con las pruebas de arriba.
+await import('./sitio-publico.casos.js');
+await import('./sitio-ajustes.casos.js');

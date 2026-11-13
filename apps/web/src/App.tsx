@@ -1,7 +1,7 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION, VEN_SITIO } from './api';
-import { GRUPO_SITIO, MENU, resolverVista } from './menu';
+import { GRUPOS_SUPERADMIN, MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
 import { ClienteDetalle } from './vistas/ClienteDetalle';
@@ -23,6 +23,7 @@ import { ConexionesIA } from './vistas/ConexionesIA';
 import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
+import { SitioAjustes } from './vistas/SitioAjustes';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -91,7 +92,7 @@ export function App() {
   const veSitio = VEN_SITIO.includes(usuario.rol);
   // Nuevo SCORM y Rentabilidad solo aparecen a quien puede usarlos (RN-01-2: la API también lo valida).
   // HU-1501 · El superadmin ve solo «Sitio web»; el resto de los roles nunca lo ve (CP-109).
-  const menu = MENU.filter((g) => (g.nombre === GRUPO_SITIO) === veSitio).map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion)) })).filter((g) => g.items.length);
+  const menu = MENU.filter((g) => GRUPOS_SUPERADMIN.includes(g.nombre) === veSitio).map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion)) })).filter((g) => g.items.length);
   return (
     <Estructura
       menu={menu}
@@ -132,6 +133,8 @@ export function App() {
         <SitioPaginas />
       ) : vista?.activo === '/sitio/contenido' && veSitio ? (
         <SitioContenido />
+      ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
+        <SitioAjustes />
       ) : vista?.activo === '/operacion' && veOperacion ? (
         <OperacionVista />
       ) : vista?.activo === '/conexiones-ia' && veConexiones ? (

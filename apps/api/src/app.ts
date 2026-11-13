@@ -1,5 +1,6 @@
 import { HttpStatus, type INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
@@ -14,6 +15,8 @@ export function configurarApp(app: INestApplication): INestApplication {
     exclude: [{ path: 's', method: RequestMethod.GET }, { path: 's/{*ruta}', method: RequestMethod.GET }],
   });
   app.use(cookieParser());
+  // HU-1509 · El logo y el favicon llegan como el archivo mismo (SVG o PNG), hasta 200 KB; más, 413 DEMASIADO_GRANDE.
+  (app as NestExpressApplication).useBodyParser('raw', { type: ['image/svg+xml', 'image/png'], limit: '200kb' });
   app.enableCors({ origin: process.env.WEB_URL ?? 'http://localhost:5173', credentials: true });
   app.useGlobalPipes(
     // 422 para datos no válidos, como define docs/api/openapi.yaml (respuesta NoValido).

@@ -1,7 +1,9 @@
 import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
 import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
 import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
-import { cabecerasSitio, leerFuente, renderizar404, renderizarSitio, resolverPedido } from '@aptio/sitio';
+import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
+import { cabecerasSitio, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
@@ -134,6 +136,9 @@ export interface ComentarioSim {
   resuelto: boolean; resueltoPor: string | null; resueltoEn: string | null; creadoEn: string;
 }
 
+/** HU-1509 · El aviso que ve arriba el superadmin con el sitio en mantenimiento (el mismo texto que la API). */
+export const AVISO_MANTENIMIENTO = 'Modo mantenimiento activo: los visitantes ven el aviso «Volvemos pronto». Tú ves el sitio porque iniciaste sesión como superadmin.';
+
 export interface OpcionesSimulacion {
   /** HU-0506 · Comentarios del curso; pasa el mismo arreglo a dos páginas para que vean lo mismo. */
   comentarios?: ComentarioSim[];
@@ -151,6 +156,8 @@ export interface OpcionesSimulacion {
   versionSitio?: boolean;
   /** HU-1508 · Estado del pre-render de las versiones (por defecto `listo`: el worker ya subió el HTML). */
   prerenderSitio?: 'listo' | 'en_curso' | 'error';
+  /** HU-1509 · Ajustes del sitio ya guardados (sin ellos, la fila no existe y la API devuelve los valores por defecto). */
+  ajustesSitio?: Partial<AjustesSitio>;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -392,7 +399,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo' }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
@@ -404,8 +411,14 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-1507 · Versiones del sitio: la instantánea se arma con la misma función que usa la API.
   type VersionSim = { numero: number; creadoEn: string; entorno: string; origen: string; restauradaDe: number | null; publicadoPor: { id: string; nombre: string } | null; instantanea: Instantanea };
   const versionesSim: VersionSim[] = [];
+  // HU-1509 · Ajustes del sitio: una sola fila, con las mismas reglas que la API; la marca subida queda en memoria.
+  let ajustesSim: AjustesSitio | null = ajustesSitio ? { ...structuredClone(AJUSTES_POR_DEFECTO), ...structuredClone(ajustesSitio) } : null;
+  let ajustesEn: string | null = ajustesSitio ? '2026-11-13T15:00:00.000Z' : null;
+  const marcaSim = new Map<string, Buffer>();
+  const ajustesDto = () => ({ ...(ajustesSim ?? structuredClone(AJUSTES_POR_DEFECTO)), actualizadoEn: ajustesEn });
+  const guardarAjustesSim = (a: AjustesSitio) => { ajustesSim = a; ajustesEn = new Date().toISOString(); return ajustesDto(); };
   const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
-  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim }, entornoSitio);
+  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim }, entornoSitio);
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
       numero: versionesSim.length + 1, creadoEn: new Date(Date.UTC(2026, 10, 13, 15, versionesSim.length)).toISOString(), entorno: entornoSitio, origen,
@@ -483,10 +496,21 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     const ruta = new URL(route.request().url()).pathname.slice(2) || '/';
     const pedido = resolverPedido(ruta);
     const op = { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s' } as const;
-    const enviar = (status: number, tipo: Parameters<typeof cabecerasSitio>[0], cuerpo: string | Buffer) => route.fulfill({ status, headers: cabecerasSitio(tipo, cuerpo), body: cuerpo });
+    // HU-1509 · CP-121 · En mantenimiento el visitante recibe el aviso (503); el superadmin con sesión ve el sitio con un aviso arriba.
+    const mantenimiento = Boolean(ajustesSim?.mantenimiento.activo) && pedido?.tipo !== 'fuente' && pedido?.tipo !== 'marca';
+    const superadmin = sesion && usuario.rol === 'SUPERADMIN';
+    const enviar = (status: number, tipo: Parameters<typeof cabecerasSitio>[0], cuerpo: string | Buffer, archivo?: string) => {
+      const html = mantenimiento && superadmin && typeof cuerpo === 'string' ? cuerpo.replace('<body>', `<body><p class="aviso-pruebas" role="status">${AVISO_MANTENIMIENTO}</p>`) : cuerpo;
+      return route.fulfill({ status, headers: cabecerasSitio(tipo, html, { archivo, privada: mantenimiento }), body: html });
+    };
+    if (mantenimiento && !superadmin) return enviar(503, '503', renderizarMantenimiento({ sitio: ajustesPublicados(ajustesSim!) }, op, ajustesSim!.mantenimiento.mensaje));
     if (pedido?.tipo === 'fuente') {
       const f = leerFuente(pedido.archivo);
       return f ? enviar(200, 'fuente', Buffer.from(f)) : enviar(404, '404', renderizar404(null, op));
+    }
+    if (pedido?.tipo === 'marca') {
+      const m = marcaSim.get(pedido.archivo);
+      return m ? enviar(200, 'marca', m, pedido.archivo) : enviar(404, '404', renderizar404(null, op));
     }
     const ultima = prerenderSitio === 'listo' ? versionesSim.at(-1) : undefined;
     if (!ultima) return enviar(404, '404', renderizar404(null, op));
@@ -643,6 +667,42 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     // HU-1501 y HU-1502 · Sitio web › Páginas: solo el superadmin (CP-109), con las mismas reglas que la API.
     // HU-1504 · Contenido del sitio: mismas reglas que la API (oculto al final, datos validados, orden completo).
     // HU-1505 · Ficticios visibles y «Ocultar todos los ficticios».
+    // HU-1509 · Ajustes del sitio (PNT-38): mismas reglas que la API.
+    if (ruta === '/sitio/ajustes' || ruta.startsWith('/sitio/ajustes/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const actual = ajustesSim ?? structuredClone(AJUSTES_POR_DEFECTO);
+      const metodo = req.method();
+      if (ruta === '/sitio/ajustes' && metodo === 'GET') return responder(200, ajustesDto());
+      if (ruta === '/sitio/ajustes' && metodo === 'PATCH') {
+        const r = aplicarCambiosAjustes(actual, req.postDataJSON() as Parameters<typeof aplicarCambiosAjustes>[1]);
+        return r.ok ? responder(200, guardarAjustesSim(r.ajustes)) : responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+      }
+      const marca = ruta.match(/^\/sitio\/ajustes\/marca\/(logo|favicon)$/);
+      if (marca && metodo === 'PUT') {
+        const tipo = marca[1] as 'logo' | 'favicon';
+        const cuerpo = req.postDataBuffer() ?? Buffer.alloc(0);
+        const mime = req.headers()['content-type'];
+        if (cuerpo.length > LIMITES_AJUSTES.marcaBytes) return responder(413, { codigo: 'DEMASIADO_GRANDE', mensaje: 'El archivo supera los 200 KB' });
+        const valido = mime === 'image/png' ? esPng(cuerpo) : mime === 'image/svg+xml' && cuerpo.toString('utf8').includes('<svg');
+        if (!valido) return responder(422, { codigo: 'ARCHIVO_NO_VALIDO', mensaje: 'Sube un SVG o un PNG válido' });
+        const archivo = nombreArchivoMarca(tipo, createHash('sha256').update(cuerpo).digest('hex'), mime as 'image/png' | 'image/svg+xml');
+        marcaSim.set(archivo, cuerpo);
+        return responder(200, guardarAjustesSim({ ...actual, [tipo]: { archivo, mime: mime as 'image/png' | 'image/svg+xml' } }));
+      }
+      if (marca && metodo === 'DELETE') return responder(200, guardarAjustesSim({ ...actual, [marca[1]!]: null }));
+      if (ruta === '/sitio/ajustes/correo-prueba') {
+        return actual.correoLeads ? responder(200, { para: actual.correoLeads }) : responder(422, { codigo: 'SIN_CORREO_LEADS', mensaje: 'Guarda primero el correo que recibe los leads' });
+      }
+      if (ruta === '/sitio/ajustes/dominio/comprobar') {
+        const dominio = actual.dominio;
+        if (!dominio) return responder(422, { codigo: 'SIN_DOMINIO', mensaje: 'Guarda primero el dominio' });
+        // Un dominio que termina en .invalido simula uno sin certificado válido.
+        return responder(200, dominio.endsWith('.invalido')
+          ? { dominio, ok: false, venceEn: null, emisor: null, error: 'El certificado no corresponde al dominio' }
+          : { dominio, ok: true, venceEn: '2027-02-10T12:00:00.000Z', emisor: "Let's Encrypt", error: null });
+      }
+      return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'No encontrado' });
+    }
     if (ruta === '/sitio/ficticios' || ruta === '/sitio/ficticios/ocultar') {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       let ocultados = 0;

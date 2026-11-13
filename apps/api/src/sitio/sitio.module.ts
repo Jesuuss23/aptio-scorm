@@ -1,5 +1,8 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import { CorreoModule } from '../correo/correo.module.js';
 import { RecursosModule } from '../recursos/recursos.module.js';
+import { AjustesController } from './ajustes.controller.js';
+import { AjustesService } from './ajustes.service.js';
 import { PrerenderService } from './prerender.service.js';
 import { SitioPublicoController } from './sitio-publico.controller.js';
 import { SitioPublicoService } from './sitio-publico.service.js';
@@ -18,9 +21,9 @@ import { VersionesService } from './versiones.service.js';
 
 /** M16 · Sitio web y contenido (fase comercial, ADR-011): administración solo del superadmin y rutas públicas. */
 @Module({
-  imports: [RecursosModule],
-  controllers: [SitioController, BloquesController, ElementosController, FicticiosController, NavegacionController, VersionesController, PublicoController, SitioPublicoController],
-  providers: [SitioService, VersionesService, PrerenderService, SitioPublicoService, BloquesService, ElementosService, NavegacionService, LimitePublicoService],
+  imports: [RecursosModule, CorreoModule],
+  controllers: [SitioController, BloquesController, ElementosController, FicticiosController, NavegacionController, VersionesController, PublicoController, SitioPublicoController, AjustesController],
+  providers: [SitioService, VersionesService, PrerenderService, SitioPublicoService, AjustesService, BloquesService, ElementosService, NavegacionService, LimitePublicoService],
 })
 export class SitioModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

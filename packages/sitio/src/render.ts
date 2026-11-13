@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { COLECCION_DE_BLOQUE } from '@aptio/schema/sitio-contenido';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import type { EnlacePublico, NavegacionPublica } from '@aptio/schema/sitio-navegacion';
+import { enlaceWhatsapp, NOMBRE_POR_DEFECTO, type SitioPublicado } from '@aptio/schema/sitio-ajustes';
 import { type Instantanea, type PaginaServida, paginaServida } from '@aptio/schema/sitio-versiones';
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
@@ -22,6 +23,20 @@ export interface OpcionesRender {
   base: string;
   /** Año del pie (por defecto, el actual). */
   anio?: number;
+}
+
+/** HU-1509 · Carpeta pública del logo y el favicon (`sitio/marca/` en el bucket). */
+export const CARPETA_MARCA = '_marca';
+
+/** HU-1509 · Nombre, logo, favicon y WhatsApp de la versión; las versiones anteriores a los ajustes usan la marca de siempre. */
+export interface Marca { nombre: string; logo: SitioPublicado['logo']; favicon: SitioPublicado['favicon']; whatsapp: SitioPublicado['whatsapp'] }
+export const marcaDe = (inst: Pick<Instantanea, 'sitio'> | null | undefined): Marca => ({
+  nombre: inst?.sitio?.nombre ?? NOMBRE_POR_DEFECTO, logo: inst?.sitio?.logo ?? null, favicon: inst?.sitio?.favicon ?? null, whatsapp: inst?.sitio?.whatsapp ?? null,
+});
+
+/** HU-1509 · El dominio guardado en los ajustes de la versión manda sobre `SITIO_URL` para canonical, sitemap y robots. */
+export function conDominio(inst: Pick<Instantanea, 'sitio'> | null | undefined, op: OpcionesRender): OpcionesRender {
+  return inst?.sitio?.dominio ? { ...op, sitioUrl: `https://${inst.sitio.dominio}` } : op;
 }
 
 type Elemento = NonNullable<PaginaServida['bloques'][number]['elementos']>[number];
@@ -57,12 +72,17 @@ const LOGO = h('span', { className: 'logo', 'aria-hidden': 'true' },
   h('svg', { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: '#fff', strokeWidth: 2.4, strokeLinecap: 'round' },
     h('path', { d: 'M6 6l12 12M18 6L6 18' }), h('circle', { cx: 6, cy: 6, r: 2.2, fill: '#fff' }), h('circle', { cx: 18, cy: 18, r: 2.2, fill: '#fff' })));
 
-function Cabecera({ menu, base, idioma, actual }: { menu: EnlacePublico[]; base: string; idioma: Idioma; actual: string }) {
+function Marcador({ marca, base }: { marca: Marca; base: string }) {
+  const logo = marca.logo ? h('img', { className: 'logo-img', src: `${base}/${CARPETA_MARCA}/${marca.logo.archivo}`, alt: '', width: 32, height: 32 }) : LOGO;
+  return h(Fragment, null, logo, marca.nombre === NOMBRE_POR_DEFECTO ? h('span', null, 'Aptio ', h('b', null, 'SCORM')) : h('span', null, marca.nombre));
+}
+
+function Cabecera({ menu, base, idioma, actual, marca }: { menu: EnlacePublico[]; base: string; idioma: Idioma; actual: string; marca: Marca }) {
   const t = INTERFAZ[idioma];
   const lista = () => h('ul', null, menu.map((e) => h('li', { key: e.ruta + e.texto }, h(Enlace, { e, base, actual }))));
   return h('header', { className: 'shead' },
     h('div', { className: 'in' },
-      h('a', { className: 'wm', href: `${base}${idioma === 'en' ? '/en' : '/'}` }, LOGO, h('span', null, 'Aptio ', h('b', null, 'SCORM'))),
+      h('a', { className: 'wm', href: `${base}${idioma === 'en' ? '/en' : '/'}` }, h(Marcador, { marca, base })),
       menu.length ? h(Fragment, null,
         h('nav', { className: 'nav-escritorio', 'aria-label': t.principal }, lista()),
         h('details', { className: 'menu-celular' },
@@ -70,16 +90,16 @@ function Cabecera({ menu, base, idioma, actual }: { menu: EnlacePublico[]; base:
           h('nav', { className: 'nav-celular', 'aria-label': `${t.principal} (${t.menu.toLowerCase()})` }, lista()))) : null));
 }
 
-function Pie({ pie, base, idioma, anio }: { pie: NavegacionPublica['pie']; base: string; idioma: Idioma; anio: number }) {
+function Pie({ pie, base, idioma, anio, nombre }: { pie: NavegacionPublica['pie']; base: string; idioma: Idioma; anio: number; nombre: string }) {
   const t = INTERFAZ[idioma];
   return h('footer', { className: 'sfoot', 'aria-label': t.pie },
     h('div', { className: 'in' },
       h('div', { className: 'cols' },
-        h('div', null, h('p', { className: 'flogo' }, 'Aptio SCORM'), h('p', { style: { marginTop: 12 } }, PIE.marca)),
+        h('div', null, h('p', { className: 'flogo' }, nombre), h('p', { style: { marginTop: 12 } }, PIE.marca)),
         pie.map((c) => h('div', { key: c.titulo },
           h('h2', null, c.ruta ? h(Enlace, { e: { texto: c.titulo, ruta: c.ruta, externo: c.externo ?? false }, base }) : c.titulo),
           h('ul', null, c.enlaces.map((e) => h('li', { key: e.ruta + e.texto }, h(Enlace, { e, base }))))))),
-      h('p', { className: 'bottom' }, `© ${anio} Aptio SCORM. ${t.derechos}`)));
+      h('p', { className: 'bottom' }, `© ${anio} ${nombre}. ${t.derechos}`)));
 }
 
 const ANA = h('svg', { viewBox: '0 0 72 96', role: 'img', 'aria-label': 'Ana, la presentadora' },
@@ -187,8 +207,8 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
   }
 }
 
-function Documento({ titulo, descripcion, canonical, idioma, entorno, base, children }: {
-  titulo: string; descripcion: string; canonical: string | null; idioma: Idioma; entorno: EntornoSitio; base: string; children?: ReactNode;
+function Documento({ titulo, descripcion, canonical, idioma, entorno, base, favicon, robots, children }: {
+  titulo: string; descripcion: string; canonical: string | null; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -198,28 +218,35 @@ function Documento({ titulo, descripcion, canonical, idioma, entorno, base, chil
       h('title', null, titulo),
       h('meta', { name: 'description', content: descripcion }),
       canonical ? h('link', { rel: 'canonical', href: canonical }) : null,
-      h('meta', { name: 'robots', content: entorno === 'produccion' && canonical ? 'index, follow' : 'noindex, nofollow' }),
+      h('meta', { name: 'robots', content: robots ?? (entorno === 'produccion' && canonical ? 'index, follow' : 'noindex, nofollow') }),
       h('meta', { name: 'theme-color', content: '#004ECC' }),
+      favicon ? h('link', { rel: 'icon', href: `${base}/${CARPETA_MARCA}/${favicon.archivo}`, type: favicon.mime }) : null,
       lista.filter((f) => f.precargar).map((f) => h('link', { key: f.archivo, rel: 'preload', href: `${base}/${CARPETA_FUENTES}/${f.archivo}`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })),
       h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO } })),
     h('body', null, children));
 }
 
-function Marco({ nav, op, idioma, actual, children }: { nav: NavegacionPublica; op: OpcionesRender; idioma: Idioma; actual: string; children?: ReactNode }) {
+function Marco({ nav, op, idioma, actual, marca, children }: { nav: NavegacionPublica; op: OpcionesRender; idioma: Idioma; actual: string; marca: Marca; children?: ReactNode }) {
   const t = INTERFAZ[idioma];
   return h(Fragment, null,
     h('a', { className: 'saltar', href: '#contenido' }, t.saltar),
     op.entorno === 'pruebas' ? h('p', { className: 'aviso-pruebas' }, t.pruebas) : null,
-    h(Cabecera, { menu: nav.menu, base: op.base, idioma, actual }),
+    h(Cabecera, { menu: nav.menu, base: op.base, idioma, actual, marca }),
     h('main', { id: 'contenido', tabIndex: -1 }, children),
-    h(Pie, { pie: nav.pie, base: op.base, idioma, anio: op.anio ?? new Date().getFullYear() }));
+    h(Pie, { pie: nav.pie, base: op.base, idioma, anio: op.anio ?? new Date().getFullYear(), nombre: marca.nombre }),
+    marca.whatsapp ? h('a', { className: 'whatsapp', href: enlaceWhatsapp(marca.whatsapp), target: '_blank', rel: 'noopener', 'aria-label': `${t.whatsapp} ${t.pestanaNueva}` }, WHATSAPP) : null);
 }
+
+const WHATSAPP = h('svg', { width: 28, height: 28, viewBox: '0 0 24 24', 'aria-hidden': 'true', fill: '#fff' },
+  h('path', { d: 'M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.6-.3z' }));
 
 const documento = (nodo: ReactNode) => `<!doctype html>${renderToStaticMarkup(nodo)}`;
 const sinBarra = (u: string) => u.replace(/\/+$/, '');
 
 /** El HTML completo de una página de la instantánea, o `null` si no está publicada en ella. */
-export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string, op: OpcionesRender): string | null {
+export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string, opciones: OpcionesRender): string | null {
+  const op = conDominio(inst, opciones);
+  const marca = marcaDe(inst);
   const p = paginaServida(inst, ruta, idioma, op.entorno);
   if (!p) return null;
   const i = idiomaDe(p.idioma);
@@ -235,20 +262,37 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     hayH1 ? null : h('section', { className: 'titulo-pagina' }, h('div', { className: 'in' }, h('h1', null, p.titulo))),
     bloques);
   return documento(h(Documento, {
-    titulo: p.ruta === '/' ? `Aptio SCORM · ${p.titulo}` : `${p.titulo} · Aptio SCORM`, descripcion: DESCRIPCION,
-    canonical: sinBarra(op.sitioUrl) + publica, idioma: i, entorno: op.entorno, base: op.base,
-  }, h(Marco, { nav: inst.navegacion, op, idioma: i, actual: p.ruta }, cuerpo)));
+    titulo: p.ruta === '/' ? `${marca.nombre} · ${p.titulo}` : `${p.titulo} · ${marca.nombre}`, descripcion: DESCRIPCION,
+    canonical: sinBarra(op.sitioUrl) + publica, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
+  }, h(Marco, { nav: inst.navegacion, op, idioma: i, actual: p.ruta, marca }, cuerpo)));
 }
 
 /** La página 404 del sitio, con el menú y el pie de la versión (o sin ellos si aún no hay versión). */
 export function renderizar404(inst: Instantanea | null, op: OpcionesRender, idioma: string = 'es'): string {
   const i = idiomaDe(idioma);
   const t = INTERFAZ[i];
-  return documento(h(Documento, { titulo: `${t.noEncontrada} · Aptio SCORM`, descripcion: t.noEncontradaTexto, canonical: null, idioma: i, entorno: op.entorno, base: op.base },
-    h(Marco, { nav: inst?.navegacion ?? { menu: [], pie: [] }, op, idioma: i, actual: '' },
+  const marca = marcaDe(inst);
+  return documento(h(Documento, { titulo: `${t.noEncontrada} · ${marca.nombre}`, descripcion: t.noEncontradaTexto, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon },
+    h(Marco, { nav: inst?.navegacion ?? { menu: [], pie: [] }, op, idioma: i, actual: '', marca },
       h('section', { className: 'no-encontrada' }, h('div', { className: 'in' },
         h('h1', null, t.noEncontrada), h('p', null, t.noEncontradaTexto),
         h('a', { className: 'btn primary', href: `${op.base}${i === 'en' ? '/en' : '/'}` }, t.volver))))));
+}
+
+/**
+ * HU-1509 · CP-121 · La página de aviso del modo mantenimiento (se sirve con 503): solo la marca, el aviso y el mensaje
+ * opcional del superadmin, sin menú ni enlaces, y `noindex`. El texto se escapa como todo lo demás (RN-16-7).
+ */
+export function renderizarMantenimiento(inst: Pick<Instantanea, 'sitio'> | null, op: OpcionesRender, mensaje: string | null, idioma: string = 'es'): string {
+  const i = idiomaDe(idioma);
+  const t = INTERFAZ[i];
+  const marca = { ...marcaDe(inst), whatsapp: null };
+  return documento(h(Documento, { titulo: `${t.mantenimiento} · ${marca.nombre}`, descripcion: t.mantenimientoTexto, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon, robots: 'noindex, nofollow' },
+    h(Fragment, null,
+      h('header', { className: 'shead' }, h('div', { className: 'in' }, h('span', { className: 'wm' }, h(Marcador, { marca, base: op.base })))),
+      h('main', { id: 'contenido' },
+        h('section', { className: 'mantenimiento' }, h('div', { className: 'in' },
+          h('h1', null, t.mantenimiento), h('p', null, t.mantenimientoTexto), mensaje ? h('p', null, mensaje) : null))))));
 }
 
 const escaparXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -271,7 +315,8 @@ export function robotsTxt(op: OpcionesRender): string {
 export interface ArchivoSitio { archivo: string; contenido: string; mime: string }
 
 /** Todos los archivos de una versión: una página por ruta e idioma, la 404, el sitemap y robots.txt. */
-export function renderizarSitio(inst: Instantanea, op: OpcionesRender): ArchivoSitio[] {
+export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): ArchivoSitio[] {
+  const op = conDominio(inst, opciones);
   const html = 'text/html; charset=utf-8';
   const paginas = inst.paginas.flatMap((p) => {
     const contenido = renderizarPagina(inst, p.ruta, p.idioma, op);
