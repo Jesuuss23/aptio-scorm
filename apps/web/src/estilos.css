@@ -189,7 +189,8 @@ ul.fila-chips {
   font-size: var(--texto-sm);
   font-weight: 600;
 }
-.opcion[aria-pressed='true'] {
+.opcion[aria-pressed='true'],
+.opcion[aria-selected='true'] {
   border-color: var(--color-cobalto);
   background: var(--color-cobalto-suave);
   color: var(--color-cobalto);
@@ -2758,4 +2759,40 @@ ul.fila-chips {
 .datos-pagina dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/* HU-1504 · Sitio web › Contenido (PNT-27). */
+.elemento-campos {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px 12px;
+}
+.elemento-campos .campo.ancho {
+  grid-column: 1 / -1;
+}
+.elemento-campos textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+.elemento-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.bloque-fila .nota {
+  flex-basis: 100%;
+  margin: 0;
+}
+.elemento-fila {
+  align-items: flex-start;
+  padding: 12px;
+}
+.elemento-guardar {
+  grid-column: 1 / -1;
+}
+.elemento-guardar .nota {
+  flex-basis: auto;
 }

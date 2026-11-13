@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, type SitioPagina } from '@aptio/db';
 import { rutaSitioValida } from '@aptio/db';
 import { bloquesPublicos } from '@aptio/schema/sitio-bloques';
+import { COLECCION_DE_BLOQUE, elementosDeBloque } from '@aptio/schema/sitio-contenido';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { AccionPagina, PaginaPublicaDto, PaginaSitioCambioDto, PaginaSitioDto, PaginaSitioEntradaDto } from './sitio.dto.js';
@@ -100,7 +101,19 @@ export class SitioService {
     // RN-16-4 · Si la página no está publicada no se expone nada, tampoco sus bloques.
     if (!p || p.estado !== 'PUBLICADA' || !p.publicadaEn) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'Página no encontrada' });
     // HU-1503 · Los bloques se ven al instante hasta que la HU-1507 sume versiones (SUP-172).
-    const bloques = bloquesPublicos(p.bloques).map((b) => ({ tipo: b.tipo, ajustes: (b.ajustes as Record<string, unknown> | null) ?? null }));
+    const visibles = bloquesPublicos(p.bloques);
+    // HU-1504 · Cascada página → bloque → elemento (RN-16-4): solo los elementos visibles de los bloques visibles (CP-114).
+    const colecciones: string[] = [...new Set(visibles.flatMap((b) => COLECCION_DE_BLOQUE[b.tipo] ?? []))];
+    const elementos = colecciones.length
+      ? await this.bd.sitioElemento.findMany({ where: { coleccion: { in: colecciones }, visible: true }, orderBy: { orden: 'asc' } })
+      : [];
+    const bloques = visibles.map((b) => {
+      const propios = elementosDeBloque(b.tipo, p.ruta, elementos);
+      return {
+        tipo: b.tipo, ajustes: (b.ajustes as Record<string, unknown> | null) ?? null,
+        ...(propios ? { elementos: propios.map((e) => ({ datos: e.datos as Record<string, string | number> })) } : {}),
+      };
+    });
     return { ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: p.publicadaEn.toISOString(), bloques };
   }
 

@@ -776,3 +776,18 @@ model SitioBloque {
 
   @@index([paginaId, orden])
 }
+
+/// Elemento de contenido del sitio comercial (HU-1504, REQ-066, PNT-27): cifras, testimonios, logos, funcionalidades,
+/// pasos, LMS y preguntas. Los campos de `datos` los fija `@aptio/schema/sitio-contenido`; nace oculto (RN-16-2).
+model SitioElemento {
+  id            String   @id @default(uuid()) @db.Uuid
+  coleccion     String
+  /// Posición 0, 1, 2… sin huecos dentro de la colección.
+  orden         Int
+  visible       Boolean  @default(false)
+  datos         Json
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([coleccion, orden])
+}

@@ -23,6 +23,7 @@ import { ConexionesIA } from './vistas/ConexionesIA';
 import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
+import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
 
@@ -129,6 +130,8 @@ export function App() {
         <SitioResumen />
       ) : vista?.activo === '/sitio/paginas' && veSitio ? (
         <SitioPaginas />
+      ) : vista?.activo === '/sitio/contenido' && veSitio ? (
+        <SitioContenido />
       ) : vista?.activo === '/operacion' && veOperacion ? (
         <OperacionVista />
       ) : vista?.activo === '/conexiones-ia' && veConexiones ? (

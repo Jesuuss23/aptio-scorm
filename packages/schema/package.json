@@ -46,6 +46,7 @@
     "./rentabilidad": "./src/rentabilidad.ts",
     "./conexiones": "./src/conexiones.ts",
     "./operacion": "./src/operacion.ts",
-    "./sitio-bloques": "./src/sitio-bloques.ts"
+    "./sitio-bloques": "./src/sitio-bloques.ts",
+    "./sitio-contenido": "./src/sitio-contenido.ts"
   }
 }
