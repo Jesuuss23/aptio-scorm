@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.56 · actualizado con la cuarta entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.57 · actualizado con la quinta entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -705,6 +705,13 @@ Un borrador o una página programada no se ven en el sitio: quien abra su direcc
 3. **Mostrar u ocultar:** con el interruptor. Un elemento oculto deja de verse en **todas** las páginas y conserva sus datos.
 4. **Cambiar el orden** con las flechas ↑ y ↓, y **borrar** con confirmación.
 
+**Datos ficticios.** Si un dato es inventado (por ejemplo, un testimonio de ejemplo), marca su casilla **Ficticio**: aparece el distintivo «Ficticio» y sube el contador **Datos ficticios visibles** de arriba. Mientras haya alguno visible:
+
+- **En el sitio real (producción)** ninguna página se puede publicar: al pulsar **Publicar** aparece la lista de los datos ficticios y el botón **Ocultar todos los ficticios**, que los oculta y publica la página en un solo clic. Una página programada espera y se publica sola cuando ya no queda ninguno. El sitio real nunca muestra un dato ficticio.
+- **En el sitio de pruebas** la página se publica igual y aparece un aviso con la cantidad.
+
+El mismo botón **Ocultar todos los ficticios** está en Contenido. Ocultarlos no los borra ni les quita la marca.
+
 Las preguntas sin página salen en el bloque Preguntas de todas las páginas; si les pones una ruta (por ejemplo `/precios`), salen además solo en esa página. Los logos por ahora son solo el nombre. Un elemento se ve en el sitio solo si su página está publicada y su bloque está visible.
 
 Si la página ya está publicada, estos cambios se ven en el sitio al momento. Si está en borrador o programada, el sitio no muestra nada de ella. La edición del contenido de cada bloque, la vista previa y el SEO llegarán en próximas entregas.
@@ -801,6 +808,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.54 | 2026-11-13 | Sitio web › Páginas (8.28): nueva página, publicar, programar en hora de Lima, pasar a borrador y borrar; el Resumen cuenta las páginas por estado. |
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
+| 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |

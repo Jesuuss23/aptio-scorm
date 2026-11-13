@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.56 · actualizado con la cuarta entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.57 · actualizado con la quinta entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -383,6 +383,13 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Rutas (solo SUPERADMIN):** `GET`, `POST` y `PATCH /sitio/elementos` (listar por `coleccion`, agregar, reordenar con la lista completa) y `PATCH` y `DELETE /sitio/elementos/{id}` (datos parciales o visibilidad; borrar y compactar). Cada cambio deja una fila `SITIO_ELEMENTO_*` o `SITIO_ELEMENTOS_REORDENADOS` en la auditoría.
 - **Sitio público:** en `GET /publico/paginas`, cada bloque visible con colección trae sus `elementos` visibles en orden; la visibilidad va en cascada página → bloque → elemento (RN-16-4, CP-114). Las preguntas generales salen en todas las páginas y las de una ruta solo en esa (SUP-177).
 
+### 3.15 Datos ficticios y bloqueo de publicación (HU-1505)
+
+- **Entorno (`SITIO_ENTORNO`):** `pruebas` o, si falta o trae otro valor, `produccion` (SUP-179). Lo leen la API en cada uso y el worker en cada vuelta.
+- **Regla (RN-16-3):** un `SitioElemento` con `ficticio` y `visible` bloquea en producción publicar cualquier página: `PATCH` o `POST /sitio/paginas` con `accion=publicar` responde 409 FICTICIOS_VISIBLES con la lista (CP-116). En pruebas publica y devuelve `avisoFicticios` (CP-117). `GET /sitio/ficticios` lista los visibles y `POST /sitio/ficticios/ocultar` los oculta de una vez, con auditoría.
+- **Programadas:** en producción la tarea de 30 s no publica mientras haya ficticios visibles; deja SITIO_PAGINA_BLOQUEADA una vez en la auditoría y publica en la primera vuelta sin ficticios (SUP-181).
+- **Sitio público:** en producción `GET /publico/paginas` nunca devuelve ficticios; en pruebas salen con `ficticio: true` (SUP-182).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -513,6 +520,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.54 | 2026-11-13 | Páginas del sitio con estados y programación (3.12): la tabla `SitioPagina`, las rutas públicas con su límite por IP, el sitemap y la publicación programada cada 30 s. |
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
+| 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
 | 0.53 | 2026-11-13 | Superadmin de plataforma (3.11 y 5): rutas `/sitio/*` solo para SUPERADMIN y el grupo «Sitio web» con «Resumen». |
 | 0.52 | 2026-11-13 | Kit de gamificación para el LMS (3.3.0.3): formato KIT_GAMIFICACION en la cola `export`, insignias SVG y PNG con resvg, plan y guía por LMS. |
 | 0.50 | 2026-11-13 | Comentarios del revisor del cliente (3.9): alcance por cliente y organización, texto plano inmutable, resolver solo el equipo con auditoría y sin cambiar la aprobación. |
