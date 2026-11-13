@@ -371,6 +371,8 @@ model TrabajoIA {
   intentos       Int            @default(0)
   error          String?
   duracionMs     Int?
+  /// HU-0206 · Lo que deja una tarea sin curso ni proyecto, p. ej. la propuesta de kit (IA-18) con su cliente y evidencias.
+  resultado      Json?
   creadoEn       DateTime       @default(now())
 
   proyecto     Proyecto?    @relation(fields: [proyectoId], references: [id])

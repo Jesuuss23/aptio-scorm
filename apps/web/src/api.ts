@@ -108,6 +108,26 @@ export interface Kit extends KitEntrada {
   contraste: { textoFondo: number; cumpleAA: boolean };
   advertencias: { codigo: string; mensaje: string; colores: string[]; relacion: number }[];
 }
+/** HU-0206 · La propuesta de kit desde un curso anterior o un manual de marca (IA-18 v2). */
+export interface PropuestaKit {
+  trabajoId: string;
+  estado: 'procesando' | 'lista' | 'error';
+  recursoId: string;
+  nombreArchivo: string;
+  creadoEn: string;
+  evidencias?: { origen: 'zip' | 'pdf'; leidos: number; colores: { valor: string; veces: number }[]; fuentes: { valor: string; veces: number }[]; avisos: string[] };
+  propuesta?: {
+    paleta: Paleta;
+    tipografias: { titulos: string; texto: string; alternativasLibres?: string[] };
+    tipografiaMarca: { titulos: string; texto: string };
+    estilo: { ilustracion: string; esquinas: string; tono: string; kit: KitEntrada['estilo'] };
+    contrasteOk: boolean;
+    evidencias: string[];
+    confianza: number;
+  };
+  avisosTipografia: string[];
+  error?: { codigo: string; mensaje: string };
+}
 export interface Recurso {
   id: string;
   tipo: string;
@@ -584,6 +604,10 @@ export const api = {
   exportacion: (id: string) => pedir<Exportacion>(`/exportaciones/${id}`),
   kit: (clienteId: string) => pedir<Kit>(`/clientes/${clienteId}/kit`),
   guardarKit: (clienteId: string, datos: KitEntrada) => pedir<Kit>(`/clientes/${clienteId}/kit`, json(datos, 'PUT')),
+  // HU-0206 · Kit propuesto desde un curso anterior (ZIP) o un manual de marca (PDF).
+  extraerKit: (clienteId: string, recursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/clientes/${clienteId}/kit/extraer`, json({ recursoId })),
+  propuestaKit: (clienteId: string) => pedir<PropuestaKit>(`/clientes/${clienteId}/kit/propuesta`),
+  descartarPropuestaKit: (clienteId: string) => pedir<void>(`/clientes/${clienteId}/kit/propuesta`, { method: 'DELETE' }),
   pantallasModelo: (clienteId: string) => pedir<PantallaModelo[]>(`/clientes/${clienteId}/kit/pantallas-modelo`),
   guardarPantallaModelo: (clienteId: string, datos: PantallaModeloEntrada, id?: string) =>
     id

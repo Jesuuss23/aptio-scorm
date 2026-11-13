@@ -32,6 +32,8 @@ export interface DatosTrabajo {
    * el material de audio, el recurso que se usa (original o limpio) y quién autorizó usarla y cuándo (RN-07-4).
    */
   grabacion?: { materialId: string; recursoId: string; version: 'original' | 'limpio'; autorizadoPor: string; autorizadoEn: string };
+  /** HU-0206 · El kit propuesto desde un ZIP o PDF del cliente (IA-18 v2); `trabajoId` es entonces el TrabajoIA. */
+  kit?: { clienteId: string; recursoId: string };
 }
 
 export type EstadoTrabajo = 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';

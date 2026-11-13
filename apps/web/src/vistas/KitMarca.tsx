@@ -3,6 +3,7 @@ import './fuentes-kit';
 import { type CSSProperties, useEffect, useState } from 'react';
 import { BOCAS, ESTILOS_KIT, FUENTES_KIT, KIT_INICIAL, type Paleta, revisarPaleta, type RolColor } from '@aptio/schema/marca';
 import { PantallasModelo } from './PantallasModelo';
+import { PropuestaKitPanel } from './PropuestaKit';
 import { api, EDITAN_KIT, ErrorApi, type Kit, type KitEntrada, type Rol, type Voz } from '../api';
 
 const NOMBRE_COLOR: Record<RolColor, string> = {
@@ -121,6 +122,18 @@ export function KitMarca({ clienteId, rol, conIngles, alGuardar }: { clienteId: 
 
       <div className="kit-columnas">
         <fieldset className="sin-borde kit-campos" disabled={!puedeEditar || ocupado}>
+          {puedeEditar ? (
+            <PropuestaKitPanel
+              key={clienteId}
+              clienteId={clienteId}
+              deshabilitado={ocupado}
+              alAplicar={(p) => {
+                // Solo llena el formulario: la vista previa y las pantallas modelo cambian al instante, sin guardar (CP-020).
+                setDatos({ ...datos, estilo: p.estilo.kit, paleta: { ...p.paleta }, tipografias: { titulos: p.tipografias.titulos, textos: p.tipografias.texto } });
+                setAviso('');
+              }}
+            />
+          ) : null}
           <div className="kit-bloque">
             <h3>Paleta</h3>
             <div className="kit-colores">

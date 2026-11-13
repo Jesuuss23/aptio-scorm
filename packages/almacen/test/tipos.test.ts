@@ -52,4 +52,11 @@ describe('tipo real de los archivos (RN-14-1)', () => {
     }, 'application/pdf');
     expect(pedidos).toEqual([BYTES_CABECERA]);
   });
+
+  it('HU-0206 · acepta un zip de curso anterior por su contenido y rechaza un PDF declarado como zip', async () => {
+    const zip = new Uint8Array([0x50, 0x4b, 0x03, 0x04, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0x61, 0x2e, 0x63, 0x73, 0x73]);
+    expect(PERMITIDOS['application/zip']).toMatchObject({ tipo: 'DOCUMENTO' });
+    expect(await verificarTipo(zip, 'application/zip')).toMatchObject({ valido: true, mimeReal: 'application/zip' });
+    expect(await verificarTipo(PDF, 'application/zip')).toMatchObject({ valido: false, mimeReal: 'application/pdf' });
+  });
 });
