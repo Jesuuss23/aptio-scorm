@@ -272,6 +272,15 @@ export interface Curso {
 export type TextoI18n = { es?: string; en?: string };
 
 /** HU-0501 · Observación de una pantalla (reglas, IA o personas). */
+/** HU-0506 · Comentario de una pantalla: el texto no se edita; el equipo lo resuelve o lo reabre. */
+export interface Comentario {
+  id: string; cursoId: string; pantallaId: string; autor: { id: string; nombre: string; rol: Rol }; texto: string;
+  resuelto: boolean; resueltoPor: string | null; resueltoEn: string | null; creadoEn: string;
+}
+/** HU-0506 · Resuelven y reabren comentarios los del equipo (el revisor del cliente solo comenta). */
+export const RESUELVEN_COMENTARIOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'DISENADOR_GRAFICO', 'PRODUCTOR'];
+export const MAX_COMENTARIO = 1000;
+
 export interface Observacion {
   id: string;
   pantallaId: string | null;
@@ -610,6 +619,9 @@ export const api = {
   limpiarAudio: (materialId: string) => pedir<{ estado: 'procesando' | 'listo' }>(`/materiales/${materialId}/limpiar`, { method: 'POST' }),
   regenerarNarraciones: (cursoId: string, datos: { pantallaIds?: string[]; soloDesactualizadas?: boolean; idiomas?: ('es' | 'en')[] } = {}) =>
     pedir<Regeneracion>(`/cursos/${cursoId}/narraciones/regenerar`, json(datos)),
+  comentarios: (cursoId: string) => pedir<Comentario[]>(`/cursos/${cursoId}/comentarios`),
+  comentar: (cursoId: string, pantallaId: string, texto: string) => pedir<Comentario>(`/cursos/${cursoId}/comentarios`, json({ pantallaId, texto })),
+  resolverComentario: (id: string, resuelto: boolean) => pedir<Comentario>(`/comentarios/${id}`, json({ resuelto }, 'PATCH')),
   observaciones: (cursoId: string) => pedir<Observacion[]>(`/cursos/${cursoId}/observaciones?resuelta=false`),
   /** HU-0505 · «✦ Revisar con IA» (IA-12) y descartar una observación de la IA. */
   controlCalidad: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/control-calidad`, { method: 'POST' }),

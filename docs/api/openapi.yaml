@@ -2265,6 +2265,9 @@ paths:
       - Revisión
       summary: Listar comentarios
       operationId: get_cursos_cursoId_comentarios
+      description: |-
+        HU-0506 · Comentarios del curso en orden cronológico (REQ-058). Lo usan el equipo y REVISOR_CLIENTE; el revisor
+        solo ve los cursos de los proyectos de su cliente (otro cliente u otra organización responde 404).
       parameters:
       - name: cursoId
         in: path
@@ -2292,7 +2295,10 @@ paths:
       - Revisión
       summary: Comentar una pantalla
       operationId: post_cursos_cursoId_comentarios
-      description: REVISOR_CLIENTE puede comentar, no editar
+      description: |-
+        HU-0506 · Comenta una pantalla del curso (CP-055). REVISOR_CLIENTE puede comentar pero no editar. Texto plano de 1
+        a 1000 caracteres (se recorta). Comentar no cambia el estado de aprobación de la pantalla. 422 VALIDACION si el
+        texto está vacío o es muy largo, y PANTALLA_NO_EXISTE si la pantalla no está en el curso.
       parameters:
       - name: cursoId
         in: path
@@ -2325,8 +2331,11 @@ paths:
     patch:
       tags:
       - Revisión
-      summary: Resolver comentario
+      summary: Resolver o reabrir un comentario
       operationId: patch_comentarios_comentarioId
+      description: |-
+        HU-0506 · Solo el equipo (403 para REVISOR_CLIENTE). Marca o desmarca el comentario como resuelto, guarda quién
+        y cuándo, y deja COMENTARIO_RESUELTO o COMENTARIO_REABIERTO en la auditoría. El texto no se edita ni se borra.
       parameters:
       - name: comentarioId
         in: path
@@ -2339,7 +2348,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Comentario'
+              $ref: '#/components/schemas/ResolverComentario'
       responses:
         '200':
           description: OK
@@ -6043,38 +6052,93 @@ components:
         resuelta:
           type: boolean
           description: true descarta la observación de la IA; false la reabre.
+    AutorComentario:
+      type: object
+      required:
+      - id
+      - nombre
+      - rol
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        rol:
+          type: string
+          enum:
+          - SUPERADMIN
+          - ADMINISTRADOR
+          - DISENADOR_INSTRUCCIONAL
+          - DISENADOR_GRAFICO
+          - PRODUCTOR
+          - REVISOR_CLIENTE
+          description: REVISOR_CLIENTE se muestra con el distintivo «Cliente».
     Comentario:
       type: object
       required:
       - id
+      - cursoId
       - pantallaId
+      - autor
       - texto
+      - resuelto
+      - resueltoPor
+      - resueltoEn
+      - creadoEn
       properties:
         id:
+          type: string
+          format: uuid
+        cursoId:
           type: string
           format: uuid
         pantallaId:
           type: string
         autor:
-          type: string
+          $ref: '#/components/schemas/AutorComentario'
         texto:
           type: string
+          minLength: 1
+          maxLength: 1000
         resuelto:
           type: boolean
+        resueltoPor:
+          type: string
+          nullable: true
+          description: Nombre de quien lo resolvió; null si está abierto.
+        resueltoEn:
+          type: string
+          format: date-time
+          nullable: true
         creadoEn:
           type: string
           format: date-time
     ComentarioEntrada:
       type: object
+      additionalProperties: false
       required:
       - pantallaId
       - texto
       properties:
         pantallaId:
           type: string
+          minLength: 1
+          maxLength: 80
         texto:
           type: string
           minLength: 1
+          maxLength: 1000
+          description: Texto plano (sin caracteres de control salvo saltos de línea y tabulaciones); se recorta.
+    ResolverComentario:
+      type: object
+      additionalProperties: false
+      required:
+      - resuelto
+      properties:
+        resuelto:
+          type: boolean
+          description: true lo marca como resuelto; false lo reabre.
     Narracion:
       type: object
       required:

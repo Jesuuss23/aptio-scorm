@@ -124,7 +124,15 @@ function resumenCostos(q: URLSearchParams) {
   };
 }
 
+/** HU-0506 · Un comentario de la simulación (la lista se puede compartir entre dos páginas de la misma prueba). */
+export interface ComentarioSim {
+  id: string; cursoId: string; pantallaId: string; autor: { id: string; nombre: string; rol: string }; texto: string;
+  resuelto: boolean; resueltoPor: string | null; resueltoEn: string | null; creadoEn: string;
+}
+
 export interface OpcionesSimulacion {
+  /** HU-0506 · Comentarios del curso; pasa el mismo arreglo a dos páginas para que vean lo mismo. */
+  comentarios?: ComentarioSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -347,7 +355,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [] }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -798,6 +806,30 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).
     if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);
+    // HU-0506 · Comentarios: todos comentan; solo el equipo resuelve o reabre (CP-055).
+    if (ruta === `/cursos/${CURSO_ID}/comentarios`) {
+      if (req.method() === 'GET') return responder(200, comentarios);
+      const { pantallaId, texto } = req.postDataJSON() as { pantallaId: string; texto: string };
+      const limpio = (texto ?? '').trim();
+      if (!limpio || limpio.length > 1000) return responder(422, { codigo: 'VALIDACION', mensaje: 'El comentario admite de 1 a 1000 caracteres' });
+      if (!pantallasDe(revision.documento as unknown as CursoDoc).some((p) => p.id === pantallaId)) return responder(422, { codigo: 'PANTALLA_NO_EXISTE', mensaje: 'La pantalla no existe en el curso' });
+      const nuevo: ComentarioSim = {
+        id: `00000000-0000-4000-8000-${String(comentarios.length + 1).padStart(12, '0')}`, cursoId: CURSO_ID, pantallaId,
+        autor: { id: usuario.id, nombre: usuario.nombre, rol: usuario.rol }, texto: limpio, resuelto: false, resueltoPor: null, resueltoEn: null,
+        creadoEn: new Date().toISOString(),
+      };
+      comentarios.push(nuevo);
+      return responder(201, nuevo);
+    }
+    const resolverComentario = ruta.match(/^\/comentarios\/([^/]+)$/);
+    if (resolverComentario && req.method() === 'PATCH') {
+      if (usuario.rol === 'REVISOR_CLIENTE') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
+      const c = comentarios.find((x) => x.id === resolverComentario[1]);
+      if (!c) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Comentario no encontrado' });
+      const { resuelto } = req.postDataJSON() as { resuelto: boolean };
+      Object.assign(c, resuelto ? { resuelto, resueltoPor: usuario.nombre, resueltoEn: new Date().toISOString() } : { resuelto, resueltoPor: null, resueltoEn: null });
+      return responder(200, c);
+    }
     // HU-0704 · Audio del cliente: la limpieza termina a la 2.ª consulta y la grabación, en la 2.ª consulta de narraciones.
     if (ruta === `/cursos/${CURSO_ID}/audios-cliente`) {
       if (!conAudioCliente) return responder(200, []);
