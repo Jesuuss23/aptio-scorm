@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.52 · actualizado con la sexta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.53 · actualizado con la primera entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -87,6 +87,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - **Errores:** siempre `{ codigo, mensaje, detalles }` (`apps/api/src/comun/filtro-errores.ts`). Usa 422 para datos inválidos con un `codigo` en mayúsculas (por ejemplo, `SIN_MATERIAL`), 404 cuando no existe o no es de la organización, y 409 para conflictos (`GENERACION_ACTIVA`, `KIT_DESACTUALIZADO`).
 - **Sesión y roles:** toda ruta exige sesión salvo `@Publico()`, y `@Roles(...)` la limita por rol (`guarda-roles.ts`).
 - **Alcance por organización:** toda consulta filtra por `organizacionId` (`organizacionDe(u)`). El `REVISOR_CLIENTE` además queda limitado a su `clienteId`.
+- **Superadmin (ADR-011):** `SUPERADMIN` no tiene organización (`organizacionId` null). Las rutas de la fase comercial (`/sitio/*`, y más adelante `/ventas/*`) llevan `@Roles('SUPERADMIN')` en el controlador (`apps/api/src/sitio/`); en la web, el grupo «Sitio web» de `menu.ts` se muestra solo a `VEN_SITIO` y `App.tsx` lleva al superadmin a `/sitio` desde cualquier otra ruta.
 - **Auditoría:** las acciones relevantes dejan una fila en `Auditoria` (por ejemplo, `MATERIAL_AGREGADO` o `RECURSO_SUBIDO`).
 
 ### 6.2 Trabajos en segundo plano
@@ -418,6 +419,7 @@ Ninguna clave real va al repositorio.
 | 0.44 | 2026-11-13 | HU-0609: `biblioteca.ts` del reproductor, `@aptio/schema/biblioteca`, el enlace de imágenes en `CursosService.editar`, `panel-imagenes.tsx` e `imagenes.spec.ts`. |
 | 0.45 | 2026-11-13 | HU-0704: `@aptio/schema/grabacion`, `GrabacionService`, `src/grabacion.ts` del worker (grabación y limpieza con ffmpeg), la protección en la etapa 6 y `PersonajeVozVista.tsx`. |
 | 0.51 | 2026-11-13 | HU-1403: el paquete `@aptio/respaldo` (copia, purga, restauración y su CLI), la tarea `respaldar` de la cola `mantenimiento`, `correo.ts` y el aviso de límite del worker, el aviso de comentario en `ComentariosService`, el módulo `operacion` de la API, `@aptio/schema/operacion` y `OperacionVista.tsx`. |
+| 0.53 | 2026-11-13 | HU-1501: el módulo `sitio` de la API con `GET /sitio/paginas` solo para SUPERADMIN, el grupo «Sitio web» en `menu.ts`, `VEN_SITIO` y `SitioResumen.tsx`, y las pruebas `sitio.e2e.test.ts` y `sitio.spec.ts`. |
 | 0.52 | 2026-11-13 | HU-1205: `construirKitGamificacion` y `kit-guias.ts` en `@aptio/exporters`, `insignias.ts` del worker con `@resvg/resvg-js`, el formato KIT_GAMIFICACION en `ExportacionesService` y el worker, y la tarjeta `KitGamificacion.tsx` de Entrega. |
 | 0.50 | 2026-11-13 | HU-0506: el módulo `comentarios` de la API (alcance con `CursosService.buscar`), la migración `comentarios_resueltos`, `comentarios.ts` y `PanelComentarios.tsx` en Revisión, y `comentarios` compartibles en la API simulada. |
 | 0.49 | 2026-11-13 | HU-1304: `@aptio/schema/conexiones`, `conexiones.ts` y `conModeloDe` del worker, `sintetizarElevenLabs`, `probarAnthropic`, el módulo `conexiones` de la API, la migración por organización y `ConexionesIA.tsx` con el medidor. |

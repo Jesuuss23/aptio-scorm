@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.52 · actualizado con la sexta entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.53 · actualizado con la primera entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -31,6 +31,7 @@ Cada persona entra con su propio usuario y ve solo lo que le corresponde a su ro
 | **Diseño gráfico** | Prepara el kit de marca de cada cliente (colores, letras, logo, personaje y pantallas modelo) y corrige textos de las pantallas. |
 | **Producción** | Crea proyectos, sube material, sigue el avance de la generación y corrige textos de las pantallas. |
 | **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos y comentar cada pantalla. No puede modificar la configuración. |
+| **Superadmin de la plataforma** | Administra el sitio comercial de Aptio SCORM desde el grupo **Sitio web**. No pertenece a ninguna empresa: no ve proyectos, clientes ni la sección Empresa. Nadie más ve el grupo Sitio web, ni siquiera Administración. |
 
 ---
 
@@ -676,6 +677,12 @@ Dentro del ZIP encuentras:
 - `plan.json` con el mismo plan, para quien configure el LMS, y `LEEME.txt` con el contenido y los créditos.
 
 Los nombres de los menús de cada LMS cambian entre versiones: por eso la guía dice «Verificar con la versión del cliente». Revísala con quien administra el LMS antes de configurarlo.
+### 8.28 Sitio web (solo superadmin)
+
+Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Sitio web › Resumen**. Por ahora el resumen dice que el sitio todavía no tiene páginas; cuando se puedan crear, ahí verás cuántas están publicadas, programadas o en borrador. Las demás opciones del grupo (Páginas, Contenido, Blog, SEO) aparecerán a medida que estén disponibles.
+
+Si otra persona escribe la dirección del sitio web en el navegador, ve «Página no encontrada».
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -762,6 +769,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
 | 0.51 | 2026-11-13 | Operación y copias de seguridad (4 y 8.26): errores por proveedor, colas, tiempo y costo por etapa, copias diarias con «Respaldar ahora», y los correos del límite de gasto (8.24) y del comentario del cliente (8.25). |
 | 0.52 | 2026-11-13 | Kit de gamificación para el LMS del cliente (8.27): insignias con la marca, plan, guía del LMS elegido y descarga desde el historial de Entrega. |
+| 0.53 | 2026-11-13 | Superadmin de la plataforma (2 y 8.28): el grupo «Sitio web» con «Resumen», solo para el superadmin. |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |
