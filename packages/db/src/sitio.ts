@@ -1,7 +1,62 @@
 // HU-1502 · Páginas del sitio comercial (M16). Reglas compartidas por la API y el worker: forma de la ruta y la
 // publicación de las programadas que ya llegaron a su hora (CP-111).
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
+import { armarInstantanea, coleccionesDeBloques, leerInstantanea, type Instantanea, type OrigenVersion } from '@aptio/schema/sitio-versiones';
+
+type Bd = PrismaClient | Prisma.TransactionClient;
+
+/**
+ * HU-1507 · La instantánea del sitio tal como está ahora en el panel: las páginas PUBLICADAS con sus bloques y elementos
+ * visibles y la navegación visible (RN-16-5). En producción no entra ningún ficticio.
+ */
+export async function armarInstantaneaActual(bd: Bd, entorno: EntornoSitio): Promise<Instantanea> {
+  const paginas = await bd.sitioPagina.findMany({ where: { estado: 'PUBLICADA' }, include: { bloques: true } });
+  const colecciones = coleccionesDeBloques(paginas.flatMap((p) => p.bloques.filter((b) => b.visible).map((b) => b.tipo)));
+  const elementos = colecciones.length ? await bd.sitioElemento.findMany({ where: { coleccion: { in: colecciones }, visible: true } }) : [];
+  const enlaces = await bd.sitioEnlace.findMany({ where: { visible: true } });
+  return armarInstantanea({ paginas, elementos, enlaces }, entorno);
+}
+
+/** HU-1507 · La última versión publicada (la que ve el sitio), o null si todavía no hay ninguna. */
+export async function ultimaVersion(bd: Bd): Promise<{ numero: number; instantanea: Instantanea; creadoEn: Date } | null> {
+  const v = await bd.sitioVersion.findFirst({ orderBy: { numero: 'desc' }, select: { numero: true, instantanea: true, creadoEn: true } });
+  return v ? { numero: v.numero, instantanea: leerInstantanea(v.instantanea), creadoEn: v.creadoEn } : null;
+}
+
+export interface NuevaVersion {
+  origen: OrigenVersion;
+  entorno: EntornoSitio;
+  usuario?: { id: string; nombre: string } | null;
+  /** Por defecto, la instantánea actual del panel; al restaurar, la de la versión restaurada. */
+  instantanea?: Instantanea;
+  restauradaDe?: number;
+}
+
+/**
+ * HU-1507 · Crea la versión siguiente (número mayor + 1). Si dos publicaciones chocan en el número único, reintenta con
+ * el siguiente. Devuelve la versión creada.
+ */
+export async function crearVersion(bd: PrismaClient, v: NuevaVersion) {
+  for (let intento = 0; ; intento++) {
+    try {
+      return await bd.$transaction(async (tx) => {
+        const instantanea = v.instantanea ?? (await armarInstantaneaActual(tx, v.entorno));
+        const mayor = await tx.sitioVersion.aggregate({ _max: { numero: true } });
+        return tx.sitioVersion.create({
+          data: {
+            numero: (mayor._max.numero ?? 0) + 1, instantanea: instantanea as unknown as Prisma.InputJsonValue,
+            publicadoPorId: v.usuario?.id ?? null, publicadoPorNombre: v.usuario?.nombre ?? null,
+            entorno: v.entorno, origen: v.origen, restauradaDe: v.restauradaDe ?? null,
+          },
+        });
+      });
+    } catch (e) {
+      if (intento < 3 && e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') continue;
+      throw e;
+    }
+  }
+}
 
 /** `/` (inicio) o `/segmento[/segmento…]` con minúsculas, números y guiones; sin `/` final ni segmentos vacíos. */
 export const RUTA_SITIO = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
@@ -15,6 +70,8 @@ export const rutaSitioValida = (ruta: string): boolean => ruta.length <= 200 && 
  * HU-1505 · En producción, si hay algún dato ficticio visible (RN-16-3), no publica: la página sigue PROGRAMADA y queda
  * SITIO_PAGINA_BLOQUEADA en la auditoría una sola vez (no en cada vuelta de 30 s). Se publica en la primera vuelta en
  * que ya no quede ninguno.
+ *
+ * HU-1507 · Si publicó alguna, crea una versión del sitio completo con origen `programada` (RN-16-5).
  */
 export async function publicarProgramadas(bd: PrismaClient, ahora: Date = new Date(), entorno: EntornoSitio = 'produccion'): Promise<string[]> {
   const vencidas = await bd.sitioPagina.findMany({
@@ -54,6 +111,10 @@ export async function publicarProgramadas(bd: PrismaClient, ahora: Date = new Da
       },
     });
     publicadas.push(p.id);
+  }
+  if (publicadas.length) {
+    const v = await crearVersion(bd, { origen: 'programada', entorno });
+    await bd.auditoria.create({ data: { accion: 'SITIO_VERSION_PUBLICADA', entidad: 'SitioVersion', entidadId: v.id, datos: { numero: v.numero, origen: 'programada', entorno, paginas: publicadas } } });
   }
   return publicadas;
 }

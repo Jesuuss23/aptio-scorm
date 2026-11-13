@@ -166,6 +166,9 @@ paths:
         FICTICIOS_VISIBLES con `detalles` (id, coleccion, nombre) (CP-116); en pruebas publica y trae `avisoFicticios`
         (CP-117). En producción la cola tampoco publica una programada mientras haya ficticios visibles: queda
         SITIO_PAGINA_BLOQUEADA en la auditoría una vez.
+        HU-1507: `publicar` una página, o pasar a `borrador` o `programar` una PUBLICADA, crea una versión del sitio
+        con origen `pagina` (el sitio completo del panel, RN-16-5) y la respuesta trae `version`. La cola crea una con
+        origen `programada` al publicar las programadas.
       requestBody:
         required: true
         content:
@@ -530,6 +533,120 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+  /sitio/publicar:
+    post:
+      tags:
+      - Sitio web
+      summary: Publicar los cambios del panel como una versión nueva del sitio (HU-1507, RN-16-5)
+      operationId: post_sitio_publicar
+      description: |-
+        Solo SUPERADMIN. Arma la instantánea del sitio completo (páginas PUBLICADAS con sus bloques y elementos visibles
+        en orden, y el menú y el pie visibles) y crea la versión siguiente, inmutable, con origen `publicacion`. El sitio
+        público sirve solo la última. En producción, con algún dato ficticio visible, 409 FICTICIOS_VISIBLES con
+        `detalles` (id, coleccion, nombre) y no crea nada (CP-116); en pruebas publica y trae `avisoFicticios` (CP-117).
+        Una instantánea de producción nunca guarda un ficticio. Auditoría SITIO_VERSION_PUBLICADA.
+      responses:
+        '201':
+          description: Versión creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionPublicada'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+  /sitio/versiones:
+    get:
+      tags:
+      - Sitio web
+      summary: Versiones publicadas del sitio y si hay cambios sin publicar (HU-1507)
+      operationId: get_sitio_versiones
+      description: |-
+        Solo SUPERADMIN. Las 50 más recientes, de la mayor a la menor; se conservan todas (`total`). `actual` es la que
+        ve el sitio (null si aún no hay ninguna). `pendientes` compara por contenido la instantánea del panel con la
+        última versión; sin versiones, es true si hay algo publicable.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionesSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /sitio/versiones/{numero}/restaurar:
+    parameters:
+    - name: numero
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    post:
+      tags:
+      - Sitio web
+      summary: Restaurar una versión del sitio (HU-1507, CP-119)
+      operationId: post_sitio_versiones_numero_restaurar
+      description: |-
+        Solo SUPERADMIN. Crea la versión siguiente (origen `restauracion`, `restauradaDe` = N) con la instantánea de la
+        N: el sitio público queda igual a la N y lo que se edita en el panel no cambia. 404 si no existe, 422
+        VERSION_ACTUAL si ya es la que ve el sitio, y en producción 409 FICTICIOS_VISIBLES si la instantánea guarda
+        datos ficticios (una versión publicada en pruebas). 400 si `numero` no es entero. Auditoría
+        SITIO_VERSION_RESTAURADA.
+      responses:
+        '201':
+          description: Versión creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionSitio'
+        '400':
+          $ref: '#/components/responses/NoValido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/paginas/{paginaId}/vista-previa:
+    parameters:
+    - name: paginaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Sitio web
+      summary: Vista previa de una página con lo que hay en el panel (HU-1507, PNT-26)
+      operationId: get_sitio_paginas_id_vista_previa
+      description: |-
+        Solo SUPERADMIN. La página en cualquier estado, con sus bloques visibles en orden y sus elementos visibles, y el
+        menú y el pie visibles del panel, publicados o no. Los ficticios salen con `ficticio: true` aunque el entorno sea
+        producción: es para revisar, no para el público.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VistaPreviaPagina'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /sitio/navegacion:
     get:
       tags:
@@ -665,7 +782,7 @@ paths:
       summary: Una página publicada del sitio (HU-1502, CP-110)
       operationId: get_publico_paginas
       security: []
-      description: Sin sesión. 200 solo si la página está PUBLICADA, con `bloques` visibles en su orden (HU-1503, CP-112, CP-113) y, en los bloques con colección, sus `elementos` visibles (HU-1504, CP-114); borrador, programada o inexistente dan 404 sin bloques (CP-110, RN-16-4). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
+      description: Sin sesión. HU-1507 · Lee la última versión publicada del sitio (sin versiones, 404). 200 solo si la página está PUBLICADA en esa versión, con `bloques` visibles en su orden (HU-1503, CP-112, CP-113) y, en los bloques con colección, sus `elementos` visibles (HU-1504, CP-114); borrador, programada o inexistente dan 404 sin bloques (CP-110, RN-16-4). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
       parameters:
       - name: ruta
         in: query
@@ -699,7 +816,7 @@ paths:
       summary: Menú y pie del sitio con solo lo visible (HU-1506, CP-118)
       operationId: get_publico_navegacion
       security: []
-      description: Sin sesión. `menu` lo usan la cabecera y el menú de celular. En `pie` solo salen las columnas visibles con al menos un enlace visible; una columna oculta oculta sus enlaces. `externo` es true en las rutas `https://` (abrir con `rel="noopener"`). Mismo límite de 60 peticiones por minuto en `/publico/*`.
+      description: Sin sesión. HU-1507 · Sale de la última versión publicada (sin versiones, `menu` y `pie` vacíos). `menu` lo usan la cabecera y el menú de celular. En `pie` solo salen las columnas visibles con al menos un enlace visible; una columna oculta oculta sus enlaces. `externo` es true en las rutas `https://` (abrir con `rel="noopener"`). Mismo límite de 60 peticiones por minuto en `/publico/*`.
       responses:
         '200':
           description: OK
@@ -717,7 +834,7 @@ paths:
       operationId: get_publico_sitemap
       security: []
       description: |-
-        Sin sesión. Solo las páginas PUBLICADAS, con `SITIO_URL` como dominio (por defecto https://aptioscorm.com) y la
+        Sin sesión. HU-1507 · Solo las páginas de la última versión publicada (sin versiones, vacío), con `SITIO_URL` como dominio (por defecto https://aptioscorm.com) y la
         fecha de publicación como `lastmod`. Las páginas en inglés van bajo `/en` hasta la HU-1510.
       responses:
         '200':
@@ -4139,6 +4256,10 @@ components:
           type: integer
           minimum: 1
           description: HU-1505 · Solo al publicar en pruebas con datos ficticios visibles (CP-117)
+        version:
+          type: integer
+          minimum: 1
+          description: HU-1507 · Si el cambio publicó o retiró la página, la versión del sitio que creó
     PaginaSitioEntrada:
       type: object
       additionalProperties: false
@@ -4510,6 +4631,120 @@ components:
           type: string
         externo:
           type: boolean
+    VersionSitio:
+      type: object
+      description: HU-1507 · Versión publicada del sitio (RN-16-5). Inmutable; la mayor es la que ve el sitio.
+      required:
+      - numero
+      - creadoEn
+      - entorno
+      - origen
+      - restauradaDe
+      - publicadoPor
+      - paginas
+      properties:
+        numero:
+          type: integer
+          minimum: 1
+        creadoEn:
+          type: string
+          format: date-time
+        entorno:
+          type: string
+          enum:
+          - produccion
+          - pruebas
+        origen:
+          type: string
+          enum:
+          - publicacion
+          - pagina
+          - programada
+          - restauracion
+          description: publicacion («Publicar cambios»), pagina (publicar o retirar una página), programada (la cola) o restauracion
+        restauradaDe:
+          type: integer
+          nullable: true
+          description: Con origen restauracion, la versión restaurada
+        publicadoPor:
+          type: object
+          nullable: true
+          description: null si la publicó la plataforma (programada)
+          required:
+          - id
+          - nombre
+          properties:
+            id:
+              type: string
+              format: uuid
+            nombre:
+              type: string
+        paginas:
+          type: integer
+          minimum: 0
+          description: Páginas publicadas en la versión
+    VersionPublicada:
+      allOf:
+      - $ref: '#/components/schemas/VersionSitio'
+      - type: object
+        properties:
+          avisoFicticios:
+            type: integer
+            minimum: 1
+            description: Solo en pruebas, cuántos datos ficticios visibles se publicaron (CP-117)
+    VersionesSitio:
+      type: object
+      required:
+      - entorno
+      - actual
+      - pendientes
+      - total
+      - versiones
+      properties:
+        entorno:
+          type: string
+          enum:
+          - produccion
+          - pruebas
+        actual:
+          type: integer
+          nullable: true
+          description: La versión que ve el sitio; null si aún no hay ninguna
+        pendientes:
+          type: boolean
+          description: El panel tiene cambios que el sitio todavía no muestra
+        total:
+          type: integer
+          minimum: 0
+        versiones:
+          type: array
+          description: Las 50 más recientes, de la mayor a la menor
+          items:
+            $ref: '#/components/schemas/VersionSitio'
+    VistaPreviaPagina:
+      type: object
+      description: HU-1507 · Vista previa de una página con lo que hay en el panel, publicado o no.
+      required:
+      - estado
+      - entorno
+      - pagina
+      - navegacion
+      properties:
+        estado:
+          type: string
+          enum:
+          - BORRADOR
+          - PROGRAMADA
+          - PUBLICADA
+        entorno:
+          type: string
+          enum:
+          - produccion
+          - pruebas
+        pagina:
+          $ref: '#/components/schemas/PaginaPublica'
+        navegacion:
+          $ref: '#/components/schemas/NavegacionPublica'
     NavegacionPublica:
       type: object
       required:
@@ -4614,6 +4849,8 @@ components:
         publicadaEn:
           type: string
           format: date-time
+          nullable: true
+          description: null solo en la vista previa de una página que aún no se publicó
         bloques:
           type: array
           description: Solo los visibles, en orden (HU-1503)

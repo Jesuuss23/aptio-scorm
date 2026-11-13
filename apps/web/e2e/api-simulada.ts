@@ -1,5 +1,6 @@
 import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
-import { arbolNavegacion, esColumnaPie, esEnlaceExterno, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
+import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
+import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
@@ -145,6 +146,8 @@ export interface OpcionesSimulacion {
   enlacesSitio?: EnlaceSitioSim[];
   /** HU-1505 · Entorno del sitio simulado (por defecto producción, como la API sin `SITIO_ENTORNO`). */
   entornoSitio?: 'produccion' | 'pruebas';
+  /** HU-1507 · Si el sitio ya tiene publicada la versión 1 con el estado inicial del panel. */
+  versionSitio?: boolean;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -386,7 +389,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion' }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
@@ -395,6 +398,21 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ ...p }));
   const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
   let bloquesCreados = 0;
+  // HU-1507 · Versiones del sitio: la instantánea se arma con la misma función que usa la API.
+  type VersionSim = { numero: number; creadoEn: string; entorno: string; origen: string; restauradaDe: number | null; publicadoPor: { id: string; nombre: string } | null; instantanea: Instantanea };
+  const versionesSim: VersionSim[] = [];
+  const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
+  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim }, entornoSitio);
+  const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
+    const v: VersionSim = {
+      numero: versionesSim.length + 1, creadoEn: new Date(Date.UTC(2026, 10, 13, 15, versionesSim.length)).toISOString(), entorno: entornoSitio, origen,
+      restauradaDe: extra.restauradaDe ?? null, publicadoPor: extra.autor === false ? null : { id: USUARIO.id, nombre: USUARIO.nombre }, instantanea: extra.instantanea ?? instantaneaSim(),
+    };
+    versionesSim.push(v);
+    return v;
+  };
+  const versionDto = ({ instantanea, ...v }: VersionSim) => ({ ...v, paginas: instantanea.paginas.length });
+  if (versionSitio) nuevaVersionSim('publicacion');
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -710,6 +728,40 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       e.actualizadoEn = new Date(Date.now() + elementosCreados++).toISOString();
       return responder(200, e);
     }
+    // HU-1507 · Publicar cambios, versiones, restaurar y vista previa: mismas reglas que la API.
+    const vistaPrevia = ruta.match(/^\/sitio\/paginas\/([^/]+)\/vista-previa$/);
+    if (ruta === '/sitio/publicar' || ruta === '/sitio/versiones' || /^\/sitio\/versiones\/\d+\/restaurar$/.test(ruta) || vistaPrevia) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      if (vistaPrevia) {
+        const p = paginasSim.find((x) => x.id === vistaPrevia[1]);
+        if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La página no existe' });
+        const armada = armarPagina({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) }, filasElementos(), 'pruebas');
+        return responder(200, {
+          estado: p.estado, entorno: entornoSitio, navegacion: navegacionPublica(enlacesSim),
+          pagina: { ...armada, bloques: armada.bloques.map((b) => ({ tipo: b.tipo, ajustes: b.ajustes, ...(b.elementos ? { elementos: b.elementos.map((e) => ({ datos: e.datos, ...(e.ficticio ? { ficticio: true } : {}) })) } : {}) })) },
+        });
+      }
+      if (ruta === '/sitio/versiones') {
+        const ultima = versionesSim.at(-1);
+        return responder(200, { entorno: entornoSitio, actual: ultima?.numero ?? null, pendientes: hayPendientes(instantaneaSim(), ultima?.instantanea ?? null), total: versionesSim.length, versiones: [...versionesSim].reverse().slice(0, 50).map(versionDto) });
+      }
+      const bloqueo = (detalles: { id: string; coleccion: string; nombre: string }[], que: string) => responder(409, {
+        codigo: 'FICTICIOS_VISIBLES', mensaje: `No se ${que} en producción con datos ficticios: hay ${detalles.length}. Ocúltalos o reemplázalos primero.`, detalles,
+      });
+      if (ruta === '/sitio/publicar') {
+        const ficticios = ficticiosVisiblesSim();
+        if (ficticios.length && entornoSitio === 'produccion') return bloqueo(ficticios.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: String(Object.values(e.datos)[0] ?? e.coleccion) })), 'publica');
+        const v = nuevaVersionSim('publicacion');
+        return responder(201, { ...versionDto(v), ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}) });
+      }
+      const numero = Number(ruta.split('/')[3]);
+      const origen = versionesSim.find((v) => v.numero === numero);
+      if (!origen) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: `No existe la versión ${numero}` });
+      if (versionesSim.at(-1)!.numero === numero) return responder(422, { codigo: 'VERSION_ACTUAL', mensaje: `La versión ${numero} ya es la que ve el sitio` });
+      const ficticios = ficticiosDeInstantanea(origen.instantanea);
+      if (ficticios.length && entornoSitio === 'produccion') return bloqueo(ficticios, `restaura la versión ${numero}`);
+      return responder(201, versionDto(nuevaVersionSim('restauracion', { instantanea: origen.instantanea, restauradaDe: numero })));
+    }
     if (ruta === '/sitio/paginas' || ruta.startsWith('/sitio/paginas/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const ahora = new Date().toISOString();
@@ -772,6 +824,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
           detalles: ficticios.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: String(Object.values(e.datos)[0] ?? e.coleccion) })),
         });
       }
+      const estabaPublicada = p.estado === 'PUBLICADA';
       if (b.accion === 'publicar') Object.assign(p, { estado: 'PUBLICADA', publicadaEn: ahora, publicarEn: null });
       if (b.accion === 'borrador') Object.assign(p, { estado: 'BORRADOR', publicarEn: null });
       if (b.accion === 'programar') {
@@ -779,7 +832,9 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         Object.assign(p, { estado: 'PROGRAMADA', publicarEn: new Date(b.publicarEn).toISOString() });
       }
       p.actualizadoEn = ahora;
-      return responder(200, ficticios.length ? { ...p, avisoFicticios: ficticios.length } : p);
+      // HU-1507 · Publicar una página, o retirar una publicada, crea una versión del sitio (origen «pagina»).
+      const version = b.accion === 'publicar' || (estabaPublicada && b.accion) ? nuevaVersionSim('pagina').numero : undefined;
+      return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}) });
     }
     // HU-1403 · Empresa › Operación: solo administración; «Respaldar ahora» deja una copia en curso (409 si ya hay una).
     if (ruta === '/operacion' || ruta === '/operacion/respaldar') {

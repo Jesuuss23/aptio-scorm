@@ -1,11 +1,10 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, type SitioPagina } from '@aptio/db';
-import { rutaSitioValida } from '@aptio/db';
-import { bloquesPublicos } from '@aptio/schema/sitio-bloques';
-import { COLECCION_DE_BLOQUE, elementosDeBloque, nombreElemento } from '@aptio/schema/sitio-contenido';
-import { bloqueaPublicacion, elementosParaPublico, ficticiosVisibles } from '@aptio/schema/sitio-ficticios';
+import { rutaSitioValida, ultimaVersion } from '@aptio/db';
+import { paginaServida } from '@aptio/schema/sitio-versiones';
 import { entornoActual } from './entorno-sitio.js';
+import { VersionesService } from './versiones.service.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { AccionPagina, PaginaPublicaDto, PaginaSitioCambioDto, PaginaSitioDto, PaginaSitioEntradaDto } from './sitio.dto.js';
@@ -40,6 +39,7 @@ export class SitioService {
   constructor(
     private readonly baseDatos: BaseDatosService,
     private readonly config: ConfigService,
+    private readonly versiones: VersionesService,
   ) {}
 
   private get bd() {
@@ -53,11 +53,13 @@ export class SitioService {
 
   async crear(u: UsuarioSesion, dto: PaginaSitioEntradaDto, ahora = new Date()): Promise<PaginaSitioDto> {
     const estado = this.estadoPedido(dto.accion ?? 'borrador', dto.publicarEn, ahora);
-    const aviso = dto.accion === 'publicar' ? await this.revisarFicticios() : 0;
+    const aviso = dto.accion === 'publicar' ? await this.versiones.revisarFicticios() : 0;
     try {
       const p = await this.bd.sitioPagina.create({ data: { ruta: dto.ruta, idioma: dto.idioma ?? 'es', titulo: dto.titulo.trim(), ...estado } });
       await this.auditar(u, 'SITIO_PAGINA_CREADA', p, { estado: p.estado, ...(aviso ? { ficticiosVisibles: aviso } : {}) });
-      return { ...aDto(p), ...(aviso ? { avisoFicticios: aviso } : {}) };
+      // HU-1507 · Crear una página ya publicada publica el sitio completo en una versión nueva (RN-16-5).
+      const v = p.estado === 'PUBLICADA' ? await this.versiones.nuevaVersion(u, 'pagina') : null;
+      return { ...aDto(p), ...(aviso ? { avisoFicticios: aviso } : {}), ...(v ? { version: v.numero } : {}) };
     } catch (e) {
       throw this.duplicada(e, dto.ruta, dto.idioma ?? 'es');
     }
@@ -78,14 +80,17 @@ export class SitioService {
     if (dto.accion) Object.assign(datos, this.estadoPedido(dto.accion, dto.publicarEn, ahora));
     if (!Object.keys(datos).length) return aDto(actual);
     // HU-1505 · CP-116 y CP-117: en producción no se publica con ficticios visibles; en pruebas, sí, con aviso.
-    const aviso = dto.accion === 'publicar' ? await this.revisarFicticios() : 0;
+    const aviso = dto.accion === 'publicar' ? await this.versiones.revisarFicticios() : 0;
     try {
       const p = await this.bd.sitioPagina.update({ where: { id }, data: datos });
       if (Object.keys(editado).length) await this.auditar(u, 'SITIO_PAGINA_EDITADA', p, { antes: { titulo: actual.titulo, ruta: actual.ruta }, ...editado });
       if (dto.accion) {
         await this.auditar(u, AUDITORIA[dto.accion], p, { desde: actual.estado, publicarEn: p.publicarEn?.toISOString() ?? null, ...(aviso ? { ficticiosVisibles: aviso } : {}) });
       }
-      return { ...aDto(p), ...(aviso ? { avisoFicticios: aviso } : {}) };
+      // HU-1507 · Publicar una página, o retirar una publicada (a borrador o programada), crea una versión del sitio
+      // completo: lleva al sitio todos los cambios pendientes (RN-16-5).
+      const v = dto.accion && (dto.accion === 'publicar' || actual.estado === 'PUBLICADA') ? await this.versiones.nuevaVersion(u, 'pagina') : null;
+      return { ...aDto(p), ...(aviso ? { avisoFicticios: aviso } : {}), ...(v ? { version: v.numero } : {}) };
     } catch (e) {
       throw this.duplicada(e, dto.ruta ?? actual.ruta, actual.idioma);
     }
@@ -100,58 +105,27 @@ export class SitioService {
     await this.auditar(u, 'SITIO_PAGINA_BORRADA', p, { titulo: p.titulo });
   }
 
-  /** CP-110 · El sitio público solo ve las publicadas; borrador, programada o inexistente dan 404. */
+  /**
+   * CP-110 · El sitio público solo ve las páginas publicadas. HU-1507 · Lee la última versión (RN-16-5): sin versiones,
+   * o si la página no está en ella, 404. En producción nunca sale un ficticio (segunda defensa, RN-16-3).
+   */
   async publica(ruta: string, idioma = 'es'): Promise<PaginaPublicaDto> {
-    const p = rutaSitioValida(ruta) && (idioma === 'es' || idioma === 'en')
-      ? await this.bd.sitioPagina.findUnique({ where: { ruta_idioma: { ruta, idioma } }, include: { bloques: true } })
-      : null;
-    // RN-16-4 · Si la página no está publicada no se expone nada, tampoco sus bloques.
-    if (!p || p.estado !== 'PUBLICADA' || !p.publicadaEn) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'Página no encontrada' });
-    // HU-1503 · Los bloques se ven al instante hasta que la HU-1507 sume versiones (SUP-172).
-    const visibles = bloquesPublicos(p.bloques);
-    // HU-1504 · Cascada página → bloque → elemento (RN-16-4): solo los elementos visibles de los bloques visibles (CP-114).
-    const colecciones: string[] = [...new Set(visibles.flatMap((b) => COLECCION_DE_BLOQUE[b.tipo] ?? []))];
-    const elementos = colecciones.length
-      ? await this.bd.sitioElemento.findMany({ where: { coleccion: { in: colecciones }, visible: true }, orderBy: { orden: 'asc' } })
-      : [];
-    // HU-1505 · Segunda defensa: en producción nunca sale un ficticio; en pruebas sale marcado (RN-16-3).
-    const publicos = elementosParaPublico(entornoActual(), elementos);
-    const bloques = visibles.map((b) => {
-      const propios = elementosDeBloque(b.tipo, p.ruta, publicos);
-      return {
-        tipo: b.tipo, ajustes: (b.ajustes as Record<string, unknown> | null) ?? null,
-        ...(propios ? { elementos: propios.map((e) => ({ datos: e.datos as Record<string, string | number>, ...(e.ficticio ? { ficticio: true } : {}) })) } : {}),
-      };
-    });
-    return { ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: p.publicadaEn.toISOString(), bloques };
+    const v = rutaSitioValida(ruta) && (idioma === 'es' || idioma === 'en') ? await ultimaVersion(this.bd) : null;
+    const p = v ? paginaServida(v.instantanea, ruta, idioma, entornoActual()) : null;
+    if (!p) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'Página no encontrada' });
+    return { ...p, publicadaEn: p.publicadaEn ?? v!.creadoEn.toISOString() };
   }
 
-  /** CP-110 y CP-111 · Solo las publicadas. El inglés va bajo `/en` hasta que la HU-1510 sume hreflang (SUP-168). */
+  /** CP-110 y CP-111 · Las páginas de la última versión. El inglés va bajo `/en` hasta que la HU-1510 sume hreflang (SUP-168). */
   async sitemap(): Promise<string> {
     const base = (this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO).replace(/\/+$/, '');
-    const filas = await this.bd.sitioPagina.findMany({ where: { estado: 'PUBLICADA' }, orderBy: [{ idioma: 'asc' }, { ruta: 'asc' }] });
+    const filas = [...((await ultimaVersion(this.bd))?.instantanea.paginas ?? [])].sort((a, b) => a.idioma.localeCompare(b.idioma) || a.ruta.localeCompare(b.ruta));
     const urls = filas.map((p) => {
       const ruta = p.idioma === 'en' ? `/en${p.ruta === '/' ? '' : p.ruta}` : p.ruta;
-      const lastmod = p.publicadaEn ? `<lastmod>${p.publicadaEn.toISOString()}</lastmod>` : '';
+      const lastmod = p.publicadaEn ? `<lastmod>${p.publicadaEn}</lastmod>` : '';
       return `  <url><loc>${escaparXml(base + ruta)}</loc>${lastmod}</url>`;
     });
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}${urls.length ? '\n' : ''}</urlset>\n`;
-  }
-
-  /**
-   * HU-1505 · Antes de publicar: en producción, 409 FICTICIOS_VISIBLES con la lista si hay algún ficticio visible
-   * (CP-116); en pruebas devuelve cuántos hay para avisar (CP-117).
-   */
-  private async revisarFicticios(): Promise<number> {
-    const filas = ficticiosVisibles(await this.bd.sitioElemento.findMany({ where: { ficticio: true, visible: true } }));
-    if (bloqueaPublicacion(entornoActual(), filas.length)) {
-      throw new ConflictException({
-        codigo: 'FICTICIOS_VISIBLES',
-        mensaje: `No se publica en producción con datos ficticios visibles: hay ${filas.length}. Ocúltalos o reemplázalos primero.`,
-        detalles: filas.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: nombreElemento(e.coleccion, e.datos) })),
-      });
-    }
-    return filas.length;
   }
 
   private async buscar(id: string): Promise<SitioPagina> {

@@ -5,12 +5,15 @@
 // HU-1505 · En producción, publicar con datos ficticios visibles da 409: se muestra la lista con «Ocultar todos los
 // ficticios», que los oculta y vuelve a publicar en un clic (CP-116). En pruebas se publica con aviso (CP-117).
 // HU-1506 · Debajo de la tabla, las tarjetas «Menú principal» y «Pie de página» (CP-118).
+// HU-1507 · «Publicar cambios» con el chip «Cambios sin publicar» en la cabecera y la tarjeta «Versiones» (CP-119).
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { type Coleccion, COLECCIONES_CONTENIDO } from '@aptio/schema/sitio-contenido';
 import { navegar } from '../ruta';
 import { type AccionPagina, api, ErrorApi, type PaginaSitio, type PaginaSitioCambio } from '../api';
 import { NavegacionSitio } from './SitioNavegacion';
+import { usePublicacionSitio } from './publicacion-sitio';
+import { AccionPublicar, AvisosPublicacion, TarjetaVersiones } from './SitioVersiones';
 import { ESTADO_PAGINA, fechaHoraLima, limaAIso, MENSAJE_RUTA, minimoProgramable, NOMBRE_IDIOMA, RUTA_SITIO } from './sitio-paginas';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
@@ -27,6 +30,7 @@ export function SitioPaginas() {
   const [ocupado, setOcupado] = useState(false);
   const [bloqueo, setBloqueo] = useState<Bloqueo>(null);
   const titulo = useRef<HTMLHeadingElement>(null);
+  const publicacion = usePublicacionSitio();
 
   useEffect(() => {
     api.paginasSitio().then(setPaginas, (e: unknown) => setError(mensajeDe(e, 'No se pudieron cargar las páginas')));
@@ -38,9 +42,11 @@ export function SitioPaginas() {
     setOcupado(true);
     setAviso(null);
     setBloqueo(null);
+    publicacion.limpiar();
     try {
       const r = await api.cambiarPaginaSitio(p.id, datos);
       reemplazar(r);
+      publicacion.recargar();
       setAviso(r.avisoFicticios
         ? { tipo: 'aviso', texto: `${ok} Aviso: hay ${r.avisoFicticios === 1 ? '1 dato ficticio visible' : `${r.avisoFicticios} datos ficticios visibles`}; en pruebas se publica igual, pero en producción quedaría bloqueado.` }
         : { tipo: 'ok', texto: ok });
@@ -80,6 +86,7 @@ export function SitioPaginas() {
     try {
       await api.borrarPaginaSitio(p.id);
       setPaginas((l) => (l ?? []).filter((x) => x.id !== p.id));
+      publicacion.recargar();
       setAviso({ tipo: 'ok', texto: `«${p.titulo}» se borró.` });
       setAbierto(null);
       titulo.current?.focus();
@@ -90,10 +97,16 @@ export function SitioPaginas() {
     }
   }
 
-  const botonNueva = <button type="button" className="boton primario" onClick={() => { setNueva(true); setAviso(null); }} disabled={nueva}>Nueva página</button>;
+  const acciones = (
+    <div className="acciones-cabecera">
+      <AccionPublicar estado={publicacion} />
+      <button type="button" className="boton" onClick={() => { setNueva(true); setAviso(null); }} disabled={nueva}>Nueva página</button>
+    </div>
+  );
   return (
     <>
-      <Cabecera titulo="Páginas" subtitulo="Páginas del sitio comercial. Un borrador o una página programada no se ven en el sitio ni entran al sitemap; una programada se publica sola a su hora." accion={botonNueva} />
+      <Cabecera titulo="Páginas" subtitulo="Páginas del sitio comercial. Lo que cambies en bloques, contenido, menú y pie llega al sitio con «Publicar cambios»; publicar o retirar una página, o una programada a su hora, también publica todo lo pendiente." accion={acciones} />
+      <AvisosPublicacion estado={publicacion} />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {nueva ? (
         <NuevaPagina
@@ -149,7 +162,8 @@ export function SitioPaginas() {
           )}
         </section>
       )}
-      <NavegacionSitio />
+      <NavegacionSitio alCambiar={publicacion.recargar} />
+      <TarjetaVersiones estado={publicacion} />
     </>
   );
 }

@@ -80,7 +80,9 @@ jobs:
       - name: Cliente de PostgreSQL 16 para las copias de seguridad (HU-1403)
         run: test -x /usr/lib/postgresql/16/bin/pg_dump || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-16)
       - name: Pruebas (Vitest)
-        run: pnpm test
+        # Un paquete a la vez: la API y el worker comparten PostgreSQL, y desde la HU-1507 las versiones del sitio son
+        # globales (la última es la que ve el público), así que dos suites en paralelo se pisarían.
+        run: pnpm --workspace-concurrency=1 test
       - name: Salidas de IA del caso LOTO
         run: pnpm ia:casos
       - name: Contrato OpenAPI

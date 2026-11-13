@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { Prisma, type SitioEnlace } from '@aptio/db';
+import { Prisma, type SitioEnlace, ultimaVersion } from '@aptio/db';
 import { ordenAlFinal, validarOrden } from '@aptio/schema/sitio-bloques';
 import {
-  arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion,
+  arbolNavegacion, esColumnaPie, esEnlaceExterno, validarRuta, validarTextoEnlace, validarUbicacion,
   type ErrorUbicacion, type NavegacionPublica,
 } from '@aptio/schema/sitio-navegacion';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
@@ -48,9 +48,9 @@ export class NavegacionService {
     return { menu: arbol.menu.map(aDto), pie: arbol.pie.map((c) => ({ ...aDto(c), enlaces: c.enlaces.map(aDto) })) };
   }
 
-  /** CP-118 · Solo lo visible, en su orden; una columna oculta oculta sus enlaces. */
+  /** CP-118 · Solo lo visible, en su orden. HU-1507 · Sale de la última versión publicada; sin versiones, vacía (RN-16-5). */
   async publica(): Promise<NavegacionPublica> {
-    return navegacionPublica(await this.bd.sitioEnlace.findMany({ where: { visible: true } }));
+    return (await ultimaVersion(this.bd))?.instantanea.navegacion ?? { menu: [], pie: [] };
   }
 
   async agregar(u: UsuarioSesion, dto: EnlaceSitioEntradaDto): Promise<EnlaceSitioDto> {

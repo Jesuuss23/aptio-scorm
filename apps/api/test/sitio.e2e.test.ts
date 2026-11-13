@@ -11,6 +11,9 @@
 // publica con aviso; «Ocultar todos los ficticios», la segunda defensa del sitio público, permisos y auditoría.
 // HU-1506 · CP-118: menú y pie administrables (orden entre hermanos, ocultar en cascada por columna, rutas y texto
 // plano), GET /publico/navegacion, permisos y auditoría.
+// HU-1507 · CP-119: publicar crea versiones inmutables del sitio completo y el público sirve la última; restaurar la N
+// crea la siguiente sin tocar el panel; ficticios en producción (409 al publicar y al restaurar), vista previa con lo no
+// publicado, sitio sin versiones, permisos y auditoría.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -297,6 +300,9 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       const oculto = await mostrar(p, testi.id, false);
       expect(oculto.status).toBe(200);
       expect(oculto.body).toMatchObject({ visible: false, ajustes: datos });
+      // HU-1507 · RN-16-5: el sitio sigue igual hasta «Publicar cambios».
+      expect((await publica(ruta('cp112'))).body.bloques).toHaveLength(2);
+      expect((await enviar('post', '/sitio/publicar')).status).toBe(201);
       expect((await publica(ruta('cp112'))).body.bloques).toEqual([{ tipo: 'hero', ajustes: null }]);
       const admin = (await enviar('get', `/sitio/paginas/${p}/bloques`)).body as { id: string; ajustes: unknown }[];
       expect(admin.find((x) => x.id === testi.id)?.ajustes).toEqual(datos);
@@ -314,6 +320,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       const r = await enviar('patch', `/sitio/paginas/${p}/bloques`, { orden: [hero, logos, cifras, cta] });
       expect(r.status).toBe(200);
       expect(r.body.map((b: { tipo: string; orden: number }) => [b.tipo, b.orden])).toEqual([['hero', 0], ['logos', 1], ['metricas', 2], ['cta', 3]]);
+      await enviar('post', '/sitio/publicar');
       expect(await tipos()).toEqual(['hero', 'logos', 'metricas', 'cta']);
     });
 
@@ -464,6 +471,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       expect(await nombresEn(ruta('cp114-a'), 'testimonios')).toEqual([`Ana ${marca}`, `Beto ${marca}`]);
       const oculto = await mostrar(b.id, false);
       expect(oculto.body).toMatchObject({ visible: false, datos: { nombre: `Beto ${marca}` } });
+      await enviar('post', '/sitio/publicar');
       expect([await nombresEn(ruta('cp114-a'), 'testimonios'), await nombresEn(ruta('cp114-b'), 'testimonios')]).toEqual([[`Ana ${marca}`], [`Ana ${marca}`]]);
       // El bloque sin colección no trae elementos.
       expect((await publica(ruta('cp114-a'))).body.bloques[0]).toEqual({ tipo: 'hero', ajustes: null });
@@ -723,8 +731,10 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
     };
     const mostrar = (id: string, visible = true) => enviar('patch', `/sitio/navegacion/${id}`, { visible });
     const propios = <T extends { texto?: string; titulo?: string }>(l: T[]) => l.filter((x) => (x.texto ?? x.titulo)?.endsWith(marca));
-    const publica = async () => {
+    /** HU-1507 · RN-16-5: el sitio muestra la navegación de la última versión; con `publicar` se publica antes. */
+    const publica = async (publicar = true) => {
       reiniciarLimite();
+      if (publicar) expect((await enviar('post', '/sitio/publicar')).status).toBe(201);
       const r = await request(servidor).get('/api/v1/publico/navegacion');
       expect(r.status).toBe(200);
       return r.body as { menu: { texto: string; ruta: string; externo: boolean }[]; pie: { titulo: string; enlaces: { texto: string }[] }[] };
@@ -761,6 +771,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       const r = await mostrar(casos.id, false);
       expect(r.status).toBe(200);
       expect(r.body).toMatchObject({ visible: false, texto: `Casos ${marca}`, ruta: '/#testimonios' });
+      expect(propios((await publica(false)).menu).map((x) => x.texto)).toEqual([`Producto ${marca}`, `Casos ${marca}`]); // hasta publicar
       expect(propios((await publica()).menu)).toEqual([{ texto: `Producto ${marca}`, ruta: '/funcionalidades/personaje', externo: false }]);
       // Ocultar no borra: mostrarlo lo restituye igual (REQ-066).
       await mostrar(casos.id);
@@ -875,6 +886,165 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       // «Auditado» estaba al final del menú: subirlo al principio queda como SITIO_ENLACES_REORDENADOS.
       const r = await prisma.auditoria.findFirst({ where: { entidad: 'SitioEnlace', accion: 'SITIO_ENLACES_REORDENADOS', entidadId: null }, orderBy: { creadoEn: 'desc' } });
       expect(r?.datos).toMatchObject({ zona: 'menu', padreId: null, despues: [x.id, ...menu.filter((id) => id !== x.id)] });
+    });
+  });
+
+  describe('vista previa, versiones y restauración (HU-1507)', () => {
+    const ruta = (n: string) => `/prueba-${sufijo}-v-${n}`;
+    const marca = `zv-${sufijo}`;
+    const creados: string[] = [];
+    const entornoOriginal = process.env.SITIO_ENTORNO;
+    const enviar = (m: 'get' | 'post' | 'patch' | 'delete', r: string, b?: object, c = cookies.SUPERADMIN) => {
+      const req = request(servidor)[m](`/api/v1${r}`);
+      if (c) req.set('Cookie', c);
+      return b ? req.send(b) : req;
+    };
+    const reiniciarLimite = () => app.get(LimitePublicoService).reiniciar();
+    const publica = (r: string) => { reiniciarLimite(); return request(servidor).get('/api/v1/publico/paginas').query({ ruta: r, idioma: 'es' }); };
+    const publicar = async () => {
+      const r = await enviar('post', '/sitio/publicar');
+      if (r.status !== 201) throw new Error(`publicar: ${r.status} ${JSON.stringify(r.body)}`);
+      return r.body as { numero: number; origen: string; entorno: string; publicadoPor: { nombre: string } | null; avisoFicticios?: number };
+    };
+    const bloque = async (p: string, tipo: string, ajustes?: object) => {
+      const b = (await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo, ...(ajustes ? { ajustes } : {}) })).body.id as string;
+      await enviar('patch', `/sitio/paginas/${p}/bloques/${b}`, { visible: true });
+      return b;
+    };
+    const testimonio = async (nombre: string, ficticio: boolean) => {
+      const r = await enviar('post', '/sitio/elementos', { coleccion: 'testimonios', ficticio, datos: { nombre: `${nombre} ${marca}`, cargo: 'Jefa', empresa: 'Minera', texto: 'Útil.', estrellas: 5 } });
+      creados.push(r.body.id);
+      await enviar('patch', `/sitio/elementos/${r.body.id}`, { visible: true });
+      return r.body.id as string;
+    };
+
+    afterEach(async () => {
+      process.env.SITIO_ENTORNO = entornoOriginal;
+      await prisma.sitioElemento.updateMany({ where: { id: { in: creados } }, data: { visible: false } });
+    });
+    afterAll(async () => {
+      if (entornoOriginal === undefined) delete process.env.SITIO_ENTORNO;
+      await prisma.sitioElemento.deleteMany({ where: { id: { in: creados } } });
+    });
+
+    it('CP-119: con 3 publicaciones de Inicio, restaurar la 1 deja el sitio igual a la 1 y crea la 4', async () => {
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta('inicio'), titulo: 'Inicio uno' })).body.id as string;
+      const hero = await bloque(p, 'hero', { titulo: 'Primera portada' });
+      const v1 = (await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' })).body.version as number;
+      const sitio1 = (await publica(ruta('inicio'))).body;
+      expect(sitio1).toMatchObject({ titulo: 'Inicio uno', bloques: [{ tipo: 'hero', ajustes: { titulo: 'Primera portada' } }] });
+
+      await enviar('patch', `/sitio/paginas/${p}`, { titulo: 'Inicio dos' });
+      expect((await publica(ruta('inicio'))).body.titulo).toBe('Inicio uno'); // hasta publicar (RN-16-5)
+      const v2 = await publicar();
+      expect([v2.numero, v2.origen, v2.publicadoPor?.nombre]).toEqual([v1 + 1, 'publicacion', 'Super']);
+      await bloque(p, 'cta');
+      await enviar('patch', `/sitio/paginas/${p}/bloques/${hero}`, { visible: false });
+      const v3 = await publicar();
+      expect((await publica(ruta('inicio'))).body).toMatchObject({ titulo: 'Inicio dos', bloques: [{ tipo: 'cta' }] });
+
+      const r = await enviar('post', `/sitio/versiones/${v1}/restaurar`);
+      expect(r.status).toBe(201);
+      expect(r.body).toMatchObject({ numero: v3.numero + 1, origen: 'restauracion', restauradaDe: v1, publicadoPor: { nombre: 'Super' } });
+      expect((await publica(ruta('inicio'))).body).toEqual(sitio1);
+      // El panel conserva lo que se está editando, y avisa que el sitio no lo muestra.
+      expect((await enviar('get', '/sitio/paginas')).body.find((x: { id: string }) => x.id === p).titulo).toBe('Inicio dos');
+      const lista = (await enviar('get', '/sitio/versiones')).body;
+      expect(lista).toMatchObject({ actual: v3.numero + 1, pendientes: true });
+      expect(lista.versiones.slice(0, 4).map((v: { numero: number; origen: string; restauradaDe: number | null }) => [v.numero, v.origen, v.restauradaDe]))
+        .toEqual([[v3.numero + 1, 'restauracion', v1], [v3.numero, 'publicacion', null], [v2.numero, 'publicacion', null], [v1, 'pagina', null]]);
+      // Las versiones no cambian: restaurar la actual no tiene sentido y la que no existe da 404.
+      expect((await enviar('post', `/sitio/versiones/${v3.numero + 1}/restaurar`)).body.codigo).toBe('VERSION_ACTUAL');
+      expect((await enviar('post', '/sitio/versiones/999999/restaurar')).status).toBe(404);
+      expect((await enviar('post', '/sitio/versiones/uno/restaurar')).status).toBe(400);
+      await publicar();
+      expect((await enviar('get', '/sitio/versiones')).body.pendientes).toBe(false);
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'borrador' });
+      expect((await publica(ruta('inicio'))).status).toBe(404); // retirar la página también crea su versión
+      const ultima = await prisma.sitioVersion.findFirstOrThrow({ orderBy: { numero: 'desc' } });
+      expect(ultima.origen).toBe('pagina');
+    });
+
+    it('en producción los ficticios bloquean publicar y restaurar una versión de pruebas que los tiene (409)', async () => {
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta('fic'), titulo: 'Ficticios' })).body.id as string;
+      await bloque(p, 'testimonios');
+      process.env.SITIO_ENTORNO = 'pruebas';
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      const ficticio = await testimonio('Inventada', true);
+      const dePruebas = await publicar();
+      expect([dePruebas.entorno, dePruebas.avisoFicticios]).toEqual(['pruebas', 1]);
+
+      delete process.env.SITIO_ENTORNO; // producción
+      const r = await enviar('post', '/sitio/publicar');
+      expect([r.status, r.body.codigo, r.body.detalles]).toEqual([409, 'FICTICIOS_VISIBLES', [{ id: ficticio, coleccion: 'testimonios', nombre: `Inventada ${marca}` }]]);
+      // Segunda defensa: en producción la versión de pruebas se sirve sin el ficticio.
+      expect((await publica(ruta('fic'))).body.bloques[0].elementos ?? []).toEqual([]);
+      await enviar('patch', `/sitio/elementos/${ficticio}`, { visible: false });
+      await publicar();
+      const res = await enviar('post', `/sitio/versiones/${dePruebas.numero}/restaurar`);
+      expect([res.status, res.body.codigo, res.body.detalles]).toEqual([409, 'FICTICIOS_VISIBLES', [{ id: ficticio, coleccion: 'testimonios', nombre: `Inventada ${marca}` }]]);
+      await enviar('patch', `/sitio/paginas/${p}`, { accion: 'borrador' });
+    });
+
+    it('la vista previa muestra lo que hay en el panel aunque no esté publicado', async () => {
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta('previa'), titulo: 'Previa' })).body.id as string;
+      await bloque(p, 'testimonios');
+      const oculto = (await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo: 'faq' })).body.id as string;
+      await testimonio('Visible', false);
+      const r = await enviar('get', `/sitio/paginas/${p}/vista-previa`);
+      expect(r.status).toBe(200);
+      expect(r.body.estado).toBe('BORRADOR');
+      expect(r.body.pagina).toMatchObject({ ruta: ruta('previa'), titulo: 'Previa', publicadaEn: null });
+      expect(r.body.pagina.bloques.map((b: { tipo: string }) => b.tipo)).toEqual(['testimonios']);
+      expect(r.body.pagina.bloques[0].elementos.map((e: { datos: { nombre: string } }) => e.datos.nombre)).toContain(`Visible ${marca}`);
+      expect(r.body.navegacion).toHaveProperty('menu');
+      expect(oculto).toBeTruthy();
+      expect((await publica(ruta('previa'))).status).toBe(404);
+      expect((await enviar('get', '/sitio/paginas/00000000-0000-4000-8000-000000000000/vista-previa')).status).toBe(404);
+      expect((await enviar('get', '/sitio/paginas/no-es-uuid/vista-previa')).status).toBe(400);
+    });
+
+    it('sin ninguna versión el sitio no muestra páginas ni navegación y el sitemap está vacío', async () => {
+      const respaldo = await prisma.sitioVersion.findMany();
+      await prisma.sitioVersion.deleteMany();
+      try {
+        const p = (await enviar('post', '/sitio/paginas', { ruta: ruta('sin'), titulo: 'Sin versión' })).body.id as string;
+        await prisma.sitioPagina.update({ where: { id: p }, data: { estado: 'PUBLICADA', publicadaEn: new Date() } }); // publicada sin versión
+        expect((await publica(ruta('sin'))).status).toBe(404);
+        reiniciarLimite();
+        expect((await request(servidor).get('/api/v1/publico/navegacion')).body).toEqual({ menu: [], pie: [] });
+        expect((await request(servidor).get('/api/v1/publico/sitemap.xml')).text).not.toContain('<url>');
+        const lista = (await enviar('get', '/sitio/versiones')).body;
+        expect(lista).toMatchObject({ actual: null, total: 0, versiones: [], pendientes: true });
+        await prisma.sitioPagina.update({ where: { id: p }, data: { estado: 'BORRADOR', publicadaEn: null } });
+      } finally {
+        await prisma.sitioVersion.deleteMany();
+        await prisma.sitioVersion.createMany({ data: respaldo.map((v) => ({ ...v, instantanea: v.instantanea as object })) });
+      }
+    });
+
+    it('solo el superadmin publica, ve versiones, restaura y abre la vista previa (403 y 401)', async () => {
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta('rbac'), titulo: 'Rbac' })).body.id as string;
+      const antes = await prisma.sitioVersion.count();
+      const rutas: ['get' | 'post', string][] = [['post', '/sitio/publicar'], ['get', '/sitio/versiones'], ['post', '/sitio/versiones/1/restaurar'], ['get', `/sitio/paginas/${p}/vista-previa`]];
+      const estados = [];
+      for (const rol of ROLES_ORGANIZACION) for (const [m, r] of rutas) estados.push((await enviar(m, r, undefined, cookies[rol])).status);
+      expect(new Set(estados)).toEqual(new Set([403]));
+      const sinSesion = [];
+      for (const [m, r] of rutas) sinSesion.push((await enviar(m, r, undefined, '')).status);
+      expect(sinSesion).toEqual([401, 401, 401, 401]);
+      expect(await prisma.sitioVersion.count()).toBe(antes);
+    });
+
+    it('publicar y restaurar quedan en la auditoría, sin organización', async () => {
+      const a = await publicar();
+      const b = await publicar();
+      const r = (await enviar('post', `/sitio/versiones/${a.numero}/restaurar`)).body as { numero: number };
+      const filas = await prisma.auditoria.findMany({ where: { entidad: 'SitioVersion', datos: { path: ['numero'], gte: a.numero } }, orderBy: { creadoEn: 'asc' } });
+      expect(filas.map((f) => [f.accion, f.organizacionId, (f.datos as { numero: number }).numero])).toEqual([
+        ['SITIO_VERSION_PUBLICADA', null, a.numero], ['SITIO_VERSION_PUBLICADA', null, b.numero], ['SITIO_VERSION_RESTAURADA', null, r.numero],
+      ]);
+      expect(filas[2]!.datos).toMatchObject({ origen: 'restauracion', restauradaDe: a.numero });
     });
   });
 });

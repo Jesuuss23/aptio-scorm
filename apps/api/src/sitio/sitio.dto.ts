@@ -24,6 +24,7 @@ export class PaginaSitioDto {
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
   @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
   @ApiPropertyOptional({ description: 'HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117)' }) avisoFicticios?: number;
+  @ApiPropertyOptional({ description: 'HU-1507 · Si el cambio publicó o retiró la página: la versión del sitio que creó' }) version?: number;
 }
 
 class CamposAccion {

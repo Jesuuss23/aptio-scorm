@@ -814,3 +814,23 @@ model SitioEnlace {
 
   @@index([zona, padreId, orden])
 }
+
+/// HU-1507 · Versión publicada del sitio (REQ-068, RN-16-5): instantánea inmutable del sitio completo. El sitio público
+/// sirve solo la última. No se edita ni se borra; restaurar la N crea una nueva con la instantánea de N (CP-119).
+model SitioVersion {
+  id                 String   @id @default(uuid()) @db.Uuid
+  /// 1, 2, 3… sin repetir; la mayor es la que ve el sitio.
+  numero             Int      @unique
+  /// Páginas publicadas con sus bloques y elementos visibles, y la navegación visible (`@aptio/schema/sitio-versiones`).
+  instantanea        Json
+  /// Quién publicó; null cuando la publica la plataforma (programada). Sin llave foránea: la versión no cambia aunque se borre el usuario.
+  publicadoPorId     String?  @db.Uuid
+  publicadoPorNombre String?
+  /// produccion | pruebas
+  entorno            String
+  /// publicacion | pagina | programada | restauracion
+  origen             String
+  /// Con origen restauracion: el número de la versión restaurada.
+  restauradaDe       Int?
+  creadoEn           DateTime @default(now())
+}
