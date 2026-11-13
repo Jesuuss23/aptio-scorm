@@ -594,6 +594,8 @@ export const api = {
   /** HU-1406 · Recursos generados de un proyecto, con su procedencia. */
   recursosGenerados: (proyectoId: string) => pedir<Recurso[]>(`/recursos?${new URLSearchParams({ proyectoId, origen: 'GENERADO' })}`),
   recurso: (id: string) => pedir<Recurso>(`/recursos/${id}`),
+  /** HU-0609 · La biblioteca del proyecto: sus imágenes y SVG subidos o generados, con URL firmada (sin el material del cliente). */
+  bibliotecaProyecto: (proyectoId: string) => pedir<Recurso[]>(`/recursos?${new URLSearchParams({ proyectoId, biblioteca: 'true' })}`),
   /** Sube un archivo directo al almacenamiento cifrado (HU-1404): pide la URL firmada, envía el PUT y confirma. */
   async subir(archivo: File, destino: { clienteId?: string; proyectoId?: string; origen?: 'SUBIDO' | 'CLIENTE' }): Promise<Recurso> {
     const subida = await pedir<{ subidaId: string; url: string; cabeceras: Record<string, string> }>(

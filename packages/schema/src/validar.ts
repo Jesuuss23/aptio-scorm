@@ -4,6 +4,7 @@ import { Ajv2020, type ValidateFunction } from 'ajv/dist/2020.js';
 import formatosModulo, { type FormatsPlugin } from 'ajv-formats';
 import esquema from '../esquemas/curso-v0.schema.json' with { type: 'json' };
 import type { CursoDeCapsulasEsquemaV0 as Curso } from './curso.generado.js';
+import { erroresExtras } from './biblioteca.js';
 import { erroresDisparadores } from './disparadores.js';
 import { erroresMarcadores } from './marcadores.js';
 
@@ -148,6 +149,10 @@ export function erroresCurso(documento: unknown): string[] {
       if (b.tipo === 'video') errores.push(...erroresMarcadores(`${p.id}/${b.id}`, b.marcadores, b.recursoId ? duraciones.get(b.recursoId) : undefined));
     }
   }
+
+  // 9. HU-0609 · Imágenes de los extras: una pieza del kit o una imagen o SVG del curso, no las dos
+  const tiposRecurso = new Map((curso.recursos ?? []).map((r) => [r.id, r.tipo as string]));
+  for (const m of curso.modulos) for (const c of m.capsulas) for (const p of c.pantallas) errores.push(...erroresExtras(p.id, p.extras, tiposRecurso));
 
   // 8. Coherencia de idiomas
   if (curso.modoIdioma === 'unico' && curso.idiomas.length !== 1) errores.push("modoIdioma 'unico' exige exactamente un idioma");

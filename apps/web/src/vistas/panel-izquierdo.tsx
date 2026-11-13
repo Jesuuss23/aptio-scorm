@@ -1,10 +1,11 @@
-// HU-0606 · Panel izquierdo del editor (prototipo: riel Diseños · Agregar · Capas). «Agregar» pone un elemento nuevo en la
-// pantalla, elegido y en modo Libre (CP-061); «Capas» elige, oculta o muestra cada elemento.
+// HU-0606 · Panel izquierdo del editor (prototipo: riel Diseños · Agregar · Imágenes · Capas). «Agregar» pone un elemento
+// nuevo en la pantalla, elegido y en modo Libre (CP-061); «Capas» elige, oculta o muestra cada elemento. HU-0609 ·
+// «Imágenes» trae la biblioteca del kit, la subida y la biblioteca del proyecto (`panel-imagenes.tsx`).
 import type { ReactNode } from 'react';
 import { type Capa, TIPOS_EXTRA, type TipoExtra } from './extras';
 
-export type PestanaIzquierda = 'disenos' | 'agregar' | 'capas';
-const PESTANAS: [PestanaIzquierda, string][] = [['disenos', 'Diseños'], ['agregar', 'Agregar'], ['capas', 'Capas']];
+export type PestanaIzquierda = 'disenos' | 'agregar' | 'imagenes' | 'capas';
+const PESTANAS: [PestanaIzquierda, string][] = [['disenos', 'Diseños'], ['agregar', 'Agregar'], ['imagenes', 'Imágenes'], ['capas', 'Capas']];
 
 /** Vista previa de cada tipo en el panel Agregar (solo decorativa). */
 const MUESTRA: Record<TipoExtra, ReactNode> = {
@@ -18,8 +19,8 @@ const MUESTRA: Record<TipoExtra, ReactNode> = {
   personaje: <span className="muestra-personaje" />,
 };
 
-export function PanelIzquierdo({ pestana, alCambiarPestana, disenos, capas, elegidoId, ocupado, alAgregar, alElegirCapa, alAlternarOculto }: {
-  pestana: PestanaIzquierda; alCambiarPestana: (p: PestanaIzquierda) => void; disenos: ReactNode;
+export function PanelIzquierdo({ pestana, alCambiarPestana, disenos, imagenes, capas, elegidoId, ocupado, alAgregar, alElegirCapa, alAlternarOculto }: {
+  pestana: PestanaIzquierda; alCambiarPestana: (p: PestanaIzquierda) => void; disenos: ReactNode; imagenes: ReactNode;
   capas: Capa[]; elegidoId: string | null; ocupado: boolean;
   alAgregar: (tipo: TipoExtra) => void; alElegirCapa: (id: string) => void; alAlternarOculto: (id: string) => void;
 }) {
@@ -34,6 +35,7 @@ export function PanelIzquierdo({ pestana, alCambiarPestana, disenos, capas, eleg
       <div role="tabpanel" id={`panel-${pestana}`} aria-labelledby={`pestana-${pestana}`}>
         {pestana === 'disenos' ? disenos : null}
         {pestana === 'agregar' ? <PanelAgregar ocupado={ocupado} alAgregar={alAgregar} /> : null}
+        {pestana === 'imagenes' ? imagenes : null}
         {pestana === 'capas' ? <PanelCapas capas={capas} elegidoId={elegidoId} ocupado={ocupado} alElegir={alElegirCapa} alAlternarOculto={alAlternarOculto} /> : null}
       </div>
     </div>

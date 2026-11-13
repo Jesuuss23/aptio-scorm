@@ -130,7 +130,8 @@ export class ProyectosService {
     // el SVG (ya saneado al subirlo) en la respuesta, para no depender del CORS del almacenamiento.
     const doc = c.documento as { recursos?: { id: string; tipo: string }[]; modulos?: { capsulas: { pantallas: { bloques: { tipo: string; recursoId?: string }[] }[] }[] }[] };
     // HU-0901 · El video del cliente también va con URL firmada: la vista previa y Video interactivo lo reproducen.
-    const audios = (doc.recursos ?? []).filter((r) => r.tipo === 'audio' || r.tipo === 'video').map((r) => r.id);
+    // HU-0609 · Y las imágenes y SVG del curso (las subidas que muestran los extras), con la misma URL firmada.
+    const audios = (doc.recursos ?? []).filter((r) => ['audio', 'video', 'imagen', 'svg'].includes(r.tipo)).map((r) => r.id);
     // HU-0801 · Los WebVTT van como texto, igual que el SVG: son pocos KB y el reproductor los lee sin CORS (SUP-37).
     const vtts = (doc.recursos ?? []).filter((r) => r.tipo === 'subtitulos').map((r) => r.id);
     const personajes = [...new Set((doc.modulos ?? []).flatMap((m) => m.capsulas.flatMap((x) => x.pantallas.flatMap((p) => p.bloques.filter((b) => b.tipo === 'personaje' && b.recursoId).map((b) => b.recursoId!)))))];

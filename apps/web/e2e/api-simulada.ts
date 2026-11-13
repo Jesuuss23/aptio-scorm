@@ -298,7 +298,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   let falla = generacion === 'falla';
   let ajena = generacion === 'ajena';
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
-  const subidas = new Map<string, { nombre: string; mime: string }>();
+  const subidas = new Map<string, { nombre: string; mime: string; proyectoId?: string }>();
+  // HU-0609 · Lo que se subió al almacenamiento simulado y la biblioteca del proyecto (imágenes y SVG subidos).
+  const archivos = new Map<string, { mime: string; cuerpo: Buffer }>();
+  const biblioteca: { id: string; tipo: string; origen: string; nombre: string; mime: string; bytes: number; url: string }[] = [];
   const modelos: Record<string, unknown>[] = [];
   let glosario: { termino: string; traduccion: string | null; noTraducir: boolean }[] = [];
   // HU-1204 · Fichas de compatibilidad LMS, de la más nueva a la más vieja.
@@ -331,6 +334,14 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-0702: los audios de narración se sirven como silencio WAV con la duración de su pantalla (o la pedida en el nombre).
   await page.route('**/s3-simulado/**', (route) => {
     const nombre = new URL(route.request().url()).pathname.split('/').pop() ?? '';
+    if (subidas.has(nombre)) {
+      if (route.request().method() === 'PUT') {
+        archivos.set(nombre, { mime: subidas.get(nombre)!.mime, cuerpo: route.request().postDataBuffer() ?? Buffer.alloc(0) });
+        return route.fulfill({ status: 200, body: '' });
+      }
+      const a = archivos.get(nombre);
+      if (a) return route.fulfill({ status: 200, contentType: a.mime, body: a.cuerpo });
+    }
     if (nombre === 'video-60s.webm') {
       // Con rangos, como S3: sin ellos el navegador no deja mover el video a otro segundo.
       const rango = /bytes=(\d+)-(\d*)/.exec(route.request().headers().range ?? '');
@@ -414,9 +425,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return responder(201, nuevo);
     }
     // HU-1406 · Sin recursos generados por defecto; entrega.spec simula los del curso.
-    if (ruta === '/recursos' && req.method() === 'GET') return responder(200, []);
+    if (ruta === '/recursos' && req.method() === 'GET') {
+      return responder(200, new URL(req.url()).searchParams.get('biblioteca') === 'true' ? biblioteca : []);
+    }
     if (ruta === '/recursos/subidas' && req.method() === 'POST') {
-      const datos = req.postDataJSON() as { nombre: string; mime: string };
+      const datos = req.postDataJSON() as { nombre: string; mime: string; proyectoId?: string };
       const subidaId = `00000000-0000-4000-8000-${String(subidas.size + 1).padStart(12, '0')}`;
       subidas.set(subidaId, datos);
       return responder(201, {
@@ -437,6 +450,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         return responder(201, { id: confirmar[1], tipo: s.mime.startsWith('video/') ? 'VIDEO' : 'AUDIO', origen: 'CLIENTE', nombre: s.nombre, mime: s.mime, bytes: 100 });
       }
       const svg = s.mime === 'image/svg+xml';
+      // HU-0609 · Una imagen subida a un proyecto queda en su biblioteca, con la URL del almacenamiento.
+      if (s.proyectoId) {
+        const fila = { id: confirmar[1]!, tipo: svg ? 'SVG' : 'IMAGEN', origen: 'SUBIDO', nombre: s.nombre, mime: s.mime, bytes: archivos.get(confirmar[1]!)?.cuerpo.length ?? 100, url: `${new URL(req.url()).origin}/s3-simulado/${confirmar[1]}` };
+        biblioteca.unshift(fila);
+        return responder(201, fila);
+      }
       return responder(201, {
         id: confirmar[1], tipo: svg ? 'SVG' : 'IMAGEN', origen: 'SUBIDO', nombre: s.nombre, mime: s.mime, bytes: 100,
         ...(svg ? { eliminadosAlSanear: s.nombre.includes('peligrosa') ? ['script', 'atributos on*'] : [] } : {}),
@@ -605,8 +624,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (!p || !(p.avance as { total: number }).total) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El proyecto aún no tiene curso: genera las pantallas en Producción' });
       const origen = new URL(req.url()).origin;
       const urlsRecursos = Object.fromEntries((revision.documento.recursos as { id: string; tipo: string; nombre: string }[])
-        .filter((r) => r.tipo === 'audio' || (conVideo && r.tipo === 'video'))
-        .map((r) => [r.id, r.tipo === 'video' ? `${origen}/s3-simulado/video-60s.webm` : `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
+        .filter((r) => r.tipo === 'audio' || (conVideo && r.tipo === 'video') || biblioteca.some((b) => b.id === r.id))
+        .map((r) => [r.id, r.tipo === 'video' ? `${origen}/s3-simulado/video-60s.webm` : biblioteca.some((b) => b.id === r.id) ? `${origen}/s3-simulado/${r.id}` : `${origen}/s3-simulado/${r.nombre.replace(/\.mp3$/, '.wav')}`]));
       return responder(200, {
         id: CURSO_ID, proyectoId: p.id, versionEsquema: '0.2.0', version: revision.version,
         documento: navegacionCurso ? { ...revision.documento, navegacion: navegacionCurso() } : revision.documento, actualizadoEn: '2026-11-10T10:00:00.000Z',
@@ -745,10 +764,21 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         const ids = datos.extras.map((e) => e.id);
         const repetido = ids.find((id, i) => ids.indexOf(id) !== i || bloques.some((b) => b.id === id));
         if (repetido) return responder(422, { codigo: 'EXTRA_NO_VALIDO', mensaje: `El id «${repetido}» ya está en la pantalla` });
+        // HU-0609 · Una imagen de la biblioteca del proyecto se suma a los recursos del curso; una que ya nadie usa, sale.
+        const recursos = revision.documento.recursos as { id: string; tipo: string; origen: string; nombre: string; mime: string }[];
+        for (const e of datos.extras as unknown as { tipo: string; recursoId?: string }[]) {
+          if (e.tipo !== 'imagen' || !e.recursoId || recursos.some((r) => r.id === e.recursoId)) continue;
+          const b = biblioteca.find((x) => x.id === e.recursoId);
+          if (!b) return responder(422, { codigo: 'RECURSO_NO_VALIDO', mensaje: 'La imagen no existe en este proyecto o no es una imagen (PNG, JPEG, WebP o SVG)' });
+          recursos.push({ id: b.id, tipo: b.tipo === 'SVG' ? 'svg' : 'imagen', origen: 'subido', nombre: b.nombre, mime: b.mime });
+        }
+        const antesRecursos = (pe.extras ?? []).map((e) => (e as { recursoId?: string }).recursoId).filter(Boolean);
         for (const e of pe.extras ?? []) if (!ids.includes(e.id) && pa.ajustes) delete pa.ajustes[e.id];
         if (pa.ajustes && !Object.keys(pa.ajustes).length) delete pa.ajustes;
         if (datos.extras.length) pe.extras = datos.extras;
         else delete pe.extras;
+        const usados = new Set(JSON.stringify(revision.documento.modulos).match(/"recursoId":"[^"]+"/g)?.map((x) => x.slice(13, -1)) ?? []);
+        revision.documento.recursos = recursos.filter((r) => !(r.origen === 'subido' && antesRecursos.includes(r.id) && !usados.has(r.id)));
         purgarDisparadores(p as unknown as Parameters<typeof purgarDisparadores>[0]);
       }
       // HU-0610: los disparadores llegan como lista completa, con las reglas de la API.

@@ -10,6 +10,7 @@ import { hashNarracion } from '@aptio/ai';
 import { type Prisma, recalcularReglas } from '@aptio/db';
 import { erroresCurso } from '@aptio/schema';
 import { CASCADA_ES, ESPERA_CASCADA_MS, TAREA_CASCADA } from '@aptio/schema/generacion';
+import { erroresExtras, TIPOS_IMAGEN } from '@aptio/schema/biblioteca';
 import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
 import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { disenoPermitido, disenosPara, plantillaPara } from '@aptio/schema/marca';
@@ -38,6 +39,51 @@ function limpio(t: TextoI18nDto | undefined): Texto | null {
     if (typeof v === 'string' && v.trim()) r[k] = v.trim();
   }
   return Object.keys(r).length ? r : null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+type ExtraImagen = { id: string; tipo: string; recursoId?: string; pieza?: string; decorativa?: boolean };
+type ImagenSubida = { tipo: 'imagen' | 'svg'; nombre: string; mime: string; bytes: number; licencia: string | null };
+type RecursoImg = { id: string; tipo: string; origen: string; nombre: string; mime: string; bytes?: number; licencia?: string };
+
+const recursoNoValido = (mensaje: string) => new UnprocessableEntityException({ codigo: 'RECURSO_NO_VALIDO', mensaje });
+
+/**
+ * HU-0609 · Los extras imagen con `recursoId`: el recurso ya es una imagen o SVG del curso, o es una imagen o SVG subido
+ * al proyecto del curso (`subidas`) y se suma a `recursos` con origen `subido`. Si no, 422 RECURSO_NO_VALIDO. Una pieza
+ * con `recursoId`, o `pieza`/`decorativa` fuera de una imagen, da 422 EXTRA_NO_VALIDO.
+ */
+function enlazarImagenes(doc: CursoDoc, pantallaId: string, extras: readonly ExtraImagen[], subidas: ReadonlyMap<string, ImagenSubida>): void {
+  const d = doc as unknown as { recursos?: RecursoImg[] };
+  const recursos = d.recursos ?? (d.recursos = []);
+  const errores = erroresExtras(pantallaId, extras, new Map(recursos.map((r) => [r.id, r.tipo])));
+  if (errores.length) throw new UnprocessableEntityException({ codigo: 'EXTRA_NO_VALIDO', mensaje: 'Revisa la imagen del elemento agregado', detalles: errores.map((e) => ({ mensaje: e })) });
+  for (const e of extras) {
+    if (e.tipo !== 'imagen' || e.recursoId === undefined) continue;
+    const enCurso = recursos.find((r) => r.id === e.recursoId);
+    if (enCurso) continue; // erroresExtras ya comprobó que es una imagen o un SVG
+    const s = subidas.get(e.recursoId);
+    if (!s) throw recursoNoValido('La imagen no existe en este proyecto o no es una imagen (PNG, JPEG, WebP o SVG)');
+    recursos.push({ id: e.recursoId, tipo: s.tipo, origen: 'subido', nombre: s.nombre, mime: s.mime, bytes: s.bytes, ...(s.licencia ? { licencia: s.licencia } : {}) });
+  }
+}
+
+/** Quita de `recursos` las imágenes subidas de `candidatos` que ya no nombra ningún elemento del curso. */
+function soltarImagenes(doc: CursoDoc, candidatos: readonly string[]): void {
+  const d = doc as unknown as { recursos?: RecursoImg[] };
+  if (!candidatos.length || !d.recursos?.length) return;
+  const { recursos, ...resto } = d;
+  const usados = new Set<string>();
+  const visitar = (v: unknown): void => {
+    if (Array.isArray(v)) { v.forEach(visitar); return; }
+    if (!v || typeof v !== 'object') return;
+    for (const [k, x] of Object.entries(v)) {
+      if (k === 'recursoId' && typeof x === 'string') usados.add(x);
+      else visitar(x);
+    }
+  };
+  visitar(resto);
+  d.recursos = recursos.filter((r) => !(candidatos.includes(r.id) && r.origen === 'subido' && (TIPOS_IMAGEN as readonly string[]).includes(r.tipo) && !usados.has(r.id)));
 }
 
 @Injectable()
@@ -121,6 +167,21 @@ export class CursosService {
     return { ...resultado, version };
   }
 
+  /** HU-0609 · Las imágenes y SVG subidos o generados en el proyecto del curso que nombran los extras imagen (ids uuid); nunca el material del cliente. */
+  private async imagenesDelProyecto(u: UsuarioSesion, cursoId: string, extras: unknown): Promise<Map<string, ImagenSubida>> {
+    const ids = Array.isArray(extras)
+      ? [...new Set(extras.filter((e): e is ExtraImagen => Boolean(e) && typeof e === 'object' && (e as ExtraImagen).tipo === 'imagen' && typeof (e as ExtraImagen).recursoId === 'string')
+        .map((e) => e.recursoId!).filter((id) => UUID.test(id)))]
+      : [];
+    if (!ids.length) return new Map();
+    const c = await this.buscar(u, cursoId);
+    const filas = await this.bd.recurso.findMany({
+      where: { id: { in: ids }, organizacionId: c.organizacionId, proyectoId: c.proyectoId, tipo: { in: ['IMAGEN', 'SVG'] }, origen: { not: 'CLIENTE' } },
+      select: { id: true, tipo: true, nombre: true, mime: true, bytes: true, licencia: true },
+    });
+    return new Map(filas.map((f) => [f.id, { tipo: f.tipo === 'SVG' ? 'svg' : 'imagen', nombre: f.nombre, mime: f.mime, bytes: Number(f.bytes), licencia: f.licencia }]));
+  }
+
   private pantalla(doc: CursoDoc, pantallaId: string): PantallaDoc {
     const p = pantallasDe(doc).find((x) => x.id === pantallaId);
     if (!p) throw new NotFoundException('Pantalla no encontrada');
@@ -134,6 +195,9 @@ export class CursosService {
     /** HU-0608 · Elementos que perdieron su palabra de anclaje y elementos cuyo tiempo se volvió a fijar. */
     const sinAncla: string[] = [];
     const tiempoFijado: string[] = [];
+    // HU-0609 · Las imágenes subidas que traen los extras: se buscan antes (solo las del proyecto del curso) para
+    // sumarlas a `recursos` del curso en la misma versión.
+    const subidas = await this.imagenesDelProyecto(u, cursoId, dto.extras);
     const r = await this.guardar(u, cursoId, dto.version, dto.motivo ?? 'edición', (doc) => {
       const p = this.pantalla(doc, pantallaId);
       const bloques = p.bloques as Bloque[];
@@ -188,12 +252,16 @@ export class CursosService {
         const repetido = ids.find((id, i) => ids.indexOf(id) !== i || bloques.some((b) => b.id === id));
         if (repetido) throw new UnprocessableEntityException({ codigo: 'EXTRA_NO_VALIDO', mensaje: `El id «${repetido}» ya está en la pantalla` });
         const antes = (pe.extras ?? []).map((e) => e.id);
+        const recursosAntes = (pe.extras ?? []).map((e) => (e as { recursoId?: string }).recursoId).filter((x): x is string => Boolean(x));
+        enlazarImagenes(doc, p.id, dto.extras as ExtraImagen[], subidas);
         for (const id of antes) if (!ids.includes(id) && pe.ajustes) delete pe.ajustes[id];
         if (pe.ajustes && !Object.keys(pe.ajustes).length) delete pe.ajustes;
         if (dto.extras.length) pe.extras = dto.extras as { id: string }[];
         else delete pe.extras;
         // HU-0610 · Los disparadores de un extra que se quitó se van con él.
         purgarDisparadores(p as PantallaDoc & { disparadores?: unknown });
+        // HU-0609 · Una imagen subida que ya nadie usa sale de `recursos` (así Deshacer la quita en el mismo cambio).
+        soltarImagenes(doc, recursosAntes);
         cambios++;
       }
       // HU-0610 · Disparadores: la lista completa de la pantalla, como los extras (después de ellos, para poder apuntar a

@@ -4,6 +4,7 @@ import { accionBoton, aplicarAjuste, posicionExtra } from './ajustes.ts';
 import { mostrarBoca, mostrarPose, svgEnLinea } from './boca.ts';
 import { h } from './dom.ts';
 import { t, type Textos } from './textos.ts';
+import { esPieza, piezaSvg } from './biblioteca.ts';
 import type { Bloque, BloqueInteraccion, BloqueVideo, ElementoExtra, Idioma, Pantalla, RolColor } from './tipos.ts';
 
 export interface ContextoPantalla {
@@ -77,9 +78,18 @@ function dibujarExtra(e: ElementoExtra, p: Pantalla, ctx: ContextoPantalla): HTM
     const accion = accionBoton(e.alClic);
     el = h('button', { ...base, type: 'button', class: 'ap-extra ap-extra-boton', onclick: () => { if (accion === 'siguiente') ctx.alSiguiente?.(); } }, texto);
   } else if (e.tipo === 'imagen') {
-    const url = e.recursoId ? ctx.urlRecurso(e.recursoId) : undefined;
-    el = h('figure', { ...base, class: 'ap-extra ap-extra-imagen' },
-      url ? h('img', { src: url, alt: texto }) : h('span', { class: 'ap-sin-imagen', role: 'img', 'aria-label': texto || ctx.tx.imagenPendiente }, texto || ctx.tx.imagenPendiente));
+    // HU-0609 · Una pieza de la biblioteca del kit se dibuja en línea con sus colores; una subida, con su URL firmada.
+    // Decorativa: sin nombre para el lector de pantalla (RN-14-3).
+    const nombre = e.decorativa ? null : texto || null;
+    if (esPieza(e.pieza)) {
+      // El SVG ya va oculto; decorativa, la figura queda sin nombre (no aria-hidden: en el editor se elige con Tab).
+      el = h('figure', { ...base, class: 'ap-extra ap-extra-imagen ap-extra-pieza', role: nombre ? 'img' : null, 'aria-label': nombre }, piezaSvg(e.pieza));
+    } else {
+      const url = e.recursoId ? ctx.urlRecurso(e.recursoId) : undefined;
+      el = h('figure', { ...base, class: 'ap-extra ap-extra-imagen' },
+        url ? h('img', { src: url, alt: e.decorativa ? '' : texto })
+          : h('span', { class: 'ap-sin-imagen', role: 'img', 'aria-label': texto || ctx.tx.imagenPendiente }, texto || ctx.tx.imagenPendiente));
+    }
   } else if (e.tipo === 'insignia') el = h('figure', { ...base, class: 'ap-extra ap-extra-insignia', role: texto ? 'img' : null, 'aria-label': texto || null, 'aria-hidden': texto ? null : 'true' }, insignia());
   else if (e.tipo === 'forma') el = h('div', { ...base, class: 'ap-extra ap-extra-forma', 'aria-hidden': 'true' });
   else {

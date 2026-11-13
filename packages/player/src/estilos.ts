@@ -221,6 +221,7 @@ button:disabled{cursor:not-allowed}
 .ap-extra-boton{min-height:44px;border:0;border-radius:10px;padding:8px 16px;background:var(--ap-acento);color:var(--ap-texto);font:inherit;font-weight:700;cursor:pointer}
 .ap-extra-boton:focus-visible{outline:3px solid var(--ap-primario);outline-offset:2px}
 .ap-extra-imagen img{display:block;width:100%;height:auto;border-radius:8px}
+.ap-extra-pieza svg{display:block;width:100%;height:auto}
 .ap-extra-insignia svg{display:block;width:100%;height:auto}
 .ap-insignia-fondo{fill:var(--ap-secundario)}
 .ap-insignia-estrella{fill:var(--ap-acento)}

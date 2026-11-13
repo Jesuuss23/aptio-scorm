@@ -21,11 +21,15 @@
 // HU-0608 PR 2 · «✦ Sincronizar con la voz» (SUP-48) calcula la propuesta aquí, sin IA: se ve en la franja morada con
 // las barras donde quedarían; Aplicar la guarda en un solo PATCH y Ctrl+Z la deshace (CP-068). Las barras de los
 // elementos que perdieron su palabra al cambiar la narración muestran «⚠ revisar tiempo» (CP-067).
+// HU-0609 · Pestaña «Imágenes» (piezas del kit, subir y la biblioteca del proyecto) y soltar un archivo de imagen sobre
+// el lienzo: se sube, queda centrado donde se soltó (en %, dentro de la pantalla), elegido y en modo Libre, y la API lo
+// suma a los recursos del curso en el mismo cambio (CP-070). Su texto alternativo empieza con el nombre del archivo.
 import { type AjusteElemento, type CursoReproductor, type Disparador, duracionDe, leerVtt, montar, PALETA_BASE, type Pantalla, type Reproductor, type RolColor, tiemposDe } from '@aptio/player';
 import { elementoRevisarTiempo, marcasPalabra, ORIGEN_REVISAR_TIEMPO, sincronizarConVoz, type TiempoSincronizado } from '@aptio/schema/tiempos';
+import { type PiezaKit, posicionSoltada } from '@aptio/schema/biblioteca';
 import { type CursoDoc, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Rol } from '../api';
+import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Recurso, type Rol } from '../api';
 import { navegar } from '../ruta';
 import {
   ajusteCon, cambioDesplazamiento, controlesDe, desplazado, escalaSiguiente, FLECHAS, nombreElemento, PASO_FLECHA, pxAPorcentaje, seRetoca,
@@ -36,6 +40,8 @@ import { capasDe, extraNuevo, nombreExtra, type PantallaConExtras, sinExtra, TIP
 import { cambioHacia, conFoto, type Foto, fotoDe, type Historial, HISTORIAL_VACIO, mover as moverHistorial, registrar } from './historial';
 import { LineaTiempo } from './LineaTiempo';
 import { type CambioTiempo, tramosBoca, tramosSubtitulos } from './linea-tiempo';
+import { altPorRevisar, ANCHO_IMAGEN, extraImagen, motivoImagen } from './imagenes';
+import { PanelImagenes } from './panel-imagenes';
 import { PanelIzquierdo, type PestanaIzquierda } from './panel-izquierdo';
 import { PanelDisenos } from './disenos';
 import { PanelDisparadores } from './PanelDisparadores';
@@ -101,6 +107,10 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   };
   const panelDisenos = useRef<HTMLDivElement>(null);
   const [pestana, setPestana] = useState<PestanaIzquierda>('disenos');
+  // HU-0609 · Biblioteca del proyecto, si se está subiendo una imagen y si hay un archivo encima del lienzo.
+  const [biblioteca, setBiblioteca] = useState<Recurso[]>([]);
+  const [subiendo, setSubiendo] = useState(false);
+  const [soltando, setSoltando] = useState(false);
   // HU-0608 · La aguja (null: se ve todo), si está corriendo y si la línea de tiempo se ve.
   // Van con el id de la pantalla: otra pantalla empieza con todo a la vista.
   const [aguja, setAguja] = useState<{ pantallaId: string; s: number } | null>(null);
@@ -134,6 +144,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       (p) => {
         alCargar(p.nombre);
         api.kit(p.clienteId).then(setKit, () => setKit(null));
+        api.bibliotecaProyecto(proyectoId).then(setBiblioteca, () => setBiblioteca([]));
         recargar().catch((e: unknown) => {
           if (e instanceof ErrorApi && e.estado === 404) setSinCurso(true);
           else setError(mensajeDe(e, 'No se pudo cargar el curso'));
@@ -677,23 +688,80 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       setElegido({ pantallaId: actual.id, bloqueId: nuevo.id, tamanoVisto: 2 });
     }
   };
+  /** HU-0609 · Agrega una imagen (pieza del kit o imagen subida): queda elegida y en modo Libre, como lo agregado. */
+  const agregarImagen = async (origen: { pieza: PiezaKit } | { recursoId: string; nombre: string }, posicion?: { x: number; y: number; ancho: number }) => {
+    const nuevo = extraImagen(actual as PantallaConExtras, origen, posicion);
+    reenfocar.current = nuevo.id;
+    const listo = 'pieza' in origen ? `${nuevo.texto!.es} agregado: arrástralo donde quieras.` : `Imagen «${origen.nombre}» agregada. Revisa su texto alternativo en Propiedades.`;
+    if (await enviar(actual, { extras: [...extras, nuevo] }, listo)) {
+      setModo('libre');
+      setElegido({ pantallaId: actual.id, bloqueId: nuevo.id, tamanoVisto: 2 });
+    }
+  };
+  /** HU-0609 · Sube una imagen propia y la agrega; soltada en el lienzo, queda centrada en ese punto (CP-070). */
+  const subirImagen = async (archivo: File, punto?: { x: number; y: number; caja: { ancho: number; alto: number } }) => {
+    const motivo = motivoImagen(archivo);
+    if (motivo) {
+      setAviso('');
+      setError(motivo);
+      return;
+    }
+    if (!(await guardarPendientes())) return;
+    setError('');
+    setAviso(`Subiendo «${archivo.name}»…`);
+    setSubiendo(true);
+    try {
+      const [recurso, proporcion] = await Promise.all([api.subir(archivo, { proyectoId, origen: 'SUBIDO' }), proporcionDe(archivo)]);
+      setBiblioteca((b) => [recurso, ...b.filter((x) => x.id !== recurso.id)]);
+      api.bibliotecaProyecto(proyectoId).then(setBiblioteca, () => undefined);
+      const posicion = punto ? posicionSoltada(punto, punto.caja, ANCHO_IMAGEN, proporcion) : undefined;
+      await agregarImagen({ recursoId: recurso.id, nombre: recurso.nombre }, posicion);
+    } catch (e) {
+      setAviso('');
+      setError(mensajeDe(e, `No se pudo subir «${archivo.name}»`));
+    } finally {
+      setSubiendo(false);
+    }
+  };
+  /** HU-0609 · Un archivo soltado sobre la pantalla: el punto relativo a la pantalla dibujada en el lienzo. */
+  const soltar = (ev: DragEvent<HTMLDivElement>) => {
+    if (!editan) return;
+    ev.preventDefault();
+    setSoltando(false);
+    const archivo = ev.dataTransfer.files?.[0];
+    if (!archivo || ocupado || subiendo) return;
+    const pantallaEl = lienzo.current?.shadowRoot?.querySelector<HTMLElement>(`[data-pantalla="${CSS.escape(actual.id)}"]`) ?? lienzo.current;
+    const caja = pantallaEl?.getBoundingClientRect();
+    const punto = caja ? { x: ev.clientX - caja.left, y: ev.clientY - caja.top, caja: { ancho: caja.width, alto: caja.height } } : undefined;
+    void subirImagen(archivo, punto);
+  };
+  const arrastrandoArchivo = (ev: DragEvent<HTMLDivElement>) => {
+    if (!editan || !Array.from(ev.dataTransfer.types).includes('Files')) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'copy';
+    if (!soltando) setSoltando(true);
+  };
   const alternarOculto = (id: string) => {
     const previo = (actual as PantallaConAjustes).ajustes?.[id];
     const ocultar = previo?.oculto !== true;
     void enviar(actual, { ajustes: { [id]: ajusteCon(previo, { oculto: ocultar ? true : undefined }) } }, ocultar ? 'Elemento oculto: se puede mostrar desde Capas.' : 'Elemento visible.');
   };
   /** Cambia un dato del extra elegido (la imagen, su texto alternativo o lo que hace el botón). */
-  const cambiarExtra = (cambio: Partial<Pick<NonNullable<typeof extraElegido>, 'recursoId' | 'texto' | 'alClic'>>) => {
+  const cambiarExtra = (cambio: Partial<Pick<NonNullable<typeof extraElegido>, 'recursoId' | 'pieza' | 'decorativa' | 'texto' | 'alClic'>>) => {
     if (!extraElegido) return;
     const lista = extras.map((e) => {
       if (e.id !== extraElegido.id) return e;
       const nuevo = { ...e, ...cambio };
       if (!nuevo.recursoId) delete nuevo.recursoId;
+      if (!nuevo.pieza) delete nuevo.pieza;
+      if (!nuevo.decorativa) delete nuevo.decorativa;
       return nuevo;
     });
     void enviar(actual, { extras: lista }, 'Cambio guardado.');
   };
-  const imagenes = ((documento?.recursos ?? []) as { id: string; tipo: string; nombre: string }[]).filter((r) => r.tipo === 'imagen');
+  // HU-0609 · Las imágenes y SVG del curso y las de la biblioteca del proyecto (elegir una de esta la suma al curso).
+  const delCurso = ((documento?.recursos ?? []) as { id: string; tipo: string; nombre: string }[]).filter((r) => r.tipo === 'imagen' || r.tipo === 'svg');
+  const imagenes = [...delCurso, ...biblioteca.filter((b) => !delCurso.some((r) => r.id === b.id))].map(({ id, nombre }) => ({ id, nombre }));
   const retocar = (cambio: Partial<Record<keyof AjusteElemento, unknown>>) => {
     if (!bloque) return;
     void enviar(actual, { ajustes: { [bloque.id]: ajusteCon(ajuste, cambio) } }, 'Cambio guardado.');
@@ -754,6 +822,9 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
         <div ref={panelDisenos} className="editor-col-disenos" tabIndex={-1}>
           <PanelIzquierdo pestana={pestana} alCambiarPestana={setPestana} capas={capas} elegidoId={elegidoId} ocupado={ocupado}
             alAgregar={(t) => void agregar(t)} alElegirCapa={elegirCapa} alAlternarOculto={alternarOculto}
+            imagenes={<PanelImagenes paleta={paleta} biblioteca={biblioteca} ocupado={ocupado || !editan} subiendo={subiendo}
+              alPieza={(p) => void agregarImagen({ pieza: p })} alSubir={(a) => void subirImagen(a)}
+              alUsar={(r) => void agregarImagen({ recursoId: r.id, nombre: r.nombre })} />}
             disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={cambiarDiseno} />} />
         </div>
         <section className="editor-lienzo" aria-label={`Lienzo de la pantalla ${actual.id}`}>
@@ -764,15 +835,17 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
               {escribiendo ? 'Escribiendo… Enter para terminar · Esc para cancelar' : ocupado ? 'Guardando…' : 'Clic en un elemento para cambiarlo; doble clic en un texto para escribir (o Tab hasta él y Espacio o Enter).'}
             </p>
           )}
-          <div className="revision-escenario">
+          <div className={`revision-escenario${soltando ? ' soltando' : ''}`} onDragOver={arrastrandoArchivo} onDragEnter={arrastrandoArchivo}
+            onDragLeave={(ev) => { if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setSoltando(false); }} onDrop={soltar}>
             <div ref={lienzo} className="revision-reproductor" />
+            {soltando ? <p className="editor-soltar" aria-hidden="true">Suelta la imagen donde quieras ponerla</p> : null}
           </div>
           <p className="editor-ayuda">
             {modo === 'libre' ? 'Modo Libre: arrastra un elemento para moverlo, o elígelo y usa las flechas (0,5 % por pulsación).' : 'Modo Automático: la disposición acomoda los elementos. Cambia a Libre para moverlos.'}
           </p>
         </section>
         <PanelPropiedades elegido={datosElegido} paleta={paleta} ocupado={ocupado} modo={modo} acciones={acciones}
-          imagenes={imagenes} alCambiarExtra={cambiarExtra}
+          imagenes={imagenes} alCambiarExtra={cambiarExtra} revisarAlt={Boolean(extraElegido && altPorRevisar(extraElegido, imagenes))}
           avanzado={<PanelDisparadores key={actual.id} pantalla={actual as PantallaConExtras} lista={disparadores} elementos={opcionesElemento} pantallas={opcionesPantalla} editan={editan}
             alGuardar={(lista) => enviar(actual, { disparadores: lista }, lista.length ? 'Disparadores guardados.' : 'Disparadores quitados.')} />}
           tiempo={bloque && tiempos.get(bloque.id) ? {
@@ -815,4 +888,16 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
       </nav>
     </div>
   );
+}
+
+/** HU-0609 · Alto / ancho de la imagen, para centrarla en el punto donde se soltó; 1 si no se puede leer. */
+function proporcionDe(archivo: File): Promise<number> {
+  return new Promise((resolver) => {
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    const fin = (v: number) => { URL.revokeObjectURL(url); resolver(v); };
+    img.onload = () => fin(img.naturalWidth > 0 && img.naturalHeight > 0 ? img.naturalHeight / img.naturalWidth : 1);
+    img.onerror = () => fin(1);
+    img.src = url;
+  });
 }

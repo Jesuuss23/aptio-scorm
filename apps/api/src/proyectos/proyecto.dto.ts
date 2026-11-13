@@ -74,7 +74,7 @@ export class CursoDto {
   @ApiProperty({ description: 'Versión del documento; va también en el encabezado ETag' }) version: number;
   @ApiProperty({ type: 'object', additionalProperties: true, description: 'Valida contra packages/schema/esquemas/curso-v0.schema.json' }) documento: Record<string, unknown>;
   @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
-  @ApiProperty({ type: 'object', additionalProperties: { type: 'string', format: 'uri' }, description: 'HU-0702 · URL firmada (15 min) de cada audio de narración del curso, por id de recurso' })
+  @ApiProperty({ type: 'object', additionalProperties: { type: 'string', format: 'uri' }, description: 'HU-0702 · URL firmada (15 min) de cada audio de narración, video (HU-0901) e imagen o SVG (HU-0609) del curso, por id de recurso' })
   urlsRecursos: Record<string, string>;
   @ApiProperty({ type: 'object', additionalProperties: { type: 'string' }, description: 'HU-0702 · SVG saneado de cada personaje del curso, por id de recurso, para dibujarlo en línea y animar su boca' })
   svgPersonajes: Record<string, string>;

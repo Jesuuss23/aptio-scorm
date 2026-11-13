@@ -3,7 +3,8 @@
 // HU-0606 · Ocultar o mostrar cualquier elemento; eliminar, la imagen y lo que hace el botón, solo en los extras.
 import type { AjusteElemento, ElementoExtra, RolColor } from '@aptio/player';
 import type { MarcaPalabra } from '@aptio/schema/tiempos';
-import { type KeyboardEvent, type ReactNode, useState } from 'react';
+import { NOMBRE_PIEZA, PIEZAS_KIT, type PiezaKit } from '@aptio/schema/biblioteca';
+import { type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import type { CambioTiempo } from './linea-tiempo';
 import { ALINEACIONES, ANIMACIONES, type Animacion, COLORES_KIT, controlesDe, ESCALA, TAMANO } from './ajustes-elemento';
 
@@ -31,7 +32,7 @@ interface Elegido {
   /** HU-0606 · El extra, si el elemento es uno agregado en el editor. */
   extra: ElementoExtra | null;
 }
-type CambioExtra = Partial<Pick<ElementoExtra, 'recursoId' | 'texto' | 'alClic'>>;
+type CambioExtra = Partial<Pick<ElementoExtra, 'recursoId' | 'pieza' | 'decorativa' | 'texto' | 'alClic'>>;
 
 function OcultarEliminar({ elegido, ocupado, acciones }: { elegido: Elegido; ocupado: boolean; acciones: AccionesRetoque }) {
   return (
@@ -61,8 +62,8 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
   return (
     <div className="editor-ctx-barra" role="toolbar" aria-label="Opciones del elemento">
       <b className="editor-ctx-nombre">{elegido.nombre}</b>
-      <button type="button" className="boton" disabled={ocupado} aria-label="Más pequeño" onClick={() => acciones.alTamano(-1)}>A−</button>
-      <button type="button" className="boton" disabled={ocupado} aria-label="Más grande" onClick={() => acciones.alTamano(1)}>A+</button>
+      <button type="button" className="boton" disabled={ocupado} aria-label="A− Más pequeño" onClick={() => acciones.alTamano(-1)}>A−</button>
+      <button type="button" className="boton" disabled={ocupado} aria-label="A+ Más grande" onClick={() => acciones.alTamano(1)}>A+</button>
       {c.color ? <Colores elegido={elegido} paleta={paleta} ocupado={ocupado} alColor={acciones.alColor} /> : null}
       {c.alineacion ? (
         <div className="opciones" role="group" aria-label="Alineación">
@@ -84,10 +85,11 @@ export function BarraElemento({ elegido, paleta, ocupado, acciones }: { elegido:
 /** HU-0608 · El tiempo del elemento elegido en la línea de tiempo y las palabras de la narración. */
 export type TiempoElegido = { inicioS: number; finS: number | null; anclaPalabra?: number | undefined; palabras: MarcaPalabra[]; alCambiar: (c: CambioTiempo) => void };
 
-export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra, tiempo, avanzado }: {
+export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, diseno, alCambiarDiseno, imagenes = [], alCambiarExtra, revisarAlt = false, tiempo, avanzado }: {
   elegido: Elegido | null; paleta: Record<RolColor, string>; ocupado: boolean; modo: 'auto' | 'libre'; acciones: AccionesRetoque;
-  /** HU-0606 · Imágenes del curso para un extra «Imagen del kit» y cómo cambiar el extra elegido. */
-  imagenes?: { id: string; nombre: string }[]; alCambiarExtra?: (cambio: CambioExtra) => void;
+  /** HU-0606 · Imágenes del curso para un extra «Imagen del kit» y cómo cambiar el extra elegido. HU-0609 · También las
+   * de la biblioteca del proyecto, y si el texto alternativo sigue siendo el nombre del archivo (hay que revisarlo). */
+  imagenes?: { id: string; nombre: string }[]; alCambiarExtra?: (cambio: CambioExtra) => void; revisarAlt?: boolean;
   /** HU-0605 · Nombre del diseño de la pantalla y cómo ir al panel Diseños. */
   diseno: string; alCambiarDiseno: () => void;
   tiempo?: TiempoElegido | null;
@@ -155,7 +157,7 @@ export function PanelPropiedades({ elegido, paleta, ocupado, modo, acciones, dis
         </div>
       ) : null}
       {tiempo ? <TiempoElemento key={`${elegido.nombre}-${tiempo.inicioS}-${tiempo.finS}`} tiempo={tiempo} ocupado={ocupado} /> : null}
-      {elegido.extra && alCambiarExtra ? <DatosExtra key={elegido.extra.id} extra={elegido.extra} imagenes={imagenes} ocupado={ocupado} alCambiar={alCambiarExtra} /> : null}
+      {elegido.extra && alCambiarExtra ? <DatosExtra key={`${elegido.extra.id}:${elegido.extra.texto?.es ?? ''}`} extra={elegido.extra} imagenes={imagenes} revisarAlt={revisarAlt} ocupado={ocupado} alCambiar={alCambiarExtra} /> : null}
       <div className="acciones-form">
         <button type="button" className="boton" onClick={acciones.alVerAnimacion}>▶ Ver animación</button>
         {elegido.ajuste ? <button type="button" className="boton" disabled={ocupado} onClick={acciones.alRestablecer}>Restablecer</button> : null}
@@ -224,9 +226,15 @@ function Deslizador({ tipo, inicial, ocupado, alCambiar }: { tipo: 'texto' | 'es
   );
 }
 
-/** HU-0606 · Lo propio de un extra: qué hace el botón (por ahora «Siguiente» o «Nada», SUP-45) y la imagen del curso con su texto alternativo. */
-function DatosExtra({ extra, imagenes, ocupado, alCambiar }: { extra: ElementoExtra; imagenes: { id: string; nombre: string }[]; ocupado: boolean; alCambiar: (c: CambioExtra) => void }) {
+/** HU-0606 · Lo propio de un extra: qué hace el botón (por ahora «Siguiente» o «Nada», SUP-45) y la imagen con su texto
+ * alternativo. HU-0609 · La imagen es una pieza del kit o una imagen del curso o de la biblioteca; puede ser decorativa
+ * (RN-14-3) y, si su texto alternativo sigue siendo el nombre del archivo, se pide revisarlo. */
+function DatosExtra({ extra, imagenes, revisarAlt, ocupado, alCambiar }: {
+  extra: ElementoExtra; imagenes: { id: string; nombre: string }[]; revisarAlt: boolean; ocupado: boolean; alCambiar: (c: CambioExtra) => void;
+}) {
   const [alt, setAlt] = useState(extra.texto?.es ?? '');
+  // Enter guarda y, al quedar deshabilitado mientras guarda, el campo pierde el foco: el blur no debe mandarlo otra vez.
+  const enviado = useRef(extra.texto?.es ?? '');
   if (extra.tipo === 'boton') {
     return (
       <label className="campo">
@@ -241,22 +249,45 @@ function DatosExtra({ extra, imagenes, ocupado, alCambiar }: { extra: ElementoEx
   if (extra.tipo !== 'imagen') return null;
   const guardarAlt = () => {
     const limpio = alt.replace(/\s+/g, ' ').trim();
-    if (limpio && limpio !== (extra.texto?.es ?? '')) alCambiar({ texto: { ...extra.texto, es: limpio } });
+    if (!limpio || limpio === enviado.current) return;
+    enviado.current = limpio;
+    alCambiar({ texto: { ...extra.texto, es: limpio } });
+  };
+  const valor = extra.pieza ? `pieza:${extra.pieza}` : (extra.recursoId ?? '');
+  const elegir = (v: string) => {
+    if (v.startsWith('pieza:')) {
+      const pieza = v.slice(6) as PiezaKit;
+      alCambiar({ pieza, recursoId: undefined, texto: { ...extra.texto, es: NOMBRE_PIEZA[pieza] } });
+    } else alCambiar({ recursoId: v || undefined, pieza: undefined });
   };
   return (
     <>
       <label className="campo">
         Imagen
-        <select value={extra.recursoId ?? ''} disabled={ocupado} onChange={(e) => alCambiar({ recursoId: e.target.value || undefined })}>
+        <select value={valor} disabled={ocupado} onChange={(e) => elegir(e.target.value)}>
           <option value="">Sin imagen (marco)</option>
-          {imagenes.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+          <optgroup label="Biblioteca del kit">
+            {PIEZAS_KIT.map((p) => <option key={p} value={`pieza:${p}`}>{NOMBRE_PIEZA[p]}</option>)}
+          </optgroup>
+          {imagenes.length ? (
+            <optgroup label="Imágenes del proyecto">
+              {imagenes.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
+            </optgroup>
+          ) : null}
         </select>
-        {imagenes.length ? null : <span className="ayuda">El curso aún no tiene imágenes; subirlas llega con el panel Imágenes.</span>}
+        {imagenes.length ? null : <span className="ayuda">Sube imágenes propias desde el panel Imágenes o arrastrándolas al lienzo.</span>}
       </label>
       <label className="campo">
         Texto alternativo
-        <input type="text" value={alt} disabled={ocupado} onChange={(e) => setAlt(e.target.value)} onBlur={guardarAlt}
+        <input type="text" value={alt} disabled={ocupado || extra.decorativa === true} aria-describedby={revisarAlt && !extra.decorativa ? 'aviso-alt' : undefined}
+          onChange={(e) => setAlt(e.target.value)} onBlur={guardarAlt}
           onKeyDown={(e) => { if (e.key === 'Enter') guardarAlt(); }} />
+        {revisarAlt && !extra.decorativa ? <span id="aviso-alt" className="ayuda aviso-alt" role="note">Revisa el texto alternativo: ahora es el nombre del archivo.</span> : null}
+      </label>
+      <label className="casilla">
+        <input type="checkbox" checked={extra.decorativa === true} disabled={ocupado}
+          onChange={(e) => alCambiar({ decorativa: e.target.checked ? true : undefined })} />
+        Decorativa (el lector de pantalla la omite)
       </label>
     </>
   );
