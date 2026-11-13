@@ -3044,22 +3044,26 @@ paths:
       - Costos y rentabilidad
       summary: Resumen de costos de IA
       operationId: get_costos
+      description: 'HU-1302 · Solo ADMINISTRADOR y DISENADOR_INSTRUCCIONAL (solo lectura). Las fechas son días de Lima (UTC−05:00), ambos incluidos; todo queda acotado a la organización de la sesión.'
       parameters:
       - name: desde
         in: query
         required: false
+        description: Primer día incluido (hora de Lima)
         schema:
           type: string
           format: date
       - name: hasta
         in: query
         required: false
+        description: Último día incluido (hora de Lima)
         schema:
           type: string
           format: date
       - name: clienteId
         in: query
         required: false
+        description: Proyectos del cliente y sus trabajos sin proyecto
         schema:
           type: string
           format: uuid
@@ -3080,6 +3084,8 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /negocio/parametros:
     get:
       tags:
@@ -6978,36 +6984,101 @@ components:
           type: string
     ResumenCostos:
       type: object
+      description: 'HU-1302 · Costos de IA en dólares (US$) registrados en TrabajoIA, sin los trabajos que aún no llamaron a un proveedor'
       required:
       - totalUsd
+      - scormContados
+      - promedioPorScormUsd
+      - criterioPromedio
+      - porProyecto
+      - porCliente
+      - porProveedorTarea
       properties:
         totalUsd:
           type: number
-        porProveedor:
-          type: array
-          items:
-            type: object
-            properties:
-              proveedor:
-                type: string
-              tarea:
-                type: string
-              usd:
-                type: number
+        scormContados:
+          type: integer
+          description: SCORM sobre los que se calcula el promedio
+        promedioPorScormUsd:
+          type: number
+          description: 0 si no hay proyectos en el alcance
+        criterioPromedio:
+          type: string
+          enum:
+          - exportados
+          - con-gasto
+          description: 'exportados: proyectos con al menos un paquete exportado; con-gasto: aún no hay exportaciones en el alcance y se usan los proyectos con gasto'
         porProyecto:
           type: array
           items:
             type: object
+            required:
+            - proyectoId
+            - nombre
+            - clienteId
+            - cliente
+            - llamadas
+            - usd
+            - exportado
             properties:
               proyectoId:
                 type: string
                 format: uuid
               nombre:
                 type: string
+              clienteId:
+                type: string
+                format: uuid
+              cliente:
+                type: string
+              llamadas:
+                type: integer
               usd:
                 type: number
-        promedioPorScormUsd:
-          type: number
+              exportado:
+                type: boolean
+        porCliente:
+          type: array
+          description: Incluye los trabajos del cliente sin proyecto, p. ej. la propuesta del kit (IA-18)
+          items:
+            type: object
+            required:
+            - clienteId
+            - nombre
+            - proyectosUsd
+            - sinProyectoUsd
+            - usd
+            properties:
+              clienteId:
+                type: string
+                format: uuid
+              nombre:
+                type: string
+              proyectosUsd:
+                type: number
+              sinProyectoUsd:
+                type: number
+              usd:
+                type: number
+        porProveedorTarea:
+          type: array
+          items:
+            type: object
+            required:
+            - proveedor
+            - tarea
+            - llamadas
+            - usd
+            properties:
+              proveedor:
+                type: string
+              tarea:
+                type: string
+                description: IA-##
+              llamadas:
+                type: integer
+              usd:
+                type: number
     ParametrosNegocio:
       type: object
       properties:

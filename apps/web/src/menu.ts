@@ -6,7 +6,7 @@ import type { GrupoMenu } from '@aptio/ui';
  */
 export const MENU: GrupoMenu[] = [
   { nombre: 'Inicio', items: [{ ruta: '/', nombre: 'Proyectos' }, { ruta: '/nuevo', nombre: 'Nuevo SCORM' }] },
-  { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }] },
+  { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }] },
 ];
 
 /** Vista a partir de la ruta: grupo de la ruta, nombre, ítem activo del menú y parámetro. */
@@ -33,6 +33,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (video) return { grupo: 'Inicio', nombre: 'Video interactivo', activo: '/', id: video[1]!, sub: 'video' };
   const voz = camino.match(/^\/proyectos\/([0-9a-f-]{36})\/voz$/i);
   if (voz) return { grupo: 'Inicio', nombre: 'Personaje y voz', activo: '/', id: voz[1]!, sub: 'voz' };
+  if (camino === '/rentabilidad') return { grupo: 'Empresa', nombre: 'Rentabilidad', activo: '/rentabilidad' };
   if (camino === '/clientes') return { grupo: 'Empresa', nombre: 'Clientes y kits', activo: '/clientes' };
   const cliente = camino.match(/^\/clientes\/([0-9a-f-]{36})$/i);
   if (cliente) return { grupo: 'Empresa', nombre: 'Cliente', activo: '/clientes', id: cliente[1]! };

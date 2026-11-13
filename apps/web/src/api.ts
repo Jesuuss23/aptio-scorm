@@ -543,12 +543,29 @@ export interface NavegacionCambio {
 /** Editan la navegación administración y diseño instruccional; diseño gráfico y producción solo ven (M14). */
 export const EDITAN_NAVEGACION: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
 
+/** HU-1302 · Ven los costos de IA administración y diseño instruccional (solo lectura); la API lo vuelve a verificar. */
+export const VEN_COSTOS: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
+export interface FiltroCostos { desde?: string; hasta?: string; clienteId?: string; proyectoId?: string }
+export interface ResumenCostos {
+  totalUsd: number;
+  scormContados: number;
+  promedioPorScormUsd: number;
+  criterioPromedio: 'exportados' | 'con-gasto';
+  porProyecto: { proyectoId: string; nombre: string; clienteId: string; cliente: string; llamadas: number; usd: number; exportado: boolean }[];
+  porCliente: { clienteId: string; nombre: string; proyectosUsd: number; sinProyectoUsd: number; usd: number }[];
+  porProveedorTarea: { proveedor: string; tarea: string; llamadas: number; usd: number }[];
+}
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
   ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
   salir: () => pedir<void>('/auth/salir', { method: 'POST' }),
   pedirClave: (email: string) => pedir<void>('/auth/clave/olvido', json({ email })),
   crearClave: (token: string, clave: string) => pedir<void>('/auth/clave/restablecer', json({ token, clave })),
+  costos: (f: FiltroCostos = {}) => {
+    const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
+    return pedir<ResumenCostos>(`/costos${q ? `?${q}` : ''}`);
+  },
   clientes: (buscar = '') => pedir<Cliente[]>(`/clientes${buscar ? `?buscar=${encodeURIComponent(buscar)}` : ''}`),
   cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),

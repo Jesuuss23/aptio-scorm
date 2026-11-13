@@ -18,6 +18,7 @@ import { AlineacionModule } from './alineacion/alineacion.module.js';
 import { NavegacionModule } from './navegacion/navegacion.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 import { VozModule } from './voz/voz.module.js';
+import { CostosModule } from './costos/costos.module.js';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { VozModule } from './voz/voz.module.js';
     RecursosModule,
     SaludModule,
     VozModule,
+    CostosModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

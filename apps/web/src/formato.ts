@@ -74,3 +74,12 @@ export function resumenActividad(tipo: string, datos: Record<string, unknown>): 
     default: return 'con datos';
   }
 }
+
+/** HU-1302 · Nombre corto de cada tarea registrada en TrabajoIA (docs/06-ia.md); las demás se muestran con su código. */
+export const NOMBRE_TAREA: Record<string, string> = {
+  'IA-01': 'Mapa de temas', 'IA-02': 'Conservar u omitir', 'IA-03': 'Resumen por tema', 'IA-04': 'Estructura', 'IA-05': 'Storyboard',
+  'IA-06': 'Sugerir interacción', 'IA-07': 'Datos de interacción', 'IA-08': 'Banco de preguntas', 'IA-09': 'Pausas de video',
+  'IA-10': 'Traducción', 'IA-11': 'Prompt de imagen', 'IA-12': 'Revisión de calidad', 'IA-13': 'Acta de omitidos',
+  'IA-14': 'Patrón de navegación', 'IA-15': 'Componer pantalla', 'IA-16': 'Propuesta de retoque', 'IA-17': 'Corrección de alineación',
+  'IA-18': 'Extracción de kit', VOZ: 'Narración', MUESTRA_VOZ: 'Muestra de voz', TRANSCRIPCION: 'Transcripción',
+};
