@@ -10,6 +10,8 @@ export const PERMITIDOS: Record<string, { tipo: TipoRecurso; maxBytes: number }>
   'application/pdf': { tipo: 'DOCUMENTO', maxBytes: 200 * MB },
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { tipo: 'DOCUMENTO', maxBytes: 200 * MB },
   'application/vnd.openxmlformats-officedocument.presentationml.presentation': { tipo: 'DOCUMENTO', maxBytes: 500 * MB },
+  // HU-0206 · Un curso anterior empaquetado (SCORM o HTML) para extraer el kit: solo se leen sus textos, nunca se ejecuta.
+  'application/zip': { tipo: 'DOCUMENTO', maxBytes: 500 * MB },
   'image/png': { tipo: 'IMAGEN', maxBytes: 20 * MB },
   'image/jpeg': { tipo: 'IMAGEN', maxBytes: 20 * MB },
   'image/webp': { tipo: 'IMAGEN', maxBytes: 20 * MB },

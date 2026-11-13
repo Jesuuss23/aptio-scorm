@@ -34,6 +34,8 @@ import { crearExportador } from './exportar.js';
 import { crearProcesador, type TrabajoEnCola } from './procesar.js';
 import { crearTranscriptor, TAREA_TRANSCRIBIR } from './transcribir.js';
 import { crearGrabacion, crearLimpieza } from './grabacion.js';
+import { crearExtraccionKit } from './kit.js';
+import { TAREA_KIT } from '@aptio/schema/extraccion-kit';
 import { TAREA_GRABACION, TAREA_LIMPIAR } from '@aptio/schema/grabacion';
 import { borrarDocumentosVencidos, COLA_MANTENIMIENTO, PATRON_BORRADO, TAREA_BORRADO } from './retencion.js';
 
@@ -78,7 +80,10 @@ const exportar = crearExportador({ bd: prisma, redis, leer: (clave) => almacen.l
 // El audio del cliente (HU-0704): la grabación como narración (cola voz) y la limpieza de ruido (cola media), con ffmpeg.
 const grabacion = crearGrabacion({ bd: prisma, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime), calcular: calculadorBocasDesdeEntorno(process.env) });
 const limpiarAudio = crearLimpieza({ bd: prisma, leer: (clave) => almacen.leer(clave), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime) });
+// El kit propuesto desde un curso anterior o un manual de marca (HU-0206, IA-18 v2): lee el ZIP o el PDF sin ejecutar nada.
+const extraerKit = crearExtraccionKit({ bd: prisma, redis, leer: (clave) => almacen.leer(clave), proveedor: proveedorDesdeEntorno(process.env, () => proveedorSimulado()) });
 const despachar = (trabajo: TrabajoEnCola) => {
+  if (trabajo.data.tarea === TAREA_KIT && trabajo.data.kit) return extraerKit(trabajo);
   if (trabajo.data.tarea === TAREA_GRABACION && trabajo.data.grabacion) return grabacion(trabajo);
   if (trabajo.data.tarea === TAREA_LIMPIAR) return limpiarAudio(trabajo);
   if (trabajo.data.tarea === TAREA_EXPORTAR) return exportar(trabajo);

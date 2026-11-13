@@ -607,9 +607,9 @@ paths:
     post:
       tags:
       - Clientes y kits
-      summary: Extraer kit de un curso o logo (IA)
+      summary: Proponer el kit desde un curso anterior o un manual de marca (IA-18)
       operationId: post_clientes_clienteId_kit_extraer
-      description: Devuelve una propuesta de kit para revisar
+      description: HU-0206 (CP-028). Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y DISENADOR_GRAFICO. El recurso es material del cliente (subido con origen CLIENTE) en ZIP (un curso anterior) o PDF (el manual de marca); otro formato da 422 FORMATO_NO_VALIDO. Encola IA-18 v2 en la cola ia; el worker lee solo los archivos de texto del ZIP (.css, .html, .js, .json) con topes de entradas y de bytes descomprimidos, o las tipografías y colores de relleno del PDF, sin ejecutar nada. El kit no cambia; la propuesta se lee en GET /clientes/{clienteId}/kit/propuesta.
       parameters:
       - name: clienteId
         in: path
@@ -622,10 +622,10 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PropuestaSolicitud'
+              $ref: '#/components/schemas/ExtraerKitSolicitud'
       responses:
         '202':
-          description: OK
+          description: IA-18 encolada
           content:
             application/json:
               schema:
@@ -638,6 +638,55 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /clientes/{clienteId}/kit/propuesta:
+    get:
+      tags:
+      - Clientes y kits
+      summary: Ver la última propuesta de kit
+      operationId: get_clientes_clienteId_kit_propuesta
+      description: HU-0206. Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y DISENADOR_GRAFICO. La última propuesta del cliente, guardada en TrabajoIA.resultado — procesando, lista (con evidencias, paleta, tipografías de la lista del kit y el aviso de la tipografía de marca) o error con su código (SIN_COLORES, ZIP_NO_VALIDO, FORMATO_NO_VALIDO, PROPUESTA_NO_VALIDA) y un mensaje legible. 404 si no hay o se descartó.
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropuestaKit'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+    delete:
+      tags:
+      - Clientes y kits
+      summary: Descartar la propuesta de kit
+      operationId: delete_clientes_clienteId_kit_propuesta
+      description: HU-0206. La propuesta deja de ofrecerse (queda en la auditoría como KIT_PROPUESTA_DESCARTADA); el kit no cambia.
+      parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Descartada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /clientes/{clienteId}/kit/pantallas-modelo:
     get:
       tags:
@@ -3511,6 +3560,208 @@ components:
           type: integer
           minimum: 1
           maximum: 3650
+    ExtraerKitSolicitud:
+      type: object
+      required:
+      - recursoId
+      properties:
+        recursoId:
+          type: string
+          format: uuid
+          description: Recurso del cliente en application/zip o application/pdf
+    Frecuencia:
+      type: object
+      required:
+      - valor
+      - veces
+      properties:
+        valor:
+          type: string
+        veces:
+          type: integer
+    EvidenciasKit:
+      type: object
+      required:
+      - origen
+      - leidos
+      - colores
+      - fuentes
+      - avisos
+      properties:
+        origen:
+          type: string
+          enum:
+          - zip
+          - pdf
+        leidos:
+          type: integer
+          description: Archivos de texto leídos del ZIP o páginas revisadas del PDF
+        colores:
+          type: array
+          items:
+            $ref: '#/components/schemas/Frecuencia'
+        fuentes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Frecuencia'
+        avisos:
+          type: array
+          items:
+            type: string
+    PropuestaKitIA:
+      type: object
+      description: Salida de IA-18 v2 (packages/ai/esquemas/IA-18.salida.schema.json); contrasteOk lo calcula el backend.
+      required:
+      - paleta
+      - tipografias
+      - tipografiaMarca
+      - estilo
+      - contrasteOk
+      - evidencias
+      - confianza
+      properties:
+        paleta:
+          $ref: '#/components/schemas/Paleta'
+        tipografias:
+          type: object
+          required:
+          - titulos
+          - texto
+          properties:
+            titulos:
+              type: string
+              enum:
+              - Barlow Condensed
+              - Montserrat
+              - Poppins
+              - Merriweather
+              - Plus Jakarta Sans
+              - Atkinson Hyperlegible
+              - Open Sans
+              - Nunito
+              - Lato
+              - Source Sans 3
+            texto:
+              type: string
+              enum:
+              - Barlow Condensed
+              - Montserrat
+              - Poppins
+              - Merriweather
+              - Plus Jakarta Sans
+              - Atkinson Hyperlegible
+              - Open Sans
+              - Nunito
+              - Lato
+              - Source Sans 3
+            alternativasLibres:
+              type: array
+              items:
+                type: string
+        tipografiaMarca:
+          type: object
+          required:
+          - titulos
+          - texto
+          properties:
+            titulos:
+              type: string
+            texto:
+              type: string
+        estilo:
+          type: object
+          required:
+          - ilustracion
+          - esquinas
+          - tono
+          - kit
+          properties:
+            ilustracion:
+              type: string
+              enum:
+              - plana
+              - lineal
+              - isometrica
+              - semirrealista
+              - fotografia
+            esquinas:
+              type: string
+              enum:
+              - rectas
+              - suaves
+              - redondeadas
+            tono:
+              type: string
+            kit:
+              type: string
+              enum:
+              - Industrial
+              - Corporativo
+              - Institucional
+              - Infantil aula
+              - Salud
+        contrasteOk:
+          type: boolean
+        evidencias:
+          type: array
+          items:
+            type: string
+        confianza:
+          type: number
+          minimum: 0
+          maximum: 1
+    PropuestaKit:
+      type: object
+      required:
+      - trabajoId
+      - estado
+      - recursoId
+      - nombreArchivo
+      - creadoEn
+      - avisosTipografia
+      properties:
+        trabajoId:
+          type: string
+          format: uuid
+        estado:
+          type: string
+          enum:
+          - procesando
+          - lista
+          - error
+        recursoId:
+          type: string
+          format: uuid
+        nombreArchivo:
+          type: string
+        creadoEn:
+          type: string
+          format: date-time
+        evidencias:
+          $ref: '#/components/schemas/EvidenciasKit'
+        propuesta:
+          $ref: '#/components/schemas/PropuestaKitIA'
+        avisosTipografia:
+          type: array
+          description: «La marca usa X en títulos; se propone Y (libre)»
+          items:
+            type: string
+        error:
+          type: object
+          required:
+          - codigo
+          - mensaje
+          properties:
+            codigo:
+              type: string
+              enum:
+              - FORMATO_NO_VALIDO
+              - ZIP_NO_VALIDO
+              - SIN_COLORES
+              - PROPUESTA_NO_VALIDA
+              - ERROR
+            mensaje:
+              type: string
     Paleta:
       type: object
       required:

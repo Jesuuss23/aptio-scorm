@@ -43,6 +43,66 @@
       "additionalProperties": false,
       "properties": {
         "titulos": {
+          "enum": [
+            "Barlow Condensed",
+            "Montserrat",
+            "Poppins",
+            "Merriweather",
+            "Plus Jakarta Sans",
+            "Atkinson Hyperlegible",
+            "Open Sans",
+            "Nunito",
+            "Lato",
+            "Source Sans 3"
+          ],
+          "description": "De la lista cerrada del kit (FUENTES_KIT, SIL OFL)"
+        },
+        "texto": {
+          "enum": [
+            "Barlow Condensed",
+            "Montserrat",
+            "Poppins",
+            "Merriweather",
+            "Plus Jakarta Sans",
+            "Atkinson Hyperlegible",
+            "Open Sans",
+            "Nunito",
+            "Lato",
+            "Source Sans 3"
+          ],
+          "description": "De la lista cerrada del kit (FUENTES_KIT, SIL OFL)"
+        },
+        "alternativasLibres": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "Barlow Condensed",
+              "Montserrat",
+              "Poppins",
+              "Merriweather",
+              "Plus Jakarta Sans",
+              "Atkinson Hyperlegible",
+              "Open Sans",
+              "Nunito",
+              "Lato",
+              "Source Sans 3"
+            ]
+          },
+          "minItems": 0,
+          "maxItems": 4
+        }
+      },
+      "required": [
+        "titulos",
+        "texto"
+      ]
+    },
+    "tipografiaMarca": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Las tipografías que usa la marca, aunque no sean libres (HU-0206)",
+      "properties": {
+        "titulos": {
           "type": "string",
           "minLength": 1,
           "maxLength": 60
@@ -51,16 +111,6 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 60
-        },
-        "alternativasLibres": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 60
-          },
-          "minItems": 0,
-          "maxItems": 4
         }
       },
       "required": [
@@ -92,12 +142,23 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 160
+        },
+        "kit": {
+          "enum": [
+            "Industrial",
+            "Corporativo",
+            "Institucional",
+            "Infantil aula",
+            "Salud"
+          ],
+          "description": "Estilo base del kit (ESTILOS_KIT)"
         }
       },
       "required": [
         "ilustracion",
         "esquinas",
-        "tono"
+        "tono",
+        "kit"
       ]
     },
     "contrasteOk": {
@@ -123,6 +184,7 @@
   "required": [
     "paleta",
     "tipografias",
+    "tipografiaMarca",
     "estilo",
     "contrasteOk",
     "evidencias",

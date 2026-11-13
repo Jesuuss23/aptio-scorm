@@ -13,6 +13,10 @@ import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { aplicarPausas, type PropuestaPausas } from '@aptio/schema/pausas';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
+/** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
+export const PROPUESTA_KIT = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/salidas/X-IA-18-kit.json', import.meta.url), 'utf8')) as {
+  paleta: Record<'primario' | 'secundario' | 'acento' | 'fondo' | 'texto', string>; tipografias: { titulos: string; texto: string }; estilo: { kit: string }; evidencias: string[];
+};
 
 /** HU-0903 · La salida simulada de IA-09 v2 para el video de prueba de 60 s (ya normalizada). */
 const ia = { tipo: 'ia', revisado: false };
@@ -306,6 +310,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   let ajena = generacion === 'ajena';
   const kits = new Map<string, Record<string, unknown>>([[CLIENTE_ID, structuredClone(KIT_MINERA)]]);
   const subidas = new Map<string, { nombre: string; mime: string; proyectoId?: string }>();
+  // HU-0206 · La propuesta de kit por cliente: «procesando» en la primera consulta y luego lista (o el error del material).
+  const propuestasKit = new Map<string, { trabajoId: string; recursoId: string; nombreArchivo: string; consultas: number }>();
   // HU-0609 · Lo que se subió al almacenamiento simulado y la biblioteca del proyecto (imágenes y SVG subidos).
   const archivos = new Map<string, { mime: string; cuerpo: Buffer }>();
   const biblioteca: { id: string; tipo: string; origen: string; nombre: string; mime: string; bytes: number; url: string }[] = [];
@@ -960,6 +966,37 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return responder(200, {
         audioUrl: 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=', bocas: [], ssml: `<speak>${texto}</speak>`,
         dicho, aplicados, proveedor: 'simulado', voz: 'es-US-Neural2-A', simulada: true,
+      });
+    }
+    const extraerKit = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/extraer$/);
+    if (extraerKit && req.method() === 'POST') {
+      const { recursoId } = req.postDataJSON() as { recursoId: string };
+      const s = subidas.get(recursoId);
+      if (!s) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Material no encontrado para este cliente' });
+      if (!['application/zip', 'application/pdf'].includes(s.mime)) {
+        return responder(422, { codigo: 'FORMATO_NO_VALIDO', mensaje: 'El kit se extrae de un ZIP de un curso anterior o de un PDF del manual de marca' });
+      }
+      const trabajoId = `00000000-0000-4000-8000-${String(700 + propuestasKit.size).padStart(12, '0')}`;
+      propuestasKit.set(extraerKit[1]!, { trabajoId, recursoId, nombreArchivo: s.nombre, consultas: 0 });
+      return responder(202, { id: trabajoId, estado: 'EN_COLA', eventos: '/api/v1/eventos' });
+    }
+    const propuestaKit = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/propuesta$/);
+    if (propuestaKit) {
+      const actual = propuestasKit.get(propuestaKit[1]!);
+      if (!actual) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El cliente no tiene una propuesta de kit' });
+      if (req.method() === 'DELETE') {
+        propuestasKit.delete(propuestaKit[1]!);
+        return responder(204);
+      }
+      const base = { trabajoId: actual.trabajoId, recursoId: actual.recursoId, nombreArchivo: actual.nombreArchivo, creadoEn: new Date().toISOString(), avisosTipografia: [] as string[] };
+      if (actual.consultas++ < 1) return responder(200, { ...base, estado: 'procesando' });
+      if (actual.nombreArchivo.includes('sin-colores')) {
+        return responder(200, { ...base, estado: 'error', error: { codigo: 'SIN_COLORES', mensaje: 'No se encontraron colores en los estilos del curso: sube el ZIP completo del paquete o el manual de marca en PDF' } });
+      }
+      return responder(200, {
+        ...base, estado: 'lista', propuesta: PROPUESTA_KIT,
+        evidencias: { origen: 'zip', leidos: 3, colores: [{ valor: '#0F2A44', veces: 5 }, { valor: '#F5F7FA', veces: 2 }, { valor: '#F2A900', veces: 1 }], fuentes: [{ valor: 'Archivo', veces: 3 }, { valor: 'Source Sans 3', veces: 1 }], avisos: ['1 archivos que no son de texto (imágenes, fuentes, rutas no seguras) no se abrieron'] },
+        avisosTipografia: ['La marca usa Archivo en títulos; se propone Montserrat (libre)'],
       });
     }
     const listaModelos = ruta.match(/^\/clientes\/([0-9a-f-]+)\/kit\/pantallas-modelo$/);

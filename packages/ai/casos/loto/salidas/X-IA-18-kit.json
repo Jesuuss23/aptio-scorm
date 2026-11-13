@@ -7,23 +7,29 @@
     "fondo": "#F5F7FA"
   },
   "tipografias": {
-    "titulos": "Archivo",
+    "titulos": "Montserrat",
     "texto": "Source Sans 3",
     "alternativasLibres": [
-      "Inter",
-      "IBM Plex Sans"
+      "Plus Jakarta Sans",
+      "Open Sans"
     ]
+  },
+  "tipografiaMarca": {
+    "titulos": "Archivo",
+    "texto": "Source Sans 3"
   },
   "estilo": {
     "ilustracion": "plana",
     "esquinas": "suaves",
-    "tono": "Industrial, claro, con amarillo de seguridad como acento"
+    "tono": "Industrial, claro, con amarillo de seguridad como acento",
+    "kit": "Industrial"
   },
   "contrasteOk": true,
   "evidencias": [
-    "Azul marino dominante en portada y encabezados",
-    "Amarillo de seguridad en señalética",
-    "Fuente sin serifa geométrica en títulos"
+    "Azul marino #0F2A44 dominante en encabezados y botones",
+    "Amarillo de seguridad #F2A900 como acento",
+    "Archivo en títulos: se propone Montserrat, libre y geométrica",
+    "Source Sans 3 en textos, ya está en el kit"
   ],
   "confianza": 0.8
 }
