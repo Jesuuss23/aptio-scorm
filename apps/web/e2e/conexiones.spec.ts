@@ -75,6 +75,9 @@ test.describe('conexiones IA (HU-1304)', () => {
   });
 
   test('CP-100 · con el texto al tope: aviso, medidor en rojo y «Continuar» tras subir el límite', async ({ page }) => {
+    // Tres generaciones simuladas, dos visitas al proyecto y tres pasadas de axe: solo tarda ~15 s, pero con la suite
+    // completa en el runner de CI pasó de los 30 s por defecto (PR #81).
+    test.setTimeout(60_000);
     await simularApi(page, { conSesion: true, conProyectos: true, rol: 'ADMINISTRADOR', generacion: 'limite' });
     await page.goto(PROYECTO);
     const material = page.getByRole('region', { name: 'Material del cliente' });
