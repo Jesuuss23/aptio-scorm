@@ -84,6 +84,13 @@ export function camposDe(c: Coleccion): readonly CampoContenido[] {
   return COLECCIONES_CONTENIDO[c].campos;
 }
 
+/** Nombre corto de un elemento para listas y avisos: su primer campo o, si falta, el nombre singular de la colección. */
+export function nombreElemento(coleccion: string, datos: unknown): string {
+  if (!esColeccion(coleccion)) return coleccion;
+  const v = (datos as Record<string, unknown> | null)?.[camposDe(coleccion)[0]!.clave];
+  return typeof v === 'string' || typeof v === 'number' ? String(v) : COLECCIONES_CONTENIDO[coleccion].singular;
+}
+
 /** Bloque del sitio → colección de la que toma sus elementos. */
 export const COLECCION_DE_BLOQUE: Readonly<Record<string, Coleccion>> = {
   metricas: 'cifras',

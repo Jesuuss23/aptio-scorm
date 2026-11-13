@@ -2796,3 +2796,13 @@ ul.fila-chips {
 .elemento-guardar .nota {
   flex-basis: auto;
 }
+/* HU-1505 · Contador de datos ficticios visibles en la cabecera de Contenido. */
+.contador-ficticios {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  font-size: var(--texto-sm);
+}

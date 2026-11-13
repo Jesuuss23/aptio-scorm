@@ -1,5 +1,6 @@
 // HU-1502 · CP-111: la tarea `publicar-paginas` de la cola `mantenimiento` publica las páginas del sitio programadas
 // cuya hora ya llegó y no toca las futuras ni los borradores. PostgreSQL real.
+// HU-1505 · En producción no publica mientras haya datos ficticios visibles y audita el bloqueo una sola vez.
 import { prisma, publicarProgramadas } from '@aptio/db';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -10,7 +11,10 @@ describe.skipIf(!hayBase && !process.env.CI)('publicación programada de página
   const sufijo = Math.random().toString(36).slice(2, 8);
   const ruta = (n: string) => `/prueba-${sufijo}-${n}`;
 
+  const elementos: string[] = [];
+
   afterAll(async () => {
+    await prisma.sitioElemento.deleteMany({ where: { id: { in: elementos } } });
     const ids = (await prisma.sitioPagina.findMany({ where: { ruta: { startsWith: `/prueba-${sufijo}-` } }, select: { id: true } })).map((p) => p.id);
     await prisma.auditoria.deleteMany({ where: { entidad: 'SitioPagina', entidadId: { in: ids } } });
     await prisma.sitioPagina.deleteMany({ where: { id: { in: ids } } });
@@ -41,5 +45,34 @@ describe.skipIf(!hayBase && !process.env.CI)('publicación programada de página
     // Una segunda vuelta no vuelve a publicar ni a auditar.
     expect(await publicarProgramadas(prisma, ahora)).not.toContain(vencida.id);
     expect(await prisma.auditoria.count({ where: { entidad: 'SitioPagina', entidadId: vencida.id } })).toBe(1);
+  });
+
+  it('en producción, con un ficticio visible, la deja programada y audita SITIO_PAGINA_BLOQUEADA una sola vez', async () => {
+    const ahora = new Date();
+    const p = await prisma.sitioPagina.create({ data: { ruta: ruta('bloqueada'), titulo: 'Bloqueada', estado: 'PROGRAMADA', publicarEn: new Date(ahora.getTime() - MIN) } });
+    const f = await prisma.sitioElemento.create({ data: { coleccion: 'testimonios', orden: 999, visible: true, ficticio: true, datos: { nombre: 'Inventado' } } });
+    elementos.push(f.id);
+
+    expect(await publicarProgramadas(prisma, ahora, 'produccion')).not.toContain(p.id);
+    expect(await publicarProgramadas(prisma, new Date(ahora.getTime() + 30_000), 'produccion')).not.toContain(p.id);
+    expect((await prisma.sitioPagina.findUniqueOrThrow({ where: { id: p.id } })).estado).toBe('PROGRAMADA');
+    const bloqueos = await prisma.auditoria.findMany({ where: { entidad: 'SitioPagina', entidadId: p.id } });
+    expect(bloqueos.map((a) => a.accion)).toEqual(['SITIO_PAGINA_BLOQUEADA']);
+    expect(bloqueos[0]!.datos).toMatchObject({ motivo: 'FICTICIOS_VISIBLES' });
+
+    // Al ocultar el ficticio, la siguiente vuelta la publica.
+    await prisma.sitioElemento.update({ where: { id: f.id }, data: { visible: false } });
+    expect(await publicarProgramadas(prisma, new Date(ahora.getTime() + 60_000), 'produccion')).toContain(p.id);
+    expect((await prisma.auditoria.findMany({ where: { entidad: 'SitioPagina', entidadId: p.id }, orderBy: { creadoEn: 'asc' } })).map((a) => a.accion))
+      .toEqual(['SITIO_PAGINA_BLOQUEADA', 'SITIO_PAGINA_PUBLICADA']);
+  });
+
+  it('en pruebas publica aunque haya ficticios visibles', async () => {
+    const ahora = new Date();
+    const p = await prisma.sitioPagina.create({ data: { ruta: ruta('pruebas'), titulo: 'Pruebas', estado: 'PROGRAMADA', publicarEn: new Date(ahora.getTime() - MIN) } });
+    const f = await prisma.sitioElemento.create({ data: { coleccion: 'logos', orden: 999, visible: true, ficticio: true, datos: { nombre: 'Inventado' } } });
+    elementos.push(f.id);
+    expect(await publicarProgramadas(prisma, ahora, 'pruebas')).toContain(p.id);
+    await prisma.sitioElemento.update({ where: { id: f.id }, data: { visible: false } });
   });
 });

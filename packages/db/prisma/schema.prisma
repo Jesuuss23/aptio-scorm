@@ -785,6 +785,8 @@ model SitioElemento {
   /// Posición 0, 1, 2… sin huecos dentro de la colección.
   orden         Int
   visible       Boolean  @default(false)
+  /// HU-1505 · Dato inventado: bloquea publicar en producción mientras esté visible (RN-16-3).
+  ficticio      Boolean  @default(false)
   datos         Json
   creadoEn      DateTime @default(now())
   actualizadoEn DateTime @updatedAt

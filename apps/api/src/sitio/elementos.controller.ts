@@ -6,7 +6,7 @@ import {
 import type { Coleccion } from '@aptio/schema/sitio-contenido';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
-import { ConsultaElementosDto, ElementoSitioCambioDto, ElementoSitioDto, ElementoSitioEntradaDto, OrdenElementosDto } from './elementos.dto.js';
+import { ConsultaElementosDto, ElementoSitioCambioDto, ElementoSitioDto, ElementoSitioEntradaDto, FicticiosOcultadosDto, FicticiosSitioDto, OrdenElementosDto } from './elementos.dto.js';
 import { ElementosService } from './elementos.service.js';
 
 /** HU-1504 · Contenido del sitio (REQ-066, PNT-27): solo el superadmin; 403 al resto y 401 sin sesión. */
@@ -30,7 +30,7 @@ export class ElementosController {
   @ApiCreatedResponse({ type: ElementoSitioDto, description: 'Al final y oculto (RN-16-2, CP-115)' })
   @ApiUnprocessableEntityResponse({ description: 'DATOS_NO_VALIDOS: campos de la colección o texto plano (RN-16-7)' })
   agregar(@UsuarioActual() u: UsuarioSesion, @Body() dto: ElementoSitioEntradaDto): Promise<ElementoSitioDto> {
-    return this.elementos.agregar(u, dto.coleccion as Coleccion, dto.datos);
+    return this.elementos.agregar(u, dto.coleccion as Coleccion, dto.datos, dto.ficticio ?? false);
   }
 
   @Patch()
@@ -54,5 +54,29 @@ export class ElementosController {
   @ApiNotFoundResponse({ description: 'El elemento no existe' })
   borrar(@UsuarioActual() u: UsuarioSesion, @Param('elementoId', ParseUUIDPipe) id: string): Promise<void> {
     return this.elementos.borrar(u, id);
+  }
+}
+
+/** HU-1505 · Datos ficticios del sitio (REQ-067, RN-16-3): solo el superadmin. */
+@ApiTags('Sitio web')
+@ApiCookieAuth('sesion')
+@ApiUnauthorizedResponse({ description: 'Sin sesión' })
+@ApiForbiddenResponse({ description: 'Solo el superadmin de plataforma (CP-109)' })
+@Controller('sitio/ficticios')
+@Roles('SUPERADMIN')
+export class FicticiosController {
+  constructor(private readonly elementos: ElementosService) {}
+
+  @Get()
+  @ApiOkResponse({ type: FicticiosSitioDto })
+  listar(): Promise<FicticiosSitioDto> {
+    return this.elementos.ficticios();
+  }
+
+  @Post('ocultar')
+  @HttpCode(200)
+  @ApiOkResponse({ type: FicticiosOcultadosDto, description: 'Todos los ficticios visibles quedan ocultos' })
+  ocultar(@UsuarioActual() u: UsuarioSesion): Promise<FicticiosOcultadosDto> {
+    return this.elementos.ocultarFicticios(u);
   }
 }

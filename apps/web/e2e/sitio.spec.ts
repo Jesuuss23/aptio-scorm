@@ -287,3 +287,67 @@ test('Contenido es solo del superadmin', async ({ page }) => {
   await page.goto('/sitio/contenido');
   await expect(page.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible();
 });
+
+// HU-1505 · CP-116: en producción, un testimonio marcado ficticio y visible bloquea publicar; la lista sale con «Ocultar
+// todos los ficticios», que los oculta y publica en un clic. CP-117: en pruebas se publica con aviso. axe en 0.
+const F = '2026-11-10T15:00:00.000Z';
+const PAG_PRECIOS = { id: '00000000-0000-4000-8000-000000000002', ruta: '/precios', idioma: 'es' as const, titulo: 'Precios', estado: 'BORRADOR' as const, publicarEn: null, publicadaEn: null, creadoEn: F, actualizadoEn: F };
+const testimonioSim = (n: number, nombre: string) => ({ id: `00000000-0000-4000-9300-00000000000${n}`, coleccion: 'testimonios', orden: n, visible: true, datos: { nombre, cargo: 'Jefa', empresa: 'Minera Andina', texto: 'Muy útil.', estrellas: 5 }, creadoEn: F, actualizadoEn: F });
+
+test('CP-116: en producción los ficticios visibles bloquean publicar y se resuelve con «Ocultar todos los ficticios»', async ({ page }) => {
+  await simularApi(page, { conSesion: true, rol: 'SUPERADMIN', entornoSitio: 'produccion', paginasSitio: [PAG_PRECIOS], elementosSitio: [testimonioSim(0, 'Mariana Paredes'), testimonioSim(1, 'Carlos Alarcón')] });
+  await page.goto('/sitio/contenido');
+  await expect(page.getByText('Datos ficticios visibles:')).toContainText('0');
+  await page.getByRole('tab', { name: 'Testimonios' }).click();
+  // Marca los dos como ficticios: aparece el distintivo, el contador y el aviso.
+  for (const nombre of ['Mariana Paredes', 'Carlos Alarcón']) {
+    await page.getByRole('checkbox', { name: `Ficticio: ${nombre}` }).click();
+    await expect(page.getByRole('checkbox', { name: `Ficticio: ${nombre}` })).toBeChecked();
+  }
+  await expect(page.getByRole('listitem').filter({ hasText: 'Ficticio' }).locator('.chip.aviso')).toHaveCount(2);
+  await expect(page.getByText('Datos ficticios visibles:')).toContainText('2');
+  const region = page.getByRole('region', { name: 'Datos ficticios visibles' });
+  await expect(region).toContainText('Hay 2 datos ficticios visibles. En producción no se puede publicar');
+  const axe = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+
+  // Publicar en Páginas: 409 con la lista.
+  await menu(page).getByRole('link', { name: 'Páginas' }).click();
+  await page.getByRole('button', { name: 'Publicar Precios' }).click();
+  const alerta = page.getByRole('alert').filter({ hasText: '«Precios» no se publicó.' });
+  await expect(alerta).toBeVisible();
+  await expect(alerta.getByRole('list', { name: 'Datos ficticios visibles' }).getByRole('listitem')).toHaveText(['Mariana Paredes (Testimonios)', 'Carlos Alarcón (Testimonios)']);
+  const tabla = page.getByRole('table', { name: 'Páginas del sitio' });
+  await expect(tabla.getByRole('row', { name: /Precios/ })).toContainText('Borrador');
+  const axe409 = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axe409.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.failureSummary).join(' | ')}`)).toEqual([]);
+
+  // Un clic: los oculta y publica.
+  await alerta.getByRole('button', { name: 'Ocultar todos los ficticios' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '«Precios» está publicada en /precios.' })).toBeVisible();
+  await expect(tabla.getByRole('row', { name: /Precios/ })).toContainText('Publicada');
+  await expect(page.getByText('no se publicó')).toHaveCount(0);
+
+  // De vuelta en Contenido: siguen marcados, ahora ocultos, y el contador en 0.
+  await menu(page).getByRole('link', { name: 'Contenido' }).click();
+  await expect(page.getByText('Datos ficticios visibles:')).toContainText('0');
+  await page.getByRole('tab', { name: 'Testimonios' }).click();
+  await expect(page.getByRole('switch', { name: 'Mostrar Mariana Paredes' })).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByRole('checkbox', { name: 'Ficticio: Mariana Paredes' })).toBeChecked();
+});
+
+test('CP-117: en pruebas se publica con aviso y Contenido ofrece ocultarlos', async ({ page }) => {
+  const ficticio = { ...testimonioSim(0, 'Mariana Paredes'), ficticio: true };
+  await simularApi(page, { conSesion: true, rol: 'SUPERADMIN', entornoSitio: 'pruebas', paginasSitio: [PAG_PRECIOS], elementosSitio: [ficticio, { ...testimonioSim(1, 'Carlos Alarcón'), ficticio: true }] });
+  await page.goto('/sitio/paginas');
+  await page.getByRole('button', { name: 'Publicar Precios' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Aviso: hay 2 datos ficticios visibles; en pruebas se publica igual' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Páginas del sitio' }).getByRole('row', { name: /Precios/ })).toContainText('Publicada');
+
+  await menu(page).getByRole('link', { name: 'Contenido' }).click();
+  const region = page.getByRole('region', { name: 'Datos ficticios visibles' });
+  await expect(region).toContainText('En pruebas se publica igual, con aviso');
+  await region.getByRole('button', { name: 'Ocultar todos los ficticios' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Se ocultaron 2 datos ficticios.' })).toBeVisible();
+  await expect(region).toHaveCount(0);
+});
