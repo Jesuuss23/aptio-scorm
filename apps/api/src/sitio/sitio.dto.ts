@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RUTA_SITIO } from '@aptio/db';
 import { TIPOS_BLOQUE } from '@aptio/schema/sitio-bloques';
 import { TIPOS_PAGINA } from '@aptio/schema/sitio-sectores';
+import { LIMITES_SEO, TIPOS_DATOS_ESTRUCTURADOS } from '@aptio/schema/sitio-seo';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 
@@ -13,6 +14,13 @@ export type AccionPagina = (typeof ACCIONES_PAGINA)[number];
 /** Fecha y hora ISO 8601 con zona explícita (la web manda la hora de Lima con `-05:00`). */
 const FECHA_CON_ZONA = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})$/;
 const MENSAJE_RUTA = 'La ruta empieza con / y solo lleva minúsculas, números y guiones (por ejemplo /precios o /sectores/mineria)';
+
+/** HU-1512 · La redirección 301 creada al cambiar la ruta de una página publicada. */
+export class RedireccionCreadaDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ example: '/precios-2025' }) desde: string;
+  @ApiProperty({ example: '/precios' }) hacia: string;
+}
 
 /** HU-1502 · Página del sitio comercial (M16) con su estado (RN-16-6). */
 export class PaginaSitioDto {
@@ -26,13 +34,20 @@ export class PaginaSitioDto {
   @ApiProperty({ enum: TIPOS_PAGINA, description: 'HU-1514 · general o sector (landing por sector)' }) tipo: string;
   @ApiProperty({ nullable: true, description: 'HU-1514 · Nombre del sector de una landing' }) sector: string | null;
   @ApiProperty({ type: () => PortadaSectorDto, nullable: true, description: 'HU-1514 · Portada propia de una landing' }) portada: PortadaSectorDto | null;
-  @ApiProperty({ nullable: true, description: 'HU-1514 · Meta título de una landing (RN-16-9)' }) metaTitulo: string | null;
+  @ApiProperty({ nullable: true, maxLength: LIMITES_SEO.metaTitulo, description: 'HU-1512 · Meta título (en una landing es obligatorio para publicar, RN-16-9); null = el título con el nombre del sitio' }) metaTitulo: string | null;
+  @ApiProperty({ type: String, nullable: true, maxLength: LIMITES_SEO.metaDescripcion, description: 'HU-1512 · Meta descripción; null = el texto general del sitio' }) metaDescripcion: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '/precios', description: 'HU-1512 · URL canónica propia (ruta interna o https://); null = la de la página en el dominio' }) canonical: string | null;
+  @ApiProperty({ description: 'HU-1512 · false = noindex, fuera del sitemap y sin hreflang (CP-125)' }) indexar: boolean;
+  @ApiProperty({ enum: TIPOS_DATOS_ESTRUCTURADOS, description: 'HU-1512 · Datos estructurados JSON-LD de la página' }) datosEstructurados: string;
   @ApiProperty({ nullable: true, description: 'HU-1514 · Categoría con que empieza filtrada la sección Blog (CP-159)' }) blogCategoriaInicial: string | null;
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
   @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
   @ApiPropertyOptional({ description: 'HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117)' }) avisoFicticios?: number;
   @ApiPropertyOptional({ description: 'HU-1507 · Si el cambio publicó o retiró la página: la versión del sitio que creó' }) version?: number;
+  @ApiPropertyOptional({ type: () => RedireccionCreadaDto, description: 'HU-1512 · Al cambiar la ruta de una página publicada: la redirección 301 que se creó sola' }) redireccion?: RedireccionCreadaDto;
+  @ApiPropertyOptional({ description: 'HU-1512 · Al cambiar la ruta de una página publicada: qué pasó con la redirección 301' }) avisoRedireccion?: string;
 }
+
 
 /** HU-1514 · Portada de una landing por sector. */
 export class PortadaSectorDto {
@@ -51,7 +66,7 @@ class CamposSector {
   @IsOptional() @IsString() @MaxLength(200) sector?: string;
   @ApiPropertyOptional({ type: PortadaSectorCambioDto, nullable: true })
   @IsOptional() @ValidateIf((_o, v) => v !== null) @ValidateNested() @Type(() => PortadaSectorCambioDto) portada?: PortadaSectorCambioDto | null;
-  @ApiPropertyOptional({ maxLength: 70, nullable: true })
+  @ApiPropertyOptional({ maxLength: LIMITES_SEO.metaTitulo, nullable: true, description: 'HU-1512 · En cualquier página; vacío = el título con el nombre del sitio' })
   @IsOptional() @ValidateIf((_o, v) => v !== null) @IsString() @MaxLength(300) metaTitulo?: string | null;
   @ApiPropertyOptional({ maxLength: 60, nullable: true })
   @IsOptional() @ValidateIf((_o, v) => v !== null) @IsString() @MaxLength(200) blogCategoriaInicial?: string | null;
@@ -78,10 +93,18 @@ export class PaginaSitioEntradaDto extends CamposAccion {
 }
 
 export class PaginaSitioCambioDto extends CamposAccion {
-  @ApiPropertyOptional({ example: '/precios', pattern: RUTA_SITIO.source, description: 'No se cambia en una página PUBLICADA (422 RUTA_PUBLICADA)' })
+  @ApiPropertyOptional({ example: '/precios', pattern: RUTA_SITIO.source, description: 'HU-1512 · En una página PUBLICADA crea sola la redirección 301 de la ruta anterior a la nueva' })
   @IsOptional() @IsString() @MaxLength(200) @Matches(RUTA_SITIO, { message: MENSAJE_RUTA }) ruta?: string;
   @ApiPropertyOptional({ minLength: 1, maxLength: 120 })
   @IsOptional() @IsString() @MinLength(1) @MaxLength(120) titulo?: string;
+  @ApiPropertyOptional({ maxLength: LIMITES_SEO.metaDescripcion, nullable: true, description: 'HU-1512 · Texto plano; vacío = el texto general del sitio' })
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsString() @MaxLength(1000) metaDescripcion?: string | null;
+  @ApiPropertyOptional({ maxLength: LIMITES_SEO.canonical, nullable: true, example: '/precios', description: 'HU-1512 · Ruta interna o https://; vacío = la de la página' })
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsString() @MaxLength(1000) canonical?: string | null;
+  @ApiPropertyOptional({ description: 'HU-1512 · false = noindex, fuera del sitemap y sin hreflang (CP-125)' })
+  @IsOptional() @IsBoolean() indexar?: boolean;
+  @ApiPropertyOptional({ enum: TIPOS_DATOS_ESTRUCTURADOS })
+  @IsOptional() @IsIn(TIPOS_DATOS_ESTRUCTURADOS, { message: 'datosEstructurados debe ser WebPage, FAQPage o Product' }) datosEstructurados?: (typeof TIPOS_DATOS_ESTRUCTURADOS)[number];
 }
 
 /** HU-1503 · Bloque de una página (REQ-066). Nace oculto (RN-16-2). */

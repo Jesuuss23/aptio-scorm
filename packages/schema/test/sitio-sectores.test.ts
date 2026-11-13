@@ -17,7 +17,7 @@ describe('landings por sector (HU-1514)', () => {
   it('valida el sector, la portada, el meta título y la categoría; un texto vacío se guarda null', () => {
     const ok = aplicarCambiosSector(vacio, { sector: ' Banca  y seguros ', portada: { titulo: 'Cumplimiento', texto: '' }, metaTitulo: '', blogCategoriaInicial: 'Estándares' });
     expect(ok).toEqual({ ok: true, datos: { sector: 'Banca y seguros', portada: { titulo: 'Cumplimiento', texto: '' }, metaTitulo: null, blogCategoriaInicial: 'Estándares' } });
-    const mal = aplicarCambiosSector(vacio, { sector: 'general', portada: { titulo: '<b>x</b>' }, metaTitulo: 'x'.repeat(71) });
+    const mal = aplicarCambiosSector(vacio, { sector: 'general', portada: { titulo: '<b>x</b>' }, metaTitulo: 'x'.repeat(61) });
     expect(mal.ok ? [] : mal.errores.map((e) => e.campo)).toEqual(['sector', 'portada.titulo', 'metaTitulo']);
     expect(aplicarCambiosSector(vacio, { sector: '' })).toMatchObject({ ok: false, errores: [{ campo: 'sector', mensaje: 'El sector es obligatorio' }] });
   });

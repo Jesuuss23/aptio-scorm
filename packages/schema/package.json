@@ -53,6 +53,7 @@
     "./sitio-ficticios": "./src/sitio-ficticios.ts",
     "./sitio-navegacion": "./src/sitio-navegacion.ts",
     "./sitio-sectores": "./src/sitio-sectores.ts",
+    "./sitio-seo": "./src/sitio-seo.ts",
     "./sitio-versiones": "./src/sitio-versiones.ts"
   }
 }

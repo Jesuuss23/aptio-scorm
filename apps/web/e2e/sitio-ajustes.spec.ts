@@ -172,7 +172,7 @@ test('CP-121: con el mantenimiento activo el visitante ve «Volvemos pronto» (5
   await expect(visitante.getByRole('heading', { level: 1, name: 'Volvemos pronto' })).toBeVisible();
   await expect(visitante.getByText('Volvemos hoy a las 3 p. m.')).toBeVisible();
   await expect(visitante.locator('meta[name="robots"]')).toHaveAttribute('content', /noindex/);
-  expect(await visitante.locator('script').count()).toBe(0);
+  expect(await visitante.locator('script:not([type="application/ld+json"])').count()).toBe(0);
   await sinViolaciones(visitante, false);
   await contexto.close();
 

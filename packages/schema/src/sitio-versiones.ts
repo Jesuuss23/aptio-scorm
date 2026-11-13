@@ -10,6 +10,7 @@ import { elementosParaPublico, type EntornoSitio } from './sitio-ficticios.js';
 import { navegacionPublica, type NavegacionPublica } from './sitio-navegacion.js';
 import { ajustesPublicados, type AjustesSitio, type SitioPublicado } from './sitio-ajustes.js';
 import { sectorPublicado, type SectorPublicado, testimoniosDeSector } from './sitio-sectores.js';
+import { type Redireccion, seoPublicado, type SeoPublicado } from './sitio-seo.js';
 
 export const ORIGENES_VERSION = ['publicacion', 'pagina', 'programada', 'restauracion'] as const;
 export type OrigenVersion = (typeof ORIGENES_VERSION)[number];
@@ -33,6 +34,8 @@ export interface PaginaInstantanea {
   bloques: BloqueInstantanea[];
   /** HU-1514 · Solo en una landing de sector: su nombre, portada, meta título y categoría inicial del blog. */
   sector?: SectorPublicado;
+  /** HU-1512 · Meta título, descripción, canonical, «Indexar» y datos estructurados; falta si todo es por defecto. */
+  seo?: SeoPublicado;
 }
 export interface Instantanea {
   formato: 1;
@@ -43,6 +46,10 @@ export interface Instantanea {
   navegacionEn?: NavegacionPublica;
   /** HU-1509 · Nombre, dominio, logo, favicon y WhatsApp publicados. Falta en las versiones de antes de los ajustes. */
   sitio?: SitioPublicado;
+  /** HU-1512 · Las redirecciones 301 activas (CP-124); falta si no hay ninguna. */
+  redirecciones?: { desde: string; hacia: string }[];
+  /** HU-1512 · Las reglas extra de robots.txt, ya validadas; falta si no hay. */
+  robotsExtra?: string;
 }
 
 /** Filas tal como salen de la base (solo los campos que usa la armadora). */
@@ -59,6 +66,11 @@ export interface FilaPagina {
   portada?: unknown;
   metaTitulo?: string | null;
   blogCategoriaInicial?: string | null;
+  /** HU-1512 · SEO de la página; sin los campos (filas de antes), los valores por defecto. */
+  metaDescripcion?: string | null;
+  canonical?: string | null;
+  indexar?: boolean | null;
+  datosEstructurados?: string | null;
 }
 export interface FilaElemento {
   id: string;
@@ -94,9 +106,11 @@ export function armarPagina(p: FilaPagina, elementos: readonly FilaElemento[], e
   const permitidos = elementosParaPublico(entorno, delIdioma(elementos, p.idioma).filter((e) => e.visible));
   // HU-1514 · Una landing suma las preguntas del inicio y muestra los testimonios de su sector (CP-157).
   const sector = sectorPublicado(p);
+  const seo = seoPublicado(p, Boolean(sector));
   return {
     ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: iso(p.publicadaEn),
     ...(sector ? { sector } : {}),
+    ...(seo ? { seo } : {}),
     bloques: visibles.map((b) => {
       const todos = elementosDeBloque(b.tipo, p.ruta, permitidos, sector ? ['/'] : []);
       const propios = todos && sector && b.tipo === 'testimonios' ? testimoniosDeSector(sector.nombre, todos) : todos;
@@ -109,17 +123,24 @@ export function armarPagina(p: FilaPagina, elementos: readonly FilaElemento[], e
 }
 
 /** La instantánea del sitio completo: solo las páginas PUBLICADAS, por ruta e idioma, y la navegación visible. */
-export function armarInstantanea(datos: { paginas: readonly FilaPagina[]; elementos: readonly FilaElemento[]; enlaces: readonly FilaEnlace[]; ajustes?: AjustesSitio | null }, entorno: EntornoSitio): Instantanea {
+export function armarInstantanea(datos: {
+  paginas: readonly FilaPagina[]; elementos: readonly FilaElemento[]; enlaces: readonly FilaEnlace[]; ajustes?: AjustesSitio | null;
+  /** HU-1512 · Solo entran las activas, por origen. */
+  redirecciones?: readonly Redireccion[]; robotsExtra?: string | null;
+}, entorno: EntornoSitio): Instantanea {
   const paginas = datos.paginas
     .filter((p) => p.estado === 'PUBLICADA')
     .sort((a, b) => a.ruta.localeCompare(b.ruta) || a.idioma.localeCompare(b.idioma))
     .map((p) => armarPagina(p, datos.elementos, entorno));
   // Sin fila de ajustes la instantánea queda igual que antes de la HU-1509 (no marca cambios pendientes).
   const en = navegacionPublica(delIdioma(datos.enlaces, 'en'));
+  const redirecciones = (datos.redirecciones ?? []).filter((r) => r.activa).map((r) => ({ desde: r.desde, hacia: r.hacia })).sort((a, b) => a.desde.localeCompare(b.desde));
   return {
     formato: 1, paginas, navegacion: navegacionPublica(delIdioma(datos.enlaces, 'es')),
     ...(en.menu.length || en.pie.length ? { navegacionEn: en } : {}),
     ...(datos.ajustes ? { sitio: ajustesPublicados(datos.ajustes) } : {}),
+    ...(redirecciones.length ? { redirecciones } : {}),
+    ...(datos.robotsExtra?.trim() ? { robotsExtra: datos.robotsExtra.trim() } : {}),
   };
 }
 
@@ -163,6 +184,7 @@ export interface PaginaServida {
   publicadaEn: string | null;
   bloques: { tipo: string; ajustes: Record<string, unknown> | null; elementos?: { datos: Record<string, string | number>; ficticio?: true }[] }[];
   sector?: SectorPublicado;
+  seo?: SeoPublicado;
 }
 
 /**
@@ -175,6 +197,7 @@ export function paginaServida(inst: Instantanea, ruta: string, idioma: string, e
   return {
     ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: p.publicadaEn,
     ...(p.sector ? { sector: p.sector } : {}),
+    ...(p.seo ? { seo: p.seo } : {}),
     bloques: p.bloques.map((b) => ({
       tipo: b.tipo, ajustes: b.ajustes,
       ...(b.elementos ? { elementos: elementosParaPublico(entorno, b.elementos.map((e) => ({ ...e, ficticio: e.ficticio ?? false }))).map((e) => ({ datos: e.datos, ...(e.ficticio ? { ficticio: true as const } : {}) })) } : {}),
@@ -189,10 +212,11 @@ export function navegacionDe(inst: Pick<Instantanea, 'navegacion' | 'navegacionE
 
 /**
  * HU-1510 · CP-122 · Las versiones publicadas de una ruta en cada idioma (para hreflang y el sitemap): solo si la misma
- * ruta está publicada en los dos idiomas; si no, ninguna (RN-16-6).
+ * ruta está publicada en los dos idiomas; si no, ninguna (RN-16-6). HU-1512 · CP-125: una página sin indexar no tiene
+ * alternas ni es alterna de la otra.
  */
 export function alternasDe(inst: Pick<Instantanea, 'paginas'>, ruta: string): { idioma: 'es' | 'en' }[] {
-  const idiomas = new Set(inst.paginas.filter((p) => p.ruta === ruta).map((p) => p.idioma));
+  const idiomas = new Set(inst.paginas.filter((p) => p.ruta === ruta && p.seo?.indexar !== false).map((p) => p.idioma));
   return idiomas.has('es') && idiomas.has('en') ? [{ idioma: 'es' }, { idioma: 'en' }] : [];
 }
 

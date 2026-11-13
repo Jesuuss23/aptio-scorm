@@ -16,7 +16,7 @@ export const SECTOR_GENERAL = 'General';
 /** Bloques con que nace una landing, en orden (como «Nueva landing de sector» del prototipo). */
 export const PLANTILLA_SECTOR = ['hero', 'metricas', 'pasos', 'testimonios', 'faq', 'bloglista', 'cta'] as const;
 
-export const LIMITES_SECTOR = { sector: 60, portadaTitulo: 120, portadaTexto: 300, metaTitulo: 70, blogCategoria: 60 } as const;
+export const LIMITES_SECTOR = { sector: 60, portadaTitulo: 120, portadaTexto: 300, metaTitulo: 60, blogCategoria: 60 } as const;
 
 export interface PortadaSector { titulo: string; texto: string }
 

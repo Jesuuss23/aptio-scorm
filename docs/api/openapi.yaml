@@ -164,8 +164,10 @@ paths:
       description: |-
         Solo SUPERADMIN. `accion`: `publicar` (PUBLICADA, `publicadaEn` = ahora, limpia `publicarEn`), `programar` (exige
         `publicarEn` futuro con zona, 422 PUBLICAR_EN_REQUERIDO o PUBLICAR_EN_PASADO) o `borrador` (limpia `publicarEn`).
-        `publicarEn` sin `programar` da 422 PUBLICAR_EN_SIN_PROGRAMAR. La ruta no cambia en una PUBLICADA (422
-        RUTA_PUBLICADA). Auditoría SITIO_PAGINA_EDITADA, SITIO_PAGINA_PUBLICADA, SITIO_PAGINA_PROGRAMADA o
+        `publicarEn` sin `programar` da 422 PUBLICAR_EN_SIN_PROGRAMAR. HU-1512 · Si cambia la ruta de una PUBLICADA, se
+        crea sola la redirección 301 de la ruta anterior a la nueva (si no hay una desde esa ruta y no forma bucle ni
+        cadena); la respuesta trae `redireccion` y `avisoRedireccion` (si no se pudo crear, solo el aviso, y la ruta
+        cambia igual). Auditoría SITIO_PAGINA_EDITADA, SITIO_PAGINA_PUBLICADA, SITIO_PAGINA_PROGRAMADA o
         SITIO_PAGINA_A_BORRADOR. Una programada la publica sola la cola `mantenimiento` (cada 30 s, CP-111).
         HU-1505: con `accion=publicar` en producción (`SITIO_ENTORNO`) y algún dato ficticio visible, 409
         FICTICIOS_VISIBLES con `detalles` (id, coleccion, nombre) (CP-116); en pruebas publica y trae `avisoFicticios`
@@ -178,6 +180,10 @@ paths:
         plano; vacío guarda null; en una página general, 422 NO_ES_LANDING). La ruta no cambia al cambiar el sector.
         RN-16-9: una landing sin título y texto de portada y sin meta título no se publica ni se programa, ni se deja
         así si ya está publicada o programada: 422 LANDING_INCOMPLETA con `detalles` (campo, mensaje).
+        HU-1512 · SEO de cualquier página (PNT-26): `metaTitulo` (hasta 60), `metaDescripcion` (hasta 160), ambos en texto
+        plano (RN-16-7; vacío guarda null), `canonical` (ruta interna o https:// con dominio), `indexar` y
+        `datosEstructurados` (WebPage, FAQPage o Product). 422 NO_VALIDO con `detalles`. Llegan al sitio con «Publicar
+        cambios» y quedan en SITIO_PAGINA_EDITADA.
       requestBody:
         required: true
         content:
@@ -993,6 +999,147 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /sitio/seo:
+    get:
+      tags:
+      - Sitio web
+      summary: Revisión SEO, redirecciones 301 y robots.txt (HU-1512, PNT-29)
+      operationId: get_sitio_seo
+      description: |-
+        Solo SUPERADMIN. `problemas` es la revisión automática de las páginas y redirecciones del panel, de la más grave a
+        la más leve: páginas sin meta descripción, con un título de más de 60 o una descripción de más de 160 caracteres,
+        sin indexar, y redirecciones activas cuyo destino no es ninguna página (o no está publicada) o que una página
+        publicada deja sin usar. Cada problema trae `paginaId` o `redireccionId` para corregirlo. `robotsVistaPrevia` es el
+        robots.txt que tendrá el sitio con «Publicar cambios» en el entorno actual.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeoSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Sitio web
+      summary: Guardar las reglas extra de robots.txt (HU-1512)
+      operationId: patch_sitio_seo
+      description: |-
+        Solo SUPERADMIN. Una regla por línea: `Allow: /ruta`, `Disallow: /ruta` o un comentario con `#` (hasta 50). No se
+        aceptan `Disallow: /` ni `Disallow: /*`, `User-agent`, `Sitemap` ni HTML: esas líneas las pone el sistema. Se
+        guardan normalizadas y van dentro del grupo `User-agent: *` en producción (en pruebas robots.txt sigue
+        bloqueando todo). Llegan al sitio con «Publicar cambios». Auditoría SITIO_ROBOTS_EDITADO. 422 NO_VALIDO con la
+        línea de cada error en `detalles` (campo `robotsExtra.{n}`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeoCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeoSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/seo/redirecciones:
+    post:
+      tags:
+      - Sitio web
+      summary: Agregar una redirección 301 (HU-1512, CP-124)
+      operationId: post_sitio_seo_redirecciones
+      description: |-
+        Solo SUPERADMIN. `desde` y `hacia` son rutas internas en minúsculas (se guardan sin / final); el inicio no se
+        redirige. 409 REDIRECCION_REPETIDA si ya hay una desde ese origen. 422 REDIRECCION_INVALIDA,
+        REDIRECCION_A_SI_MISMA, REDIRECCION_EN_BUCLE (A → B y B → A), REDIRECCION_EN_CADENA (A → B y B → C, o C → A y
+        A → B, con las activas) o REDIRECCION_PISA_PAGINA (el origen es una página publicada), con `detalles`; una
+        inactiva no se compara con las páginas ni forma cadenas. Hasta 500 (422 LIMITE_REDIRECCIONES). Llega al sitio
+        con «Publicar cambios»: `GET /s/{desde}` responde 301 a `/s/{hacia}`. Auditoría SITIO_REDIRECCION_CREADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedireccionEntrada'
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedireccionSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/seo/redirecciones/{redireccionId}:
+    parameters:
+    - name: redireccionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Sitio web
+      summary: Cambiar o activar una redirección 301 (HU-1512)
+      operationId: patch_sitio_seo_redireccion
+      description: |-
+        Solo SUPERADMIN. Las mismas reglas que al agregarla, contra las demás: activar una que formaría una cadena da 422
+        REDIRECCION_EN_CADENA. Auditoría SITIO_REDIRECCION_EDITADA con los valores de antes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedireccionCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedireccionSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Borrar una redirección 301 (HU-1512)
+      operationId: delete_sitio_seo_redireccion
+      description: Solo SUPERADMIN. Al publicar, la ruta de origen vuelve a dar la 404. Auditoría SITIO_REDIRECCION_BORRADA.
+      responses:
+        '204':
+          description: Borrada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /sitio/paginas/{paginaId}/vista-previa:
     parameters:
     - name: paginaId
@@ -1314,6 +1461,11 @@ paths:
         con la misma caché. Con el modo mantenimiento activo, toda ruta salvo fuentes y marca responde 503 con la página
         «Volvemos pronto» (CP-121), salvo para el superadmin con sesión, que ve el sitio con un aviso arriba y
         `Cache-Control: private, no-store`.
+
+        HU-1512 · Una ruta sin página con una redirección activa en la versión vigente responde 301 con `Location:
+        /s/{hacia}` (CP-124); la página publicada manda sobre la redirección. Cada página lleva su título, meta
+        descripción, canonical, Open Graph y un bloque JSON-LD (`application/ld+json`, no se ejecuta); con «Indexar»
+        apagado lleva `noindex`, sale del sitemap y no tiene hreflang (CP-125). robots.txt suma las reglas extra.
       parameters:
       - name: ruta
         in: path
@@ -1345,6 +1497,14 @@ paths:
             text/plain:
               schema:
                 type: string
+        '301':
+          description: HU-1512 · Redirección activa de la versión vigente (CP-124)
+          headers:
+            Location:
+              description: La ruta de destino bajo `/s`
+              schema:
+                type: string
+                example: /s/precios
         '304':
           description: El navegador ya tiene esta versión (misma ETag)
         '404':
@@ -4773,7 +4933,7 @@ components:
   schemas:
     PaginaSitio:
       type: object
-      description: Página del sitio comercial (M16). Bloques (HU-1503) y landings por sector (HU-1514); el SEO por página llega con la HU-1512.
+      description: Página del sitio comercial (M16). Bloques (HU-1503), landings por sector (HU-1514) y SEO de la página (HU-1512).
       required:
       - id
       - ruta
@@ -4789,6 +4949,10 @@ components:
       - portada
       - metaTitulo
       - blogCategoriaInicial
+      - metaDescripcion
+      - canonical
+      - indexar
+      - datosEstructurados
       properties:
         tipo:
           type: string
@@ -4810,8 +4974,28 @@ components:
         metaTitulo:
           type: string
           nullable: true
-          maxLength: 70
-          description: HU-1514 · El `<title>` de la landing
+          maxLength: 60
+          description: HU-1512 · El `<title>` de la página (en una landing, obligatorio para publicar, RN-16-9); null = el título con el nombre del sitio
+        metaDescripcion:
+          type: string
+          nullable: true
+          maxLength: 160
+          description: HU-1512 · null = el texto general del sitio
+        canonical:
+          type: string
+          nullable: true
+          example: /precios
+          description: HU-1512 · Ruta interna o https://; null = la de la página en el dominio publicado
+        indexar:
+          type: boolean
+          description: HU-1512 · false = noindex, fuera del sitemap y sin hreflang (CP-125)
+        datosEstructurados:
+          type: string
+          enum:
+          - WebPage
+          - FAQPage
+          - Product
+          description: HU-1512 · Tipo del JSON-LD de la página; FAQPage usa sus preguntas visibles
         blogCategoriaInicial:
           type: string
           nullable: true
@@ -4860,6 +5044,26 @@ components:
           type: integer
           minimum: 1
           description: HU-1507 · Si el cambio publicó o retiró la página, la versión del sitio que creó
+        redireccion:
+          type: object
+          description: HU-1512 · Al cambiar la ruta de una publicada, la redirección 301 que se creó sola
+          required:
+          - id
+          - desde
+          - hacia
+          properties:
+            id:
+              type: string
+              format: uuid
+            desde:
+              type: string
+              example: /precios-2025
+            hacia:
+              type: string
+              example: /precios
+        avisoRedireccion:
+          type: string
+          description: HU-1512 · Al cambiar la ruta de una publicada, qué pasó con la redirección 301
     PortadaSector:
       type: object
       description: HU-1514 · La portada propia de una landing por sector
@@ -4906,7 +5110,7 @@ components:
         metaTitulo:
           type: string
           nullable: true
-          maxLength: 70
+          maxLength: 60
         blogCategoriaInicial:
           type: string
           nullable: true
@@ -4941,7 +5145,7 @@ components:
           type: string
           maxLength: 200
           pattern: ^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$
-          description: No se cambia en una página PUBLICADA (422 RUTA_PUBLICADA)
+          description: HU-1512 · En una página PUBLICADA crea sola la redirección 301 de la ruta anterior a la nueva
         sector:
           type: string
           maxLength: 60
@@ -4954,11 +5158,31 @@ components:
         metaTitulo:
           type: string
           nullable: true
-          maxLength: 70
+          maxLength: 60
         blogCategoriaInicial:
           type: string
           nullable: true
           maxLength: 60
+        metaDescripcion:
+          type: string
+          nullable: true
+          maxLength: 160
+          description: HU-1512 · Texto plano; vacío guarda null
+        canonical:
+          type: string
+          nullable: true
+          maxLength: 300
+          example: /precios
+          description: HU-1512 · Ruta interna o https:// con dominio; vacío guarda null
+        indexar:
+          type: boolean
+          description: HU-1512 · false = noindex, fuera del sitemap y sin hreflang (CP-125)
+        datosEstructurados:
+          type: string
+          enum:
+          - WebPage
+          - FAQPage
+          - Product
         titulo:
           type: string
           minLength: 1
@@ -5824,6 +6048,141 @@ components:
                   alto:
                     type: integer
                     nullable: true
+    RedireccionSitio:
+      type: object
+      description: HU-1512 · Redirección 301 del sitio público (CP-124)
+      required:
+      - id
+      - desde
+      - hacia
+      - activa
+      - creadoEn
+      - actualizadoEn
+      properties:
+        id:
+          type: string
+          format: uuid
+        desde:
+          type: string
+          example: /precios-2025
+          description: Ruta interna de origen (única)
+        hacia:
+          type: string
+          example: /precios
+        activa:
+          type: boolean
+          description: Solo las activas llegan al sitio, con «Publicar cambios»
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    RedireccionEntrada:
+      type: object
+      additionalProperties: false
+      required:
+      - desde
+      - hacia
+      properties:
+        desde:
+          type: string
+          maxLength: 200
+          example: /precios-2025
+        hacia:
+          type: string
+          maxLength: 200
+          example: /precios
+        activa:
+          type: boolean
+          default: true
+    RedireccionCambio:
+      type: object
+      additionalProperties: false
+      properties:
+        desde:
+          type: string
+          maxLength: 200
+        hacia:
+          type: string
+          maxLength: 200
+        activa:
+          type: boolean
+    ProblemaSeo:
+      type: object
+      description: HU-1512 · Un problema de la revisión SEO (PNT-29)
+      required:
+      - tipo
+      - severidad
+      - titulo
+      - detalle
+      properties:
+        tipo:
+          type: string
+          enum:
+          - sin-descripcion
+          - titulo-largo
+          - descripcion-larga
+          - sin-indexar
+          - redireccion-sin-destino
+          - redireccion-tapada
+        severidad:
+          type: string
+          enum:
+          - alta
+          - media
+          - baja
+        titulo:
+          type: string
+          example: Falta la meta descripción
+        detalle:
+          type: string
+          example: 'Precios (/precios): los buscadores muestran el texto general del sitio.'
+        paginaId:
+          type: string
+          format: uuid
+          description: La página que hay que corregir
+        redireccionId:
+          type: string
+          format: uuid
+          description: La redirección que hay que corregir
+    SeoSitio:
+      type: object
+      description: HU-1512 · Sitio web › SEO (PNT-29)
+      required:
+      - robotsExtra
+      - robotsVistaPrevia
+      - redirecciones
+      - problemas
+      properties:
+        robotsExtra:
+          type: string
+          example: 'Disallow: /panel'
+        robotsVistaPrevia:
+          type: string
+          description: El robots.txt que tendrá el sitio con «Publicar cambios»
+        redirecciones:
+          type: array
+          items:
+            $ref: '#/components/schemas/RedireccionSitio'
+        problemas:
+          type: array
+          description: De los más graves a los más leves
+          items:
+            $ref: '#/components/schemas/ProblemaSeo'
+    SeoCambio:
+      type: object
+      additionalProperties: false
+      required:
+      - robotsExtra
+      properties:
+        robotsExtra:
+          type: string
+          maxLength: 12000
+          example: |-
+            # Panel interno
+            Disallow: /panel
+          description: 'Una regla por línea: Allow: /ruta, Disallow: /ruta o # comentario'
     ComprobacionDominio:
       type: object
       required:

@@ -8,5 +8,5 @@ const global = globalThis as unknown as { __aptioPrisma?: PrismaClient };
 export const prisma: PrismaClient = global.__aptioPrisma ?? new PrismaClient();
 if (process.env.NODE_ENV !== 'production') global.__aptioPrisma = prisma;
 export { recalcularReglas } from './observaciones.js';
-export { armarInstantaneaActual, crearVersion, ID_AJUSTES, leerAjustesSitio, type NuevaVersion, publicarProgramadas, RUTA_SITIO, rutaSitioValida, ultimaVersion } from './sitio.js';
+export { armarInstantaneaActual, crearVersion, ID_AJUSTES, ID_SEO, leerAjustesSitio, type NuevaVersion, publicarProgramadas, RUTA_SITIO, rutaSitioValida, ultimaVersion } from './sitio.js';
 export { ID_BLOG, leerBlogPublico, leerConexionBlog } from './blog.js';

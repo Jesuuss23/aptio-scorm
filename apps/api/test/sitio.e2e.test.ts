@@ -195,20 +195,27 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       expect((await sa().post('/sitio/paginas', { ruta: `${ruta('sectores')}/mineria-y-energia`, titulo: 'Mining', idioma: 'en' })).status).toBe(201);
     });
 
-    it('la ruta no cambia en una publicada (422); el título sí; en borrador cambia la ruta', async () => {
+    it('HU-1512: la ruta de una publicada cambia y deja una 301 de la anterior; el título también; en borrador, sin 301', async () => {
       const p = (await sa().post('/sitio/paginas', { ruta: ruta('producto'), titulo: 'Producto', accion: 'publicar' })).body;
       expect(p.estado).toBe('PUBLICADA');
       const r = await sa().patch(`/sitio/paginas/${p.id}`, { ruta: ruta('producto-2') });
-      expect([r.status, r.body.codigo]).toEqual([422, 'RUTA_PUBLICADA']);
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ ruta: ruta('producto-2'), estado: 'PUBLICADA', redireccion: { desde: ruta('producto'), hacia: ruta('producto-2') } });
+      expect(r.body.avisoRedireccion).toContain('Se creó la redirección 301');
       const t = await sa().patch(`/sitio/paginas/${p.id}`, { titulo: 'Producto nuevo' });
-      expect(t.body).toMatchObject({ titulo: 'Producto nuevo', estado: 'PUBLICADA', ruta: ruta('producto') });
+      expect(t.body).toMatchObject({ titulo: 'Producto nuevo', estado: 'PUBLICADA', ruta: ruta('producto-2') });
+      expect(t.body.redireccion).toBeUndefined();
       await sa().patch(`/sitio/paginas/${p.id}`, { accion: 'borrador' });
-      const c = await sa().patch(`/sitio/paginas/${p.id}`, { ruta: ruta('producto-2') });
-      expect(c.body.ruta).toBe(ruta('producto-2'));
+      const c = await sa().patch(`/sitio/paginas/${p.id}`, { ruta: ruta('producto-3') });
+      expect([c.body.ruta, c.body.redireccion]).toEqual([ruta('producto-3'), undefined]);
       const editadas = (await auditorias(p.id)).filter((a) => a.accion === 'SITIO_PAGINA_EDITADA');
       expect(editadas.map((a) => a.datos)).toEqual([
-        expect.objectContaining({ titulo: 'Producto nuevo' }), expect.objectContaining({ ruta: ruta('producto-2'), antes: expect.objectContaining({ ruta: ruta('producto') }) }),
+        expect.objectContaining({ ruta: ruta('producto-2'), antes: expect.objectContaining({ ruta: ruta('producto') }) }),
+        expect.objectContaining({ titulo: 'Producto nuevo' }),
+        expect.objectContaining({ ruta: ruta('producto-3'), antes: expect.objectContaining({ ruta: ruta('producto-2') }) }),
       ]);
+      await prisma.auditoria.deleteMany({ where: { entidadId: r.body.redireccion.id } });
+      await prisma.sitioRedireccion.delete({ where: { id: r.body.redireccion.id } });
     });
 
     it('solo se borra un borrador (422 en programada o publicada), con auditoría', async () => {
@@ -1049,10 +1056,11 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
   });
 });
 
-// HU-1508, HU-1509, HU-1514, HU-1510 y HU-1511 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
+// HU-1508, HU-1509, HU-1514, HU-1510, HU-1511 y HU-1512 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
 // en serie, para no pisarse con las pruebas de arriba.
 await import('./sitio-publico.casos.js');
 await import('./sitio-ajustes.casos.js');
 await import('./sitio-sectores.casos.js');
 await import('./sitio-idiomas.casos.js');
 await import('./sitio-blog.casos.js');
+await import('./sitio-seo.casos.js');

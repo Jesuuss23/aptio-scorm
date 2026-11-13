@@ -25,6 +25,7 @@ import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
 import { SitioAjustes } from './vistas/SitioAjustes';
 import { SitioBlog } from './vistas/SitioBlog';
+import { SitioSeo } from './vistas/SitioSeo';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -105,7 +106,7 @@ export function App() {
       pie={veConexiones && conexiones ? <MedidorCostoIA resumen={conexiones} /> : null}
     >
       {vista?.sub === 'editor-pagina' && veSitio ? (
-        <EditorPaginaSitio key={vista.id} paginaId={vista.id!} nueva={new URLSearchParams(busqueda).has('nueva')} />
+        <EditorPaginaSitio key={vista.id + busqueda} paginaId={vista.id!} nueva={new URLSearchParams(busqueda).has('nueva')} pestanaInicial={new URLSearchParams(busqueda).has('seo') ? 'seo' : 'pagina'} />
       ) : vista?.sub === 'vista-previa' ? (
         <VistaPrevia key={vista.id + busqueda} proyectoId={vista.id!} alCargar={alCargar} prueba={new URLSearchParams(busqueda)} />
       ) : vista?.sub === 'entrega' ? (
@@ -136,6 +137,8 @@ export function App() {
         <SitioContenido />
       ) : vista?.activo === '/sitio/blog' && veSitio ? (
         <SitioBlog />
+      ) : vista?.activo === '/sitio/seo' && veSitio ? (
+        <SitioSeo />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
         <SitioAjustes />
       ) : vista?.activo === '/operacion' && veOperacion ? (

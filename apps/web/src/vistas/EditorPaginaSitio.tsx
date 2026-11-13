@@ -1,11 +1,12 @@
 // HU-1503 · Sitio web › Editor de página (PNT-26, REQ-066): los bloques de una página en su orden, con flechas para
 // subir y bajar (dedo, ratón y teclado), un interruptor para mostrar u ocultar, agregar del catálogo cerrado y borrar.
 // Un bloque nuevo va al final y oculto (RN-16-2); ocultarlo no borra sus datos (CP-112). Solo el superadmin (ADR-011).
-// HU-1507 · «Publicar cambios» con el chip «Cambios sin publicar», y la vista previa en Escritorio y Celular. El SEO
-// llega con su historia. HU-1514 · En una landing de sector, la ficha con sector, portada, meta título y blog.
+// HU-1507 · «Publicar cambios» con el chip «Cambios sin publicar», y la vista previa en Escritorio y Celular.
+// HU-1514 · En una landing de sector, la ficha con sector, portada, meta título y blog. HU-1512 · Pestañas «Página» y
+// «SEO» (PNT-26) en la columna de la derecha, como en el prototipo.
 import { CATALOGO_BLOQUES, contarVisibles, fuenteBloque, moverBloque, nombreBloque, TIPOS_BLOQUE } from '@aptio/schema/sitio-bloques';
 import { Cabecera } from '@aptio/ui';
-import { useEffect, useRef, useState } from 'react';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { api, type BloqueSitio, ErrorApi, type PaginaSitio } from '../api';
 import { navegar } from '../ruta';
 import { ESTADO_PAGINA, NOMBRE_IDIOMA } from './sitio-paginas';
@@ -13,11 +14,17 @@ import { usePublicacionSitio } from './publicacion-sitio';
 import { AccionPublicar, AvisosPublicacion } from './SitioVersiones';
 import { VistaPreviaSitio } from './SitioVistaPrevia';
 import { FichaLanding } from './FichaLanding';
+import { FichaSeo } from './FichaSeo';
+
+const PESTANAS = [{ id: 'pagina', nombre: 'Página' }, { id: 'seo', nombre: 'SEO' }] as const;
+type Pestana = (typeof PESTANAS)[number]['id'];
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
 
-export function EditorPaginaSitio({ paginaId, nueva = false }: { paginaId: string; nueva?: boolean }) {
+export function EditorPaginaSitio({ paginaId, nueva = false, pestanaInicial = 'pagina' }: { paginaId: string; nueva?: boolean; pestanaInicial?: Pestana }) {
+  const [pestana, setPestana] = useState<Pestana>(pestanaInicial);
+  const pestanas = useRef<HTMLDivElement>(null);
   const [paginas, setPaginas] = useState<PaginaSitio[] | null>(null);
   const [bloques, setBloques] = useState<BloqueSitio[] | null>(null);
   const [error, setError] = useState('');
@@ -49,6 +56,18 @@ export function EditorPaginaSitio({ paginaId, nueva = false }: { paginaId: strin
   }, [bloques]);
 
   const pagina = paginas?.find((p) => p.id === paginaId) ?? null;
+  const guardada = (p: PaginaSitio) => { setPaginas((l) => (l ?? []).map((x) => (x.id === p.id ? p : x))); publicacion.recargar(); setRefresco((n) => n + 1); };
+
+  // Flechas izquierda y derecha, Inicio y Fin entre pestañas (patrón ARIA de pestañas).
+  function teclaPestana(e: KeyboardEvent<HTMLButtonElement>) {
+    const i = PESTANAS.findIndex((t) => t.id === pestana);
+    const n = PESTANAS.length;
+    const destino = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i - 1 + n) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+    if (destino < 0) return;
+    e.preventDefault();
+    setPestana(PESTANAS[destino]!.id);
+    pestanas.current?.querySelector<HTMLButtonElement>(`#pestana-editor-${PESTANAS[destino]!.id}`)?.focus();
+  }
 
   async function hacer<T>(accion: () => Promise<T>, defecto: string): Promise<T | undefined> {
     setOcupado(true);
@@ -173,7 +192,19 @@ export function EditorPaginaSitio({ paginaId, nueva = false }: { paginaId: strin
               <button type="submit" className="boton primario" disabled={ocupado}>Agregar bloque</button>
             </form>
           </section>
-          <aside className="tarjeta" aria-labelledby="pagina-datos-titulo">
+          <aside className="tarjeta" aria-label="Página y SEO">
+            <div className="opciones pestanas-editor" role="tablist" aria-label="Datos de la página" ref={pestanas}>
+              {PESTANAS.map((t) => (
+                <button key={t.id} type="button" role="tab" id={`pestana-editor-${t.id}`} className="opcion" aria-selected={pestana === t.id} aria-controls={`panel-editor-${t.id}`}
+                  tabIndex={pestana === t.id ? 0 : -1} onClick={() => setPestana(t.id)} onKeyDown={teclaPestana}>{t.nombre}</button>
+              ))}
+            </div>
+            {pestana === 'seo' ? (
+              <div role="tabpanel" id="panel-editor-seo" aria-labelledby="pestana-editor-seo">
+                {pagina ? <FichaSeo key={pagina.id} pagina={pagina} alGuardar={guardada} /> : null}
+              </div>
+            ) : (
+            <div role="tabpanel" id="panel-editor-pagina" aria-labelledby="pestana-editor-pagina">
             <h2 id="pagina-datos-titulo">Página</h2>
             {pagina ? (
               <dl className="datos-pagina">
@@ -185,10 +216,12 @@ export function EditorPaginaSitio({ paginaId, nueva = false }: { paginaId: strin
               </dl>
             ) : null}
             {pagina?.tipo === 'sector' ? (
-              <FichaLanding key={pagina.id} pagina={pagina} alGuardar={(p) => { setPaginas((l) => (l ?? []).map((x) => (x.id === p.id ? p : x))); publicacion.recargar(); setRefresco((n) => n + 1); }} />
+              <FichaLanding key={pagina.id} pagina={pagina} alGuardar={guardada} />
             ) : null}
             <p className="nota">Los cambios de bloques llegan al sitio con «Publicar cambios». Si la página está en borrador o programada, el sitio no muestra nada de ella.</p>
             <button type="button" className="boton" onClick={() => navegar('/sitio/paginas')}>Volver a Páginas</button>
+            </div>
+            )}
           </aside>
         </div>
       )}

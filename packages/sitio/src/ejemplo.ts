@@ -3,7 +3,8 @@
  * del prototipo, una página de funcionalidad, las landings de sector (HU-1514), menú y pie, y el inicio en inglés con su
  * propio contenido, menú y pie (HU-1510). HU-1511: `blogDeEjemplo` es la copia del blog del prototipo (9 artículos en 7
  * categorías, con Noticias internas y un artículo ocultos), que el render suma en la sección Blog y el pie. Lo usan las pruebas, la medición con Lighthouse (CP-120) y Playwright. Un
- * testimonio va marcado como ficticio para probar que en producción no sale.
+ * testimonio va marcado como ficticio para probar que en producción no sale. HU-1512: el inicio va como FAQPage y Personaje
+ * con su propio meta título, como Product.
  */
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
@@ -29,13 +30,17 @@ export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion'): Inst
   n = 0;
   return armarInstantanea({
     paginas: [
-      pagina('inicio', '/', 'Inicio', ['hero', 'metricas', 'confianza', 'logos', 'pasos', 'funcionalidades', 'lms', 'sectores', 'testimonios', 'faq', 'bloglista', 'cta']),
+      // HU-1512 · El inicio con sus preguntas en FAQPage; Personaje con meta título y descripción propios, como Product.
+      { ...pagina('inicio', '/', 'Inicio', ['hero', 'metricas', 'confianza', 'logos', 'pasos', 'funcionalidades', 'lms', 'sectores', 'testimonios', 'faq', 'bloglista', 'cta']), datosEstructurados: 'FAQPage' },
       landing('mineria-y-energia', 'Minería y energía', 'Cápsulas de seguridad para operaciones mineras y de energía', 'Bloqueo y etiquetado, trabajos en altura y espacios confinados en cápsulas de 5 minutos para el celular.', 'Casos'),
       landing('banca-y-seguros', 'Banca y seguros', 'Cumplimiento normativo en cápsulas que sí se terminan', 'Prevención de lavado de activos y seguridad de la información en cápsulas cortas, con evaluación en tu LMS.', 'Estándares'),
       landing('retail-y-consumo', 'Retail y consumo', 'Inducciones de tienda que caben entre dos turnos', 'Producto, caja, atención y seguridad en cápsulas que el personal ve desde el celular.', 'Microaprendizaje'),
       landing('educacion-superior', 'Educación superior', 'Educación continua bilingüe sin doble producción', 'Tus clases en cápsulas en español e inglés dentro del mismo paquete.', 'Guías'),
       landing('sector-publico', 'Sector público', 'Capacitación accesible para servidores públicos', 'Cápsulas accesibles con subtítulos y navegación por teclado.', 'Accesibilidad', 'BORRADOR'),
-      pagina('personaje', '/funcionalidades/personaje', 'Personaje', ['fhero', 'comparacion', 'testimonios', 'cta']),
+      {
+        ...pagina('personaje', '/funcionalidades/personaje', 'Personaje', ['fhero', 'comparacion', 'testimonios', 'cta']), datosEstructurados: 'Product',
+        metaTitulo: 'Personaje con boca sincronizada para cursos SCORM', metaDescripcion: 'Un personaje SVG que habla con la boca sincronizada al audio, sin video: cambias el texto y la boca se rehace sola.',
+      },
       pagina('en', '/', 'Home', ['hero', 'metricas', 'testimonios', 'cta'], 'en'),
       { ...pagina('borrador', '/borrador', 'Borrador', ['hero']), estado: 'BORRADOR', publicadaEn: null },
     ],

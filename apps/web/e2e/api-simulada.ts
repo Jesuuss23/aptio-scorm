@@ -4,7 +4,8 @@ import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, t
 import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
 import { aplicarCambiosBlog, blogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, enlaceEditarWp, type FilaArticuloBlog, type FilaCategoriaBlog, leerArticuloWp } from '@aptio/schema/sitio-blog';
-import { blogDeEjemplo, cabecerasSitio, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
+import { analizarSeo, aplicarCambiosSeo, type CambiosSeo, leerSeo, redireccionDe, rutaServida, validarRedireccion, validarRobotsExtra } from '@aptio/schema/sitio-seo';
+import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
@@ -164,6 +165,10 @@ export interface OpcionesSimulacion {
   blogSitio?: boolean;
   /** HU-1511 · Lo que devuelve WordPress en la próxima sincronización: artículos nuevos de su API REST, o `caido` si no responde. */
   wordpress?: unknown[] | 'caido';
+  /** HU-1512 · Redirecciones 301 guardadas en el panel. */
+  redireccionesSitio?: RedireccionSim[];
+  /** HU-1512 · Reglas extra de robots.txt guardadas. */
+  robotsSitio?: string;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -392,7 +397,11 @@ export interface PaginaSitioSim {
   publicarEn: string | null; publicadaEn: string | null; creadoEn: string; actualizadoEn: string;
   /** HU-1514 · Landing por sector (sin el campo, una página general). */
   tipo?: 'general' | 'sector'; sector?: string | null; portada?: { titulo: string; texto: string } | null; metaTitulo?: string | null; blogCategoriaInicial?: string | null;
+  /** HU-1512 · SEO de la página (sin los campos, los valores por defecto). */
+  metaDescripcion?: string | null; canonical?: string | null; indexar?: boolean; datosEstructurados?: 'WebPage' | 'FAQPage' | 'Product';
 }
+/** HU-1512 · Redirección 301 en la simulación. */
+export interface RedireccionSim { id: string; desde: string; hacia: string; activa: boolean; creadoEn?: string; actualizadoEn?: string }
 /** HU-1503 · Bloque de una página del sitio en la simulación. */
 export interface BloqueSitioSim {
   id: string; paginaId: string; tipo: string; orden: number; visible: boolean; ajustes: Record<string, unknown> | null; creadoEn: string; actualizadoEn: string;
@@ -407,13 +416,18 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '' }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
   const ficticiosVisiblesSim = () => elementosSim.filter((e) => e.ficticio && e.visible);
   let elementosCreados = 0;
-  const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null, ...p }));
+  const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null, metaDescripcion: null, canonical: null, indexar: true, datosEstructurados: 'WebPage', ...p }));
+  // HU-1512 · Redirecciones 301 y reglas extra de robots.txt: viajan en la versión, como en la API.
+  const redireccionesSim: RedireccionSim[] = redireccionesSitio.map((r) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...r }));
+  let redireccionesCreadas = 0;
+  let robotsSim = robotsSitio;
+  const rutasPublicadasSim = () => paginasSim.filter((p) => p.estado === 'PUBLICADA').map((p) => rutaServida(p.ruta, p.idioma));
   const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
   let bloquesCreados = 0;
   // HU-1507 · Versiones del sitio: la instantánea se arma con la misma función que usa la API.
@@ -426,7 +440,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const ajustesDto = () => ({ ...(ajustesSim ?? structuredClone(AJUSTES_POR_DEFECTO)), actualizadoEn: ajustesEn });
   const guardarAjustesSim = (a: AjustesSitio) => { ajustesSim = a; ajustesEn = new Date().toISOString(); return ajustesDto(); };
   const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
-  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim }, entornoSitio);
+  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim }, entornoSitio);
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
       numero: versionesSim.length + 1, creadoEn: new Date(Date.UTC(2026, 10, 13, 15, versionesSim.length)).toISOString(), entorno: entornoSitio, origen,
@@ -558,6 +572,9 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (!ultima) return enviar(404, '404', renderizar404(null, op));
     const archivos = renderizarSitio(ultima.instantanea, op);
     const a = pedido ? archivos.find((x) => x.archivo === pedido.archivo) : undefined;
+    // HU-1512 · CP-124 · Antes del 404, las redirecciones activas de la versión vigente.
+    const hacia = !a && pedido?.tipo === 'pagina' ? redireccionDe(ultima.instantanea.redirecciones, pedido.ruta) : null;
+    if (hacia) return route.fulfill({ status: 301, headers: { Location: `/s${hacia === '/' ? '' : hacia}`, 'Cache-Control': 'public, max-age=0, s-maxage=60' }, body: '' });
     return a ? enviar(200, pedido!.tipo, a.contenido) : enviar(404, '404', archivos.find((x) => x.archivo === '404.html')!.contenido);
   });
 
@@ -965,7 +982,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         if (!RUTA_SITIO_SIM.test(b.ruta)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'La ruta empieza con / y solo lleva minúsculas, números y guiones' });
         const idioma = b.idioma ?? 'es';
         if (paginasSim.some((p) => p.ruta === b.ruta && p.idioma === idioma)) return responder(409, { codigo: 'RUTA_EN_USO', mensaje: `Ya hay una página en ${b.ruta} en ${idioma === 'en' ? 'inglés' : 'español'}` });
-        const nueva: PaginaSitioSim = { id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: b.ruta, idioma, titulo: b.titulo, estado: 'BORRADOR', publicarEn: null, publicadaEn: null, creadoEn: ahora, actualizadoEn: ahora, tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null };
+        const nueva: PaginaSitioSim = { id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: b.ruta, idioma, titulo: b.titulo, estado: 'BORRADOR', publicarEn: null, publicadaEn: null, creadoEn: ahora, actualizadoEn: ahora, tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null, metaDescripcion: null, canonical: null, indexar: true, datosEstructurados: 'WebPage' };
         paginasSim.push(nueva);
         return responder(201, nueva);
       }
@@ -1008,20 +1025,47 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         paginasSim.splice(paginasSim.indexOf(p), 1);
         return responder(204);
       }
-      const b = req.postDataJSON() as { accion?: 'borrador' | 'programar' | 'publicar'; publicarEn?: string; titulo?: string; ruta?: string } & CambiosSector;
+      const b = req.postDataJSON() as { accion?: 'borrador' | 'programar' | 'publicar'; publicarEn?: string; titulo?: string; ruta?: string } & CambiosSector & CambiosSeo;
       // HU-1514 · Campos de la landing y RN-16-9: sin portada ni meta título no se publica ni se programa.
       const actualSector = { sector: p.sector ?? null, portada: p.portada ?? null, metaTitulo: p.metaTitulo ?? null, blogCategoriaInicial: p.blogCategoriaInicial ?? null };
       let datosSector = actualSector;
-      if (b.sector !== undefined || b.portada !== undefined || b.metaTitulo !== undefined || b.blogCategoriaInicial !== undefined) {
-        if (p.tipo !== 'sector') return responder(422, { codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada, meta título y categoría del blog son solo de las landings por sector' });
+      if (p.tipo !== 'sector' && (b.sector !== undefined || b.portada !== undefined || b.blogCategoriaInicial !== undefined)) {
+        return responder(422, { codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada y categoría del blog son solo de las landings por sector' });
+      }
+      if (p.tipo === 'sector' && (b.sector !== undefined || b.portada !== undefined || b.metaTitulo !== undefined || b.blogCategoriaInicial !== undefined)) {
         const r = aplicarCambiosSector(actualSector, b);
         if (!r.ok) return responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
         datosSector = r.datos;
       }
+      // HU-1512 · SEO de la página con las mismas reglas que la API (en una landing el meta título va por su ficha).
+      const seo = aplicarCambiosSeo(leerSeo(p), { metaTitulo: p.tipo === 'sector' ? undefined : b.metaTitulo, metaDescripcion: b.metaDescripcion, canonical: b.canonical, indexar: b.indexar, datosEstructurados: b.datosEstructurados });
+      if (!seo.ok) return responder(422, { codigo: 'NO_VALIDO', mensaje: seo.errores.map((e) => e.mensaje).join('. '), detalles: seo.errores });
+      const rutaNueva = b.ruta !== undefined && b.ruta !== p.ruta ? b.ruta : null;
+      if (rutaNueva !== null && !RUTA_SITIO_SIM.test(rutaNueva)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'La ruta empieza con / y solo lleva minúsculas, números y guiones' });
+      if (rutaNueva !== null && paginasSim.some((x) => x !== p && x.ruta === rutaNueva && x.idioma === p.idioma)) return responder(409, { codigo: 'RUTA_EN_USO', mensaje: `Ya hay una página en ${rutaNueva} en ${p.idioma === 'en' ? 'inglés' : 'español'}` });
       const estadoFinal = b.accion === 'publicar' ? 'PUBLICADA' : b.accion === 'programar' ? 'PROGRAMADA' : b.accion === 'borrador' ? 'BORRADOR' : p.estado;
       const faltan = p.tipo === 'sector' && estadoFinal !== 'BORRADOR' ? faltantesParaPublicar(datosSector) : [];
       if (faltan.length) return responder(422, { codigo: 'LANDING_INCOMPLETA', mensaje: `La landing no se puede publicar ni programar todavía: ${faltan.map((f) => f.mensaje.toLowerCase()).join(', ')}`, detalles: faltan });
       if (p.tipo === 'sector') Object.assign(p, datosSector);
+      Object.assign(p, p.tipo === 'sector' ? { ...seo.datos, metaTitulo: p.metaTitulo } : seo.datos);
+      if (b.titulo !== undefined) p.titulo = b.titulo.trim();
+      // HU-1512 · La ruta de una publicada cambió: la anterior redirige (301) a la nueva, si no forma bucle ni cadena.
+      let r301: { redireccion?: { id: string; desde: string; hacia: string }; avisoRedireccion?: string } = {};
+      if (rutaNueva !== null) {
+        const desde = rutaServida(p.ruta, p.idioma);
+        p.ruta = rutaNueva;
+        if (p.estado === 'PUBLICADA') {
+          const hacia = rutaServida(rutaNueva, p.idioma);
+          const r = validarRedireccion({ desde, hacia }, redireccionesSim, rutasPublicadasSim());
+          if (r.ok) {
+            const nueva: RedireccionSim = { id: `00000000-0000-4000-a000-${String(++redireccionesCreadas).padStart(12, '0')}`, ...r.redireccion, creadoEn: ahora, actualizadoEn: ahora };
+            redireccionesSim.push(nueva);
+            r301 = { redireccion: { id: nueva.id, desde, hacia }, avisoRedireccion: `Se creó la redirección 301 de ${desde} a ${hacia}. Llega al sitio con «Publicar cambios».` };
+          } else {
+            r301 = { avisoRedireccion: `No se creó la redirección 301 de ${desde} a ${hacia}: ${r.errores.map((e) => e.mensaje).join('. ')}` };
+          }
+        }
+      }
       const ficticios = b.accion === 'publicar' ? ficticiosVisiblesSim() : [];
       if (ficticios.length && entornoSitio === 'produccion') {
         return responder(409, {
@@ -1039,7 +1083,45 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       p.actualizadoEn = ahora;
       // HU-1507 · Publicar una página, o retirar una publicada, crea una versión del sitio (origen «pagina»).
       const version = b.accion === 'publicar' || (estabaPublicada && b.accion) ? nuevaVersionSim('pagina').numero : undefined;
-      return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}) });
+      return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}), ...r301 });
+    }
+    // HU-1512 · Sitio web › SEO (PNT-29): mismas reglas que la API; todo llega al sitio con «Publicar cambios».
+    if (ruta === '/sitio/seo' || ruta.startsWith('/sitio/seo/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const metodo = req.method();
+      const ahora = new Date().toISOString();
+      const ordenadas = () => [...redireccionesSim].sort((a, b) => a.desde.localeCompare(b.desde));
+      const seoDto = () => {
+        const op = conDominio(ajustesSim ? { sitio: ajustesPublicados(ajustesSim) } : null, { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s', blog: blogPublicoSim() });
+        return { robotsExtra: robotsSim, robotsVistaPrevia: robotsTxt(op, robotsSim), redirecciones: ordenadas(), problemas: analizarSeo({ paginas: paginasSim, redirecciones: redireccionesSim, nombreSitio: ajustesSim?.nombre || 'Aptio SCORM' }) };
+      };
+      const fallo = (r: Extract<ReturnType<typeof validarRedireccion>, { ok: false }>) =>
+        responder(r.codigo === 'REDIRECCION_REPETIDA' ? 409 : 422, { codigo: r.codigo, mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+      if (ruta === '/sitio/seo' && metodo === 'GET') return responder(200, seoDto());
+      if (ruta === '/sitio/seo' && metodo === 'PATCH') {
+        const r = validarRobotsExtra((req.postDataJSON() as { robotsExtra: string }).robotsExtra);
+        if (!r.ok) return responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+        robotsSim = r.robotsExtra;
+        return responder(200, seoDto());
+      }
+      if (ruta === '/sitio/seo/redirecciones' && metodo === 'POST') {
+        const r = validarRedireccion(req.postDataJSON() as { desde: string; hacia: string; activa?: boolean }, redireccionesSim, rutasPublicadasSim());
+        if (!r.ok) return fallo(r);
+        const nueva: RedireccionSim = { id: `00000000-0000-4000-a000-${String(++redireccionesCreadas).padStart(12, '0')}`, ...r.redireccion, creadoEn: ahora, actualizadoEn: ahora };
+        redireccionesSim.push(nueva);
+        return responder(201, nueva);
+      }
+      const red = redireccionesSim.find((x) => x.id === ruta.split('/')[4]);
+      if (!red) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La redirección no existe' });
+      if (metodo === 'DELETE') {
+        redireccionesSim.splice(redireccionesSim.indexOf(red), 1);
+        return responder(204);
+      }
+      const cambio = req.postDataJSON() as { desde?: string; hacia?: string; activa?: boolean };
+      const r = validarRedireccion({ desde: cambio.desde ?? red.desde, hacia: cambio.hacia ?? red.hacia, activa: cambio.activa ?? red.activa }, redireccionesSim.filter((x) => x !== red), rutasPublicadasSim());
+      if (!r.ok) return fallo(r);
+      Object.assign(red, r.redireccion, { actualizadoEn: ahora });
+      return responder(200, red);
     }
     // HU-1403 · Empresa › Operación: solo administración; «Respaldar ahora» deja una copia en curso (409 si ya hay una).
     if (ruta === '/operacion' || ruta === '/operacion/respaldar') {
