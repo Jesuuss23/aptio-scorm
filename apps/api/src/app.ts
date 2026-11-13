@@ -1,4 +1,4 @@
-import { HttpStatus, type INestApplication, ValidationPipe } from '@nestjs/common';
+import { HttpStatus, type INestApplication, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
@@ -9,7 +9,10 @@ export const PREFIJO = 'api/v1';
 
 /** Configuración común a la app real y a las pruebas: prefijo, validación, errores y OpenAPI. */
 export function configurarApp(app: INestApplication): INestApplication {
-  app.setGlobalPrefix(PREFIJO);
+  // HU-1508 · El sitio público pre-renderizado queda fuera del prefijo de la API.
+  app.setGlobalPrefix(PREFIJO, {
+    exclude: [{ path: 's', method: RequestMethod.GET }, { path: 's/{*ruta}', method: RequestMethod.GET }],
+  });
   app.use(cookieParser());
   app.enableCors({ origin: process.env.WEB_URL ?? 'http://localhost:5173', credentials: true });
   app.useGlobalPipes(

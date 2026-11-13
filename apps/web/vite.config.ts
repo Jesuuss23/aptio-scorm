@@ -7,6 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': process.env.API_URL ?? 'http://localhost:3000',
+      // HU-1508 · El sitio público pre-renderizado lo sirve la API fuera de su prefijo.
+      '/s/': process.env.API_URL ?? 'http://localhost:3000',
+      '^/s$': process.env.API_URL ?? 'http://localhost:3000',
     },
   },
 })

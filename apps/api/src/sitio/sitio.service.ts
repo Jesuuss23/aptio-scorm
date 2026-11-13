@@ -3,13 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, type SitioPagina } from '@aptio/db';
 import { rutaSitioValida, ultimaVersion } from '@aptio/db';
 import { paginaServida } from '@aptio/schema/sitio-versiones';
+import { SITIO_URL_POR_DEFECTO, sitemapXml } from '@aptio/sitio';
 import { entornoActual } from './entorno-sitio.js';
 import { VersionesService } from './versiones.service.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { AccionPagina, PaginaPublicaDto, PaginaSitioCambioDto, PaginaSitioDto, PaginaSitioEntradaDto } from './sitio.dto.js';
 
-export const SITIO_URL_POR_DEFECTO = 'https://aptioscorm.com';
 
 const aDto = (p: SitioPagina): PaginaSitioDto => ({
   id: p.id, ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, estado: p.estado,
@@ -24,7 +24,6 @@ const diaExiste = (iso: string): boolean => {
   return f.getUTCFullYear() === a && f.getUTCMonth() === m - 1 && f.getUTCDate() === d;
 };
 
-const escaparXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
 const AUDITORIA: Record<AccionPagina, string> = {
   borrador: 'SITIO_PAGINA_A_BORRADOR', programar: 'SITIO_PAGINA_PROGRAMADA', publicar: 'SITIO_PAGINA_PUBLICADA',
@@ -118,14 +117,8 @@ export class SitioService {
 
   /** CP-110 y CP-111 · Las páginas de la última versión. El inglés va bajo `/en` hasta que la HU-1510 sume hreflang (SUP-168). */
   async sitemap(): Promise<string> {
-    const base = (this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO).replace(/\/+$/, '');
-    const filas = [...((await ultimaVersion(this.bd))?.instantanea.paginas ?? [])].sort((a, b) => a.idioma.localeCompare(b.idioma) || a.ruta.localeCompare(b.ruta));
-    const urls = filas.map((p) => {
-      const ruta = p.idioma === 'en' ? `/en${p.ruta === '/' ? '' : p.ruta}` : p.ruta;
-      const lastmod = p.publicadaEn ? `<lastmod>${p.publicadaEn}</lastmod>` : '';
-      return `  <url><loc>${escaparXml(base + ruta)}</loc>${lastmod}</url>`;
-    });
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}${urls.length ? '\n' : ''}</urlset>\n`;
+    const v = await ultimaVersion(this.bd);
+    return sitemapXml(v?.instantanea ?? { paginas: [] }, this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO);
   }
 
   private async buscar(id: string): Promise<SitioPagina> {

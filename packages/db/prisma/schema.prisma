@@ -832,5 +832,9 @@ model SitioVersion {
   origen             String
   /// Con origen restauracion: el número de la versión restaurada.
   restauradaDe       Int?
+  /// HU-1508 · Pre-render del HTML al bucket: en_curso | listo | error.
+  prerenderEstado    String   @default("en_curso")
+  prerenderEn        DateTime?
+  prerenderError     String?
   creadoEn           DateTime @default(now())
 }

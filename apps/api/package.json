@@ -16,6 +16,7 @@
     "@aptio/db": "workspace:*",
     "@aptio/exporters": "workspace:*",
     "@aptio/schema": "workspace:*",
+    "@aptio/sitio": "workspace:*",
     "@nestjs/common": "^12.4.2",
     "@nestjs/config": "^12.1.1",
     "@nestjs/core": "^12.4.2",

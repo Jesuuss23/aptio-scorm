@@ -1,6 +1,7 @@
 import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
 import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
 import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
+import { cabecerasSitio, leerFuente, renderizar404, renderizarSitio, resolverPedido } from '@aptio/sitio';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
@@ -148,6 +149,8 @@ export interface OpcionesSimulacion {
   entornoSitio?: 'produccion' | 'pruebas';
   /** HU-1507 · Si el sitio ya tiene publicada la versión 1 con el estado inicial del panel. */
   versionSitio?: boolean;
+  /** HU-1508 · Estado del pre-render de las versiones (por defecto `listo`: el worker ya subió el HTML). */
+  prerenderSitio?: 'listo' | 'en_curso' | 'error';
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -389,7 +392,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo' }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
@@ -411,7 +414,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     versionesSim.push(v);
     return v;
   };
-  const versionDto = ({ instantanea, ...v }: VersionSim) => ({ ...v, paginas: instantanea.paginas.length });
+  const prerenderDto = (v: VersionSim) => ({
+    estado: prerenderSitio, en: prerenderSitio === 'en_curso' ? null : v.creadoEn,
+    error: prerenderSitio === 'error' ? 'No se pudo subir el sitio al almacenamiento: Access Denied' : null,
+  });
+  const versionDto = ({ instantanea, ...v }: VersionSim) => ({ ...v, paginas: instantanea.paginas.length, prerender: prerenderDto({ instantanea, ...v }) });
   if (versionSitio) nuevaVersionSim('publicacion');
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
@@ -471,6 +478,23 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const pantallasSim = () => (revision.documento.modulos as { capsulas: { pantallas: PantallaSim[] }[] }[]).flatMap((m) => m.capsulas.flatMap((c) => c.pantallas));
   // El almacenamiento: el PUT firmado de la subida va directo a S3, fuera de la API.
   // HU-0702: los audios de narración se sirven como silencio WAV con la duración de su pantalla (o la pedida en el nombre).
+  // HU-1508 · El sitio público pre-renderizado en /s/*: el HTML de la última versión, armado con el mismo paquete que el worker.
+  await page.route(/^https?:\/\/[^/]+\/s(?:[/?#]|$)/, (route) => {
+    const ruta = new URL(route.request().url()).pathname.slice(2) || '/';
+    const pedido = resolverPedido(ruta);
+    const op = { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s' } as const;
+    const enviar = (status: number, tipo: Parameters<typeof cabecerasSitio>[0], cuerpo: string | Buffer) => route.fulfill({ status, headers: cabecerasSitio(tipo, cuerpo), body: cuerpo });
+    if (pedido?.tipo === 'fuente') {
+      const f = leerFuente(pedido.archivo);
+      return f ? enviar(200, 'fuente', Buffer.from(f)) : enviar(404, '404', renderizar404(null, op));
+    }
+    const ultima = prerenderSitio === 'listo' ? versionesSim.at(-1) : undefined;
+    if (!ultima) return enviar(404, '404', renderizar404(null, op));
+    const archivos = renderizarSitio(ultima.instantanea, op);
+    const a = pedido ? archivos.find((x) => x.archivo === pedido.archivo) : undefined;
+    return a ? enviar(200, pedido!.tipo, a.contenido) : enviar(404, '404', archivos.find((x) => x.archivo === '404.html')!.contenido);
+  });
+
   await page.route('**/s3-simulado/**', (route) => {
     const nombre = new URL(route.request().url()).pathname.split('/').pop() ?? '';
     if (subidas.has(nombre)) {

@@ -835,7 +835,8 @@ paths:
       security: []
       description: |-
         Sin sesión. HU-1507 · Solo las páginas de la última versión publicada (sin versiones, vacío), con `SITIO_URL` como dominio (por defecto https://aptioscorm.com) y la
-        fecha de publicación como `lastmod`. Las páginas en inglés van bajo `/en` hasta la HU-1510.
+        fecha de publicación como `lastmod`. Las páginas en inglés van bajo `/en` hasta la HU-1510. HU-1508 · Es el mismo
+        sitemap que el worker guarda con cada versión y que se sirve en `GET /s/sitemap.xml`.
       responses:
         '200':
           description: OK
@@ -845,6 +846,89 @@ paths:
                 type: string
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
+  /s:
+    get:
+      tags:
+      - Sitio público
+      summary: Portada del sitio público pre-renderizado (HU-1508)
+      operationId: get_sitio_portada
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión y fuera del prefijo de la API (DA-08, REQ-109). Igual que `GET /s/{ruta}` con la ruta `/`: la portada
+        en español de la versión que indica `sitio/actual.json`.
+      parameters:
+      - $ref: '#/components/parameters/SiNoCoincide'
+      responses:
+        '200':
+          $ref: '#/components/responses/PaginaSitio'
+        '304':
+          description: El navegador ya tiene esta versión (misma ETag)
+        '404':
+          $ref: '#/components/responses/PaginaSitioNoEncontrada'
+  /s/{ruta}:
+    get:
+      tags:
+      - Sitio público
+      summary: Página, fuente, sitemap o robots del sitio pre-renderizado (HU-1508)
+      operationId: get_sitio_archivo
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión y fuera del prefijo de la API (DA-08, REQ-109, CP-120). El worker pre-renderiza cada versión del sitio en
+        el bucket (`sitio/v{n}/…`) y al terminar mueve el puntero `sitio/actual.json`; aquí se sirve el archivo de esa
+        versión. `ruta` puede tener varios segmentos: `precios`, `en/precios`, `sitemap.xml`, `robots.txt` o
+        `_fuentes/{nombre}-{hash8}.woff2`. Cada segmento lleva solo minúsculas, números y guiones (máximo 8); cualquier
+        otra forma da la 404. Las páginas no llevan JavaScript; los ficticios nunca salen en producción (RN-16-3).
+
+        Caché: las páginas, el sitemap y robots llevan `Cache-Control: public, max-age=0, s-maxage=60, must-revalidate`
+        (la CDN las guarda un minuto); las fuentes, `public, max-age=31536000, immutable`; la 404, `s-maxage=30`. Todas
+        llevan `ETag`; con `If-None-Match` igual responde 304. Las páginas y la 404 llevan una CSP sin scripts.
+      parameters:
+      - name: ruta
+        in: path
+        required: true
+        description: La ruta pública sin la base `/s/` (puede llevar `/`)
+        schema:
+          type: string
+          example: en/precios
+      - $ref: '#/components/parameters/SiNoCoincide'
+      responses:
+        '200':
+          description: La página (text/html), la fuente (font/woff2), el sitemap (application/xml) o robots (text/plain)
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETagSitio'
+            Cache-Control:
+              $ref: '#/components/headers/CacheSitio'
+          content:
+            text/html:
+              schema:
+                type: string
+            font/woff2:
+              schema:
+                type: string
+                format: binary
+            application/xml:
+              schema:
+                type: string
+            text/plain:
+              schema:
+                type: string
+        '304':
+          description: El navegador ya tiene esta versión (misma ETag)
+        '404':
+          $ref: '#/components/responses/PaginaSitioNoEncontrada'
   /operacion:
     get:
       tags:
@@ -4202,6 +4286,46 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    PaginaSitio:
+      description: La página en HTML, sin JavaScript
+      headers:
+        ETag:
+          $ref: '#/components/headers/ETagSitio'
+        Cache-Control:
+          $ref: '#/components/headers/CacheSitio'
+      content:
+        text/html:
+          schema:
+            type: string
+    PaginaSitioNoEncontrada:
+      description: |-
+        La página 404 en HTML (noindex): no hay ninguna versión pre-renderizada, la ruta no está publicada o no es válida.
+      headers:
+        Cache-Control:
+          description: public, max-age=0, s-maxage=30
+          schema:
+            type: string
+      content:
+        text/html:
+          schema:
+            type: string
+  parameters:
+    SiNoCoincide:
+      name: If-None-Match
+      in: header
+      required: false
+      description: La ETag que el navegador ya tiene; si coincide, 304
+      schema:
+        type: string
+  headers:
+    ETagSitio:
+      description: sha1 del contenido en base64url, entre comillas
+      schema:
+        type: string
+    CacheSitio:
+      description: 'Páginas: public, max-age=0, s-maxage=60, must-revalidate. Fuentes: public, max-age=31536000, immutable.'
+      schema:
+        type: string
   schemas:
     PaginaSitio:
       type: object
@@ -4642,6 +4766,7 @@ components:
       - restauradaDe
       - publicadoPor
       - paginas
+      - prerender
       properties:
         numero:
           type: integer
@@ -4683,6 +4808,32 @@ components:
           type: integer
           minimum: 0
           description: Páginas publicadas en la versión
+        prerender:
+          $ref: '#/components/schemas/PrerenderVersion'
+    PrerenderVersion:
+      type: object
+      description: HU-1508 · El HTML pre-renderizado de la versión (DA-08). El sitio público lo sirve cuando está listo y es la última.
+      required:
+      - estado
+      - en
+      - error
+      properties:
+        estado:
+          type: string
+          enum:
+          - en_curso
+          - listo
+          - error
+          description: en_curso al crearse la versión; listo cuando el worker subió el HTML; error con el motivo
+        en:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo terminó (listo o error)
+        error:
+          type: string
+          nullable: true
+          description: Con estado error, el motivo
     VersionPublicada:
       allOf:
       - $ref: '#/components/schemas/VersionSitio'

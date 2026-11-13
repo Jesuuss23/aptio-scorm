@@ -6,6 +6,7 @@ import { navegacionPublica, type NavegacionPublica } from '@aptio/schema/sitio-n
 import { armarPagina, coleccionesDeBloques, ficticiosDeInstantanea, hayPendientes, leerInstantanea, type Instantanea, type OrigenVersion } from '@aptio/schema/sitio-versiones';
 import { entornoActual } from './entorno-sitio.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { PrerenderService } from './prerender.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { VersionSitioDto, VersionesSitioDto, VistaPreviaPaginaDto } from './versiones.dto.js';
 
@@ -17,6 +18,7 @@ const aDto = (v: SitioVersion): VersionSitioDto => {
     numero: v.numero, creadoEn: v.creadoEn.toISOString(), entorno: v.entorno, origen: v.origen, restauradaDe: v.restauradaDe,
     publicadoPor: v.publicadoPorId ? { id: v.publicadoPorId, nombre: v.publicadoPorNombre ?? '' } : null,
     paginas: inst.paginas.length,
+    prerender: { estado: v.prerenderEstado, en: v.prerenderEn?.toISOString() ?? null, error: v.prerenderError },
   };
 };
 
@@ -36,7 +38,7 @@ export const VERSIONES_LISTADAS = 50;
  */
 @Injectable()
 export class VersionesService {
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly prerender: PrerenderService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -66,6 +68,8 @@ export class VersionesService {
         datos: { numero: v.numero, origen, entorno, ...(extra.restauradaDe ? { restauradaDe: extra.restauradaDe } : {}) } as Prisma.InputJsonValue,
       },
     });
+    // HU-1508 · El sitio público sirve el HTML pre-renderizado: el worker lo arma y mueve el puntero al terminar.
+    await this.prerender.encolar(v.numero);
     return v;
   }
 

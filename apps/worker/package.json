@@ -21,6 +21,7 @@
     "@aptio/player": "workspace:*",
     "@aptio/respaldo": "workspace:*",
     "@aptio/schema": "workspace:*",
+    "@aptio/sitio": "workspace:*",
     "@napi-rs/canvas": "^0.1.100",
     "@resvg/resvg-js": "^2.6.2",
     "@tesseract.js-data/eng": "^1.0.0",

@@ -8,6 +8,13 @@ class AutorVersionDto {
   @ApiProperty() nombre: string;
 }
 
+/** HU-1508 · Estado del pre-render de la versión (DA-08). */
+export class PrerenderVersionDto {
+  @ApiProperty({ enum: ['en_curso', 'listo', 'error'], description: 'listo: el HTML está en el bucket; el sitio lo sirve si es la versión actual' }) estado: string;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'Cuándo terminó (listo o error)' }) en: string | null;
+  @ApiProperty({ type: String, nullable: true, description: 'Con estado error: el motivo' }) error: string | null;
+}
+
 /** HU-1507 · Versión publicada del sitio (RN-16-5). Inmutable. */
 export class VersionSitioDto {
   @ApiProperty({ minimum: 1, description: 'La mayor es la que ve el sitio' }) numero: number;
@@ -17,6 +24,7 @@ export class VersionSitioDto {
   @ApiProperty({ type: Number, nullable: true, description: 'Con origen restauracion: la versión restaurada' }) restauradaDe: number | null;
   @ApiProperty({ type: AutorVersionDto, nullable: true, description: 'null si la publicó la plataforma (programada)' }) publicadoPor: AutorVersionDto | null;
   @ApiProperty({ minimum: 0, description: 'Páginas publicadas en la versión' }) paginas: number;
+  @ApiProperty({ type: PrerenderVersionDto, description: 'HU-1508 · El HTML pre-renderizado de esta versión' }) prerender: PrerenderVersionDto;
 }
 
 export class VersionPublicadaDto extends VersionSitioDto {

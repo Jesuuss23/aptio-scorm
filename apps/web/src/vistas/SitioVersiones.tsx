@@ -4,7 +4,7 @@
 // y se crea la siguiente, sin tocar lo que se edita en el panel (CP-119). En producción, los datos ficticios bloquean
 // publicar (con «Ocultar todos los ficticios») y restaurar una versión que los tenga (RN-16-3).
 import { type Coleccion, COLECCIONES_CONTENIDO } from '@aptio/schema/sitio-contenido';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { VersionSitio } from '../api';
 import type { PublicacionSitio } from './publicacion-sitio';
 import { fechaHoraLima } from './sitio-paginas';
@@ -15,6 +15,15 @@ const ORIGEN: Record<VersionSitio['origen'], string> = {
   programada: 'Publicación programada',
   restauracion: 'Restauración',
 };
+
+/** HU-1508 · El HTML que sirve el sitio público lo arma el worker después de cada versión (DA-08). */
+const PRERENDER: Record<VersionSitio['prerender']['estado'], { texto: string; clase: string }> = {
+  listo: { texto: 'Sitio listo', clase: 'validado' },
+  en_curso: { texto: 'Preparando el sitio', clase: 'aviso' },
+  error: { texto: 'Error al preparar el sitio', clase: 'error' },
+};
+
+const ESPERA_PRERENDER_MS = 3000;
 
 const textoOrigen = (v: VersionSitio) => (v.origen === 'restauracion' && v.restauradaDe ? `Restauración de la versión ${v.restauradaDe}` : ORIGEN[v.origen]);
 /** El chip «Cambios sin publicar» o «Sitio al día» y el botón «Publicar cambios», para la cabecera. */
@@ -57,6 +66,15 @@ export function TarjetaVersiones({ estado }: { estado: PublicacionSitio }) {
   const [confirmando, setConfirmando] = useState<number | null>(null);
   const titulo = useRef<HTMLHeadingElement>(null);
   const { versiones, error } = estado;
+  const vigente = versiones?.versiones.find((v) => v.numero === versiones.actual);
+  const preparando = vigente?.prerender.estado === 'en_curso';
+  const { recargar } = estado;
+  // Mientras el worker prepara el HTML, se vuelve a consultar cada 3 s para mostrar cuándo queda listo.
+  useEffect(() => {
+    if (!preparando) return;
+    const reloj = setTimeout(recargar, ESPERA_PRERENDER_MS);
+    return () => clearTimeout(reloj);
+  }, [preparando, versiones, recargar]);
 
   async function restaurar(numero: number) {
     const v = await estado.restaurar(numero);
@@ -69,8 +87,19 @@ export function TarjetaVersiones({ estado }: { estado: PublicacionSitio }) {
     <section className="tarjeta versiones-sitio" aria-labelledby="versiones-titulo">
       <div className="tarjeta-cabeza">
         <h2 id="versiones-titulo" ref={titulo} tabIndex={-1}>Versiones</h2>
-        {versiones?.actual ? <span className="chip validado">El sitio muestra la versión {versiones.actual}</span> : null}
+        <div className="acciones-fila">
+          {versiones?.actual ? <span className="chip validado">El sitio muestra la versión {versiones.actual}</span> : null}
+          {vigente ? <span className={`chip ${PRERENDER[vigente.prerender.estado].clase}`}>{PRERENDER[vigente.prerender.estado].texto}</span> : null}
+          <a className="boton" href="/s/" target="_blank" rel="noopener">Ver el sitio<span className="sr"> (se abre en una pestaña nueva)</span></a>
+        </div>
       </div>
+      {vigente?.prerender.estado === 'error' ? (
+        <div className="nota error" role="alert">
+          El sitio público todavía no muestra la versión {vigente.numero}: no se pudo preparar.{vigente.prerender.error ? ` Motivo: ${vigente.prerender.error.replace(/\.?$/, '.')}` : ''} Se reintenta al reiniciar el servicio o con la próxima publicación.
+        </div>
+      ) : vigente?.prerender.estado === 'en_curso' ? (
+        <p className="sec" role="status">Preparando la versión {vigente.numero}: el sitio público la mostrará en unos segundos.</p>
+      ) : null}
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {!versiones ? (!error ? <p className="sec">Cargando las versiones…</p> : null) : versiones.versiones.length === 0 ? (
         <p className="nota">Aún no hay versiones: el sitio no muestra nada. «Publicar cambios» crea la primera.</p>

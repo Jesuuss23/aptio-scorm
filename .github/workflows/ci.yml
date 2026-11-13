@@ -111,3 +111,29 @@ jobs:
           name: playwright
           path: apps/web/test-results
           retention-days: 7
+
+  lighthouse:
+    name: Sitio público (Lighthouse)
+    # HU-1508 · CP-120: la portada pre-renderizada en celular con 4G simulado: LCP < 2,5 s, SEO ≥ 90 y accesibilidad ≥ 90.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Medición
+        # El runner trae Google Chrome estable.
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: pnpm sitio:lighthouse
+      - name: Informe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse
+          path: packages/sitio/lighthouse
+          retention-days: 7
