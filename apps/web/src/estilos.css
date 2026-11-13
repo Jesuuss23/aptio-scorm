@@ -2508,3 +2508,45 @@ ul.fila-chips {
     grid-row: 2;
   }
 }
+
+/* HU-1304 · Empresa › Conexiones IA (PNT-23) y el medidor «Costo de IA del mes» de la barra lateral. */
+.conexiones { display: flex; flex-direction: column; gap: 12px; }
+.conexiones .tabla-costos table { min-width: 860px; }
+.conexiones th[scope='row'] .chip { margin-left: 8px; }
+.conexiones tr.al-tope > * { background: var(--color-error-suave); }
+.conexion-campos { display: flex; flex-direction: column; gap: 6px; min-width: 200px; }
+.conexion-campos select,
+.conexion-campos input,
+.conexiones input.limite {
+  border: 1px solid var(--color-borde);
+  background: var(--color-superficie);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+  color: var(--color-texto);
+}
+.conexiones input.limite { width: 110px; }
+.conexiones input[aria-invalid='true'] { border-color: var(--color-error); }
+.conexion-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.conexion-estado { margin: 4px 0 0; font-size: var(--texto-xs); color: var(--color-texto-sec); max-width: 220px; }
+.conexion-estado.ok { color: var(--color-validado); }
+.conexion-estado.error { color: var(--color-error); }
+.medidor-ia {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: var(--texto-xs);
+  color: #dbeafe;
+}
+.medidor-ia .fila { display: flex; justify-content: space-between; gap: 8px; }
+.medidor-ia b { color: #fff; }
+.medidor-ia .pista { display: block; height: 5px; border-radius: 9px; background: rgba(255, 255, 255, 0.18); margin-top: 7px; overflow: hidden; }
+.medidor-ia .pista i { display: block; height: 100%; background: var(--color-naranja); border-radius: 9px; }
+.medidor-ia.al-tope { background: var(--color-error); border-color: #ffdad6; color: #fff; }
+.medidor-ia.al-tope .pista i { background: #fff; }
+.medidor-ia small { display: block; margin-top: 4px; color: inherit; }
+.nota.limite-gasto { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+@media (max-width: 760px) {
+  .medidor-ia { display: none; }
+}

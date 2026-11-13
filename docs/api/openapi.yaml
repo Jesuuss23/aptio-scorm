@@ -3231,18 +3231,16 @@ paths:
     get:
       tags:
       - Conexiones IA
-      summary: Ver proveedor por tarea
+      summary: Ver proveedor, modelo, gasto del mes y límite por tarea
       operationId: get_conexiones_ia
-      description: Nunca devuelve claves
+      description: 'HU-1304 · Solo ADMINISTRADOR. Las 8 tareas de la lista cerrada con su conexión de la organización (o los valores del entorno si no se configuró), si la clave existe en el entorno (nunca la clave, RN-13-3), el costo estimado por SCORM, el gasto del mes de Lima y el límite mensual (RN-04-7).'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ConfigProveedor'
+                $ref: '#/components/schemas/ConexionesIA'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -3251,37 +3249,38 @@ paths:
     put:
       tags:
       - Conexiones IA
-      summary: Cambiar proveedor o modelo de una tarea
+      summary: Cambiar proveedor, modelo, voces o límite de una tarea
       operationId: put_conexiones_ia_tarea
-      description: Solo ADMINISTRADOR
+      description: 'HU-1304 · Solo ADMINISTRADOR, con auditoría CONEXION_IA_GUARDADA. Aplica al siguiente trabajo sin reiniciar el worker (CP-099) y no rehace nada ya generado (RN-13-2). No acepta claves (422 por campo no permitido). 422 PROVEEDOR_NO_VALIDO (otro proveedor o «próximamente») y MODELO_NO_VALIDO (modelo de texto sin tarifa registrada).'
       parameters:
       - name: tarea
         in: path
         required: true
+        description: Tarea de la lista cerrada, sin distinguir mayúsculas (404 si no es de la lista)
         schema:
           type: string
           enum:
-          - TEXTO
-          - PANTALLAS
-          - IMAGEN
-          - VOZ
-          - BOCA
-          - TRADUCCION
-          - TRANSCRIPCION
-          - CALIDAD
+          - texto
+          - pantallas
+          - traduccion
+          - calidad
+          - voz
+          - imagen
+          - boca
+          - transcripcion
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ConfigProveedor'
+              $ref: '#/components/schemas/ConexionEntrada'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ConfigProveedor'
+                $ref: '#/components/schemas/ConexionIA'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -3294,14 +3293,25 @@ paths:
     post:
       tags:
       - Conexiones IA
-      summary: Probar conexión
+      summary: Probar la conexión activa de una tarea
       operationId: post_conexiones_ia_tarea_probar
+      description: 'HU-1304 · Solo ADMINISTRADOR. En modo simulado responde «simulado, OK» sin llamar a nadie. En modo real hace una llamada mínima (1 token de Claude o una palabra de voz) y devuelve el resultado con la latencia; no se registra en TrabajoIA. Un error del proveedor se informa con su estado HTTP, nunca con la clave.'
       parameters:
       - name: tarea
         in: path
         required: true
+        description: Tarea de la lista cerrada, sin distinguir mayúsculas (404 si no es de la lista)
         schema:
           type: string
+          enum:
+          - texto
+          - pantallas
+          - traduccion
+          - calidad
+          - voz
+          - imagen
+          - boca
+          - transcripcion
       responses:
         '200':
           description: OK
@@ -6967,50 +6977,175 @@ components:
           type: string
         archivos:
           type: integer
-    ConfigProveedor:
+    ConexionIA:
       type: object
+      description: 'HU-1304 · Una tarea de la lista cerrada con su conexión. Nunca lleva claves (RN-13-3).'
       required:
       - tarea
+      - nombre
       - proveedor
       - modelo
+      - opciones
+      - modelos
+      - fijo
+      - voces
+      - claveConfigurada
+      - costoEstimadoScormUsd
+      - gastoMesUsd
+      - limiteGastoMensualUsd
+      - limiteAlcanzado
+      - configurada
+      - actualizadoEn
       properties:
         tarea:
           type: string
           enum:
           - TEXTO
           - PANTALLAS
-          - IMAGEN
-          - VOZ
-          - BOCA
           - TRADUCCION
-          - TRANSCRIPCION
           - CALIDAD
+          - VOZ
+          - IMAGEN
+          - BOCA
+          - TRANSCRIPCION
+        nombre:
+          type: string
         proveedor:
           type: string
+          description: anthropic, google, elevenlabs, rhubarb…
         modelo:
           type: string
-        parametros:
-          type: object
-          additionalProperties: true
-        limiteGastoMensualUsd:
-          type: number
-          nullable: true
-        activo:
+        opciones:
+          type: array
+          items:
+            type: object
+            required:
+            - proveedor
+            - nombre
+            properties:
+              proveedor:
+                type: string
+              nombre:
+                type: string
+              proximamente:
+                type: boolean
+                description: Sin ejecutor todavía (p. ej. Azure Speech)
+        modelos:
+          type: array
+          description: Modelos que se pueden elegir (los de texto, con tarifa registrada); vacío si el proveedor no tiene lista
+          items:
+            type: string
+        fijo:
           type: boolean
+          description: El proveedor no se elige (Imagen, Boca, Transcripción)
+        voces:
+          type: object
+          nullable: true
+          description: Solo en voz; la voz por idioma cuando la del kit es de otro proveedor
+          properties:
+            es:
+              type: string
+            en:
+              type: string
         claveConfigurada:
           type: boolean
           description: Solo informa si existe la variable de entorno; nunca devuelve la clave
+        costoEstimadoScormUsd:
+          type: number
+        gastoMesUsd:
+          type: number
+          description: USD de TrabajoIA del tipo desde el día 1 del mes de Lima
+        limiteGastoMensualUsd:
+          type: number
+          nullable: true
+        limiteAlcanzado:
+          type: boolean
+          description: El gasto del mes llegó al límite; los trabajos de la tarea se detienen con LIMITE_GASTO (CP-100)
+        configurada:
+          type: boolean
+          description: false mientras se usen los valores del entorno
+        actualizadoEn:
+          type: string
+          format: date-time
+          nullable: true
+    ConexionesIA:
+      type: object
+      required:
+      - mes
+      - modo
+      - gastoMesUsd
+      - limiteTotalUsd
+      - conexiones
+      properties:
+        mes:
+          type: string
+          description: Mes de Lima (AAAA-MM)
+        modo:
+          type: string
+          enum:
+          - simulado
+          - real
+        gastoMesUsd:
+          type: number
+        limiteTotalUsd:
+          type: number
+          nullable: true
+          description: Suma de los límites definidos (el medidor de la barra lateral); null si ninguna tarea tiene límite
+        conexiones:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConexionIA'
+    ConexionEntrada:
+      type: object
+      additionalProperties: false
+      description: Lo que se cambia; lo que falta queda como está. Sin claves.
+      properties:
+        proveedor:
+          type: string
+          maxLength: 40
+        modelo:
+          type: string
+          maxLength: 80
+        voces:
+          type: object
+          additionalProperties: false
+          properties:
+            es:
+              type: string
+              maxLength: 120
+            en:
+              type: string
+              maxLength: 120
+        limiteGastoMensualUsd:
+          type: number
+          minimum: 0
+          nullable: true
+          description: null quita el límite
     PruebaProveedor:
       type: object
       required:
       - ok
+      - modo
+      - proveedor
+      - modelo
+      - mensaje
+      - latenciaMs
       properties:
         ok:
           type: boolean
-        latenciaMs:
-          type: integer
+        modo:
+          type: string
+          enum:
+          - simulado
+          - real
+        proveedor:
+          type: string
+        modelo:
+          type: string
         mensaje:
           type: string
+        latenciaMs:
+          type: integer
     ResumenCostos:
       type: object
       description: 'HU-1302 · Costos de IA en dólares (US$) registrados en TrabajoIA, sin los trabajos que aún no llamaron a un proveedor'

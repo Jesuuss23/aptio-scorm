@@ -8,6 +8,9 @@ export interface PedidoVoz {
   idioma: 'es' | 'en';
   voz: string;
   velocidad?: number;
+  /** HU-1304 · Proveedor de la voz (`google` si falta) y, en ElevenLabs, el modelo de la conexión. */
+  proveedor?: string;
+  modelo?: string;
 }
 
 export interface AudioVoz {
@@ -46,6 +49,29 @@ export async function sintetizarGoogle(pedido: PedidoVoz, opciones: { apiKey: st
     audio: Uint8Array.from(Buffer.from(cuerpo.audioContent, 'base64')),
     mime: 'audio/mpeg', proveedor: 'google', modelo: pedido.voz, caracteres: pedido.ssml.length, simulada: false,
   };
+}
+
+/** Modelo de ElevenLabs cuando la conexión no indica otro (habla español e inglés). */
+export const MODELO_ELEVENLABS = 'eleven_multilingual_v2';
+
+/**
+ * HU-1304 · ElevenLabs, API REST v1 `text-to-speech/{voice_id}` con la clave en `xi-api-key`. No lee SSML: recibe el
+ * texto que se dice, con el diccionario del cliente ya aplicado (los alias de `<sub>`). Probado con `fetch` simulado
+ * hasta tener una clave real (supuesto del ESTADO).
+ */
+export async function sintetizarElevenLabs(pedido: PedidoVoz, opciones: { apiKey: string; fetch?: typeof fetch }): Promise<AudioVoz> {
+  const f = opciones.fetch ?? fetch;
+  const texto = textoHablado(pedido.ssml);
+  const modelo = pedido.modelo || MODELO_ELEVENLABS;
+  const r = await f(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(pedido.voz)}?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg', 'xi-api-key': opciones.apiKey },
+    body: JSON.stringify({ text: texto, model_id: modelo, ...(pedido.velocidad && pedido.velocidad !== 1 ? { voice_settings: { speed: pedido.velocidad } } : {}) }),
+  });
+  if (!r.ok) throw new VozNoDisponible(`ElevenLabs respondió ${r.status}`);
+  const audio = new Uint8Array(await r.arrayBuffer());
+  if (!audio.byteLength) throw new VozNoDisponible('ElevenLabs no devolvió audio');
+  return { audio, mime: 'audio/mpeg', proveedor: 'elevenlabs', modelo, caracteres: texto.length, simulada: false };
 }
 
 /** Milisegundos por carácter de la voz simulada: la misma cuenta que el caso LOTO grabado (`06-voz-es.json`). */
@@ -146,21 +172,40 @@ export function duracionAudio(audio: Uint8Array, mime: string): number | null {
  */
 export const TARIFA_VOZ_USD_MILLON = { 'Chirp3-HD': 30, Neural2: 16, otra: 16 } as const;
 
+/** USD por millón de caracteres de ElevenLabs. Supuesto del ESTADO: tarifa sin verificar contra una factura. */
+export const TARIFA_ELEVENLABS_USD_MILLON = 200;
+
 export function costoVoz(caracteres: number, voz: string, proveedor: string): number {
   if (proveedor === 'simulado') return 0;
+  if (proveedor === 'elevenlabs') return Math.round((caracteres / 1_000_000) * TARIFA_ELEVENLABS_USD_MILLON * 1_000_000) / 1_000_000;
   const tarifa = voz.includes('Chirp3-HD') ? TARIFA_VOZ_USD_MILLON['Chirp3-HD'] : voz.includes('Neural2') ? TARIFA_VOZ_USD_MILLON.Neural2 : TARIFA_VOZ_USD_MILLON.otra;
   return Math.round((caracteres / 1_000_000) * tarifa * 1_000_000) / 1_000_000;
 }
 
 export type Sintetizador = (pedido: PedidoVoz) => Promise<AudioVoz>;
 
-/** El sintetizador del entorno: simulado por defecto; Google con `GOOGLE_TTS_API_KEY` cuando el modo es real. */
-export function sintetizadorDesdeEntorno(env: NodeJS.ProcessEnv): Sintetizador {
+/** Licencia que guarda el recurso de audio según el proveedor (ADR-010). */
+export function licenciaVoz(proveedor: string): string {
+  if (proveedor === 'simulado') return 'Audio simulado de prueba';
+  if (proveedor === 'elevenlabs') return 'ElevenLabs · uso comercial (plan de pago)';
+  return 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)';
+}
+
+/**
+ * El sintetizador del entorno: simulado por defecto; en modo real, según el proveedor del pedido, Google con
+ * `GOOGLE_TTS_API_KEY` o ElevenLabs con `ELEVENLABS_API_KEY`. La clave se lee en cada pedido (nunca se guarda).
+ */
+export function sintetizadorDesdeEntorno(env: NodeJS.ProcessEnv, opciones: { fetch?: typeof fetch } = {}): Sintetizador {
   if ((env.PROVEEDORES_MODO ?? 'simulado') === 'simulado') return async (p) => vozSimulada(p);
   return async (p) => {
+    if (p.proveedor === 'elevenlabs') {
+      const apiKey = env.ELEVENLABS_API_KEY;
+      if (!apiKey) throw new VozNoDisponible('La voz de ElevenLabs no está configurada en este entorno (ELEVENLABS_API_KEY)');
+      return sintetizarElevenLabs(p, { apiKey, ...opciones });
+    }
     const apiKey = env.GOOGLE_TTS_API_KEY;
     if (!apiKey) throw new VozNoDisponible('La voz de Google no está configurada en este entorno (GOOGLE_TTS_API_KEY)');
-    return sintetizarGoogle(p, { apiKey });
+    return sintetizarGoogle(p, { apiKey, ...opciones });
   };
 }
 

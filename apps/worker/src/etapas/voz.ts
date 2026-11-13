@@ -11,8 +11,11 @@
 // `porIdioma.en`, la Narracion en inglés y `pNN-en.mp3`; el español no se toca. Las anclas siguen la voz en español.
 // HU-0704 · Una pista que es una grabación del cliente (`voz.proveedor: 'cliente'`) no se dice con la voz de la IA ni
 // se cuenta aquí: conserva su audio, su boca, sus subtítulos y su recurso en el curso.
+// HU-1304 · El proveedor de voz es el de la conexión de la organización (leída en cada generación, CP-099): la voz del
+// kit se usa si es de ese proveedor; si no, la voz por idioma de la conexión. Un audio ya listo no se rehace por cambiar
+// de proveedor (RN-13-2). El límite de gasto se revisa antes de cada síntesis (CP-100).
 import { createHash, randomUUID } from 'node:crypto';
-import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, type Sintetizador, VozNoDisponible } from '@aptio/ai';
+import { type AudioVoz, costoVoz, duracionAudio, hashNarracion, licenciaVoz, type Sintetizador, VozNoDisponible } from '@aptio/ai';
 import { Prisma } from '@aptio/db';
 import { validarCurso } from '@aptio/schema';
 import { duracionLegible, type NarracionLista, type VozCurso } from '@aptio/schema/generacion';
@@ -20,14 +23,16 @@ import { marcasPalabra, mensajeRevisarTiempo, ORIGEN_REVISAR_TIEMPO, recalcularA
 import { esGrabacion } from '@aptio/schema/grabacion';
 import { aplicarPronunciacion, type TerminoPronunciacion } from '@aptio/schema/voz';
 import { conProcedencia } from '../procedencia.js';
+import { conexionDe, vigilarLimite } from '../conexiones.js';
+import type { VocesConexion } from '@aptio/schema/conexiones';
 import { type ContextoEtapa, type EjecutorEtapa, GeneracionCancelada } from '../generar.js';
 
 /** Narraciones que se sintetizan a la vez. */
 export const EN_PARALELO = 4;
 /** Intentos por narración antes de dejar la etapa en error (los audios ya listos se conservan). */
 export const INTENTOS_VOZ = 3;
-/** Proveedores de voz con ejecutor hoy (decisión 8: Google por defecto; Azure y ElevenLabs después). */
-const PROVEEDORES = ['google'];
+/** Proveedores de voz con ejecutor hoy (decisión 8: Google por defecto; ElevenLabs desde HU-1304; Azure después). */
+export const PROVEEDORES_VOZ = ['google', 'elevenlabs'];
 
 type VozDoc = { proveedor: string; voz: string; velocidad?: number };
 type AudioDoc = { estado: string; voz: VozDoc; hashTexto: string; recursoAudioId?: string; duracionMs?: number; bocas?: unknown; subtitulosId?: string };
@@ -88,6 +93,17 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
     if (!curso) throw new Error('Falta el curso: la etapa 4 (Pantallas con el kit) debe terminar antes');
     const diccionario: TerminoPronunciacion[] = proyecto.cliente.pronunciacion.map((t) => ({ idioma, escrito: t.escrito, pronunciado: t.pronunciado }));
     const vozKit = (proyecto.cliente.kit?.voces as Partial<Record<IdiomaVoz, VozDoc>> | null | undefined)?.en;
+    // La conexión de voz de la organización, leída ahora: el cambio aplica a la siguiente generación sin reiniciar.
+    const conexion = await conexionDe(ctx.bd, ctx.organizacionId, 'VOZ');
+    const activo = conexion?.proveedor;
+    const vocesConexion = ((conexion?.parametros as { voces?: VocesConexion } | null)?.voces ?? {}) as VocesConexion;
+    /** La voz del curso si es del proveedor activo; si no, la de la conexión para el idioma. */
+    const conProveedorActivo = (v: VozDoc): VozDoc => {
+      if (!activo || v.proveedor === activo) return v;
+      const propia = vocesConexion[idioma];
+      if (!propia) throw new Error(`Falta la voz en ${NOMBRE_IDIOMA[idioma]} de ${activo} en Empresa › Conexiones IA`);
+      return { proveedor: activo, voz: propia, velocidad: v.velocidad ?? 1 };
+    };
 
     // En inglés: solo las pantallas narradas que ya tienen su inglés (las demás se listan en Idiomas).
     const conNarracion = pantallasDe(curso.documento as unknown as CursoDoc).filter((p) => p.narracion?.texto[idioma]?.trim() && p.narracion.porIdioma.es && !esGrabacion(p.narracion.porIdioma[idioma]));
@@ -119,17 +135,20 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
 
     await enParalelo(conNarracion, EN_PARALELO, async (p) => {
       const texto = p.narracion!.texto[idioma]!.trim();
-      const voz = vozDe(p);
-      const velocidad = voz.velocidad ?? 1;
+      const vozCurso = vozDe(p);
       const { ssml, aplicados } = aplicarPronunciacion(texto, diccionario, idioma);
       const usados = diccionario.filter((t) => aplicados.includes(t.escrito.trim()));
-      const hash = hashNarracion(texto, voz.voz, velocidad, usados);
-      const base = { pantallaId: p.id, titulo: p.titulo[idioma] ?? p.titulo.es ?? p.id, texto, voz: voz.voz, velocidad, proveedor: voz.proveedor, pronunciados: aplicados, hash };
-
+      const hashCurso = hashNarracion(texto, vozCurso.voz, vozCurso.velocidad ?? 1, usados);
       // Continuar: lo que ya se dijo igual no se paga otra vez. Fuera de las pantallas pedidas, el audio queda como está.
       const previa = previas.get(p.id);
       const fuera = solo !== null && !solo.has(p.id);
       const forzada = !fuera && solo !== null && pedido.forzar === true;
+      // Lo ya dicho con la voz del curso se conserva (RN-13-2); lo que se dice ahora usa el proveedor activo.
+      const conserva = fuera || (!!previa?.audioRecursoId && previa.textoHash === hashCurso && !forzada);
+      const voz = conserva ? vozCurso : conProveedorActivo(vozCurso);
+      const velocidad = voz.velocidad ?? 1;
+      const hash = conserva ? hashCurso : hashNarracion(texto, voz.voz, velocidad, usados);
+      const base = { pantallaId: p.id, titulo: p.titulo[idioma] ?? p.titulo.es ?? p.id, texto, voz: voz.voz, velocidad, proveedor: voz.proveedor, pronunciados: aplicados, hash };
       if (previa?.audioRecursoId && (fuera || (previa.textoHash === hash && !forzada))) {
         const r = await ctx.bd.recurso.findUnique({ where: { id: previa.audioRecursoId }, select: { duracionMs: true, proveedor: true, mime: true } });
         if (r?.duracionMs) {
@@ -142,17 +161,18 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
         }
       }
       if (fuera) return;
-      if (!PROVEEDORES.includes(voz.proveedor)) {
-        throw new Error(`La voz de ${voz.proveedor} todavía no está disponible: elige una voz de Google en el kit`);
+      if (!PROVEEDORES_VOZ.includes(voz.proveedor)) {
+        throw new Error(`La voz de ${voz.proveedor} todavía no está disponible: elige Google o ElevenLabs en Empresa › Conexiones IA`);
       }
 
       let audio: AudioVoz | undefined;
       let ultimoError = '';
       for (let intento = 1; intento <= INTENTOS_VOZ && !audio; intento++) {
         await ctx.comprobar();
+        await vigilarLimite(ctx.bd, ctx.organizacionId, 'VOZ', { proyectoId: proyecto.id, generacionId: ctx.generacionId || null });
         const inicio = Date.now();
         try {
-          audio = await sintetizar({ ssml, idioma, voz: voz.voz, velocidad });
+          audio = await sintetizar({ ssml, idioma, voz: voz.voz, velocidad, proveedor: voz.proveedor, ...(activo === voz.proveedor && conexion?.modelo && voz.proveedor === 'elevenlabs' ? { modelo: conexion.modelo } : {}) });
           const costo = costoVoz(audio.caracteres, audio.modelo, audio.proveedor);
           await ctx.bd.trabajoIA.create({
             data: {
@@ -190,7 +210,7 @@ export function crearEtapaVoz({ sintetizar, subir, esperaMs = 1000 }: Dependenci
             id: recursoId, organizacionId: ctx.organizacionId, clienteId: proyecto.clienteId, proyectoId: proyecto.id, tipo: 'AUDIO', origen: 'GENERADO',
             claveS3, mime: audio.mime, bytes: BigInt(audio.audio.byteLength), duracionMs, hash: createHash('sha256').update(audio.audio).digest('hex'),
             nombre: `${p.id}-${idioma}.${extension(audio.mime)}`, proveedor: audio.proveedor, modelo: audio.modelo,
-            licencia: audio.simulada ? 'Audio simulado de prueba' : 'Google Cloud Text-to-Speech · uso comercial (servicio de pago)',
+            licencia: licenciaVoz(audio.simulada ? 'simulado' : audio.proveedor),
           }),
         }),
         ctx.bd.narracion.upsert({

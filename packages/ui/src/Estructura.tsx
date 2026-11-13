@@ -28,11 +28,13 @@ export interface EstructuraProps {
   alSalir?: () => void;
   estado?: ReactNode;
   acciones?: ReactNode;
+  /** Arriba del usuario, al pie de la barra lateral (p. ej. el medidor «Costo de IA del mes», HU-1304). */
+  pie?: ReactNode;
   children: ReactNode;
 }
 
 /** Barra lateral cobalto de 240 px, barra superior con ruta y contenido a 32 px (HU-0110). */
-export function Estructura({ menu, rutaActual, ruta, usuario, alNavegar, alSalir, estado, acciones, children }: EstructuraProps) {
+export function Estructura({ menu, rutaActual, ruta, usuario, alNavegar, alSalir, estado, acciones, pie, children }: EstructuraProps) {
   const navegar = (e: MouseEvent<HTMLAnchorElement>, destino: string) => {
     if (!alNavegar || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
@@ -63,6 +65,7 @@ export function Estructura({ menu, rutaActual, ruta, usuario, alNavegar, alSalir
           </div>
         ))}
         <div className="ap-pie">
+          {pie}
           <div className="ap-usuario">
             <span className="ap-avatar" aria-hidden="true">{iniciales(usuario.nombre)}</span>
             <div>

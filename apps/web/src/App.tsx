@@ -1,6 +1,6 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_COSTOS } from './api';
+import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS } from './api';
 import { MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
@@ -19,6 +19,8 @@ import { NavegacionVista } from './vistas/NavegacionVista';
 import { VideoVista } from './vistas/VideoVista';
 import { PersonajeVozVista } from './vistas/PersonajeVozVista';
 import { Rentabilidad } from './vistas/Rentabilidad';
+import { ConexionesIA } from './vistas/ConexionesIA';
+import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -31,6 +33,11 @@ export function App() {
   const [tituloDe, setTituloDe] = useState({ camino: '', texto: '' });
   const alCargar = useCallback((texto: string) => setTituloDe({ camino: window.location.pathname, texto }), []);
   const titulo = tituloDe.camino === camino ? tituloDe.texto : '';
+  // HU-1304 · Medidor del mes para administración; se vuelve a pedir al cambiar de vista o al guardar una conexión.
+  const [conexiones, setConexiones] = useState<ResumenConexiones | null>(null);
+  const [vuelta, setVuelta] = useState(0);
+  const refrescarMedidor = useCallback(() => setVuelta((n) => n + 1), []);
+  const veConexiones = Boolean(usuario && VEN_CONEXIONES.includes(usuario.rol));
 
   useEffect(() => {
     api.yo().then(setUsuario, (e: unknown) => {
@@ -38,6 +45,13 @@ export function App() {
       setUsuario(null);
     });
   }, []);
+
+  useEffect(() => {
+    if (!veConexiones) return;
+    let vigente = true;
+    api.conexionesIA().then((r) => { if (vigente) setConexiones(r); }, () => undefined);
+    return () => { vigente = false; };
+  }, [veConexiones, camino, vuelta]);
 
   useEffect(() => {
     if (usuario === null && !PUBLICAS.includes(camino)) navegar('/ingresar');
@@ -64,7 +78,7 @@ export function App() {
   const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
   const venCostos = VEN_COSTOS.includes(usuario.rol);
   // Nuevo SCORM y Rentabilidad solo aparecen a quien puede usarlos (RN-01-2: la API también lo valida).
-  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos)) })).filter((g) => g.items.length);
+  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones)) })).filter((g) => g.items.length);
   return (
     <Estructura
       menu={menu}
@@ -73,6 +87,7 @@ export function App() {
       usuario={{ nombre: usuario.nombre, rol: NOMBRE_ROL[usuario.rol] }}
       alNavegar={navegar}
       alSalir={salir}
+      pie={veConexiones && conexiones ? <MedidorCostoIA resumen={conexiones} /> : null}
     >
       {vista?.sub === 'vista-previa' ? (
         <VistaPrevia key={vista.id + busqueda} proyectoId={vista.id!} alCargar={alCargar} prueba={new URLSearchParams(busqueda)} />
@@ -96,6 +111,8 @@ export function App() {
         <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' ? (
         <Proyectos rol={usuario.rol} />
+      ) : vista?.activo === '/conexiones-ia' && veConexiones ? (
+        <ConexionesIA alCambiar={refrescarMedidor} />
       ) : vista?.activo === '/rentabilidad' && venCostos ? (
         <Rentabilidad rol={usuario.rol} />
       ) : vista?.activo === '/nuevo' && puedeCrear ? (

@@ -43,6 +43,7 @@ model Organizacion {
   exportaciones     Exportacion[]
   mediciones        MedicionProceso[]
   parametrosNegocio ParametrosNegocio?
+  conexionesIA      ConfigProveedor[]
   auditoria         Auditoria[]
   subidas           Subida[]
 }
@@ -614,9 +615,12 @@ model Exportacion {
 
 // ---------- Configuración, negocio y auditoría ----------
 
+/// HU-1304 · Una conexión por organización y tarea; las claves van en variables de entorno (RN-13-3).
 model ConfigProveedor {
   id                    String         @id @default(uuid()) @db.Uuid
-  tarea                 TareaProveedor @unique
+  organizacionId        String?        @db.Uuid
+  organizacion          Organizacion?  @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  tarea                 TareaProveedor
   proveedor             String
   modelo                String
   parametros            Json? // sin claves: las claves van en variables de entorno
@@ -624,6 +628,8 @@ model ConfigProveedor {
   limiteGastoMensualUsd Decimal?       @db.Decimal(10, 2)
   activo                Boolean        @default(true)
   actualizadoEn         DateTime       @updatedAt
+
+  @@unique([organizacionId, tarea])
 }
 
 model ParametrosNegocio {
