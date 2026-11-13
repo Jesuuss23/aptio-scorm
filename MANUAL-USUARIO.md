@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.60 · actualizado con la octava entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.61 · actualizado con la novena entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -744,6 +744,34 @@ El sitio público carga rápido en el celular y se puede recorrer con el teclado
 
 Si otra persona escribe la dirección del sitio web en el navegador, ve «Página no encontrada».
 
+### 8.29 Ajustes del sitio (solo superadmin)
+
+En **Configuración › Ajustes del sitio** el superadmin define los datos generales del sitio comercial. La vista tiene cuatro tarjetas y cada una se guarda con su propio botón. Si algo no es válido, la tarjeta lo dice antes de guardar.
+
+**Dominio e identidad.**
+
+1. **Dominio:** escribe solo el dominio, sin `https://` ni rutas (por ejemplo `aptioscorm.com`). Es la dirección que ven los buscadores.
+2. **Comprobar el dominio:** revisa si el dominio guardado abre con un certificado de seguridad válido. Muestra **SSL activo · vence** con la fecha, o el problema encontrado. El certificado lo gestiona el equipo que publica el sitio; aquí solo se comprueba.
+3. **Nombre del sitio:** sale en el título de cada página, en la cabecera y en el pie. Hasta 60 caracteres y solo texto.
+4. **Logo y favicon:** pulsa **Subir logo** o **Subir favicon** y elige un archivo SVG o PNG de hasta 200 KB. Se ve una miniatura y puedes cambiarlo o quitarlo. Sin logo, el sitio usa el de Aptio.
+
+El dominio, el nombre, el logo y el favicon llegan al sitio con **Publicar cambios** (en Sitio web › Páginas).
+
+**Contacto.**
+
+- **Botón de WhatsApp:** con el interruptor se muestra un botón verde flotante en todas las páginas del sitio. Para mostrarlo hay que escribir el número con el código de país (por ejemplo `+51 987 654 321`). El **mensaje inicial** es opcional y aparece escrito cuando el visitante abre el chat. El botón llega al sitio con **Publicar cambios**.
+- **Correo que recibe los leads:** vale desde que lo guardas. Con **Enviar correo de prueba** confirmas que llega.
+
+**Analítica.** Guarda los identificadores de Google Analytics 4 (empieza con `G-`), Tag Manager (empieza con `GTM-`) y Meta Pixel (de 10 a 20 dígitos). Todavía no se activan: lo harán con el aviso de cookies del sitio, y solo para los visitantes que acepten las cookies de analítica.
+
+**Mantenimiento.** Sirve para pausar el sitio mientras se hacen cambios grandes.
+
+1. Escribe, si quieres, un **mensaje para los visitantes** (por ejemplo «Volvemos hoy a las 3 p. m.»).
+2. Activa el interruptor **Modo mantenimiento** y confirma con **Sí, activar**.
+3. Desde ese momento, cualquier visitante que entre a cualquier página ve **Volvemos pronto** con tu mensaje. Los buscadores lo entienden como una pausa y no pierden las páginas.
+4. Tú, con tu sesión de superadmin, sigues viendo el sitio normal, con un aviso arriba que te recuerda que está en mantenimiento.
+5. Para terminar, apaga el interruptor. El cambio se aplica al instante, sin publicar.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -835,6 +863,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.61 | 2026-11-13 | Ajustes del sitio (8.29): dominio con su comprobación, nombre, logo y favicon, botón de WhatsApp, correo de leads, analítica y modo mantenimiento con la página «Volvemos pronto». |
 | 0.60 | 2026-11-13 | «Ver el sitio» y el estado del sitio público en la tarjeta Versiones (8.28): preparando, listo o error; el sitio rápido, con menú de celular y página no encontrada. |
 | 0.59 | 2026-11-13 | Publicar cambios, versiones, restaurar y vista previa en Escritorio y Celular (8.28). Los cambios de bloques, contenido, menú y pie llegan al sitio al publicar. |
 | 0.58 | 2026-11-13 | Menú principal y pie de página (8.28): agregar, editar, mostrar u ocultar, ordenar y borrar enlaces y columnas, y la línea «En el sitio». |

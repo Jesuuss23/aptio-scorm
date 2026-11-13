@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.60 · actualizado con la octava entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.61 · actualizado con la novena entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -411,6 +411,15 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Estado y errores:** `SitioVersion.prerenderEstado` (`en_curso`, `listo`, `error`), con la fecha y el motivo; `GET /sitio/versiones` lo devuelve y el panel lo muestra en «Versiones». Auditoría SITIO_PRERENDER_LISTO y SITIO_PRERENDER_ERROR. Si falla, el sitio sigue con la versión anterior y se reintenta al arrancar el worker (si es la última) o con la próxima versión (SUP-198).
 - **Medición:** `pnpm sitio:lighthouse` y el trabajo «Sitio público (Lighthouse)» del CI miden la portada en celular con 4G simulado: LCP < 2,5 s, SEO ≥ 90 y accesibilidad ≥ 90 (SUP-199).
 
+### 3.19 Ajustes del sitio y modo mantenimiento (HU-1509)
+
+- **Datos (REQ-073, PNT-38):** una sola fila `SitioAjustes` con dominio, nombre, logo, favicon, IDs de analítica, WhatsApp, correo de leads y mantenimiento. Nombre, dominio, logo, favicon y WhatsApp entran en la instantánea de cada versión y llegan al sitio al publicar; el dominio publicado reemplaza a `SITIO_URL` en canonical y sitemap. El correo de leads y el mantenimiento valen al instante (SUP-202).
+- **Marca:** logo y favicon SVG (saneado) o PNG de hasta 200 KB, guardados como `sitio/marca/{tipo}-{sha8}.{ext}` y servidos en `/s/_marca/` con caché de un año. Quitar uno no borra el archivo porque lo usan versiones anteriores (SUP-204).
+- **Mantenimiento (CP-121):** la API lee los ajustes cada 5 s como máximo. Con el modo activo, `GET /s/*` (salvo fuentes y marca) responde 503 con `Retry-After: 600` y la página «Volvemos pronto» (noindex) a todo visitante; el superadmin con sesión ve el sitio con un aviso arriba y `Cache-Control: private, no-store`. En producción el panel y el sitio comparten el dominio de la cookie y la CDN no debe guardar respuestas `private` ni 503 (SUP-201).
+- **Dominio:** «Comprobar» abre una conexión TLS al 443 (5 s) y muestra si el certificado es válido, su emisor y vencimiento. Emitir el certificado lo hace la CDN (HU-1405, SUP-203).
+- **Analítica:** los IDs se guardan validados pero no se cargan hasta el banner de cookies; el sitio sigue sin JavaScript (SUP-200).
+- **Auditoría:** SITIO_AJUSTES_ACTUALIZADOS (campos y si requieren publicar), SITIO_MANTENIMIENTO_ACTIVADO y SITIO_MANTENIMIENTO_DESACTIVADO.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -475,6 +484,7 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 | Costos | La suma de `TrabajoIA.costoUsd` por proyecto aparece en la lista de proyectos y en cada generación. |
 | Borrado programado | Cola de mantenimiento con un trabajo diario a las 3:00 (America/Lima). |
 | Sitio público | `GET /s/` sirve la versión de `sitio/actual.json`. Estado del pre-render en Sitio web › Páginas › Versiones y en la auditoría (SITIO_PRERENDER_LISTO o _ERROR). Para rehacer el de la última versión, reiniciar el worker (3.18). |
+| Modo mantenimiento del sitio | Configuración › Ajustes del sitio › Mantenimiento: se aplica en hasta 5 s; los visitantes reciben 503 con «Volvemos pronto» y el superadmin sigue viendo el sitio. Queda en la auditoría (SITIO_MANTENIMIENTO_ACTIVADO o _DESACTIVADO) (3.19). |
 | Copias de seguridad | Cola de mantenimiento a las 3:00 (America/Lima): base y objetos al bucket `S3_BUCKET_RESPALDOS`, 14 días. Estado en Empresa › Operación; restauración con `pnpm respaldo:restaurar` (3.10). |
 | Errores y colas | Empresa › Operación: errores por proveedor en 24 h y 7 días, colas y tiempo y costo por etapa. |
 | Errores visibles al usuario | Siempre con un motivo legible: material en error, etapa en error con «Continuar». |
@@ -501,6 +511,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-29:** la etapa 4 se compone en paralelo: un tramo de 3 pantallas con la misma disposición puede colarse y queda como advertencia. El curso sale en español, sin imágenes ni datos de actividades (llegan en la etapa 5 y en HU-0407). Al continuar una etapa 4 cancelada, las pantallas se piden de nuevo.
 - **SUP-28:** la transcripción usa tramos de 55 s, y una palabra justo en el borde puede quedar partida. La etapa 1 todavía no lee transcripciones.
 - **SUP-193 a SUP-199:** el sitio público usa textos fijos del prototipo en varios bloques, omite la Franja de confianza en producción y el bloque Planes, usa Plus Jakarta Sans y Atkinson Hyperlegible, se sirve bajo `SITIO_BASE` detrás de la CDN, no invalida la caché al publicar (hasta 65 s) y Lighthouse aún no se midió detrás de la CDN real.
+- **SUP-200 a SUP-204:** la analítica se guarda pero se activa con el banner de cookies; el superadmin se reconoce por la cookie de sesión durante el mantenimiento (dominio de cookie compartido y CDN sin caché de respuestas privadas); el certificado lo emite la CDN; logo y favicon de hasta 200 KB.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -544,6 +555,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.61 | 2026-11-13 | Ajustes del sitio y modo mantenimiento (3.19): la fila de ajustes, lo que entra al publicar, la marca, el 503 para visitantes, el acceso del superadmin, «Comprobar el dominio» y la operación del mantenimiento. |
 | 0.60 | 2026-11-13 | Sitio público rápido y accesible (3.18): el pre-render en el worker, el puntero `sitio/actual.json`, `GET /s/*` con caché, ETag y 404, la configuración de la CDN, el estado en «Versiones» y Lighthouse en el CI. |
 | 0.59 | 2026-11-13 | Vista previa, versiones y restauración (3.17): la tabla `SitioVersion`, el sitio público desde la última versión, publicar, restaurar sin tocar el panel y la vista previa. |
 | 0.58 | 2026-11-13 | Menú y pie administrables (3.16): la tabla `SitioEnlace`, las reglas de rutas y niveles, las rutas `/sitio/navegacion` y `GET /publico/navegacion`. |
