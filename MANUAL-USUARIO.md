@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.54 · actualizado con la segunda entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.55 · actualizado con la tercera entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -691,6 +691,15 @@ En **Sitio web › Páginas** están todas las páginas del sitio comercial, con
 
 Un borrador o una página programada no se ven en el sitio: quien abra su dirección recibe «no encontrada».
 
+**Editar los bloques de una página.** En Páginas, pulsa **Editar** en la página que quieras. Se abre el **Editor de página** con sus bloques en el orden en que se ven en el sitio (Portada, Cifras, Logos de clientes, Testimonios…). Arriba a la derecha puedes cambiar a otra página.
+
+1. **Agregar bloque:** elige el tipo en la lista y pulsa **Agregar bloque**. Entra al final y **oculto**, para que no aparezca en el sitio antes de tiempo.
+2. **Mostrar u ocultar:** usa el interruptor de cada bloque. El contador «N visibles» se actualiza. Un bloque oculto se ve tachado y con línea punteada, y **conserva sus datos**: al volver a mostrarlo aparece igual que antes.
+3. **Cambiar el orden:** usa las flechas ↑ y ↓ de cada bloque (también con el teclado: Tab hasta la flecha y Enter). La flecha de subir del primero y la de bajar del último están desactivadas.
+4. **Borrar:** pide confirmación y se pierden los datos del bloque. Si solo quieres que no se vea, mejor ocúltalo.
+
+Si la página ya está publicada, estos cambios se ven en el sitio al momento. Si está en borrador o programada, el sitio no muestra nada de ella. La edición del contenido de cada bloque, la vista previa y el SEO llegarán en próximas entregas.
+
 Si otra persona escribe la dirección del sitio web en el navegador, ve «Página no encontrada».
 
 ## 9. Preguntas frecuentes
@@ -781,6 +790,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.52 | 2026-11-13 | Kit de gamificación para el LMS del cliente (8.27): insignias con la marca, plan, guía del LMS elegido y descarga desde el historial de Entrega. |
 | 0.53 | 2026-11-13 | Superadmin de la plataforma (2 y 8.28): el grupo «Sitio web» con «Resumen», solo para el superadmin. |
 | 0.54 | 2026-11-13 | Sitio web › Páginas (8.28): nueva página, publicar, programar en hora de Lima, pasar a borrador y borrar; el Resumen cuenta las páginas por estado. |
+| 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |

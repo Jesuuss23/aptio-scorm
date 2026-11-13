@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.54 · actualizado con la segunda entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.55 · actualizado con la tercera entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -89,6 +89,7 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
 - **Alcance por organización:** toda consulta filtra por `organizacionId` (`organizacionDe(u)`). El `REVISOR_CLIENTE` además queda limitado a su `clienteId`.
 - **Superadmin (ADR-011):** `SUPERADMIN` no tiene organización (`organizacionId` null). Las rutas de la fase comercial (`/sitio/*`, y más adelante `/ventas/*`) llevan `@Roles('SUPERADMIN')` en el controlador (`apps/api/src/sitio/`); en la web, el grupo «Sitio web» de `menu.ts` se muestra solo a `VEN_SITIO` y `App.tsx` lleva al superadmin a `/sitio` desde cualquier otra ruta.
 - **Rutas públicas:** `/publico/*` lleva `@Publico()` y pasa por `LimitePublicoMiddleware` (60 peticiones por minuto por IP, 429 DEMASIADAS_SOLICITUDES). En las pruebas, `app.get(LimitePublicoService).reiniciar()` vacía las ventanas.
+- **Bloques del sitio (HU-1503):** el catálogo cerrado (`CATALOGO_BLOQUES`, `TIPOS_BLOQUE`) y las funciones puras de orden (`ordenAlFinal`, `validarOrden`, `aplicarOrden`, `moverBloque`, `compactarOrden`, `bloquesPublicos`) viven en `@aptio/schema/sitio-bloques`; las usan `BloquesService` de la API y `EditorPaginaSitio.tsx`. Sumar un tipo de bloque es agregarlo ahí (y al enum `TipoBloque` del OpenAPI). En la base el tipo es texto; lo valida el DTO con `IsIn(TIPOS_BLOQUE)`.
 - **Páginas del sitio (HU-1502):** la regla de la ruta (`RUTA_SITIO`) y la publicación de las programadas (`publicarProgramadas(bd, ahora)`) viven en `@aptio/db/src/sitio.ts`, para que la API y el worker usen las mismas; las pruebas la llaman con un reloj controlado.
 - **Auditoría:** las acciones relevantes dejan una fila en `Auditoria` (por ejemplo, `MATERIAL_AGREGADO` o `RECURSO_SUBIDO`).
 
@@ -423,6 +424,7 @@ Ninguna clave real va al repositorio.
 | 0.45 | 2026-11-13 | HU-0704: `@aptio/schema/grabacion`, `GrabacionService`, `src/grabacion.ts` del worker (grabación y limpieza con ffmpeg), la protección en la etapa 6 y `PersonajeVozVista.tsx`. |
 | 0.51 | 2026-11-13 | HU-1403: el paquete `@aptio/respaldo` (copia, purga, restauración y su CLI), la tarea `respaldar` de la cola `mantenimiento`, `correo.ts` y el aviso de límite del worker, el aviso de comentario en `ComentariosService`, el módulo `operacion` de la API, `@aptio/schema/operacion` y `OperacionVista.tsx`. |
 | 0.54 | 2026-11-13 | HU-1502: `SitioPagina` y la migración `20261113090000_sitio_paginas`, `SitioService` y `PublicoController` con `LimitePublicoMiddleware`, `publicarProgramadas` en `@aptio/db`, la tarea `publicar-paginas` del worker, `SitioPaginas.tsx` y `sitio-paginas.ts`, y la variable `SITIO_URL`. |
+| 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.53 | 2026-11-13 | HU-1501: el módulo `sitio` de la API con `GET /sitio/paginas` solo para SUPERADMIN, el grupo «Sitio web» en `menu.ts`, `VEN_SITIO` y `SitioResumen.tsx`, y las pruebas `sitio.e2e.test.ts` y `sitio.spec.ts`. |
 | 0.52 | 2026-11-13 | HU-1205: `construirKitGamificacion` y `kit-guias.ts` en `@aptio/exporters`, `insignias.ts` del worker con `@resvg/resvg-js`, el formato KIT_GAMIFICACION en `ExportacionesService` y el worker, y la tarjeta `KitGamificacion.tsx` de Entrega. |
 | 0.50 | 2026-11-13 | HU-0506: el módulo `comentarios` de la API (alcance con `CursosService.buscar`), la migración `comentarios_resueltos`, `comentarios.ts` y `PanelComentarios.tsx` en Revisión, y `comentarios` compartibles en la API simulada. |

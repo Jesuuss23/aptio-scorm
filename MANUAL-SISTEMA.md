@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.54 · actualizado con la segunda entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.55 · actualizado con la tercera entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -371,6 +371,12 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Sitio público:** `GET /publico/paginas?ruta=&idioma=` responde 404 si la página no está publicada (CP-110) y `GET /publico/sitemap.xml` lista solo las publicadas con `SITIO_URL` (el inglés bajo `/en`, SUP-168). Toda ruta `/publico/*` tiene un límite de 60 peticiones por minuto por IP (SUP-169).
 - **Programación (CP-111):** la tarea `publicar-paginas` de la cola `mantenimiento` corre cada 30 s y publica las programadas vencidas, con auditoría sin usuario; la cola atiende 2 tareas a la vez para que una copia de seguridad no la atrase (SUP-171).
 
+### 3.13 Editor de página por bloques (HU-1503)
+
+- **Bloques (REQ-066):** cada página tiene filas `SitioBloque` (tipo del catálogo cerrado de 18, `orden` 0, 1, 2… sin huecos, `visible` y `ajustes` en JSON), que se borran con su página. Un bloque nuevo va al final y oculto (RN-16-2); ocultarlo no borra sus `ajustes` (CP-112).
+- **Rutas (solo SUPERADMIN):** `GET`, `POST` y `PATCH /sitio/paginas/{paginaId}/bloques` (listar, agregar, reordenar con la lista completa de ids; 422 ORDEN_INVALIDO si faltan, se repiten o son de otra página) y `PATCH` y `DELETE /sitio/paginas/{paginaId}/bloques/{bloqueId}` (mostrar u ocultar; borrar y compactar). Cada cambio deja una fila `SITIO_BLOQUE_*` o `SITIO_BLOQUES_REORDENADOS` en la auditoría.
+- **Sitio público:** `GET /publico/paginas` devuelve `bloques` con solo los visibles y en su orden (CP-113); si la página no está publicada, 404 sin bloques (RN-16-4). Mientras no exista la publicación con versiones (HU-1507), los cambios se ven al momento (SUP-172).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -499,6 +505,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
 | 0.51 | 2026-11-13 | Observabilidad y copias de seguridad (3.10 y 8): copia diaria con pg_dump y los objetos de S3, purga de 14 días, restauración con resguardos, `GET /operacion` y los avisos por correo. |
 | 0.54 | 2026-11-13 | Páginas del sitio con estados y programación (3.12): la tabla `SitioPagina`, las rutas públicas con su límite por IP, el sitemap y la publicación programada cada 30 s. |
+| 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.53 | 2026-11-13 | Superadmin de plataforma (3.11 y 5): rutas `/sitio/*` solo para SUPERADMIN y el grupo «Sitio web» con «Resumen». |
 | 0.52 | 2026-11-13 | Kit de gamificación para el LMS (3.3.0.3): formato KIT_GAMIFICACION en la cola `export`, insignias SVG y PNG con resvg, plan y guía por LMS. |
 | 0.50 | 2026-11-13 | Comentarios del revisor del cliente (3.9): alcance por cliente y organización, texto plano inmutable, resolver solo el equipo con auditoría y sin cambiar la aprobación. |
