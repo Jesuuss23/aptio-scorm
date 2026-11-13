@@ -21,6 +21,7 @@ import { VozModule } from './voz/voz.module.js';
 import { CostosModule } from './costos/costos.module.js';
 import { NegocioModule } from './negocio/negocio.module.js';
 import { ConexionesModule } from './conexiones/conexiones.module.js';
+import { ComentariosModule } from './comentarios/comentarios.module.js';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ConexionesModule } from './conexiones/conexiones.module.js';
     CostosModule,
     NegocioModule,
     ConexionesModule,
+    ComentariosModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

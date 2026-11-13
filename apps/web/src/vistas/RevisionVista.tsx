@@ -5,18 +5,22 @@
 // HU-0504 · «Ajustar con IA» pide una propuesta (IA-16) que se aplica, se descarta o se deshace (RN-05-3, RN-05-4).
 // HU-0601 · «✎ Editar pantalla» abre el editor en esa pantalla.
 // HU-0505 · «Control de calidad» (ControlCalidad): reglas e IA-12, con «Revisar con IA», «Descartar» y «Del curso».
+// HU-0506 · «Comentarios» por pantalla (PanelComentarios), con el contador de abiertos y el filtro «Con comentarios».
+// El revisor del cliente ve la Revisión en solo lectura: comenta, pero no edita, no aprueba ni pide IA (CP-055).
 import { Cabecera } from '@aptio/ui';
 import { type CursoReproductor, montar } from '@aptio/player';
 import { cursoConPropuesta } from '@aptio/schema/propuesta';
 import { type CursoDoc, origenDe, type PantallaDoc, pantallasDe } from '@aptio/schema/revision';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, APRUEBAN_PANTALLAS, type Curso, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Propuesta, type Proyecto, type Rol, type TextoI18n } from '../api';
+import { api, APRUEBAN_PANTALLAS, type Comentario, type Curso, RESUELVEN_COMENTARIOS, EDITAN_PANTALLAS, ErrorApi, type Kit, type Narracion, type Observacion, type Propuesta, type Proyecto, type Rol, type TextoI18n } from '../api';
 import { navegar } from '../ruta';
 import './fuentes-kit';
 import { AjustarConIA, FranjaPropuesta, type TipoPedido } from './propuestas';
 import { ControlCalidad } from './ControlCalidad';
+import { abiertosPorPantalla, type FiltroRevision, filtrarPantallas, textoContador } from './comentarios';
+import { PanelComentarios } from './PanelComentarios';
 
-type Filtro = 'todas' | 'revisar' | 'actividades';
+type Filtro = FiltroRevision;
 const NOMBRE_ESTADO: Record<string, string> = { borrador: 'Borrador', 'propuesta-ia': 'Propuesta de la IA', aprobado: 'Aprobada' };
 
 const ChipEstado = ({ estado }: { estado: string }) => (
@@ -47,6 +51,7 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
   const [curso, setCurso] = useState<Curso | null>(null);
   const [kit, setKit] = useState<Kit | null>(null);
   const [observaciones, setObservaciones] = useState<Observacion[]>([]);
+  const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [sinCurso, setSinCurso] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
@@ -64,11 +69,17 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
   const escenario = useRef<HTMLDivElement>(null);
   const editan = EDITAN_PANTALLAS.includes(rol);
   const aprueban = APRUEBAN_PANTALLAS.includes(rol);
+  const resuelven = RESUELVEN_COMENTARIOS.includes(rol);
+  const recargarComentarios = useCallback(async () => {
+    if (curso) setComentarios(await api.comentarios(curso.id));
+  }, [curso]);
 
   const recargar = useCallback(async () => {
     const c = await api.curso(proyectoId);
     setCurso(c);
-    setObservaciones(await api.observaciones(c.id));
+    const [obs, com] = await Promise.all([api.observaciones(c.id), api.comentarios(c.id)]);
+    setObservaciones(obs);
+    setComentarios(com);
     return c;
   }, [proyectoId]);
 
@@ -186,9 +197,11 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
   if (!curso || !documento || !actual) return <p className="sec" role="status">Cargando revisión…</p>;
 
   const deLa = (id: string) => observaciones.filter((o) => o.pantallaId === id);
-  const conObservaciones = new Set(observaciones.map((o) => o.pantallaId).filter(Boolean));
+  const conObservaciones = new Set(observaciones.map((o) => o.pantallaId).filter((x): x is string => Boolean(x)));
   const aprobadas = pantallas.filter((p) => p.estado === 'aprobado').length;
-  const lista = pantallas.filter((p) => (filtro === 'revisar' ? conObservaciones.has(p.id) : filtro === 'actividades' ? conActividad(p) : true));
+  const abiertos = abiertosPorPantalla(comentarios);
+  const totalAbiertos = [...abiertos.values()].reduce((a, b) => a + b, 0);
+  const lista = filtrarPantallas(pantallas, filtro, { conObservaciones, abiertos, conActividad });
   const indice = pantallas.indexOf(actual);
   const obsActual = deLa(actual.id);
   const bloquea = obsActual.some((o) => o.severidad === 'bloquea-entrega');
@@ -270,13 +283,15 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
     <>
       <Cabecera
         titulo="Revisión"
-        subtitulo="Revisa cada pantalla, corrige los textos y aprueba. Lo que cambies vuelve a borrador."
+        subtitulo={editan ? 'Revisa cada pantalla, corrige los textos y aprueba. Lo que cambies vuelve a borrador.' : 'Recorre cada pantalla y deja tus comentarios: el equipo los ve y los resuelve.'}
         accion={volver}
       />
       <dl className="revision-cifras" aria-label="Resumen de la revisión">
         <div><dt>Aprobadas</dt><dd className="num ok">{aprobadas} / {pantallas.length}</dd></div>
         <div><dt>Con observaciones</dt><dd className="num aviso">{conObservaciones.size}</dd></div>
+        <div><dt>Comentarios abiertos</dt><dd className="num aviso">{totalAbiertos}</dd></div>
       </dl>
+      {!editan ? <div className="nota" role="note">Modo solo lectura: puedes ver las pantallas, su origen y sus observaciones, y comentar cada una.</div> : null}
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {aviso ? (
         <div className="nota fila-aviso" role="status">
@@ -290,6 +305,7 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
             <button type="button" className="opcion" aria-pressed={filtro === 'todas'} onClick={() => setFiltro('todas')}>Todas</button>
             <button type="button" className="opcion" aria-pressed={filtro === 'revisar'} onClick={() => setFiltro('revisar')}>Revisar ({conObservaciones.size})</button>
             <button type="button" className="opcion" aria-pressed={filtro === 'actividades'} onClick={() => setFiltro('actividades')}>Actividades</button>
+            <button type="button" className="opcion" aria-pressed={filtro === 'comentarios'} onClick={() => setFiltro('comentarios')}>Con comentarios ({abiertos.size})</button>
           </div>
           <ol className="revision-pantallas">
             {lista.map((p) => (
@@ -299,6 +315,11 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
                   <span className="fila-chips">
                     <ChipEstado estado={p.estado} />
                     {conObservaciones.has(p.id) ? <span className="chip aviso">{deLa(p.id).length} obs.</span> : null}
+                    {abiertos.get(p.id) ? (
+                      <span className="chip ia contador-comentarios" title={textoContador(abiertos.get(p.id)!)}>
+                        <span aria-hidden="true">💬 {abiertos.get(p.id)}</span><span className="sr">{textoContador(abiertos.get(p.id)!)}</span>
+                      </span>
+                    ) : null}
                   </span>
                 </button>
               </li>
@@ -349,6 +370,7 @@ export function RevisionVista({ proyectoId, rol, alCargar, pantallaId = null }: 
 
         <aside className="revision-lateral">
           {editan ? <AjustarConIA ocupado={ocupado} calculando={pedido !== null} alPedir={(tipo, texto) => void pedirIA(tipo, texto)} /> : null}
+          <PanelComentarios cursoId={curso.id} pantallaId={actual.id} comentarios={comentarios} resuelven={resuelven} alCambiar={recargarComentarios} />
           <ControlCalidad cursoId={curso.id} pantallaId={actual.id} observaciones={observaciones} editan={editan} alCambiar={recargar} />
           <section className="tarjeta kit-bloque" aria-label="Origen">
             <h2>Origen</h2>

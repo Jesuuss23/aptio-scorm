@@ -77,14 +77,15 @@ model Usuario {
   creadoEn         DateTime  @default(now())
   ultimoIngreso    DateTime?
 
-  cliente             Cliente?      @relation(fields: [clienteId], references: [id])
-  proyectos           Proyecto[]    @relation("ProyectoCreador")
-  comentarios         Comentario[]
-  propuestasResueltas Propuesta[]   @relation("PropuestaResuelta")
-  exportaciones       Exportacion[]
-  auditoria           Auditoria[]
-  tokens              TokenAcceso[]
-  organizacion        Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  cliente              Cliente?      @relation(fields: [clienteId], references: [id])
+  proyectos            Proyecto[]    @relation("ProyectoCreador")
+  comentarios          Comentario[]
+  comentariosResueltos Comentario[]  @relation("ComentarioResuelto")
+  propuestasResueltas  Propuesta[]   @relation("PropuestaResuelta")
+  exportaciones        Exportacion[]
+  auditoria            Auditoria[]
+  tokens               TokenAcceso[]
+  organizacion         Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
   @@index([organizacionId])
 }
@@ -569,17 +570,24 @@ model Traduccion {
 
 // ---------- Revisión y entrega ----------
 
+/// HU-0506 · Comentario de una pantalla (revisor del cliente o equipo). El texto no se edita ni se borra; el equipo lo
+/// resuelve o lo reabre, con quién y cuándo.
 model Comentario {
-  id         String   @id @default(uuid()) @db.Uuid
-  cursoId    String   @db.Uuid
-  pantallaId String
-  autorId    String   @db.Uuid
-  texto      String
-  resuelto   Boolean  @default(false)
-  creadoEn   DateTime @default(now())
+  id            String    @id @default(uuid()) @db.Uuid
+  cursoId       String    @db.Uuid
+  pantallaId    String
+  autorId       String    @db.Uuid
+  texto         String
+  resuelto      Boolean   @default(false)
+  resueltoPorId String?   @db.Uuid
+  resueltoEn    DateTime?
+  creadoEn      DateTime  @default(now())
 
-  curso Curso   @relation(fields: [cursoId], references: [id], onDelete: Cascade)
-  autor Usuario @relation(fields: [autorId], references: [id])
+  curso       Curso    @relation(fields: [cursoId], references: [id], onDelete: Cascade)
+  autor       Usuario  @relation(fields: [autorId], references: [id])
+  resueltoPor Usuario? @relation("ComentarioResuelto", fields: [resueltoPorId], references: [id])
+
+  @@index([cursoId, pantallaId])
 }
 
 enum FormatoExportacion {
