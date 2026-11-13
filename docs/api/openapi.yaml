@@ -530,6 +530,134 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+  /sitio/navegacion:
+    get:
+      tags:
+      - Sitio web
+      summary: Menú principal y pie de página completos (HU-1506, PNT-25)
+      operationId: get_sitio_navegacion
+      description: Solo SUPERADMIN. Visibles y ocultos, en su orden; cada columna del pie trae sus `enlaces`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NavegacionSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Sitio web
+      summary: Agregar un enlace al menú, una columna al pie o un enlace a una columna (HU-1506)
+      operationId: post_sitio_navegacion
+      description: |-
+        Solo SUPERADMIN. Va al final de su grupo de hermanos y oculto (RN-16-2). `texto` es texto plano de hasta 60
+        caracteres (RN-16-7). `ruta` es interna (`/precios`, `/#testimonios`) o `https://`; se rechazan `javascript:`,
+        `http:`, `data:` y el resto (422 DATOS_NO_VALIDOS con `detalles[].campo`). La ruta es opcional solo en una columna
+        del pie. El menú no tiene padre y el pie tiene dos niveles: 422 UBICACION_INVALIDA con `detalles[0].tipo`
+        MENU_SIN_NIVELES, PADRE_DE_OTRA_ZONA, PROFUNDIDAD_INVALIDA o PADRE_INEXISTENTE. Auditoría SITIO_ENLACE_AGREGADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnlaceSitioEntrada'
+      responses:
+        '201':
+          description: Creado, oculto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnlaceSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    patch:
+      tags:
+      - Sitio web
+      summary: Reordenar un grupo de hermanos con la lista completa de ids (HU-1506)
+      operationId: patch_sitio_navegacion
+      description: Solo SUPERADMIN. El grupo es `zona` más `padreId` (sin padre, el menú o las columnas del pie). Si falta, se repite o es de otro grupo, 422 ORDEN_INVALIDO con `detalles[0].tipo` FALTANTE, DUPLICADO o AJENO. Auditoría SITIO_ENLACES_REORDENADOS (solo si cambió).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenEnlaces'
+      responses:
+        '200':
+          description: El grupo en el orden nuevo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnlaceSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/navegacion/{enlaceId}:
+    parameters:
+    - name: enlaceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Sitio web
+      summary: Cambiar el texto, la ruta o la visibilidad de un enlace (HU-1506, CP-118)
+      operationId: patch_sitio_navegacion_id
+      description: |-
+        Solo SUPERADMIN. Ocultar no borra; ocultar una columna oculta todos sus enlaces en el sitio. `ruta` null o vacía
+        la quita, solo en una columna del pie. Sin `texto`, `ruta` ni `visible`, 422 SIN_CAMBIOS. Auditoría
+        SITIO_ENLACE_EDITADO, SITIO_ENLACE_MOSTRADO o SITIO_ENLACE_OCULTADO (solo si cambia).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnlaceSitioCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnlaceSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Borrar un enlace, o una columna con sus enlaces, y compactar sus hermanos (HU-1506)
+      operationId: delete_sitio_navegacion_id
+      description: Solo SUPERADMIN. Auditoría SITIO_ENLACE_BORRADO con el texto, la ruta y cuántos enlaces se borraron con la columna.
+      responses:
+        '204':
+          description: Borrado
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /publico/paginas:
     get:
       tags:
@@ -562,6 +690,23 @@ paths:
                 $ref: '#/components/schemas/PaginaPublica'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/navegacion:
+    get:
+      tags:
+      - Sitio público
+      summary: Menú y pie del sitio con solo lo visible (HU-1506, CP-118)
+      operationId: get_publico_navegacion
+      security: []
+      description: Sin sesión. `menu` lo usan la cabecera y el menú de celular. En `pie` solo salen las columnas visibles con al menos un enlace visible; una columna oculta oculta sus enlaces. `externo` es true en las rutas `https://` (abrir con `rel="noopener"`). Mismo límite de 60 peticiones por minuto en `/publico/*`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NavegacionPublica'
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
   /publico/sitemap.xml:
@@ -4222,6 +4367,177 @@ components:
           type: boolean
         ficticio:
           type: boolean
+    EnlaceSitio:
+      type: object
+      required:
+      - id
+      - zona
+      - padreId
+      - texto
+      - ruta
+      - externo
+      - orden
+      - visible
+      - creadoEn
+      - actualizadoEn
+      properties:
+        id:
+          type: string
+          format: uuid
+        zona:
+          type: string
+          enum:
+          - menu
+          - pie
+        padreId:
+          type: string
+          format: uuid
+          nullable: true
+          description: La columna del pie del enlace; null en el menú y en las columnas
+        texto:
+          type: string
+          maxLength: 60
+          description: Texto del enlace o título de la columna (texto plano, RN-16-7)
+        ruta:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: Interna (/precios, /#testimonios) o https://; null solo en una columna del pie
+        externo:
+          type: boolean
+        orden:
+          type: integer
+          minimum: 0
+          description: Sin huecos entre hermanos (misma zona y padre)
+        visible:
+          type: boolean
+          description: Nace en false (RN-16-2)
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    NavegacionSitio:
+      type: object
+      required:
+      - menu
+      - pie
+      properties:
+        menu:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnlaceSitio'
+        pie:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/EnlaceSitio'
+            - type: object
+              required:
+              - enlaces
+              properties:
+                enlaces:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/EnlaceSitio'
+    EnlaceSitioEntrada:
+      type: object
+      additionalProperties: false
+      required:
+      - zona
+      - texto
+      properties:
+        zona:
+          type: string
+          enum:
+          - menu
+          - pie
+        padreId:
+          type: string
+          format: uuid
+          description: Solo en el pie, la columna del enlace; sin padre, en el pie se crea una columna
+        texto:
+          type: string
+          maxLength: 60
+        ruta:
+          type: string
+          maxLength: 300
+    EnlaceSitioCambio:
+      type: object
+      additionalProperties: false
+      properties:
+        texto:
+          type: string
+          maxLength: 60
+        ruta:
+          type: string
+          nullable: true
+          maxLength: 300
+        visible:
+          type: boolean
+    OrdenEnlaces:
+      type: object
+      additionalProperties: false
+      required:
+      - zona
+      - orden
+      properties:
+        zona:
+          type: string
+          enum:
+          - menu
+          - pie
+        padreId:
+          type: string
+          format: uuid
+        orden:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+            format: uuid
+    EnlaceNavegacionPublico:
+      type: object
+      required:
+      - texto
+      - ruta
+      - externo
+      properties:
+        texto:
+          type: string
+        ruta:
+          type: string
+        externo:
+          type: boolean
+    NavegacionPublica:
+      type: object
+      required:
+      - menu
+      - pie
+      properties:
+        menu:
+          type: array
+          items:
+            $ref: '#/components/schemas/EnlaceNavegacionPublico'
+        pie:
+          type: array
+          items:
+            type: object
+            required:
+            - titulo
+            - enlaces
+            properties:
+              titulo:
+                type: string
+              ruta:
+                type: string
+              externo:
+                type: boolean
+              enlaces:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EnlaceNavegacionPublico'
     FicticiosSitio:
       type: object
       required:

@@ -793,3 +793,24 @@ model SitioElemento {
 
   @@index([coleccion, orden])
 }
+
+/// HU-1506 · Enlaces del menú principal y del pie (REQ-066, PNT-25). El menú es plano; el pie tiene
+/// columnas (sin padre) con sus enlaces (con padre). Ocultar no borra; borrar una columna borra sus enlaces.
+model SitioEnlace {
+  id            String        @id @default(uuid()) @db.Uuid
+  /// menu | pie
+  zona          String
+  padreId       String?       @db.Uuid
+  padre         SitioEnlace?  @relation("SitioEnlaceHijos", fields: [padreId], references: [id], onDelete: Cascade)
+  hijos         SitioEnlace[] @relation("SitioEnlaceHijos")
+  texto         String
+  /// Ruta interna (/precios, /#testimonios) o https://. Vacía solo en una columna del pie.
+  ruta          String?
+  /// Posición 0, 1, 2… sin huecos entre hermanos (misma zona y mismo padre).
+  orden         Int
+  visible       Boolean       @default(false)
+  creadoEn      DateTime      @default(now())
+  actualizadoEn DateTime      @updatedAt
+
+  @@index([zona, padreId, orden])
+}

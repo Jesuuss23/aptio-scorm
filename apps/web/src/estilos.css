@@ -2806,3 +2806,41 @@ ul.fila-chips {
   color: var(--color-texto);
   font-size: var(--texto-sm);
 }
+
+/* HU-1506 · Menú principal y pie de página en Sitio web › Páginas (PNT-25). */
+.navegacion-sitio {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 24px;
+  align-items: start;
+  margin-top: 24px;
+}
+.navegacion-sitio > .nota {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.navegacion-sitio .acciones-fila {
+  justify-content: flex-start;
+  margin-bottom: 16px;
+}
+.columna-pie {
+  flex-basis: 100%;
+  display: grid;
+  gap: 8px;
+  padding-left: 16px;
+  border-left: 2px solid var(--color-borde);
+}
+.columna-pie .lista-bloques {
+  margin: 0;
+}
+.columna-pie .acciones-fila {
+  margin-bottom: 0;
+}
+.vista-navegacion {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-borde);
+  font-size: var(--texto-sm);
+  overflow-wrap: anywhere;
+}
