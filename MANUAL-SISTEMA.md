@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.47 · actualizado con la primera entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -320,7 +320,15 @@ Cada llamada a un proveedor deja su consumo y su costo en dólares en `TrabajoIA
 
 - **Filtros:** `desde` y `hasta` son días de Lima (UTC−05:00), ambos incluidos, sobre la fecha del trabajo; `clienteId` toma los proyectos del cliente y sus trabajos sin proyecto (`resultado.clienteId`, hoy la propuesta del kit IA-18); `proyectoId`, uno solo. Una fecha que no es AAAA-MM-DD o un identificador que no es UUID dan 422.
 - **Respuesta:** `totalUsd`; `porProyecto` (cliente, llamadas, costo y si tiene una exportación COMPLETADO); `porCliente` (proyectos y sin proyecto); `porProveedorTarea` (llamadas y costo); y el promedio por SCORM con `scormContados` y `criterioPromedio`: `exportados` si hay proyectos con paquete exportado en el alcance, o `con-gasto` si aún no los hay. Sin proyectos, el promedio es 0.
-- **Permisos:** administración y diseño instruccional (solo lectura); el resto recibe 403. La web lo muestra en «Empresa › Rentabilidad», en dólares hasta que HU-1303 traiga el tipo de cambio (SUP-140 a SUP-142).
+- **Permisos:** administración y diseño instruccional (solo lectura); el resto recibe 403. La web lo muestra en «Empresa › Rentabilidad», con el equivalente en soles según el tipo de cambio guardado (SUP-140, SUP-141, SUP-144).
+
+### 3.7 Rentabilidad y mediciones (HU-1303)
+
+La regla RN-13-1 vive en `@aptio/schema/rentabilidad`, que usan la API y la web (la vista recalcula sin llamar al servidor):
+
+- **Cálculo:** capacidad = personas × horas productivas × 22 días hábiles; SCORM al mes = capacidad ÷ horas; costo hoy = horas × tarifa + licencias del mes ÷ SCORM al mes; con el generador se suma la IA por API × tipo de cambio. Días = horas ÷ horas del equipo al día + espera del cliente; márgenes al precio de la competencia y al nuevo precio. Las divisiones entre cero dan 0.
+- **Parámetros:** uno por organización (`ParametrosNegocio.organizacionId`, migración aditiva); mientras no se guarden, `GET /negocio/parametros` devuelve el ejemplo del prototipo con `ejemplo: true`. `PUT` solo administración (auditoría PARAMETROS_NEGOCIO_GUARDADOS).
+- **Mediciones:** `MedicionProceso` por proyecto (id de la herramienta o nombre), escenario (`hoy` o `generador`) y una de las 8 etapas fijas. Con `GET /negocio/rentabilidad?fuente=mediciones`, cada proyecto suma sus horas por etapa y se promedia entre los proyectos del escenario; el que no tiene mediciones usa los supuestos y lo dice `respaldo`. Registrar y borrar (`DELETE /negocio/mediciones/{id}`, auditoría MEDICION_BORRADA): administración y diseño instruccional; los demás reciben 403 (SUP-143 a SUP-145).
 
 ## 4. Datos
 
@@ -445,6 +453,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.43 | 2026-11-12 | Pausas propuestas por la IA (3.3.0.1): `tipo: "pausas-video"`, 422 SIN_TRANSCRIPCION, `marcadorIds` al aplicar y `agregados` y `observaciones` en la respuesta. |
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
+| 0.48 | 2026-11-13 | Rentabilidad y mediciones (3.7): el cálculo compartido, los parámetros por organización, el promedio de las mediciones con respaldo de supuestos y los permisos. |
 | 0.47 | 2026-11-13 | Resumen de costos de IA (3.6): `GET /costos`, días de Lima, trabajos sin proyecto por cliente, criterio del promedio por SCORM y permisos. |
 | 0.46 | 2026-11-13 | Kit desde un curso anterior: flujo de la extracción en la cola `ia`, los topes de lectura del ZIP, `TrabajoIA.resultado` y los 3 endpoints de la propuesta. |
 | 0.15 | 2026-11-10 | Retoques del elemento en `ajustes` (PATCH de pantalla, reproductor) y SUP-41. |

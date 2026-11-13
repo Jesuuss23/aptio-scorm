@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.47 · actualizado con la primera entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -70,7 +70,7 @@ Puedes pedir el enlace hasta 3 veces por hora.
   - **Inicio → Proyectos:** la lista de todos tus proyectos.
   - **Inicio → Nuevo SCORM:** para crear un proyecto.
   - **Empresa → Clientes y kits:** los clientes y su identidad visual.
-  - **Empresa → Rentabilidad:** cuánto se gasta en IA por proyecto, cliente y proveedor (solo administración y diseño instruccional).
+  - **Empresa → Rentabilidad:** cuánto cuesta cada SCORM hoy y con el generador, las horas medidas y el gasto en IA por proyecto, cliente y proveedor (solo administración y diseño instruccional).
 - **Arriba**, la ruta de dónde estás (por ejemplo, «Inicio / Proyecto») y tu nombre con tu rol.
 
 Aptio SCORM funciona en computadora, tableta y celular.
@@ -608,7 +608,17 @@ En **Empresa → Rentabilidad**, la sección **Costo de IA** dice cuánto se gas
 3. Arriba ves el **Total del periodo**, el **Promedio por SCORM** y los **SCORM contados**. El promedio se calcula sobre los proyectos que ya tienen un paquete exportado; mientras no haya ninguno, sobre los proyectos con gasto, y debajo del monto se indica cuál de los dos se usó.
 4. Debajo, tres tablas: **Por proyecto** (con su cliente, las llamadas y si ya se exportó; el nombre abre el proyecto), **Por cliente** (lo de sus proyectos y lo hecho **sin proyecto**, como la propuesta del kit desde un curso anterior) y **Por proveedor y tarea**.
 
-Los montos están en dólares, como los cobra cada proveedor. La conversión a soles y la calculadora de rentabilidad llegan en la próxima entrega. Esta sección la ven administración y diseño instruccional; para los demás roles no aparece en el menú.
+Los montos están en dólares, como los cobra cada proveedor, y debajo del total y del promedio va su equivalente en soles con el tipo de cambio guardado en **Tus datos** (8.23). Esta sección la ven administración y diseño instruccional; para los demás roles no aparece en el menú.
+
+### 8.23 Rentabilidad: ¿puedes competir con tu precio?
+
+Arriba de **Costo de IA**, en **Empresa → Rentabilidad**, la calculadora compara tu proceso actual con el generador para un SCORM de 30 pantallas:
+1. Las cuatro cifras muestran **hoy → con el generador**: días por SCORM (con la espera del cliente), SCORM al mes que produce tu equipo, costo por SCORM y margen al precio de la competencia (y a tu nuevo precio). El costo es horas × tarifa del equipo + IA por API + licencias del mes repartidas entre los SCORM que produces.
+2. En **Horas por SCORM de 30 pantallas** cambia las horas de cada una de las 8 etapas: las cifras y las barras se recalculan al momento.
+3. En **Tus datos** están los precios, el equipo, la tarifa, los días de espera, las licencias, la IA por SCORM y el tipo de cambio. Al lado de **IA por API por SCORM** ves el promedio real de tus proyectos; **Usar el real** lo copia. Pulsa **Guardar** para conservar los cambios; mientras no guardes, la calculadora muestra los valores de ejemplo y lo avisa. Solo administración guarda; diseño instruccional los ve.
+4. Elige **Supuestos** (las horas de la tabla) o **Mediciones** (las horas reales que registró el equipo). Con **Mediciones**, cada escenario usa el promedio de sus proyectos medidos; si uno de los dos aún no tiene mediciones, usa los supuestos y te lo avisa.
+
+**Registrar mediciones.** En **Mediciones**, escribe el proyecto (puede ser uno de la herramienta o uno anterior), elige **Hoy** o **Con el generador**, la etapa y las horas reales del equipo, sin contar la espera del cliente, y pulsa **Registrar**. Si te equivocas, pulsa **Borrar** en esa fila. Para comparar bien, mide al menos 2 proyectos completos por escenario, como dice la guía de medición.
 
 ## 9. Preguntas frecuentes
 
@@ -693,6 +703,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |
 | 0.47 | 2026-11-13 | Costo de IA en Empresa → Rentabilidad: total, promedio por SCORM, filtros de periodo y cliente y las tablas por proyecto, cliente y proveedor (4 y 8.22). |
 | 0.46 | 2026-11-13 | Kit de marca desde un curso anterior o el manual de marca: «✦ Extraer de un curso anterior», la propuesta con sus evidencias, «Aplicar» sin guardar y «Descartar» (8.21). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
