@@ -32,7 +32,8 @@ describe('audio con ffmpeg', () => {
     expect(Math.round(duracionS)).toBe(150);
     expect(tramos.map((t) => [t.desdeS, Math.round(t.duracionS)])).toEqual([[0, 55], [55, 55], [110, 40]]);
     expect(new TextDecoder().decode(tramos[0]!.audio.slice(0, 4))).toBe('fLaC');
-  });
+    // ffmpeg real sobre 2:30 de video: en el runner de CI pasa de los 5 s por defecto.
+  }, 30_000);
 
   it('un archivo que no es video ni audio, o un video sin sonido, falla con un motivo legible', async () => {
     await expect(mediosFfmpeg.tramos(new TextEncoder().encode('no soy un video'), 55)).rejects.toThrow('El archivo no tiene audio legible');
