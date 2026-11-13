@@ -40,7 +40,7 @@ function cargarValidadores(): Map<string, ValidateFunction> {
   return validadores;
 }
 
-/** Tareas que el modo simulado sabe responder: IA-01 … IA-18, VOZ y BOCA. */
+/** Tareas que el modo simulado sabe responder: IA-01 … IA-19, VOZ y BOCA. */
 export function tareasSimuladas(): string[] {
   const ia = readdirSync(SALIDAS)
     .map((f) => f.match(/IA-\d\d/)?.[0])

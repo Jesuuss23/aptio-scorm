@@ -56,7 +56,8 @@ export class SeoService {
     const op = conDominio(sitio ? { sitio } : null, { ...opcionesRenderDesdeEnv(), entorno: entornoActual(), blog });
     return {
       robotsExtra,
-      robotsVistaPrevia: robotsTxt(op, robotsExtra),
+      // HU-1513 · La vista previa suma los rastreadores de IA bloqueados en «SEO para IA».
+      robotsVistaPrevia: robotsTxt(op, robotsExtra, fila?.rastreadoresBloqueados),
       redirecciones: redirecciones.map(aRedireccionDto),
       problemas: analizarSeo({ paginas, redirecciones, nombreSitio: sitio?.nombre ?? NOMBRE_POR_DEFECTO }),
     };

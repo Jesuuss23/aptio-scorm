@@ -26,6 +26,7 @@ import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
 import { SitioAjustes } from './vistas/SitioAjustes';
 import { SitioBlog } from './vistas/SitioBlog';
 import { SitioSeo } from './vistas/SitioSeo';
+import { SitioSeoIa } from './vistas/SitioSeoIa';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -139,6 +140,8 @@ export function App() {
         <SitioBlog />
       ) : vista?.activo === '/sitio/seo' && veSitio ? (
         <SitioSeo />
+      ) : vista?.activo === '/sitio/seo-ia' && veSitio ? (
+        <SitioSeoIa />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
         <SitioAjustes />
       ) : vista?.activo === '/operacion' && veOperacion ? (

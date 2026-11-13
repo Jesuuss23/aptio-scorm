@@ -5,6 +5,10 @@ import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambi
 import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
 import { aplicarCambiosBlog, blogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, enlaceEditarWp, type FilaArticuloBlog, type FilaCategoriaBlog, leerArticuloWp } from '@aptio/schema/sitio-blog';
 import { analizarSeo, aplicarCambiosSeo, type CambiosSeo, leerSeo, redireccionDe, rutaServida, validarRedireccion, validarRobotsExtra } from '@aptio/schema/sitio-seo';
+import {
+  aplicarMenciones, aplicarRastreadores, ASISTENTES_IA, estadoRastreadores, leerMenciones, type Menciones, type PropuestaIa, propuestasNuevas, type SalidaPropuestasIa,
+  validarLlmsTxt, validarPreguntaObjetivo,
+} from '@aptio/schema/sitio-seo-ia';
 import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -169,6 +173,8 @@ export interface OpcionesSimulacion {
   redireccionesSitio?: RedireccionSim[];
   /** HU-1512 · Reglas extra de robots.txt guardadas. */
   robotsSitio?: string;
+  /** HU-1513 · SEO para IA ya guardado: llms.txt, rastreadores bloqueados y preguntas objetivo. `iaFalla`: IA-19 no logra una salida válida. */
+  seoIaSitio?: { llmsTxt?: string; bloqueados?: string[]; preguntas?: string[]; iaFalla?: boolean };
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -416,7 +422,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '' }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {} }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -427,6 +433,14 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const redireccionesSim: RedireccionSim[] = redireccionesSitio.map((r) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', ...r }));
   let redireccionesCreadas = 0;
   let robotsSim = robotsSitio;
+  // HU-1513 · SEO para IA: llms.txt y los rastreadores bloqueados viajan en la versión; las preguntas y las propuestas, no.
+  let llmsSim = seoIaSitio.llmsTxt ?? '';
+  let bloqueadosSim: string[] = seoIaSitio.bloqueados ?? [];
+  const preguntasIaSim: { id: string; pregunta: string; menciones: Menciones; creadoEn: string; actualizadoEn: string }[] = (seoIaSitio.preguntas ?? []).map((pregunta, i) => ({
+    id: `00000000-0000-4000-b000-${String(i + 1).padStart(12, '0')}`, pregunta, menciones: leerMenciones(null), creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z',
+  }));
+  const propuestasIaSim: { id: string; tipo: string; datos: Record<string, string>; estado: string; creadoId?: string; creadoEn: string }[] = [];
+  let seoIaCreados = 0;
   const rutasPublicadasSim = () => paginasSim.filter((p) => p.estado === 'PUBLICADA').map((p) => rutaServida(p.ruta, p.idioma));
   const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
   let bloquesCreados = 0;
@@ -440,7 +454,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const ajustesDto = () => ({ ...(ajustesSim ?? structuredClone(AJUSTES_POR_DEFECTO)), actualizadoEn: ajustesEn });
   const guardarAjustesSim = (a: AjustesSitio) => { ajustesSim = a; ajustesEn = new Date().toISOString(); return ajustesDto(); };
   const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
-  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim }, entornoSitio);
+  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim, llmsTxt: llmsSim, rastreadoresBloqueados: bloqueadosSim }, entornoSitio);
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
       numero: versionesSim.length + 1, creadoEn: new Date(Date.UTC(2026, 10, 13, 15, versionesSim.length)).toISOString(), entorno: entornoSitio, origen,
@@ -1085,6 +1099,97 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const version = b.accion === 'publicar' || (estabaPublicada && b.accion) ? nuevaVersionSim('pagina').numero : undefined;
       return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}), ...r301 });
     }
+    // HU-1513 · Sitio web › SEO para IA (PNT-30): mismas reglas que la API; IA-19 responde la salida grabada del modo simulado.
+    if (ruta === '/sitio/seo-ia' || ruta.startsWith('/sitio/seo-ia/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const metodo = req.method();
+      const ahora = new Date().toISOString();
+      const noValido = (errores: { campo: string; mensaje: string }[], codigo = 'NO_VALIDO', estado = 422) => responder(estado, { codigo, mensaje: errores.map((e) => e.mensaje).join('. '), detalles: errores });
+      const pendientes = () => propuestasIaSim.filter((p) => p.estado === 'pendiente');
+      const dto = () => ({
+        llmsTxt: llmsSim, rastreadores: estadoRastreadores(bloqueadosSim), asistentes: ASISTENTES_IA, preguntas: preguntasIaSim, propuestas: pendientes(),
+        paginasFaq: { conFaq: paginasSim.filter((p) => p.estado === 'PUBLICADA' && p.datosEstructurados === 'FAQPage').length, publicadas: paginasSim.filter((p) => p.estado === 'PUBLICADA').length },
+      });
+      if (ruta === '/sitio/seo-ia' && metodo === 'GET') return responder(200, dto());
+      if (ruta === '/sitio/seo-ia' && metodo === 'PATCH') {
+        const b = req.postDataJSON() as { llmsTxt?: string; rastreadores?: Record<string, unknown> };
+        if (b.llmsTxt !== undefined) {
+          const r = validarLlmsTxt(b.llmsTxt);
+          if (!r.ok) return noValido(r.errores);
+          llmsSim = r.llmsTxt;
+        }
+        if (b.rastreadores !== undefined) {
+          const r = aplicarRastreadores(bloqueadosSim, b.rastreadores);
+          if (!r.ok) return noValido(r.errores);
+          bloqueadosSim = r.bloqueados;
+        }
+        return responder(200, dto());
+      }
+      if (ruta === '/sitio/seo-ia/preguntas' && metodo === 'POST') {
+        const r = validarPreguntaObjetivo((req.postDataJSON() as { pregunta: string }).pregunta, preguntasIaSim.map((p) => p.pregunta));
+        if (!r.ok) return noValido(r.errores, r.codigo, r.codigo === 'PREGUNTA_REPETIDA' ? 409 : 422);
+        const nueva = { id: `00000000-0000-4000-b100-${String(++seoIaCreados).padStart(12, '0')}`, pregunta: r.pregunta, menciones: leerMenciones(null), creadoEn: ahora, actualizadoEn: ahora };
+        preguntasIaSim.push(nueva);
+        return responder(201, nueva);
+      }
+      if (ruta.startsWith('/sitio/seo-ia/preguntas/')) {
+        const p = preguntasIaSim.find((x) => x.id === ruta.split('/')[4]);
+        if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La pregunta no existe' });
+        if (metodo === 'DELETE') {
+          preguntasIaSim.splice(preguntasIaSim.indexOf(p), 1);
+          return responder(204);
+        }
+        const b = req.postDataJSON() as { pregunta?: string; menciones?: Record<string, unknown> };
+        if (b.menciones !== undefined) {
+          const r = aplicarMenciones(p.menciones, b.menciones, new Date());
+          if (!r.ok) return noValido(r.errores);
+          p.menciones = r.menciones;
+        }
+        if (b.pregunta !== undefined) p.pregunta = b.pregunta.trim();
+        p.actualizadoEn = ahora;
+        return responder(200, p);
+      }
+      if (ruta === '/sitio/seo-ia/proponer' && metodo === 'POST') {
+        if (!preguntasIaSim.length) return responder(422, { codigo: 'SIN_PREGUNTAS', mensaje: 'Agrega al menos una pregunta objetivo antes de pedir propuestas' });
+        if (seoIaSitio.iaFalla) return responder(502, { codigo: 'PROPUESTA_NO_VALIDA', mensaje: 'La IA no logró una propuesta válida; vuelve a intentarlo' });
+        const salida = JSON.parse(readFileSync(new URL('../../../packages/ai/casos/loto/salidas/X-IA-19-seo-ia.json', import.meta.url), 'utf8')) as SalidaPropuestasIa;
+        const nuevas = propuestasNuevas(salida, {
+          rutas: paginasSim.filter((p) => p.idioma === 'es').map((p) => p.ruta),
+          rutasPropuestas: pendientes().filter((p) => p.tipo === 'pagina').map((p) => p.datos.ruta!),
+          preguntas: [...elementosSim.filter((e) => e.coleccion === 'preguntas').map((e) => String(e.datos.pregunta ?? '')), ...pendientes().filter((p) => p.tipo === 'pregunta').map((p) => p.datos.pregunta!)],
+        });
+        nuevas.forEach((p: PropuestaIa) => {
+          const { tipo, ...datos } = p;
+          propuestasIaSim.push({ id: `00000000-0000-4000-b200-${String(++seoIaCreados).padStart(12, '0')}`, tipo, datos, estado: 'pendiente', creadoEn: ahora });
+        });
+        return responder(200, { nuevas: nuevas.length, observaciones: salida.observaciones ?? [], propuestas: pendientes(), trabajoId: '00000000-0000-4000-b300-000000000001' });
+      }
+      const propuesta = propuestasIaSim.find((x) => x.id === ruta.split('/')[4]);
+      if (!propuesta) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La propuesta no existe' });
+      if (propuesta.estado !== 'pendiente') return responder(409, { codigo: 'PROPUESTA_RESUELTA', mensaje: 'La propuesta ya tiene su borrador' });
+      if (ruta.endsWith('/descartar')) {
+        propuesta.estado = 'descartada';
+        return responder(200, propuesta);
+      }
+      if (propuesta.tipo === 'pagina') {
+        if (paginasSim.some((p) => p.ruta === propuesta.datos.ruta && p.idioma === 'es')) return responder(409, { codigo: 'RUTA_EN_USO', mensaje: `Ya hay una página en ${propuesta.datos.ruta}: descarta la propuesta o cambia la ruta de esa página` });
+        const nueva: PaginaSitioSim = {
+          id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: propuesta.datos.ruta!, idioma: 'es', titulo: propuesta.datos.titulo!, estado: 'BORRADOR', publicarEn: null, publicadaEn: null,
+          creadoEn: ahora, actualizadoEn: ahora, tipo: 'general', sector: null, portada: null, metaTitulo: propuesta.datos.metaTitulo!, blogCategoriaInicial: null, metaDescripcion: propuesta.datos.metaDescripcion!, canonical: null, indexar: true, datosEstructurados: 'WebPage',
+        };
+        paginasSim.push(nueva);
+        propuesta.creadoId = nueva.id;
+      } else {
+        const id = `00000000-0000-4000-9200-${String(++elementosCreados).padStart(12, '0')}`;
+        elementosSim.push({
+          id, coleccion: 'preguntas', idioma: 'es', orden: elementosSim.filter((e) => e.coleccion === 'preguntas' && (e.idioma ?? 'es') === 'es').length, visible: false, ficticio: false,
+          datos: { pregunta: propuesta.datos.pregunta!, respuesta: propuesta.datos.respuesta!, ...(propuesta.datos.pagina ? { pagina: propuesta.datos.pagina } : {}) }, creadoEn: ahora, actualizadoEn: ahora,
+        });
+        propuesta.creadoId = id;
+      }
+      propuesta.estado = 'borrador_creado';
+      return responder(200, propuesta);
+    }
     // HU-1512 · Sitio web › SEO (PNT-29): mismas reglas que la API; todo llega al sitio con «Publicar cambios».
     if (ruta === '/sitio/seo' || ruta.startsWith('/sitio/seo/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
@@ -1093,7 +1198,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const ordenadas = () => [...redireccionesSim].sort((a, b) => a.desde.localeCompare(b.desde));
       const seoDto = () => {
         const op = conDominio(ajustesSim ? { sitio: ajustesPublicados(ajustesSim) } : null, { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s', blog: blogPublicoSim() });
-        return { robotsExtra: robotsSim, robotsVistaPrevia: robotsTxt(op, robotsSim), redirecciones: ordenadas(), problemas: analizarSeo({ paginas: paginasSim, redirecciones: redireccionesSim, nombreSitio: ajustesSim?.nombre || 'Aptio SCORM' }) };
+        return { robotsExtra: robotsSim, robotsVistaPrevia: robotsTxt(op, robotsSim, bloqueadosSim), redirecciones: ordenadas(), problemas: analizarSeo({ paginas: paginasSim, redirecciones: redireccionesSim, nombreSitio: ajustesSim?.nombre || 'Aptio SCORM' }) };
       };
       const fallo = (r: Extract<ReturnType<typeof validarRedireccion>, { ok: false }>) =>
         responder(r.codigo === 'REDIRECCION_REPETIDA' ? 409 : 422, { codigo: r.codigo, mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });

@@ -3194,3 +3194,99 @@ ul.fila-chips {
     display: none;
   }
 }
+
+/* HU-1513 · Sitio web › SEO para IA (PNT-30). */
+.seoia-dos {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 24px;
+  align-items: start;
+}
+.seoia-dos > .tarjeta {
+  min-width: 0;
+}
+.seoia-preguntas,
+.seoia-rastreadores,
+.seoia-propuestas {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.seoia-preguntas > li {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 12px;
+}
+.seoia-pregunta-cabeza {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  overflow-wrap: anywhere;
+}
+.seoia-menciones {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+.seoia-menciones small {
+  color: var(--color-texto-sec);
+  font-size: var(--texto-xs);
+}
+.seoia-rastreadores > li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+.seoia-rastreadores > li > .seo-ruta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.seoia-propuestas > li {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  border-color: var(--color-naranja);
+  background: var(--color-naranja-suave);
+  overflow-wrap: anywhere;
+}
+.seoia-propuestas .chip {
+  justify-self: start;
+}
+/* Sobre el fondo naranja suave el texto secundario no llega a 4,5:1. */
+.seoia-propuestas .sec {
+  color: var(--color-texto);
+}
+.seoia-propuestas .acciones-fila {
+  margin: 8px 0 0;
+}
+.seoia-faq {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 0;
+}
+.seoia-enlaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 4px;
+}
+@media (max-width: 900px) {
+  .seoia-dos {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .seoia-menciones {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

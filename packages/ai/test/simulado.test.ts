@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { leerSalidaSimulada, tareasSimuladas, validarSalida } from '../src/index.js';
 
 describe('modo simulado con el caso LOTO', () => {
-  it('responde las 18 tareas de IA más voz y boca', () => {
+  it('responde las 19 tareas de IA más voz y boca', () => {
     const tareas = tareasSimuladas();
-    expect(tareas.filter((t) => t.startsWith('IA-'))).toHaveLength(18);
-    expect(tareas).toEqual(expect.arrayContaining(['IA-01', 'IA-18', 'VOZ', 'BOCA']));
+    expect(tareas.filter((t) => t.startsWith('IA-'))).toHaveLength(19);
+    expect(tareas).toEqual(expect.arrayContaining(['IA-01', 'IA-19', 'VOZ', 'BOCA']));
   });
 
   it('cada salida grabada valida contra su esquema', () => {
