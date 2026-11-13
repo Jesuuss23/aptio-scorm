@@ -8,7 +8,7 @@ export const MENU: GrupoMenu[] = [
   { nombre: 'Inicio', items: [{ ruta: '/', nombre: 'Proyectos' }, { ruta: '/nuevo', nombre: 'Nuevo SCORM' }] },
   { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }, { ruta: '/conexiones-ia', nombre: 'Conexiones IA' }, { ruta: '/operacion', nombre: 'Operación' }] },
   // HU-1501 · Solo el superadmin (ADR-011). Páginas, Contenido, Blog y SEO se suman con sus historias.
-  { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }] },
+  { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }] },
 ];
 
 export const GRUPO_SITIO = 'Sitio web';
@@ -39,6 +39,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (voz) return { grupo: 'Inicio', nombre: 'Personaje y voz', activo: '/', id: voz[1]!, sub: 'voz' };
   if (camino === '/sitio') return { grupo: 'Sitio web', nombre: 'Resumen', activo: '/sitio' };
   if (camino === '/sitio/paginas') return { grupo: 'Sitio web', nombre: 'Páginas', activo: '/sitio/paginas' };
+  if (camino === '/sitio/contenido') return { grupo: 'Sitio web', nombre: 'Contenido', activo: '/sitio/contenido' };
   const editorPagina = camino.match(/^\/sitio\/paginas\/([0-9a-f-]{36})$/i);
   if (editorPagina) return { grupo: 'Sitio web', nombre: 'Editor de página', activo: '/sitio/paginas', id: editorPagina[1]!, sub: 'editor-pagina' };
   if (camino === '/conexiones-ia') return { grupo: 'Empresa', nombre: 'Conexiones IA', activo: '/conexiones-ia' };

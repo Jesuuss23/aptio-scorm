@@ -200,3 +200,90 @@ test('el editor de página es solo del superadmin', async ({ page }) => {
   await page.goto('/sitio/paginas/00000000-0000-4000-8000-000000000001');
   await expect(page.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible();
 });
+
+// HU-1504 · Sitio web › Contenido (PNT-27): pestañas por colección, agregar (entra oculto, CP-115), editar y guardar,
+// mostrar y ocultar con el chip, reordenar con teclado, borrar con confirmación, texto plano (RN-16-7) y axe en 0.
+test('el superadmin administra el contenido del sitio por colección', async ({ page }) => {
+  const f = '2026-11-10T15:00:00.000Z';
+  const el = (n: number, coleccion: string, visible: boolean, datos: Record<string, string | number>) => ({ id: `00000000-0000-4000-9300-00000000000${n}`, coleccion, orden: n, visible, datos, creadoEn: f, actualizadoEn: f });
+  await simularApi(page, {
+    conSesion: true, rol: 'SUPERADMIN',
+    elementosSitio: [
+      el(0, 'testimonios', true, { nombre: 'Mariana Paredes', cargo: 'Jefa de Capacitación', empresa: 'Minera Andina', texto: 'Pasamos de tres semanas a cuatro días.', estrellas: 5 }),
+      el(1, 'testimonios', true, { nombre: 'Carlos Alarcón', cargo: 'Coordinador', empresa: 'Banco Altiplano', texto: 'Subió a Moodle sin ajustes.', estrellas: 5 }),
+    ],
+  });
+  await page.goto('/sitio');
+  await menu(page).getByRole('link', { name: 'Contenido' }).click();
+  await expect(page).toHaveURL('/sitio/contenido');
+  await expect(page.getByRole('heading', { level: 1, name: 'Contenido' })).toBeVisible();
+  const pestanas = page.getByRole('tablist', { name: 'Colecciones de contenido' });
+  await expect(pestanas.getByRole('tab')).toHaveText(['Cifras', 'Testimonios', 'Logos', 'Funcionalidades', 'Pasos', 'LMS', 'Preguntas']);
+  await expect(pestanas.getByRole('tab', { name: 'Cifras' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('Aún no hay elementos en Cifras.')).toBeVisible();
+
+  // CP-115 · Una cifra nueva entra oculta; HTML se rechaza antes de enviar.
+  await page.getByRole('button', { name: 'Agregar' }).click();
+  const nueva = page.getByRole('form', { name: 'Nuevo elemento de Cifras' });
+  await expect(nueva.getByLabel('Valor')).toBeFocused();
+  await nueva.getByLabel('Valor').fill('4 días');
+  await nueva.getByLabel('Etiqueta').fill('<b>para entregar</b>');
+  await nueva.getByRole('button', { name: 'Guardar' }).click();
+  await expect(nueva.getByRole('alert')).toHaveText('Etiqueta solo admite texto, sin etiquetas HTML');
+  await nueva.getByLabel('Etiqueta').fill('para entregar una cápsula');
+  await nueva.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: '«4 días» se agregó al final, oculto.' })).toBeVisible();
+  const interruptor = page.getByRole('switch', { name: 'Mostrar 4 días' });
+  await expect(interruptor).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText('0 visibles')).toBeVisible();
+  await interruptor.click();
+  await expect(interruptor).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByText('1 visibles')).toBeVisible();
+
+  // Pestañas con el teclado: flecha derecha pasa a Testimonios.
+  await pestanas.getByRole('tab', { name: 'Cifras' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(pestanas.getByRole('tab', { name: 'Testimonios' })).toBeFocused();
+  await expect(pestanas.getByRole('tab', { name: 'Testimonios' })).toHaveAttribute('aria-selected', 'true');
+  const lista = page.getByRole('list', { name: 'Elementos de Testimonios' });
+  const nombres = async () => (await lista.getByRole('listitem').getByLabel('Nombre').evaluateAll((ns) => ns.map((n) => (n as HTMLInputElement).value)));
+  await expect.poll(nombres).toEqual(['Mariana Paredes', 'Carlos Alarcón']);
+  await expect(page.getByText('2 visibles')).toBeVisible();
+
+  // CP-114 · Ocultar un testimonio: sigue en la lista con sus datos.
+  await page.getByRole('switch', { name: 'Mostrar Carlos Alarcón' }).press('Space');
+  await expect(page.getByRole('switch', { name: 'Mostrar Carlos Alarcón' })).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText('1 visibles')).toBeVisible();
+  await expect(page.getByText('quedó oculto en todas las páginas; sus datos se conservan')).toBeAttached();
+
+  // Editar y guardar: Guardar se activa solo con cambios.
+  const editar = page.getByRole('form', { name: 'Editar Mariana Paredes' });
+  await expect(editar.getByRole('button', { name: 'Guardar' })).toBeDisabled();
+  await editar.getByLabel('Cargo').fill('Jefa de SSOMA');
+  await editar.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Se guardó «Mariana Paredes».' })).toBeVisible();
+  await expect(page.getByRole('form', { name: 'Editar Mariana Paredes' }).getByLabel('Cargo')).toHaveValue('Jefa de SSOMA');
+
+  // Reordenar con el teclado; el foco sigue al elemento.
+  const subir = page.getByRole('button', { name: 'Subir Carlos Alarcón' });
+  await subir.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(nombres).toEqual(['Carlos Alarcón', 'Mariana Paredes']);
+  await expect(page.getByRole('button', { name: 'Bajar Carlos Alarcón' })).toBeFocused();
+  const axe = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+
+  // Borrar con confirmación.
+  await page.getByRole('button', { name: 'Borrar Carlos Alarcón' }).click();
+  const confirmar = page.getByRole('group', { name: 'Confirmar el borrado de Carlos Alarcón' });
+  const axeConfirmar = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axeConfirmar.violations.map((v) => v.id)).toEqual([]);
+  await confirmar.getByRole('button', { name: 'Sí, borrar' }).click();
+  await expect.poll(nombres).toEqual(['Mariana Paredes']);
+});
+
+test('Contenido es solo del superadmin', async ({ page }) => {
+  await simularApi(page, { conSesion: true, rol: 'ADMINISTRADOR' });
+  await page.goto('/sitio/contenido');
+  await expect(page.getByRole('heading', { name: 'Página no encontrada' })).toBeVisible();
+});

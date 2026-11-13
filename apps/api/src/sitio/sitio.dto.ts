@@ -77,10 +77,17 @@ export class BloqueSitioCambioDto {
   @ApiProperty({ description: 'Mostrar u ocultar; los ajustes no cambian (CP-112)' }) @IsBoolean() visible: boolean;
 }
 
+/** HU-1504 · Elemento de contenido tal como lo ve el sitio público. */
+export class ElementoPublicoDto {
+  @ApiProperty({ type: 'object', additionalProperties: true }) datos: Record<string, string | number>;
+}
+
 /** HU-1503 · Bloque tal como lo ve el sitio público: solo visibles y en su orden. */
 export class BloquePublicoDto {
   @ApiProperty({ enum: TIPOS_BLOQUE }) tipo: string;
   @ApiProperty({ type: 'object', additionalProperties: true, nullable: true }) ajustes: Record<string, unknown> | null;
+  @ApiPropertyOptional({ type: [ElementoPublicoDto], description: 'HU-1504 · Solo en bloques con colección: sus elementos visibles, en orden (CP-114)' })
+  elementos?: ElementoPublicoDto[];
 }
 
 /** HU-1502 · Lo que ve el sitio público de una página publicada. */

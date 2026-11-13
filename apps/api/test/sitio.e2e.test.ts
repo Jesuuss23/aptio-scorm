@@ -5,6 +5,8 @@
 // /publico/*. PostgreSQL real.
 // HU-1503 · CP-112 y CP-113: bloques por página (ocultar conserva los datos, reordenar), cascada RN-16-4, validaciones,
 // permisos y auditoría.
+// HU-1504 · CP-114 y CP-115: contenido por colección (nace oculto, un testimonio oculto no sale en ninguna página),
+// cascada página → bloque → elemento, texto plano (RN-16-7), orden, permisos y auditoría.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -285,7 +287,8 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       await mostrar(p, hero.id, true);
       expect((await mostrar(p, testi.id, true)).body.visible).toBe(true);
       await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
-      expect((await publica(ruta('cp112'))).body.bloques).toEqual([{ tipo: 'hero', ajustes: null }, { tipo: 'testimonios', ajustes: datos }]);
+      const sinElementos = (r: { body: { bloques: { tipo: string; ajustes: unknown }[] } }) => r.body.bloques.map(({ tipo, ajustes }) => ({ tipo, ajustes }));
+      expect(sinElementos(await publica(ruta('cp112')))).toEqual([{ tipo: 'hero', ajustes: null }, { tipo: 'testimonios', ajustes: datos }]);
 
       const oculto = await mostrar(p, testi.id, false);
       expect(oculto.status).toBe(200);
@@ -397,6 +400,179 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
       ]);
       expect(filas[4]!.datos).toMatchObject({ antes: [a.id, b.id], despues: [b.id, a.id] });
       expect(filas[5]!.datos).toMatchObject({ tipo: 'hero', nombre: 'Portada' });
+    });
+  });
+  describe('contenido administrable (HU-1504)', () => {
+    const ruta = (n: string) => `/prueba-${sufijo}-c-${n}`;
+    const marca = `zz-${sufijo}`;
+    const creados: string[] = [];
+    const enviar = (m: 'get' | 'post' | 'patch' | 'delete', r: string, b?: object, c = cookies.SUPERADMIN) => {
+      const req = request(servidor)[m](`/api/v1${r}`);
+      if (c) req.set('Cookie', c);
+      return b ? req.send(b) : req;
+    };
+    const publica = (r: string) => request(servidor).get('/api/v1/publico/paginas').query({ ruta: r, idioma: 'es' });
+    const reiniciarLimite = () => app.get(LimitePublicoService).reiniciar();
+    const elemento = async (coleccion: string, datos: object) => {
+      const r = await enviar('post', '/sitio/elementos', { coleccion, datos });
+      if (r.status !== 201) throw new Error(`elemento ${coleccion}: ${r.status} ${JSON.stringify(r.body)}`);
+      creados.push(r.body.id);
+      return r.body as { id: string; orden: number; visible: boolean; datos: Record<string, unknown> };
+    };
+    const testimonio = (nombre: string) => elemento('testimonios', { nombre: `${nombre} ${marca}`, cargo: 'Jefa', empresa: 'Minera', texto: 'Muy útil.', estrellas: 5 });
+    const mostrar = (id: string, visible = true) => enviar('patch', `/sitio/elementos/${id}`, { visible });
+    /** Página publicada con los bloques visibles indicados. */
+    const paginaCon = async (n: string, tipos: string[], { publicar = true, ocultar = [] as string[] } = {}) => {
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta(n), titulo: n })).body.id as string;
+      for (const tipo of tipos) {
+        const b = (await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo })).body.id as string;
+        if (!ocultar.includes(tipo)) await enviar('patch', `/sitio/paginas/${p}/bloques/${b}`, { visible: true });
+      }
+      if (publicar) await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      return p;
+    };
+    const nombresEn = async (r: string, tipo: string) => {
+      const res = await publica(r);
+      const bloque = (res.body.bloques as { tipo: string; elementos?: { datos: { nombre?: string; pregunta?: string } }[] }[] | undefined)?.find((b) => b.tipo === tipo);
+      return bloque?.elementos?.map((e) => e.datos.nombre ?? e.datos.pregunta).filter((x) => x?.endsWith(marca)) ?? null;
+    };
+
+    afterAll(async () => {
+      await prisma.sitioElemento.deleteMany({ where: { id: { in: creados } } });
+    });
+
+    it('CP-115: una cifra nueva queda oculta y al final de su colección', async () => {
+      const antes = (await enviar('get', '/sitio/elementos?coleccion=cifras')).body as unknown[];
+      const c = await elemento('cifras', { valor: '4 días', etiqueta: `para entregar ${marca}` });
+      expect([c.visible, c.orden]).toEqual([false, antes.length]);
+      const lista = (await enviar('get', '/sitio/elementos?coleccion=cifras')).body as { id: string; visible: boolean }[];
+      expect(lista.at(-1)).toMatchObject({ id: c.id, visible: false });
+    });
+
+    it('CP-114: un testimonio oculto no aparece en ninguna de dos páginas publicadas con Testimonios', async () => {
+      reiniciarLimite();
+      const a = await testimonio('Ana');
+      const b = await testimonio('Beto');
+      await mostrar(a.id);
+      await mostrar(b.id);
+      await paginaCon('cp114-a', ['hero', 'testimonios']);
+      await paginaCon('cp114-b', ['testimonios', 'cta']);
+      expect(await nombresEn(ruta('cp114-a'), 'testimonios')).toEqual([`Ana ${marca}`, `Beto ${marca}`]);
+      const oculto = await mostrar(b.id, false);
+      expect(oculto.body).toMatchObject({ visible: false, datos: { nombre: `Beto ${marca}` } });
+      expect([await nombresEn(ruta('cp114-a'), 'testimonios'), await nombresEn(ruta('cp114-b'), 'testimonios')]).toEqual([[`Ana ${marca}`], [`Ana ${marca}`]]);
+      // El bloque sin colección no trae elementos.
+      expect((await publica(ruta('cp114-a'))).body.bloques[0]).toEqual({ tipo: 'hero', ajustes: null });
+    });
+
+    it('RN-16-4: un elemento visible no sale si su bloque está oculto o la página no está publicada', async () => {
+      reiniciarLimite();
+      const l = await elemento('logos', { nombre: `Logo ${marca}` });
+      await mostrar(l.id);
+      await paginaCon('cascada-a', ['hero', 'logos'], { ocultar: ['logos'] });
+      const res = await publica(ruta('cascada-a'));
+      expect(res.body.bloques.map((x: { tipo: string }) => x.tipo)).toEqual(['hero']);
+      await paginaCon('cascada-b', ['logos'], { publicar: false });
+      expect((await publica(ruta('cascada-b'))).status).toBe(404);
+    });
+
+    it('preguntas: las generales en todas las páginas y las de una ruta solo en esa', async () => {
+      reiniciarLimite();
+      const g = await elemento('preguntas', { pregunta: `¿General? ${marca}`, respuesta: 'Sí.' });
+      const p = await elemento('preguntas', { pregunta: `¿De precios? ${marca}`, respuesta: 'Sí.', pagina: ruta('faq-precios') });
+      await mostrar(g.id);
+      await mostrar(p.id);
+      await paginaCon('faq-precios', ['faq']);
+      await paginaCon('faq-otra', ['faq']);
+      expect(await nombresEn(ruta('faq-precios'), 'faq')).toEqual([`¿General? ${marca}`, `¿De precios? ${marca}`]);
+      expect(await nombresEn(ruta('faq-otra'), 'faq')).toEqual([`¿General? ${marca}`]);
+    });
+
+    it('edita los datos validando la colección; vaciar un opcional lo quita', async () => {
+      const x = await elemento('lms', { nombre: `Canvas ${marca}`, nota: 'Perfil' });
+      const r = await enviar('patch', `/sitio/elementos/${x.id}`, { datos: { nota: '' } });
+      expect(r.status).toBe(200);
+      expect(r.body.datos).toEqual({ nombre: `Canvas ${marca}` });
+      const r2 = await enviar('patch', `/sitio/elementos/${x.id}`, { datos: { nota: 'Nueva' }, visible: true });
+      expect(r2.body).toMatchObject({ visible: true, datos: { nombre: `Canvas ${marca}`, nota: 'Nueva' } });
+    });
+
+    it('rechaza colecciones, campos y HTML no válidos (422 RN-16-7) y órdenes incompletos', async () => {
+      const x = await elemento('pasos', { titulo: `Paso ${marca}`, texto: 'Texto' });
+      const casos = [
+        await enviar('get', '/sitio/elementos?coleccion=planes'),
+        await enviar('get', '/sitio/elementos'),
+        await enviar('post', '/sitio/elementos', { coleccion: 'planes', datos: {} }),
+        await enviar('post', '/sitio/elementos', { coleccion: 'pasos', datos: { titulo: 'Solo título' } }),
+        await enviar('post', '/sitio/elementos', { coleccion: 'pasos', datos: { titulo: '<b>Hola</b>', texto: 'x' } }),
+        await enviar('post', '/sitio/elementos', { coleccion: 'pasos', datos: { titulo: 'T', texto: 'x', url: 'http://x' } }),
+        await enviar('patch', `/sitio/elementos/${x.id}`, { datos: { texto: '<script>alert(1)</script>' } }),
+        await enviar('patch', `/sitio/elementos/${x.id}`, {}),
+      ];
+      expect(casos.map((r) => r.status)).toEqual([422, 422, 422, 422, 422, 422, 422, 422]);
+      expect(casos.slice(3, 7).map((r) => r.body.codigo)).toEqual(['DATOS_NO_VALIDOS', 'DATOS_NO_VALIDOS', 'DATOS_NO_VALIDOS', 'DATOS_NO_VALIDOS']);
+      expect(casos[4]!.body.detalles).toEqual([{ campo: 'titulo', mensaje: 'Título solo admite texto, sin etiquetas HTML' }]);
+      expect(casos[7]!.body.codigo).toBe('SIN_CAMBIOS');
+      expect((await prisma.sitioElemento.findUniqueOrThrow({ where: { id: x.id } })).datos).toEqual({ titulo: `Paso ${marca}`, texto: 'Texto' });
+
+      const todos = ((await enviar('get', '/sitio/elementos?coleccion=pasos')).body as { id: string }[]).map((e) => e.id);
+      const otra = await elemento('lms', { nombre: `Otro ${marca}` });
+      const ordenes = [todos.slice(1), [...todos, todos[0]!], [...todos, otra.id]];
+      const res = [];
+      for (const orden of ordenes) {
+        const r = await enviar('patch', '/sitio/elementos', { coleccion: 'pasos', orden });
+        res.push([r.status, r.body.codigo, r.body.detalles?.[0]?.tipo]);
+      }
+      expect(res).toEqual([[422, 'ORDEN_INVALIDO', 'FALTANTE'], [422, 'ORDEN_INVALIDO', 'DUPLICADO'], [422, 'ORDEN_INVALIDO', 'AJENO']]);
+      expect((await enviar('patch', '/sitio/elementos/00000000-0000-4000-8000-000000000000', { visible: true })).status).toBe(404);
+    });
+
+    it('reordena la colección y borrar compacta el orden', async () => {
+      const [a, b] = [await elemento('funcionalidades', { etiqueta: 'A', titulo: `A ${marca}`, texto: 'x' }), await elemento('funcionalidades', { etiqueta: 'B', titulo: `B ${marca}`, texto: 'x' })];
+      const ids = ((await enviar('get', '/sitio/elementos?coleccion=funcionalidades')).body as { id: string }[]).map((e) => e.id);
+      const nuevo = [...ids.filter((id) => id !== a.id && id !== b.id), b.id, a.id];
+      const r = await enviar('patch', '/sitio/elementos', { coleccion: 'funcionalidades', orden: nuevo });
+      expect(r.status).toBe(200);
+      expect(r.body.map((e: { id: string }) => e.id)).toEqual(nuevo);
+      expect((await enviar('delete', `/sitio/elementos/${b.id}`)).status).toBe(204);
+      const despues = (await enviar('get', '/sitio/elementos?coleccion=funcionalidades')).body as { id: string; orden: number }[];
+      expect(despues.map((e) => e.orden)).toEqual(despues.map((_, i) => i));
+      expect(despues.at(-1)!.id).toBe(a.id);
+    });
+
+    it('solo el superadmin: 403 a los roles de organización y 401 sin sesión', async () => {
+      const x = await elemento('logos', { nombre: `Permisos ${marca}` });
+      const estados = [];
+      for (const rol of ROLES_ORGANIZACION) {
+        const c = cookies[rol]!;
+        estados.push([rol,
+          (await enviar('get', '/sitio/elementos?coleccion=logos', undefined, c)).status,
+          (await enviar('post', '/sitio/elementos', { coleccion: 'logos', datos: { nombre: 'X' } }, c)).status,
+          (await enviar('patch', '/sitio/elementos', { coleccion: 'logos', orden: [x.id] }, c)).status,
+          (await enviar('patch', `/sitio/elementos/${x.id}`, { visible: true }, c)).status,
+          (await enviar('delete', `/sitio/elementos/${x.id}`, undefined, c)).status]);
+      }
+      expect(estados).toEqual(ROLES_ORGANIZACION.map((rol) => [rol, 403, 403, 403, 403, 403]));
+      expect([
+        (await enviar('get', '/sitio/elementos?coleccion=logos', undefined, '')).status,
+        (await enviar('patch', `/sitio/elementos/${x.id}`, { visible: true }, '')).status,
+      ]).toEqual([401, 401]);
+      expect((await prisma.sitioElemento.findUniqueOrThrow({ where: { id: x.id } })).visible).toBe(false);
+    });
+
+    it('cada cambio de contenido queda en la auditoría', async () => {
+      const x = await elemento('cifras', { valor: '1', etiqueta: `Auditada ${marca}` });
+      await mostrar(x.id);
+      await mostrar(x.id); // sin cambio: no audita
+      await enviar('patch', `/sitio/elementos/${x.id}`, { datos: { valor: '2' } });
+      await mostrar(x.id, false);
+      await enviar('delete', `/sitio/elementos/${x.id}`);
+      const filas = await prisma.auditoria.findMany({ where: { entidad: 'SitioElemento', entidadId: x.id }, orderBy: { creadoEn: 'asc' } });
+      expect(filas.map((f) => [f.accion, f.organizacionId])).toEqual([
+        ['SITIO_ELEMENTO_AGREGADO', null], ['SITIO_ELEMENTO_MOSTRADO', null], ['SITIO_ELEMENTO_EDITADO', null],
+        ['SITIO_ELEMENTO_OCULTADO', null], ['SITIO_ELEMENTO_BORRADO', null],
+      ]);
+      expect(filas[2]!.datos).toMatchObject({ coleccion: 'cifras', antes: { valor: '1' }, despues: { valor: '2' } });
     });
   });
 });

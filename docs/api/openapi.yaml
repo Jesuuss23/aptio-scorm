@@ -346,6 +346,142 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /sitio/elementos:
+    get:
+      tags:
+      - Sitio web
+      summary: Elementos de una colección de contenido, visibles y ocultos, por orden (HU-1504)
+      operationId: get_sitio_elementos
+      description: Solo SUPERADMIN. 422 si `coleccion` falta o no es una de las 7.
+      parameters:
+      - name: coleccion
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/ColeccionContenido'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ElementoSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    post:
+      tags:
+      - Sitio web
+      summary: Agregar un elemento al final de su colección, oculto (HU-1504, CP-115)
+      operationId: post_sitio_elementos
+      description: |-
+        Solo SUPERADMIN. `datos` lleva solo los campos de la colección (`@aptio/schema/sitio-contenido`), en texto plano:
+        con etiquetas HTML, campos de más o faltantes responde 422 DATOS_NO_VALIDOS con `detalles` por campo (RN-16-7).
+        Nace con `visible` en false (RN-16-2). Auditoría SITIO_ELEMENTO_AGREGADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ElementoSitioEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElementoSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    patch:
+      tags:
+      - Sitio web
+      summary: Reordenar una colección con la lista completa de ids (HU-1504)
+      operationId: patch_sitio_elementos
+      description: Solo SUPERADMIN. Si falta, se repite o es de otra colección, 422 ORDEN_INVALIDO con `detalles[0].tipo` FALTANTE, DUPLICADO o AJENO. Auditoría SITIO_ELEMENTOS_REORDENADOS (solo si cambió).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenElementos'
+      responses:
+        '200':
+          description: La colección en el orden nuevo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ElementoSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/elementos/{elementoId}:
+    parameters:
+    - name: elementoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Sitio web
+      summary: Cambiar los datos o la visibilidad de un elemento (HU-1504, CP-114)
+      operationId: patch_sitio_elementos_id
+      description: |-
+        Solo SUPERADMIN. `datos` es parcial: se validan los campos que trae y un opcional vacío se quita. Ocultar no borra
+        los datos y el elemento deja de salir en todas las páginas. Sin `datos` ni `visible`, 422 SIN_CAMBIOS. Auditoría
+        SITIO_ELEMENTO_EDITADO, SITIO_ELEMENTO_MOSTRADO o SITIO_ELEMENTO_OCULTADO (solo si cambia).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ElementoSitioCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ElementoSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Borrar un elemento y compactar su colección (HU-1504)
+      operationId: delete_sitio_elementos_id
+      description: Solo SUPERADMIN. Auditoría SITIO_ELEMENTO_BORRADO con los datos borrados.
+      responses:
+        '204':
+          description: Borrado
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /publico/paginas:
     get:
       tags:
@@ -353,7 +489,7 @@ paths:
       summary: Una página publicada del sitio (HU-1502, CP-110)
       operationId: get_publico_paginas
       security: []
-      description: Sin sesión. 200 solo si la página está PUBLICADA, con `bloques` visibles en su orden (HU-1503, CP-112, CP-113); borrador, programada o inexistente dan 404 sin bloques (CP-110, RN-16-4). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
+      description: Sin sesión. 200 solo si la página está PUBLICADA, con `bloques` visibles en su orden (HU-1503, CP-112, CP-113) y, en los bloques con colección, sus `elementos` visibles (HU-1504, CP-114); borrador, programada o inexistente dan 404 sin bloques (CP-110, RN-16-4). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
       parameters:
       - name: ruta
         in: query
@@ -3955,6 +4091,91 @@ components:
       properties:
         visible:
           type: boolean
+    ColeccionContenido:
+      type: string
+      description: Colecciones de contenido del sitio (HU-1504, `@aptio/schema/sitio-contenido`)
+      enum:
+      - cifras
+      - testimonios
+      - logos
+      - funcionalidades
+      - pasos
+      - lms
+      - preguntas
+    ElementoSitio:
+      type: object
+      required:
+      - id
+      - coleccion
+      - orden
+      - visible
+      - datos
+      - creadoEn
+      - actualizadoEn
+      properties:
+        id:
+          type: string
+          format: uuid
+        coleccion:
+          $ref: '#/components/schemas/ColeccionContenido'
+        orden:
+          type: integer
+          minimum: 0
+        visible:
+          type: boolean
+          description: Nace en false (RN-16-2)
+        datos:
+          $ref: '#/components/schemas/DatosElemento'
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    DatosElemento:
+      type: object
+      description: |-
+        Campos de la colección, en texto plano. cifras: valor, etiqueta. testimonios: nombre, cargo, empresa, sector?,
+        texto, estrellas (1 a 5), desde?. logos: nombre. funcionalidades: etiqueta, titulo, texto, vinetas? (una por
+        línea). pasos: titulo, texto. lms: nombre, nota?. preguntas: pregunta, respuesta, pagina? (ruta; vacía = todas).
+      additionalProperties:
+        oneOf:
+        - type: string
+        - type: integer
+    ElementoSitioEntrada:
+      type: object
+      additionalProperties: false
+      required:
+      - coleccion
+      - datos
+      properties:
+        coleccion:
+          $ref: '#/components/schemas/ColeccionContenido'
+        datos:
+          $ref: '#/components/schemas/DatosElemento'
+    ElementoSitioCambio:
+      type: object
+      additionalProperties: false
+      properties:
+        datos:
+          $ref: '#/components/schemas/DatosElemento'
+        visible:
+          type: boolean
+    OrdenElementos:
+      type: object
+      additionalProperties: false
+      required:
+      - coleccion
+      - orden
+      properties:
+        coleccion:
+          $ref: '#/components/schemas/ColeccionContenido'
+        orden:
+          type: array
+          maxItems: 500
+          items:
+            type: string
+            format: uuid
     BloquePublico:
       type: object
       required:
@@ -3967,6 +4188,16 @@ components:
           type: object
           nullable: true
           additionalProperties: true
+        elementos:
+          type: array
+          description: HU-1504 · Solo en bloques con colección (metricas, testimonios, logos, funcionalidades, pasos, lms, faq) y solo los visibles, en orden (RN-16-4, CP-114)
+          items:
+            type: object
+            required:
+            - datos
+            properties:
+              datos:
+                $ref: '#/components/schemas/DatosElemento'
     PaginaPublica:
       type: object
       required:

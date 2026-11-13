@@ -1,3 +1,4 @@
+import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
@@ -137,6 +138,8 @@ export interface OpcionesSimulacion {
   paginasSitio?: PaginaSitioSim[];
   /** HU-1503 · Bloques de las páginas del sitio. */
   bloquesSitio?: BloqueSitioSim[];
+  /** HU-1504 · Elementos de contenido del sitio. */
+  elementosSitio?: ElementoSitioSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -368,9 +371,15 @@ export interface PaginaSitioSim {
 export interface BloqueSitioSim {
   id: string; paginaId: string; tipo: string; orden: number; visible: boolean; ajustes: Record<string, unknown> | null; creadoEn: string; actualizadoEn: string;
 }
+/** HU-1504 · Elemento de contenido del sitio en la simulación. */
+export interface ElementoSitioSim {
+  id: string; coleccion: string; orden: number; visible: boolean; datos: Record<string, string | number>; creadoEn: string; actualizadoEn: string;
+}
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [] }: OpcionesSimulacion) {
+  const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ...e, datos: { ...e.datos } }));
+  let elementosCreados = 0;
   const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ ...p }));
   const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
   let bloquesCreados = 0;
@@ -578,6 +587,52 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     // HU-1501 · Sitio web: solo el superadmin (CP-109); la lista está vacía hasta la HU-1502.
     // HU-1501 y HU-1502 · Sitio web › Páginas: solo el superadmin (CP-109), con las mismas reglas que la API.
+    // HU-1504 · Contenido del sitio: mismas reglas que la API (oculto al final, datos validados, orden completo).
+    if (ruta === '/sitio/elementos' || ruta.startsWith('/sitio/elementos/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const ahora = new Date().toISOString();
+      const metodo = req.method();
+      const de = (c: string) => elementosSim.filter((e) => e.coleccion === c).sort((a, b) => a.orden - b.orden);
+      const invalido = (r: ReturnType<typeof validarDatos>) => (r.ok ? null : responder(422, { codigo: 'DATOS_NO_VALIDOS', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores }));
+      if (ruta === '/sitio/elementos' && metodo === 'GET') {
+        const c = new URL(req.url()).searchParams.get('coleccion') ?? '';
+        return esColeccion(c) ? responder(200, de(c)) : responder(422, { codigo: 'NO_VALIDO', mensaje: 'coleccion no válida' });
+      }
+      if (ruta === '/sitio/elementos' && metodo === 'POST') {
+        const b = req.postDataJSON() as { coleccion: string; datos: Record<string, unknown> };
+        if (!esColeccion(b.coleccion)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'coleccion no válida' });
+        const r = validarDatos(b.coleccion, b.datos);
+        if (!r.ok) return invalido(r);
+        const e: ElementoSitioSim = { id: `00000000-0000-4000-9200-${String(++elementosCreados).padStart(12, '0')}`, coleccion: b.coleccion, orden: de(b.coleccion).length, visible: false, datos: r.datos, creadoEn: ahora, actualizadoEn: ahora };
+        elementosSim.push(e);
+        return responder(201, e);
+      }
+      if (ruta === '/sitio/elementos' && metodo === 'PATCH') {
+        const { coleccion, orden } = req.postDataJSON() as { coleccion: string; orden: string[] };
+        const actuales = de(coleccion);
+        if (orden.length !== actuales.length || new Set(orden).size !== orden.length || !orden.every((id) => actuales.some((x) => x.id === id))) {
+          return responder(422, { codigo: 'ORDEN_INVALIDO', mensaje: 'Falta un elemento de la colección en la lista' });
+        }
+        orden.forEach((id, i) => { actuales.find((x) => x.id === id)!.orden = i; });
+        return responder(200, de(coleccion));
+      }
+      const e = elementosSim.find((x) => x.id === ruta.split('/')[3]);
+      if (!e) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El elemento no existe' });
+      if (metodo === 'DELETE') {
+        elementosSim.splice(elementosSim.indexOf(e), 1);
+        de(e.coleccion).forEach((x, i) => { x.orden = i; });
+        return responder(204);
+      }
+      const b = req.postDataJSON() as { datos?: Record<string, unknown>; visible?: boolean };
+      if (b.datos) {
+        const r = validarDatos(e.coleccion as Coleccion, b.datos, true);
+        if (!r.ok) return invalido(r);
+        e.datos = mezclarDatos(e.datos, r.datos);
+      }
+      if (b.visible !== undefined) e.visible = b.visible;
+      e.actualizadoEn = new Date(Date.now() + elementosCreados++).toISOString();
+      return responder(200, e);
+    }
     if (ruta === '/sitio/paginas' || ruta.startsWith('/sitio/paginas/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const ahora = new Date().toISOString();
