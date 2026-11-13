@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.57 · actualizado con la quinta entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.58 · actualizado con la sexta entrega del Sprint 11 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -691,6 +691,16 @@ En **Sitio web › Páginas** están todas las páginas del sitio comercial, con
 
 Un borrador o una página programada no se ven en el sitio: quien abra su dirección recibe «no encontrada».
 
+**Menú principal y pie de página.** Debajo de la lista de páginas están las tarjetas **Menú principal** (los enlaces de la cabecera; el menú del celular muestra los mismos, en el mismo orden) y **Pie de página** (columnas, cada una con sus enlaces).
+
+1. **Agregar:** pulsa **Agregar enlace** (o **Agregar columna** en el pie), escribe el texto y la ruta y pulsa **Agregar**. Entra al final y **oculto**. La ruta es una página del sitio, como `/precios`, una sección, como `/#testimonios`, o una dirección que empiece con `https://`, que se abre en otra pestaña y se marca «Externo». Las columnas del pie no necesitan ruta.
+2. **Editar:** cambia el texto o la ruta y pulsa **Guardar**. Solo se acepta texto, sin etiquetas HTML, y no se aceptan direcciones con `http://` ni `javascript:`.
+3. **Mostrar u ocultar:** con el interruptor. Ocultar no borra: al volver a mostrarlo aparece igual. Ocultar una columna del pie oculta todos sus enlaces, y una columna sin enlaces visibles no se ve.
+4. **Cambiar el orden** con las flechas ↑ y ↓ (también con el teclado). En el pie, las columnas se ordenan entre sí y los enlaces dentro de su columna.
+5. **Borrar** pide confirmación. Borrar una columna borra también sus enlaces.
+
+La línea **En el sitio** de cada tarjeta muestra lo que ve el visitante en ese momento. Los cambios del menú y del pie se ven en el sitio al momento.
+
 **Editar los bloques de una página.** En Páginas, pulsa **Editar** en la página que quieras. Se abre el **Editor de página** con sus bloques en el orden en que se ven en el sitio (Portada, Cifras, Logos de clientes, Testimonios…). Arriba a la derecha puedes cambiar a otra página.
 
 1. **Agregar bloque:** elige el tipo en la lista y pulsa **Agregar bloque**. Entra al final y **oculto**, para que no aparezca en el sitio antes de tiempo.
@@ -809,6 +819,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.58 | 2026-11-13 | Menú principal y pie de página (8.28): agregar, editar, mostrar u ocultar, ordenar y borrar enlaces y columnas, y la línea «En el sitio». |
 | 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |
