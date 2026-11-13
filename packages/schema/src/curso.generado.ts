@@ -300,6 +300,16 @@ export interface AudioNarracion {
    */
   bocas?: never[][];
   subtitulosId?: Id;
+  /**
+   * HU-0704: la pista es una grabación del cliente (voz.proveedor = cliente). Guarda el material de origen, el audio usado y quién autorizó usarla y cuándo (RN-07-4).
+   */
+  grabacion?: {
+    materialId: Id;
+    recursoOrigenId?: Id;
+    version?: 'original' | 'limpio';
+    autorizadoPor: string;
+    autorizadoEn: string;
+  };
 }
 /**
  * This interface was referenced by `CursoDeCapsulasEsquemaV0`'s JSON-Schema

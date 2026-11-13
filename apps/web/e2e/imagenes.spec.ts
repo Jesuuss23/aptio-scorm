@@ -128,8 +128,10 @@ test.describe('imágenes en el editor (HU-0609)', () => {
     const ediciones = contarEdiciones(page);
     await page.goto(URL_P05);
     await expect(lienzo(page).locator('[data-pantalla="p05"]')).toBeVisible();
-    const caja = (await lienzo(page).locator('[data-pantalla="p05"]').boundingBox())!;
-    await soltarEn(page, await archivo(page, 'animacion.gif', 'gif'), caja.x + 50, caja.y + 50);
+    // La pantalla se vuelve a dibujar al cargar el curso: se espera a que tenga caja antes de soltar.
+    let caja: { x: number; y: number } | null = null;
+    await expect.poll(async () => (caja = await lienzo(page).locator('[data-pantalla="p05"]').boundingBox())).not.toBeNull();
+    await soltarEn(page, await archivo(page, 'animacion.gif', 'gif'), caja!.x + 50, caja!.y + 50);
     await expect(page.getByRole('alert')).toHaveText('«animacion.gif» no es una imagen que se pueda usar: sube PNG, JPEG, WebP o SVG.');
     expect(ediciones).toEqual([]);
     await pestana(page, 'Imágenes');

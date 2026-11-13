@@ -94,7 +94,14 @@ export interface OpcionesSimulacion {
   sinIngles?: string[];
   /** HU-1104 · La navegación vigente del curso (p. ej. tras aplicar un patrón propuesto en una simulación propia). */
   navegacionCurso?: () => Record<string, unknown>;
+  /** HU-0704 · El proyecto tiene la grabación del gerente transcrita («Grabacion_gerente.wav», 3 s) en Material del cliente. */
+  conAudioCliente?: boolean;
 }
+
+/** HU-0704 · El audio del cliente de la simulación y su transcripción. */
+export const AUDIO_CLIENTE = { materialId: '00000000-0000-4000-8000-000000000a01', recursoId: '00000000-0000-4000-8000-000000000a02', limpioId: '00000000-0000-4000-8000-000000000a03', nombre: 'Grabacion_gerente.wav', texto: 'Antes de intervenir un equipo, bloquea todas sus fuentes de energía.' };
+/** Las marcas de boca que el worker calcula de la grabación (3 s): una forma distinta cada 250 ms. */
+export const BOCAS_GRABACION: [number, string][] = [...Array.from({ length: 12 }, (_, i) => [i * 250, ['B', 'D', 'C', 'E', 'A', 'F'][i % 6]!] as [number, string]), [3000, 'X']];
 
 /** HU-0604 · Los retoques de p05 con `retoquesP05`. */
 export const RETOQUES_P05 = {
@@ -278,7 +285,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -308,6 +315,9 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const fichas: Record<string, unknown>[] = [];
   let pronunciacion: { idioma: string; escrito: string; pronunciado: string }[] = [];
   const materiales = new Map<string, Record<string, unknown>[]>();
+  // HU-0704 · Las grabaciones usadas como narración (por pantalla) y la limpieza del audio del cliente.
+  const grabaciones = new Map<string, { consultas: number; grabacion: Record<string, string> }>();
+  const limpiezaSim: { estado: 'procesando' | 'listo' | null; consultas: number } = { estado: null, consultas: 0 };
   // El curso del proyecto con pantallas: CP-047 lo muestra tomado del «Manual» del cliente y 3 pantallas tienen observaciones.
   const revision = { version: 1, documento: cursoTraducido ? traducirLoto(cursoLoto()) : cursoLoto(), observaciones: OBSERVACIONES.map((o) => ({ ...o })) };
   if (retoquesP05) {
@@ -634,13 +644,64 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     // HU-0501 y HU-0502 · Revisión: observaciones, edición y aprobación sobre el mismo curso (RN-05-1, RN-05-2).
     if (ruta === `/cursos/${CURSO_ID}/observaciones`) return responder(200, revision.observaciones);
+    // HU-0704 · Audio del cliente: la limpieza termina a la 2.ª consulta y la grabación, en la 2.ª consulta de narraciones.
+    if (ruta === `/cursos/${CURSO_ID}/audios-cliente`) {
+      if (!conAudioCliente) return responder(200, []);
+      const origen = new URL(req.url()).origin;
+      if (limpiezaSim.estado === 'procesando' && ++limpiezaSim.consultas >= 2) limpiezaSim.estado = 'listo';
+      return responder(200, [{
+        materialId: AUDIO_CLIENTE.materialId, recursoId: AUDIO_CLIENTE.recursoId, nombre: AUDIO_CLIENTE.nombre, duracionS: 134, texto: AUDIO_CLIENTE.texto, url: `${origen}/s3-simulado/audio-3000.wav`,
+        limpieza: limpiezaSim.estado ? { estado: limpiezaSim.estado, ...(limpiezaSim.estado === 'listo' ? { recursoId: AUDIO_CLIENTE.limpioId, url: `${origen}/s3-simulado/audio-3001.wav` } : {}) } : null,
+      }]);
+    }
+    if (ruta === `/materiales/${AUDIO_CLIENTE.materialId}/limpiar` && req.method() === 'POST') {
+      if (limpiezaSim.estado !== 'listo') Object.assign(limpiezaSim, { estado: 'procesando', consultas: 0 });
+      return responder(202, { estado: limpiezaSim.estado });
+    }
+    const deGrabacion = ruta.match(new RegExp(`^/cursos/${CURSO_ID}/narraciones/(p\\d+)/(grabacion|relocutar)$`));
+    if (deGrabacion && req.method() === 'POST') {
+      const datos = req.postDataJSON() as { materialId: string; autorizado?: boolean; usarLimpio?: boolean; version: number };
+      if (deGrabacion[2] === 'grabacion' && datos.autorizado !== true) return responder(422, { codigo: 'AUTORIZACION_REQUERIDA', mensaje: 'Marca «El cliente autorizó usar esta grabación» para usarla en el curso' });
+      if (datos.version !== revision.version) return responder(409, { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso. Recarga para ver la última versión.' });
+      historial.set(revision.version, structuredClone(revision.documento));
+      type PistaSim = Record<string, unknown> & { voz: { proveedor: string; voz: string; velocidad?: number } };
+      const p = pantallasSim().find((x) => x.id === deGrabacion[1]) as unknown as { estado: string; narracion: { texto: { es: string }; porIdioma: { es: PistaSim } } };
+      const textoAnterior = p.narracion.texto.es;
+      p.narracion.texto = { ...p.narracion.texto, es: AUDIO_CLIENTE.texto };
+      p.estado = 'borrador';
+      if (deGrabacion[2] === 'relocutar') {
+        delete p.narracion.porIdioma.es.grabacion;
+        if (p.narracion.porIdioma.es.voz.proveedor === 'cliente') p.narracion.porIdioma.es.voz = { proveedor: 'google', voz: 'es-US-Neural2-A', velocidad: 1 };
+        grabaciones.delete(deGrabacion[1]!);
+        cascadas.set(deGrabacion[1]!, 0);
+        return responder(200, { version: ++revision.version, estado: 'DESACTUALIZADA', regenerando: ['voz-es', 'boca', 'subtitulos-es'], textoAnterior });
+      }
+      const grabacion = { materialId: datos.materialId, recursoOrigenId: datos.usarLimpio ? AUDIO_CLIENTE.limpioId : AUDIO_CLIENTE.recursoId, version: datos.usarLimpio ? 'limpio' : 'original', autorizadoPor: USUARIO.nombre, autorizadoEn: new Date().toISOString() };
+      p.narracion.porIdioma.es = { estado: 'pendiente', voz: { proveedor: 'cliente', voz: 'grabacion' }, hashTexto: '0123456789abcdef', grabacion };
+      grabaciones.set(deGrabacion[1]!, { consultas: 0, grabacion });
+      return responder(202, { version: ++revision.version, estado: 'GENERANDO', regenerando: ['voz-es', 'boca', 'subtitulos-es'] });
+    }
     if (ruta === `/cursos/${CURSO_ID}/narraciones`) {
       const origen = new URL(req.url()).origin;
       for (const [id, k] of cascadas) cascadas.set(id, k + 1);
+      // HU-0704 · El worker deja el audio, la boca y los subtítulos de la grabación en el curso.
+      for (const [id, g] of grabaciones) {
+        if (++g.consultas !== 2) continue;
+        const pista = (pantallasSim().find((x) => x.id === id) as unknown as { narracion: { porIdioma: { es: Record<string, unknown> } } }).narracion.porIdioma.es;
+        Object.assign(pista, { estado: 'generado', recursoAudioId: `aud-${id}-grabacion`, duracionMs: 3000, bocas: BOCAS_GRABACION, subtitulosId: `sub-${id}-grabacion` });
+        revision.version++;
+      }
       return responder(200, vozLoto(30).narraciones.map((n) => {
         // La cascada: 1.ª consulta «Por regenerar», 2.ª voz lista, 3.ª boca, 4.ª subtítulos (o error en la voz).
         const k = cascadas.get(n.pantallaId) ?? 9;
         const estado = cascada === 'falla' && cascadas.has(n.pantallaId) ? 'ERROR' : k < 2 || porRegenerar.has(n.pantallaId) ? 'DESACTUALIZADA' : 'ACTUALIZADA';
+        const g = grabaciones.get(n.pantallaId);
+        if (g) {
+          return {
+            pantallaId: n.pantallaId, idioma: 'es', texto: AUDIO_CLIENTE.texto, origen: 'grabacion', voz: 'grabacion', estado: g.consultas < 2 ? 'GENERANDO' : 'ACTUALIZADA', grabacion: g.grabacion,
+            ...(g.consultas >= 2 ? { duracionS: 3, audioUrl: `${origen}/s3-simulado/${n.pantallaId}-es.mp3`, bocas: BOCAS_GRABACION } : {}),
+          };
+        }
         return {
           pantallaId: n.pantallaId, idioma: 'es', texto: n.texto, duracionS: Math.round(n.duracionMs / 100) / 10, origen: 'tts', voz: n.voz, estado,
           audioUrl: `${origen}/s3-simulado/${n.pantallaId}-es.mp3`,

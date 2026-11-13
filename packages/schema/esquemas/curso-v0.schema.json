@@ -603,6 +603,38 @@
         },
         "subtitulosId": {
           "$ref": "#/$defs/id"
+        },
+        "grabacion": {
+          "description": "HU-0704: la pista es una grabación del cliente (voz.proveedor = cliente). Guarda el material de origen, el audio usado y quién autorizó usarla y cuándo (RN-07-4).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "materialId",
+            "autorizadoPor",
+            "autorizadoEn"
+          ],
+          "properties": {
+            "materialId": {
+              "$ref": "#/$defs/id"
+            },
+            "recursoOrigenId": {
+              "$ref": "#/$defs/id"
+            },
+            "version": {
+              "enum": [
+                "original",
+                "limpio"
+              ]
+            },
+            "autorizadoPor": {
+              "type": "string",
+              "minLength": 1
+            },
+            "autorizadoEn": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
         }
       },
       "if": {

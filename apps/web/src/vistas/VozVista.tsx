@@ -11,7 +11,7 @@ import { api, ErrorApi, type Narracion } from '../api';
 type PantallaDoc = { id: string; narracion?: { porIdioma?: { es?: { bocas?: MarcasBoca } } } };
 
 /** El personaje del kit en línea; mientras suena un audio mueve la boca con sus marcas. */
-function AnaHablando({ svg, audio, bocas, colores }: { svg: string; audio: HTMLAudioElement | null; bocas?: MarcasBoca; colores: ColoresUniforme }) {
+export function AnaHablando({ svg, audio, bocas, colores }: { svg: string; audio: HTMLAudioElement | null; bocas?: MarcasBoca; colores: ColoresUniforme }) {
   const marco = useRef<HTMLDivElement>(null);
   const dibujo = useRef<SVGSVGElement | null>(null);
   useEffect(() => {
