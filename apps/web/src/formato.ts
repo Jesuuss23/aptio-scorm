@@ -83,3 +83,12 @@ export const NOMBRE_TAREA: Record<string, string> = {
   'IA-14': 'Patrón de navegación', 'IA-15': 'Componer pantalla', 'IA-16': 'Propuesta de retoque', 'IA-17': 'Corrección de alineación',
   'IA-18': 'Extracción de kit', VOZ: 'Narración', MUESTRA_VOZ: 'Muestra de voz', TRANSCRIPCION: 'Transcripción',
 };
+
+/** HU-1303 · Montos en soles como en el prototipo: S/ 3,641 (o con decimales: S/ 26.25). */
+export const soles = (n: number, decimales = 0) => `S/ ${n.toLocaleString('en-US', { minimumFractionDigits: decimales, maximumFractionDigits: decimales })}`;
+
+/** Número con 1 decimal como en el prototipo: 14.3. */
+export const decimal = (n: number, decimales = 1) => n.toLocaleString('en-US', { minimumFractionDigits: decimales, maximumFractionDigits: decimales });
+
+/** Porcentaje entero: 0.5806 → «58 %». */
+export const porcentaje = (n: number) => `${Math.round(n * 100)} %`;

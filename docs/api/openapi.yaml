@@ -3092,13 +3092,14 @@ paths:
       - Costos y rentabilidad
       summary: Ver parámetros de rentabilidad
       operationId: get_negocio_parametros
+      description: 'HU-1303 · ADMINISTRADOR y DISENADOR_INSTRUCCIONAL; sin datos guardados devuelve el ejemplo del prototipo con ejemplo = true'
       responses:
         '200':
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ParametrosNegocio'
+                $ref: '#/components/schemas/ParametrosNegocioGuardados'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -3108,7 +3109,7 @@ paths:
       - Costos y rentabilidad
       summary: Guardar parámetros de rentabilidad
       operationId: put_negocio_parametros
-      description: Solo ADMINISTRADOR
+      description: 'Solo ADMINISTRADOR; guarda los de su organización (auditoría PARAMETROS_NEGOCIO_GUARDADOS)'
       requestBody:
         required: true
         content:
@@ -3121,7 +3122,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ParametrosNegocio'
+                $ref: '#/components/schemas/ParametrosNegocioGuardados'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -3134,7 +3135,7 @@ paths:
       - Costos y rentabilidad
       summary: Calcular rentabilidad
       operationId: get_negocio_rentabilidad
-      description: Con «mediciones» usa los promedios de MedicionProceso
+      description: 'Con «mediciones» usa el promedio por etapa de los proyectos medidos de cada escenario; un escenario sin mediciones usa los supuestos. ADMINISTRADOR y DISENADOR_INSTRUCCIONAL'
       parameters:
       - name: fuente
         in: query
@@ -3144,6 +3145,7 @@ paths:
           enum:
           - supuestos
           - mediciones
+          default: supuestos
       responses:
         '200':
           description: OK
@@ -3155,12 +3157,15 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /negocio/mediciones:
     get:
       tags:
       - Costos y rentabilidad
       summary: Listar mediciones de horas
       operationId: get_negocio_mediciones
+      description: 'De la organización, las más nuevas primero. ADMINISTRADOR y DISENADOR_INSTRUCCIONAL'
       responses:
         '200':
           description: OK
@@ -3179,6 +3184,7 @@ paths:
       - Costos y rentabilidad
       summary: Registrar horas medidas
       operationId: post_negocio_mediciones
+      description: 'ADMINISTRADOR y DISENADOR_INSTRUCCIONAL; 422 con datos no válidos o PROYECTO_NO_VALIDO si proyectoId es de otra organización'
       requestBody:
         required: true
         content:
@@ -3198,6 +3204,29 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '422':
           $ref: '#/components/responses/NoValido'
+  /negocio/mediciones/{id}:
+    delete:
+      tags:
+      - Costos y rentabilidad
+      summary: Borrar una medición
+      operationId: delete_negocio_mediciones_id
+      description: 'HU-1303 · Corrige una medición registrada por error (auditoría MEDICION_BORRADA). ADMINISTRADOR y DISENADOR_INSTRUCCIONAL'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Borrada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /conexiones-ia:
     get:
       tags:
@@ -7081,31 +7110,121 @@ components:
                 type: number
     ParametrosNegocio:
       type: object
+      description: 'HU-1303 · Datos del negocio de la organización; montos en soles salvo iaPorScormUsd'
+      required:
+      - precioHoy
+      - precioCompetencia
+      - precioNuevo
+      - personas
+      - horasProductivasDia
+      - tarifaHora
+      - tipoCambio
+      - diasEsperaHoy
+      - diasEsperaGenerador
+      - licenciasMesHoy
+      - licenciasMesGenerador
+      - iaPorScormUsd
+      - etapas
       properties:
         precioHoy:
           type: number
+          minimum: 0
         precioCompetencia:
           type: number
+          minimum: 0
         precioNuevo:
           type: number
+          minimum: 0
         personas:
           type: integer
+          minimum: 1
         horasProductivasDia:
           type: number
+          minimum: 0.5
+          maximum: 24
         tarifaHora:
           type: number
+          minimum: 0
         tipoCambio:
           type: number
+          minimum: 0.01
+          description: Soles por dólar
         diasEsperaHoy:
           type: number
+          minimum: 0
         diasEsperaGenerador:
           type: number
+          minimum: 0
         licenciasMesHoy:
           type: number
+          minimum: 0
         licenciasMesGenerador:
           type: number
+          minimum: 0
         iaPorScormUsd:
           type: number
+          minimum: 0
+        etapas:
+          type: array
+          maxItems: 8
+          description: Las 8 etapas fijas de docs/11-medicion-y-piloto.md; las que falten toman el ejemplo
+          items:
+            type: object
+            required:
+            - etapa
+            - horasHoy
+            - horasGenerador
+            properties:
+              etapa:
+                type: string
+                enum:
+                - lectura-guion
+                - diseno-grafico
+                - animacion
+                - audio
+                - boca
+                - ingles
+                - correcciones
+                - empaquetado
+              horasHoy:
+                type: number
+                minimum: 0
+              horasGenerador:
+                type: number
+                minimum: 0
+    ParametrosNegocioGuardados:
+      allOf:
+      - $ref: '#/components/schemas/ParametrosNegocio'
+      - type: object
+        required:
+        - ejemplo
+        - actualizadoEn
+        properties:
+          ejemplo:
+            type: boolean
+            description: true mientras la organización no guarde los suyos (valores de ejemplo del prototipo)
+          actualizadoEn:
+            type: string
+            format: date-time
+            nullable: true
+    Rentabilidad:
+      type: object
+      description: 'HU-1303 · RN-13-1, hoy frente a con el generador; costos en soles; las divisiones entre cero dan 0'
+      required:
+      - fuente
+      - etapas
+      - horasHoy
+      - horasGenerador
+      - costoHoy
+      - costoGenerador
+      - proyectosMedidos
+      - respaldo
+      properties:
+        fuente:
+          type: string
+          enum:
+          - supuestos
+          - mediciones
         etapas:
           type: array
           items:
@@ -7113,13 +7232,12 @@ components:
             properties:
               etapa:
                 type: string
+              nombre:
+                type: string
               horasHoy:
                 type: number
               horasGenerador:
                 type: number
-    Rentabilidad:
-      type: object
-      properties:
         horasHoy:
           type: number
         horasGenerador:
@@ -7142,15 +7260,32 @@ components:
           type: number
         margenPrecioNuevo:
           type: number
-        fuente:
-          type: string
-          enum:
-          - supuestos
-          - mediciones
+        proyectosMedidos:
+          type: object
+          description: Proyectos medidos de cada escenario (0 con supuestos)
+          properties:
+            hoy:
+              type: integer
+            generador:
+              type: integer
+        respaldo:
+          type: object
+          description: Con «mediciones», un escenario sin mediciones usa los supuestos
+          properties:
+            hoy:
+              type: string
+              enum:
+              - supuestos
+              - mediciones
+            generador:
+              type: string
+              enum:
+              - supuestos
+              - mediciones
     MedicionProceso:
       type: object
+      description: 'HU-1303 · Horas reales de una etapa de un proyecto medido. proyectoRef es obligatorio sin proyectoId'
       required:
-      - proyectoRef
       - escenario
       - etapa
       - horas
@@ -7158,8 +7293,17 @@ components:
         id:
           type: string
           format: uuid
+          readOnly: true
+        proyectoId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Proyecto de la herramienta (422 PROYECTO_NO_VALIDO si es de otra organización)
         proyectoRef:
           type: string
+          minLength: 2
+          maxLength: 120
+          description: Nombre del proyecto medido (puede ser anterior a la herramienta)
         escenario:
           type: string
           enum:
@@ -7167,8 +7311,29 @@ components:
           - generador
         etapa:
           type: string
+          enum:
+          - lectura-guion
+          - diseno-grafico
+          - animacion
+          - audio
+          - boca
+          - ingles
+          - correcciones
+          - empaquetado
         horas:
           type: number
           minimum: 0
+          maximum: 9999.99
+          multipleOf: 0.01
         notas:
           type: string
+          maxLength: 500
+          nullable: true
+        registradoPor:
+          type: string
+          nullable: true
+          readOnly: true
+        creadoEn:
+          type: string
+          format: date-time
+          readOnly: true

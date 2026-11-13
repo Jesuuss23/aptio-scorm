@@ -33,17 +33,18 @@ model Organizacion {
   creadoEn      DateTime           @default(now())
   actualizadoEn DateTime           @updatedAt
 
-  usuarios      Usuario[]
-  clientes      Cliente[]
-  proyectos     Proyecto[]
-  cursos        Curso[]
-  generaciones  Generacion[]
-  trabajosIA    TrabajoIA[]
-  recursos      Recurso[]
-  exportaciones Exportacion[]
-  mediciones    MedicionProceso[]
-  auditoria     Auditoria[]
-  subidas       Subida[]
+  usuarios          Usuario[]
+  clientes          Cliente[]
+  proyectos         Proyecto[]
+  cursos            Curso[]
+  generaciones      Generacion[]
+  trabajosIA        TrabajoIA[]
+  recursos          Recurso[]
+  exportaciones     Exportacion[]
+  mediciones        MedicionProceso[]
+  parametrosNegocio ParametrosNegocio?
+  auditoria         Auditoria[]
+  subidas           Subida[]
 }
 
 // ---------- Personas y acceso ----------
@@ -208,14 +209,15 @@ model Proyecto {
   creadoEn              DateTime       @default(now())
   actualizadoEn         DateTime       @updatedAt
 
-  cliente      Cliente          @relation(fields: [clienteId], references: [id])
-  creadoPor    Usuario          @relation("ProyectoCreador", fields: [creadoPorId], references: [id])
+  cliente      Cliente           @relation(fields: [clienteId], references: [id])
+  creadoPor    Usuario           @relation("ProyectoCreador", fields: [creadoPorId], references: [id])
   materiales   MaterialFuente[]
   curso        Curso?
   generaciones Generacion[]
   trabajosIA   TrabajoIA[]
+  mediciones   MedicionProceso[]
   recursos     Recurso[]
-  organizacion Organizacion     @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  organizacion Organizacion      @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
   @@index([clienteId, estado])
   @@index([organizacionId, estado])
@@ -625,15 +627,20 @@ model ConfigProveedor {
 }
 
 model ParametrosNegocio {
-  id            String   @id @default("unico")
-  datos         Json // precio actual, precio competencia, tarifa hora, personas, horas productivas, licencias, tipo de cambio…
-  actualizadoEn DateTime @updatedAt
+  id             String        @id @default(uuid())
+  /// HU-1303 · Un registro por organización; el antiguo «unico» queda sin organización y no se usa.
+  organizacionId String?       @unique @db.Uuid
+  datos          Json // precio actual, precio competencia, tarifa hora, personas, horas productivas, licencias, tipo de cambio…
+  actualizadoEn  DateTime      @updatedAt
+  organizacion   Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 }
 
 model MedicionProceso {
   id             String       @id @default(uuid()) @db.Uuid
   organizacionId String       @db.Uuid
   proyectoRef    String // nombre del proyecto medido (puede ser anterior a la herramienta)
+  /// HU-1303 · Proyecto de la herramienta, si el medido existe en ella.
+  proyectoId     String?      @db.Uuid
   escenario      String // hoy | generador
   etapa          String
   horas          Decimal      @db.Decimal(6, 2)
@@ -641,8 +648,10 @@ model MedicionProceso {
   registradoPor  String?
   creadoEn       DateTime     @default(now())
   organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  proyecto       Proyecto?    @relation(fields: [proyectoId], references: [id], onDelete: SetNull)
 
   @@index([proyectoRef, escenario])
+  @@index([organizacionId])
 }
 
 model Auditoria {

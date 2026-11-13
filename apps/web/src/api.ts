@@ -7,6 +7,7 @@ import type { OperacionPatch } from '@aptio/schema/patch';
 import type { MarcadorVideo } from '@aptio/schema/marcadores';
 import type { EstadoTraduccion } from '@aptio/schema/traduccion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
+import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
 
 export interface Usuario {
   id: string;
@@ -556,6 +557,15 @@ export interface ResumenCostos {
   porProveedorTarea: { proveedor: string; tarea: string; llamadas: number; usd: number }[];
 }
 
+/** HU-1303 · Parámetros de rentabilidad: los edita administración; diseño instruccional los ve y registra mediciones. */
+export const EDITAN_PARAMETROS: Rol[] = ['ADMINISTRADOR'];
+export type ParametrosGuardados = ParametrosNegocio & { ejemplo: boolean; actualizadoEn: string | null };
+export interface MedicionHoras {
+  id: string; proyectoRef: string; proyectoId: string | null; escenario: 'hoy' | 'generador'; etapa: string; horas: number;
+  notas: string | null; registradoPor: string | null; creadoEn: string;
+}
+export interface MedicionEntrada { proyectoRef?: string; proyectoId?: string; escenario: string; etapa: string; horas: number; notas?: string }
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
   ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
@@ -566,6 +576,11 @@ export const api = {
     const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
     return pedir<ResumenCostos>(`/costos${q ? `?${q}` : ''}`);
   },
+  parametrosNegocio: () => pedir<ParametrosGuardados>('/negocio/parametros'),
+  guardarParametrosNegocio: (datos: ParametrosNegocio) => pedir<ParametrosGuardados>('/negocio/parametros', json(datos, 'PUT')),
+  mediciones: () => pedir<MedicionHoras[]>('/negocio/mediciones'),
+  registrarMedicion: (datos: MedicionEntrada) => pedir<MedicionHoras>('/negocio/mediciones', json(datos)),
+  borrarMedicion: (id: string) => pedir<void>(`/negocio/mediciones/${id}`, { method: 'DELETE' }),
   clientes: (buscar = '') => pedir<Cliente[]>(`/clientes${buscar ? `?buscar=${encodeURIComponent(buscar)}` : ''}`),
   cliente: (id: string) => pedir<Cliente>(`/clientes/${id}`),
   crearCliente: (datos: ClienteEntrada) => pedir<Cliente>('/clientes', json(datos)),

@@ -97,7 +97,7 @@ export function App() {
       ) : vista?.activo === '/' ? (
         <Proyectos rol={usuario.rol} />
       ) : vista?.activo === '/rentabilidad' && venCostos ? (
-        <Rentabilidad />
+        <Rentabilidad rol={usuario.rol} />
       ) : vista?.activo === '/nuevo' && puedeCrear ? (
         <NuevoScorm />
       ) : vista?.id ? (
