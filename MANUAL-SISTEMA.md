@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.65 · actualizado con la tercera entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -126,6 +126,13 @@ sequenceDiagram
 3. `Exportacion.incluirDiagnostico` (por defecto true) llega al paquete; con false el paquete no responde al atajo ni a la consulta.
 4. `GET` y `POST /api/v1/clientes/{id}/fichas-lms` guardan en `FichaCompatibilidad` el LMS, la versión, el límite de subida, las notas y el informe tal cual (un objeto de menos de 256 KB, como dato; SUP-58). La lista va de la más nueva a la más vieja; crean administración, diseño instruccional y producción, y cada creación queda en la auditoría como `FICHA_LMS_CREADA`. La ficha más nueva fija el límite de la validación (3.3.0.1).
 
+
+### 3.3.0.3 Kit de gamificación para el LMS (HU-1205)
+
+1. La tarjeta «Kit de gamificación para el LMS» de Entrega pide `POST /api/v1/cursos/{id}/exportaciones` con `formato: KIT_GAMIFICACION`, `perfilLms` (el LMS de la guía) y `modoIdioma` (`unico` o `mismo-paquete`). Sin `perfilLms`, la API toma el LMS de los datos técnicos del proyecto (`perfilPropuesto`). No hay validación previa (`validar` sigue siendo de SCORM 1.2 y HTML) ni migración: el formato ya existía. Con `mismo-paquete` no se exige el inglés.
+2. La cola `export` lee la versión ligada del curso y el kit de marca del cliente (paleta, tipografías y logo, que se lee del almacenamiento) y llama a `construirKitGamificacion` de `@aptio/exporters`. Las insignias son las de `gamificacion.insignias` o, si no hay, una por cápsula, una por módulo y una del curso por plantilla, sin IA (SUP-161). Los PNG de 512 px los dibuja `@resvg/resvg-js` con las fuentes del servidor (SUP-163).
+3. El ZIP lleva `insignias/svg/`, `insignias/png/`, `plan.json` (nota de `seguimiento.notaMinima` si el curso se completa por la sumativa, niveles y orden de desbloqueo), `guia-<lms>.html` con la nota «Verificar con la versión del cliente» (SUP-162) y `LEEME.txt`. Es determinista para el mismo curso, kit y LMS.
+4. Se guarda como recurso PAQUETE `<proyecto>-kit-<lms>-v<n>.zip` con proveedor `aptio` y modelo `kit-gamificacion v1`; el informe trae `lms`, `insignias`, `archivos` y las advertencias (nombres sin inglés). La descarga es la del historial, con los mismos permisos (M14) y el aislamiento por organización.
 ### 3.3.0.3 HTML autocontenido (HU-1203)
 
 1. Con `formato: HTML`, la API valida sin límite de subida ni `suspend_data` (`limiteMb`, `origenLimite` y `suspendDataCaracteres` en `null`, SUP-60). Crea la Exportacion con perfil `generico` e `incluirDiagnostico: false`.
@@ -330,6 +337,122 @@ La regla RN-13-1 vive en `@aptio/schema/rentabilidad`, que usan la API y la web 
 - **Parámetros:** uno por organización (`ParametrosNegocio.organizacionId`, migración aditiva); mientras no se guarden, `GET /negocio/parametros` devuelve el ejemplo del prototipo con `ejemplo: true`. `PUT` solo administración (auditoría PARAMETROS_NEGOCIO_GUARDADOS).
 - **Mediciones:** `MedicionProceso` por proyecto (id de la herramienta o nombre), escenario (`hoy` o `generador`) y una de las 8 etapas fijas. Con `GET /negocio/rentabilidad?fuente=mediciones`, cada proyecto suma sus horas por etapa y se promedia entre los proyectos del escenario; el que no tiene mediciones usa los supuestos y lo dice `respaldo`. Registrar y borrar (`DELETE /negocio/mediciones/{id}`, auditoría MEDICION_BORRADA): administración y diseño instruccional; los demás reciben 403 (SUP-143 a SUP-145).
 
+### 3.8 Conexiones IA y límite de gasto (HU-1304)
+
+Cada organización elige proveedor, modelo y límite mensual por tarea (`ConfigProveedor` con `organizacionId`, único por organización y tarea; migración aditiva). Sin fila guardada se usa el entorno, como antes.
+
+- **En caliente (CP-099, RN-13-2):** el worker lee la conexión al empezar cada trabajo; no hace falta reiniciarlo. En texto, `tareaRegistrada` registra el tipo real (texto, pantallas con IA-15/IA-16, traducción con IA-10, calidad con IA-12) y usa el modelo de la conexión, que debe tener tarifa en `TARIFAS`. En voz, la etapa 6 usa el proveedor activo: la voz del kit si es de ese proveedor o la voz por idioma de la conexión; una narración ya lista se conserva.
+- **Límite (CP-100, RN-04-7):** antes de llamar al proveedor (texto, voz y transcripción) se suma `TrabajoIA.costoUsd` de la organización y el tipo desde el día 1 del mes de Lima. Si llega al límite, el trabajo queda en error con «LIMITE_GASTO: …», se audita LIMITE_GASTO_ALCANZADO y no se llama al proveedor; la generación se continúa con `POST /generaciones/{id}/continuar` después de subirlo. Desde HU-1403, el primer tope del mes con ese límite avisa por correo a cada administración activa (el worker usa `SMTP_URL`; un fallo queda en el registro y no cambia nada).
+- **API (solo administración):** `GET /conexiones-ia` (las 8 tareas con opciones, `claveConfigurada`, costo estimado, gasto del mes, límite y `limiteAlcanzado`, más el total del mes y la suma de límites para el medidor), `PUT /conexiones-ia/{tarea}` (auditoría CONEXION_IA_GUARDADA; 422 PROVEEDOR_NO_VALIDO, MODELO_NO_VALIDO o un campo de clave) y `POST /conexiones-ia/{tarea}/probar` (llamada mínima en modo real, «simulado, OK» en simulado; no se registra en TrabajoIA).
+- **Claves (RN-13-3):** solo en variables de entorno (`ANTHROPIC_API_KEY`, `GOOGLE_TTS_API_KEY`, `ELEVENLABS_API_KEY`); nunca se guardan ni se devuelven (SUP-146 a SUP-150).
+
+### 3.9 Comentarios del revisor del cliente (HU-0506)
+
+Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, índice compuesto) y no tocan el documento del curso ni su versión.
+
+- **Quién (CP-055):** `GET` y `POST /cursos/{id}/comentarios` los usan el equipo y REVISOR_CLIENTE con el mismo alcance que el curso: el revisor solo en los proyectos de su cliente; otro cliente u otra organización responde 404. El revisor sigue sin poder guardar pantallas (403).
+- **Qué:** texto plano de 1 a 1000 caracteres, recortado y sin caracteres de control salvo saltos de línea y tabulaciones; la pantalla debe existir en el curso (422 PANTALLA_NO_EXISTE). La respuesta trae el autor con su rol para el distintivo «Cliente». El texto no se edita ni se borra.
+- **Resolver:** `PATCH /comentarios/{id}` con `{resuelto}`, solo el equipo (403 al revisor); guarda o limpia `resueltoPorId` y `resueltoEn` (migración aditiva) y audita COMENTARIO_RESUELTO o COMENTARIO_REABIERTO.
+- **Estado de aprobación:** comentar no lo cambia y los comentarios abiertos no bloquean la exportación. Desde HU-1403, un comentario del revisor del cliente avisa por correo a quien creó el proyecto y a diseño instruccional, sin esperar el envío (SUP-151 a SUP-155, SUP-158).
+
+### 3.10 Observabilidad y copias de seguridad (HU-1403)
+
+- **Copia diaria (CP-108):** la cola `mantenimiento` del worker corre `respaldar` a las 3:00 de Lima (y con «Respaldar ahora», `POST /operacion/respaldar`, id fijo `respaldo-manual`, 409 si hay una corriendo o pendiente). `@aptio/respaldo` crea la fila `Respaldo` (EN_CURSO), hace `pg_dump --format=custom` con la clave en `PGPASSWORD` (nunca en los argumentos), lo sube a `<carpeta>/base.dump` del bucket `S3_BUCKET_RESPALDOS`, copia cada objeto del bucket de recursos a `<carpeta>/objetos/` con el cifrado KMS y sube al final `manifiesto.json`. Termina EXITOSO (tamaño, duración y objetos) o FALLIDO (con el error, y borra lo subido a medias), con auditoría RESPALDO_CREADO o RESPALDO_FALLIDO. Después purga las carpetas de más de 14 días (EXPIRADO, RESPALDOS_PURGADOS).
+- **Restaurar:** `pnpm respaldo:restaurar <AAAA-MM-DD o carpeta> --base postgresql://… --bucket nombre` toma la última copia con manifiesto de ese día de Lima, exige una base vacía, se niega a usar la base o el bucket en uso o el de respaldos, corre `pg_restore --exit-on-error` y copia los objetos al bucket nuevo. La prueba CP-108 levanta la API sobre lo restaurado y comprueba salud, ingreso, proyectos y curso.
+- **Operación (`GET /operacion`, solo administración):** errores por proveedor de la organización (24 h y 7 días de Lima, desde TrabajoIA y los fallos de BullMQ sin TrabajoIA, LIMITE_GASTO aparte), pendientes, activos y fallidos de las 5 colas (null si Redis no responde en 2 s), tiempo y costo promedio de las 11 etapas en 30 días y las copias de 14 días (SUP-156 a SUP-160).
+
+### 3.11 Sitio web: acceso del superadmin (HU-1501)
+
+`GET /sitio/paginas` (módulo `sitio`, M16) responde solo al SUPERADMIN. En la web, el superadmin entra directo a «Sitio web › Resumen» (`/sitio`, PNT-24) y cualquier otra ruta lo devuelve ahí (SUP-166). Para el resto de los roles, el grupo no existe y `/sitio` muestra «Página no encontrada». No hay migración: el rol ya estaba en el esquema y en la semilla (`superadmin@aptio.test`).
+
+### 3.12 Páginas con estados y programación (HU-1502)
+
+- **Estados (RN-16-6):** BORRADOR, PROGRAMADA y PUBLICADA en `SitioPagina`, única por ruta e idioma. `POST` y `PATCH /sitio/paginas` cambian el título, la ruta (en una publicada crea la 301 de la anterior, HU-1512) y el estado; `DELETE` solo en borrador. Cada cambio deja una fila `SITIO_PAGINA_*` en la auditoría, sin organización.
+- **Sitio público:** `GET /publico/paginas?ruta=&idioma=` responde 404 si la página no está publicada (CP-110) y `GET /publico/sitemap.xml` lista solo las publicadas con `SITIO_URL` (el inglés bajo `/en`, SUP-168). Toda ruta `/publico/*` tiene un límite de 60 peticiones por minuto por IP (SUP-169).
+- **Programación (CP-111):** la tarea `publicar-paginas` de la cola `mantenimiento` corre cada 30 s y publica las programadas vencidas, con auditoría sin usuario; la cola atiende 2 tareas a la vez para que una copia de seguridad no la atrase (SUP-171).
+
+### 3.13 Editor de página por bloques (HU-1503)
+
+- **Bloques (REQ-066):** cada página tiene filas `SitioBloque` (tipo del catálogo cerrado de 18, `orden` 0, 1, 2… sin huecos, `visible` y `ajustes` en JSON), que se borran con su página. Un bloque nuevo va al final y oculto (RN-16-2); ocultarlo no borra sus `ajustes` (CP-112).
+- **Rutas (solo SUPERADMIN):** `GET`, `POST` y `PATCH /sitio/paginas/{paginaId}/bloques` (listar, agregar, reordenar con la lista completa de ids; 422 ORDEN_INVALIDO si faltan, se repiten o son de otra página) y `PATCH` y `DELETE /sitio/paginas/{paginaId}/bloques/{bloqueId}` (mostrar u ocultar; borrar y compactar). Cada cambio deja una fila `SITIO_BLOQUE_*` o `SITIO_BLOQUES_REORDENADOS` en la auditoría.
+- **Sitio público:** `GET /publico/paginas` devuelve `bloques` con solo los visibles y en su orden (CP-113); si la página no está publicada, 404 sin bloques (RN-16-4). Mientras no exista la publicación con versiones (HU-1507), los cambios se ven al momento (SUP-172).
+
+### 3.14 Contenido administrable (HU-1504)
+
+- **Colecciones (REQ-066):** `SitioElemento` guarda cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas con `orden`, `visible` (nace en false, CP-115) y `datos`. Los campos de cada colección son cerrados y solo texto plano, sin etiquetas HTML (RN-16-7); los valida `@aptio/schema/sitio-contenido` en la API y en la web.
+- **Rutas (solo SUPERADMIN):** `GET`, `POST` y `PATCH /sitio/elementos` (listar por `coleccion`, agregar, reordenar con la lista completa) y `PATCH` y `DELETE /sitio/elementos/{id}` (datos parciales o visibilidad; borrar y compactar). Cada cambio deja una fila `SITIO_ELEMENTO_*` o `SITIO_ELEMENTOS_REORDENADOS` en la auditoría.
+- **Sitio público:** en `GET /publico/paginas`, cada bloque visible con colección trae sus `elementos` visibles en orden; la visibilidad va en cascada página → bloque → elemento (RN-16-4, CP-114). Las preguntas generales salen en todas las páginas y las de una ruta solo en esa (SUP-177).
+
+### 3.15 Datos ficticios y bloqueo de publicación (HU-1505)
+
+- **Entorno (`SITIO_ENTORNO`):** `pruebas` o, si falta o trae otro valor, `produccion` (SUP-179). Lo leen la API en cada uso y el worker en cada vuelta.
+- **Regla (RN-16-3):** un `SitioElemento` con `ficticio` y `visible` bloquea en producción publicar cualquier página: `PATCH` o `POST /sitio/paginas` con `accion=publicar` responde 409 FICTICIOS_VISIBLES con la lista (CP-116). En pruebas publica y devuelve `avisoFicticios` (CP-117). `GET /sitio/ficticios` lista los visibles y `POST /sitio/ficticios/ocultar` los oculta de una vez, con auditoría.
+- **Programadas:** en producción la tarea de 30 s no publica mientras haya ficticios visibles; deja SITIO_PAGINA_BLOQUEADA una vez en la auditoría y publica en la primera vuelta sin ficticios (SUP-181).
+- **Sitio público:** en producción `GET /publico/paginas` nunca devuelve ficticios; en pruebas salen con `ficticio: true` (SUP-182).
+
+### 3.16 Menú y pie administrables (HU-1506)
+
+- **Datos (REQ-066):** `SitioEnlace` guarda el menú principal (plano) y el pie (columnas y sus enlaces, dos niveles) con `orden` entre hermanos y `visible` en false al crearse (RN-16-2). Borrar una columna borra sus enlaces.
+- **Reglas:** el texto es texto plano de hasta 60 caracteres (RN-16-7). La ruta es interna (`/precios`, `/#testimonios`) o `https://` y se marca `externo`; `javascript:`, `http:`, `data:` y el resto dan 422 (SUP-185). Las rutas `/sitio/navegacion` son solo del superadmin y cada cambio queda en la auditoría (SITIO_ENLACE_*).
+- **Sitio público:** `GET /publico/navegacion` devuelve `{ menu, pie }` solo con lo visible y en su orden. Una columna oculta oculta sus enlaces, y la cabecera y el menú de celular usan la misma lista (CP-118, SUP-183). Desde la HU-1507 sale de la última versión publicada (SUP-184).
+
+### 3.17 Vista previa, versiones y restauración (HU-1507)
+
+- **Versiones (REQ-068, RN-16-5):** `SitioVersion` guarda instantáneas inmutables y numeradas del sitio completo: páginas PUBLICADAS con sus bloques y elementos visibles en orden, y el menú y el pie visibles. Las crean «Publicar cambios» (`POST /sitio/publicar`), publicar o retirar una página y la cola al publicar programadas; cada una publica todo lo pendiente (SUP-188). Se conservan todas y el panel lista las 50 últimas (SUP-191).
+- **Sitio público:** `GET /publico/paginas`, `GET /publico/navegacion` y el sitemap leen solo la última versión; sin versiones, 404, navegación vacía y sitemap vacío. En producción la instantánea nunca guarda ficticios y lo servido los vuelve a filtrar.
+- **Restaurar (CP-119):** `POST /sitio/versiones/{numero}/restaurar` crea la versión siguiente con la instantánea de la N; el panel no cambia (SUP-189). 422 VERSION_ACTUAL para la versión actual y, en producción, 409 FICTICIOS_VISIBLES si la instantánea los tiene. Auditoría SITIO_VERSION_PUBLICADA y SITIO_VERSION_RESTAURADA.
+- **Pendientes y vista previa:** `GET /sitio/versiones` compara por contenido la instantánea del panel con la última versión (`pendientes`). `GET /sitio/paginas/{paginaId}/vista-previa` devuelve la página en cualquier estado con el menú y el pie del panel; los ficticios salen marcados (SUP-190).
+
+### 3.18 Sitio público rápido y accesible (HU-1508)
+
+- **Cómo se sirve (DA-08, REQ-109):** cada versión nueva del sitio encola la tarea `sitio-prerender` en la cola `mantenimiento`. El worker arma el HTML de todas sus páginas (sin JavaScript, con el CSS en línea y fuentes propias), la 404, el sitemap y robots.txt, los sube al bucket bajo `sitio/v{n}/` y al final escribe `sitio/actual.json` con el número. El puntero solo avanza, así que el sitio cambia de una vez y un trabajo atrasado no lo devuelve a una versión vieja. La API sirve `GET /s/*` sin sesión: lee el puntero (lo guarda 5 s) y entrega el archivo de esa versión (que guarda en memoria, porque no cambia).
+- **Caché y CDN:** páginas, sitemap y robots con `public, max-age=0, s-maxage=60, must-revalidate`; la 404 con `s-maxage=30`; las fuentes, con su hash en el nombre, con `public, max-age=31536000, immutable`. Todo lleva `ETag` y responde 304 si coincide. En producción la CDN atiende el dominio, reenvía cada ruta a `/s/*`, respeta esas cabeceras, reenvía `If-None-Match` y no reenvía cookies ni la cadena de consulta (SUP-196, SUP-197); el worker usa `SITIO_BASE` vacío.
+- **Seguridad:** la ruta pedida solo admite segmentos con minúsculas, números y guiones (máximo 8) o una fuente con su hash; cualquier otra cosa es la 404. Las páginas llevan una CSP sin scripts, `nosniff` y `Referrer-Policy`. En producción el HTML nunca trae un dato ficticio (RN-16-3) y todo texto va escapado (RN-16-7).
+- **Estado y errores:** `SitioVersion.prerenderEstado` (`en_curso`, `listo`, `error`), con la fecha y el motivo; `GET /sitio/versiones` lo devuelve y el panel lo muestra en «Versiones». Auditoría SITIO_PRERENDER_LISTO y SITIO_PRERENDER_ERROR. Si falla, el sitio sigue con la versión anterior y se reintenta al arrancar el worker (si es la última) o con la próxima versión (SUP-198).
+- **Medición:** `pnpm sitio:lighthouse` y el trabajo «Sitio público (Lighthouse)» del CI miden la portada en celular con 4G simulado: LCP < 2,5 s, SEO ≥ 90 y accesibilidad ≥ 90 (SUP-199).
+
+### 3.19 Ajustes del sitio y modo mantenimiento (HU-1509)
+
+- **Datos (REQ-073, PNT-38):** una sola fila `SitioAjustes` con dominio, nombre, logo, favicon, IDs de analítica, WhatsApp, correo de leads y mantenimiento. Nombre, dominio, logo, favicon y WhatsApp entran en la instantánea de cada versión y llegan al sitio al publicar; el dominio publicado reemplaza a `SITIO_URL` en canonical y sitemap. El correo de leads y el mantenimiento valen al instante (SUP-202).
+- **Marca:** logo y favicon SVG (saneado) o PNG de hasta 200 KB, guardados como `sitio/marca/{tipo}-{sha8}.{ext}` y servidos en `/s/_marca/` con caché de un año. Quitar uno no borra el archivo porque lo usan versiones anteriores (SUP-204).
+- **Mantenimiento (CP-121):** la API lee los ajustes cada 5 s como máximo. Con el modo activo, `GET /s/*` (salvo fuentes y marca) responde 503 con `Retry-After: 600` y la página «Volvemos pronto» (noindex) a todo visitante; el superadmin con sesión ve el sitio con un aviso arriba y `Cache-Control: private, no-store`. En producción el panel y el sitio comparten el dominio de la cookie y la CDN no debe guardar respuestas `private` ni 503 (SUP-201).
+- **Dominio:** «Comprobar» abre una conexión TLS al 443 (5 s) y muestra si el certificado es válido, su emisor y vencimiento. Emitir el certificado lo hace la CDN (HU-1405, SUP-203).
+- **Analítica:** los IDs se guardan validados pero no se cargan hasta el banner de cookies; el sitio sigue sin JavaScript (SUP-200).
+- **Auditoría:** SITIO_AJUSTES_ACTUALIZADOS (campos y si requieren publicar), SITIO_MANTENIMIENTO_ACTIVADO y SITIO_MANTENIMIENTO_DESACTIVADO.
+
+### 3.20 Landings por sector (HU-1514)
+
+- **Datos (REQ-092, PNT-25):** una landing es una fila de `SitioPagina` con `tipo = sector`, nombre del sector, portada (título y texto), meta título y categoría inicial del blog. Vive en `/sectores/{slug del sector}`; la ruta no cambia si cambia el sector (SUP-208).
+- **Creación:** nace en borrador con los bloques de la plantilla ocultos (SUP-210). RN-16-9: sin portada completa y meta título no se publica, no se programa y no se deja así si ya está publicada (422 LANDING_INCOMPLETA).
+- **Publicación:** solo una landing completa lleva `sector` en la instantánea. Sus testimonios son los de su sector, comparados por nombre sin mayúsculas, o todos los visibles si no hay ninguno (CP-157, SUP-209); sus preguntas, las de su ruta, las del inicio y las generales (SUP-207). El bloque «Sectores» del inicio y la columna «Sectores» del pie salen de las landings publicadas del idioma: una en borrador no está en la versión, así que no aparece y su ruta da 404 (CP-158).
+- **Resuelto:** la categoría del blog la usa la HU-1511 (CP-159, SUP-206) y el SEO por página llegó con la HU-1512 (SUP-205, 3.23).
+- **Auditoría:** SITIO_PAGINA_CREADA con `tipo` y `sector`, y SITIO_PAGINA_EDITADA con los campos de landing cambiados.
+
+### 3.21 Sitio en español e inglés (HU-1510)
+
+- **Datos (REQ-069):** cada elemento de contenido y cada enlace del menú y del pie es de un idioma (`es` o `en`); lo que existía antes queda en español. El orden y la compactación al borrar van dentro de cada idioma. Las páginas ya tenían idioma: las de inglés viven en `/en…`.
+- **Publicación:** la versión arma cada página con el contenido de su idioma y guarda el menú y el pie de cada idioma. El ajuste «Mostrar selector ES/EN» (activo por defecto) entra en la versión, así que llega al sitio al publicar.
+- **Sitio:** las páginas en inglés usan su menú, su pie y los textos fijos en inglés (traducción pendiente de revisión, SUP-212). El selector ES · EN es HTML puro en la cabecera y el menú de celular: sale si el inicio del otro idioma está publicado y lleva a la misma ruta si está publicada en ese idioma, o a su inicio (CP-122). Los `hreflang` (es, en y x-default hacia el español) y los alternos del sitemap salen solo entre páginas publicadas en los dos idiomas. La 404 va en español.
+- **Ficticios:** los del inglés cuentan igual: salen en la lista, se ocultan con los demás y bloquean publicar en producción (RN-16-3).
+- **Auditoría:** las acciones de elementos y enlaces guardan el idioma; el ajuste queda en SITIO_AJUSTES_ACTUALIZADOS con `publicar` true.
+
+### 3.22 Blog desde WordPress (HU-1511)
+
+- **Datos (REQ-070, RN-16-8):** WordPress es la fuente de los artículos. Aptio guarda la conexión (URL, frecuencia, artículos por filtro, imagen y autor, última sincronización y último error) y una copia de lectura de las categorías y de los artículos publicados sin clave, con su visibilidad y el orden de las categorías.
+- **Sincronización:** el worker revisa cada minuto y lee la API REST de WordPress cuando pasó la frecuencia (15, 30 o 60 minutos) o con «Sincronizar ahora». Lee hasta 100 categorías y los 100 artículos más nuevos, 10 s como máximo por pedido, sin seguir redirecciones y sin dominios que apunten a la red interna. Lo oculto sigue oculto; una categoría nueva entra visible al final; lo que WordPress deja de mandar se quita. La imagen destacada (hasta 800 px y 1 MB, JPEG, PNG o WebP) se copia al bucket y se sirve en `/s/_blog/`. Si WordPress falla, la copia queda y el error se guarda para el panel (CP-156).
+- **Fuera de las versiones:** el blog no entra en la instantánea. Cada sincronización con cambios y cada cambio del panel que se ve en el sitio vuelven a renderizar la versión vigente, así que llegan en segundos sin «Publicar cambios».
+- **Sitio:** la sección Blog filtra por categoría sin JavaScript (un radio y una lista por filtro, con su número de artículos, CP-123); en una landing empieza en su categoría inicial (CP-159). El pie suma «Últimos artículos». Una categoría o un artículo ocultos no salen en ningún lado (CP-155). Sin WordPress conectado no hay sección ni columna. `robots.txt` enlaza el sitemap de WordPress.
+- **Auditoría:** SITIO_BLOG_ACTUALIZADO, SITIO_BLOG_SINCRONIZACION_PEDIDA, SITIO_BLOG_CATEGORIAS_ORDENADAS, SITIO_BLOG_CATEGORIA_OCULTADA o _MOSTRADA, SITIO_BLOG_ARTICULO_OCULTADO o _MOSTRADO, SITIO_BLOG_SINCRONIZADO y SITIO_BLOG_ERROR (solo cuando el error cambia).
+
+### 3.23 SEO técnico (HU-1512)
+
+- **Datos (REQ-071):** `SitioPagina` suma meta descripción, canonical, `indexar` y el tipo de datos estructurados (WebPage, FAQPage o Product). `SitioRedireccion` guarda las redirecciones 301 (origen único, destino y activa) y `SitioSeo`, las reglas extra de robots.txt. Todo entra en la instantánea, así que llega al sitio con «Publicar cambios» (SUP-225).
+- **Reglas:** meta título hasta 60 caracteres y meta descripción hasta 160 (también en las landings). La canonical es una ruta interna o `https://`. Las redirecciones van entre rutas internas en minúsculas, hasta 500, sin bucles ni cadenas, sin el inicio como origen y sin pisar una página publicada; las reglas de robots son solo `Allow`, `Disallow` y comentarios, hasta 50 líneas, sin bloquear todo el sitio (SUP-226 a SUP-228).
+- **Cambio de ruta (CP-124):** cambiar la ruta de una página publicada crea sola la 301 de la anterior, con auditoría marcada como automática, y la respuesta trae el aviso; reemplaza el 422 RUTA_PUBLICADA. El pre-render escribe las redirecciones de la versión en `_redirecciones.json` y `GET /s/*` responde 301 antes del 404. La CDN debe aplicar lo mismo (HU-1405).
+- **Sitio:** cada página lleva su título, descripción, canonical, Open Graph y JSON-LD (FAQPage con las preguntas visibles, Product con la marca sin precios, Organization en el inicio), escapado para que no cierre la etiqueta; la CSP lo permite porque no se ejecuta. Una página sin indexar lleva `noindex` en producción, sale del sitemap y de los hreflang (CP-125). robots.txt suma las reglas extra en producción; en pruebas bloquea todo (SUP-229).
+- **Problemas:** `GET /sitio/seo` analiza todas las páginas y las redirecciones: sin descripción (alta), descripción o título largos (media), sin indexar (baja), redirección sin destino (alta, o media si la página no está publicada) y redirección tapada por una página (baja). Google Search Console y el puntaje de auditoría quedan para después (SUP-224).
+- **Auditoría:** SITIO_ROBOTS_EDITADO, SITIO_REDIRECCION_CREADA, _EDITADA y _BORRADA; los cambios de SEO de una página van en SITIO_PAGINA_EDITADA.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -359,6 +482,7 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | **Fuerza bruta** | 5 intentos fallidos bloquean la cuenta 15 minutos. Se permiten hasta 3 pedidos de recuperación por hora. |
 | **Google** | OpenID Connect con PKCE, `state` y `nonce`, y firma del id_token verificada. Solo entran correos invitados y nunca se crean cuentas. |
 | **Roles y alcance** | Una guarda global por rol. Toda consulta se limita a la organización de la sesión, y el revisor del cliente, a su cliente. |
+| **Superadmin de plataforma (ADR-011, HU-1501)** | Rol `SUPERADMIN` sin organización. Es el único que entra a `/api/v1/sitio/*` (403 al administrador de cada organización y al resto, CP-109) y ve el grupo «Sitio web» en la web; no ve las vistas de una organización. Por ahora entra con correo y clave: el segundo factor obligatorio va en una historia propia antes de producción (SUP-167). |
 | **Archivos** | Cifrados con KMS y bucket no público. Solo se accede con URLs firmadas de 15 minutos. El tipo real se verifica por contenido (un .exe renombrado se rechaza) y el SVG se sanea con una lista cerrada. |
 | **Retención** | Los documentos del cliente se borran a la fecha de entrega más los días de retención del cliente (180 por defecto). El worker los borra cada día a las 3:00 (Lima), incluido el texto extraído y las transcripciones, y lo registra en auditoría. |
 | **Inyección en la IA** | El material del cliente va escapado y delimitado en `<material_cliente>`. Lo que parece una orden se marca y nunca se obedece (HU-1402). |
@@ -371,7 +495,7 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | Texto (etapas 1 a 3) | Anthropic Claude (`claude-opus-5-5` por defecto, SUP-23) | Salidas grabadas del caso LOTO | Integrado. Los prompts v2 de IA-04 e IA-05 todavía no se han evaluado con la clave real. |
 | Transcripción | Google Speech-to-Text v1 (`latest_long`) | Fragmentos de relleno cada 10 s, sin costo | Integrado. Sin probar con una clave real, y tarifa por minuto sin verificar (SUP-28). |
 | Boca (etapa 7) | Rhubarb Lip Sync 1.13 (MIT), local en el worker, con ffmpeg | Marcas por letras, sin costo | Integrado y probado en local con un MP3. Falta PT-01 con voz real e instalarlo en la imagen del worker (HU-1405). |
-| Voz (muestra y etapa 6) | Google Text-to-Speech (voces GA) | Silencio WAV de 65 ms por carácter, sin costo | Integrado. Sin probar con una clave real; tarifa supuesta de 16 USD por millón de caracteres (Neural2) y 30 USD (Chirp 3 HD), por confirmar (SUP-34). Azure y ElevenLabs todavía no. |
+| Voz (muestra y etapa 6) | Google Text-to-Speech (voces GA) | Silencio WAV de 65 ms por carácter, sin costo | Integrado. Sin probar con una clave real; tarifa supuesta de 16 USD por millón de caracteres (Neural2) y 30 USD (Chirp 3 HD), por confirmar (SUP-34). ElevenLabs desde HU-1304 (`eleven_multilingual_v2`), probado con `fetch` simulado y tarifa supuesta de 200 USD por millón de caracteres (SUP-147). Azure todavía no. |
 | Correo | SMTP (Mailpit en local) | — | Integrado. |
 
 Las licencias, el uso comercial y el tratamiento de datos de cada proveedor están en `docs/19-proveedores-y-licencias.md` (ADR-010). `PROVEEDORES_MODO` (`simulado` o `real`) elige el modo. En modo real sin clave, la transcripción falla con un motivo en vez de inventar texto.
@@ -392,6 +516,10 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 | Seguimiento de trabajos | Estado y avance en `GeneracionEtapa`, `MaterialFuente.estado` y `TrabajoIA`. El worker registra en consola los trabajos fallidos con su motivo. |
 | Costos | La suma de `TrabajoIA.costoUsd` por proyecto aparece en la lista de proyectos y en cada generación. |
 | Borrado programado | Cola de mantenimiento con un trabajo diario a las 3:00 (America/Lima). |
+| Sitio público | `GET /s/` sirve la versión de `sitio/actual.json`. Estado del pre-render en Sitio web › Páginas › Versiones y en la auditoría (SITIO_PRERENDER_LISTO o _ERROR). Para rehacer el de la última versión, reiniciar el worker (3.18). |
+| Modo mantenimiento del sitio | Configuración › Ajustes del sitio › Mantenimiento: se aplica en hasta 5 s; los visitantes reciben 503 con «Volvemos pronto» y el superadmin sigue viendo el sitio. Queda en la auditoría (SITIO_MANTENIMIENTO_ACTIVADO o _DESACTIVADO) (3.19). |
+| Copias de seguridad | Cola de mantenimiento a las 3:00 (America/Lima): base y objetos al bucket `S3_BUCKET_RESPALDOS`, 14 días. Estado en Empresa › Operación; restauración con `pnpm respaldo:restaurar` (3.10). |
+| Errores y colas | Empresa › Operación: errores por proveedor en 24 h y 7 días, colas y tiempo y costo por etapa. |
 | Errores visibles al usuario | Siempre con un motivo legible: material en error, etapa en error con «Continuar». |
 
 ## 9. Supuestos y limitaciones vigentes
@@ -415,7 +543,11 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-30:** el reto sumativo sale de IA-07 con sus propias preguntas; todavía no se exige un banco del doble de preguntas por intento ni se usa el banco de IA-08.
 - **SUP-29:** la etapa 4 se compone en paralelo: un tramo de 3 pantallas con la misma disposición puede colarse y queda como advertencia. El curso sale en español, sin imágenes ni datos de actividades (llegan en la etapa 5 y en HU-0407). Al continuar una etapa 4 cancelada, las pantallas se piden de nuevo.
 - **SUP-28:** la transcripción usa tramos de 55 s, y una palabra justo en el borde puede quedar partida. La etapa 1 todavía no lee transcripciones.
-- **Protección de `main`:** exigir los dos controles de CI es una configuración del repositorio que hace su administrador.
+- **SUP-193 a SUP-199:** el sitio público usa textos fijos del prototipo en varios bloques, omite la Franja de confianza en producción y el bloque Planes, usa Plus Jakarta Sans y Atkinson Hyperlegible, se sirve bajo `SITIO_BASE` detrás de la CDN, no invalida la caché al publicar (hasta 65 s) y Lighthouse aún no se midió detrás de la CDN real.
+- **SUP-205 a SUP-211:** de la landing sale ahora solo el meta título; la categoría del blog espera a la HU-1511; las preguntas de una landing son las de su ruta, del inicio y generales; la ruta no cambia con el sector; los testimonios se asignan por nombre del sector; la landing nace en borrador con la plantilla oculta; las landings de ejemplo están solo en el sitio de ejemplo y la simulación.
+- **SUP-224 a SUP-229:** Google Search Console y el puntaje de auditoría quedan para después; las redirecciones y robots llegan con «Publicar cambios» y la CDN debe aplicarlas; las redirecciones son internas, hasta 500, y el cambio de ruta crea la 301; robots solo con Allow, Disallow y comentarios; 60 y 160 caracteres; Product sin precios y Organization solo en el inicio.
+- **SUP-200 a SUP-204:** la analítica se guarda pero se activa con el banner de cookies; el superadmin se reconoce por la cookie de sesión durante el mantenimiento (dominio de cookie compartido y CDN sin caché de respuestas privadas); el certificado lo emite la CDN; logo y favicon de hasta 200 KB.
+- **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
 
@@ -453,6 +585,23 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.43 | 2026-11-12 | Pausas propuestas por la IA (3.3.0.1): `tipo: "pausas-video"`, 422 SIN_TRANSCRIPCION, `marcadorIds` al aplicar y `agregados` y `observaciones` en la respuesta. |
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
+| 0.51 | 2026-11-13 | Observabilidad y copias de seguridad (3.10 y 8): copia diaria con pg_dump y los objetos de S3, purga de 14 días, restauración con resguardos, `GET /operacion` y los avisos por correo. |
+| 0.54 | 2026-11-13 | Páginas del sitio con estados y programación (3.12): la tabla `SitioPagina`, las rutas públicas con su límite por IP, el sitemap y la publicación programada cada 30 s. |
+| 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
+| 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
+| 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.65 | 2026-11-13 | SEO técnico (3.23): los campos de SEO de la página, las redirecciones 301 y robots en la versión, la 301 automática al cambiar la ruta, Open Graph, JSON-LD y noindex, el analizador de problemas y la auditoría. |
+| 0.64 | 2026-11-13 | Blog desde WordPress (3.22): la copia de lectura, la sincronización con su frecuencia, sus límites y su error, el blog fuera de las versiones con re-render, la sección sin JavaScript, «Últimos artículos» y la auditoría. |
+| 0.63 | 2026-11-13 | Sitio en español e inglés (3.21): idioma por elemento y enlace con orden aparte, el menú y el pie de cada idioma en la versión, el selector ES · EN, `hreflang` y sitemap solo entre páginas publicadas en los dos idiomas, y los ficticios en inglés. |
+| 0.62 | 2026-11-13 | Landings por sector (3.20): la landing como página de tipo sector, la regla RN-16-9, qué entra en la versión, los testimonios y preguntas del sector, y el bloque y la columna Sectores. |
+| 0.61 | 2026-11-13 | Ajustes del sitio y modo mantenimiento (3.19): la fila de ajustes, lo que entra al publicar, la marca, el 503 para visitantes, el acceso del superadmin, «Comprobar el dominio» y la operación del mantenimiento. |
+| 0.60 | 2026-11-13 | Sitio público rápido y accesible (3.18): el pre-render en el worker, el puntero `sitio/actual.json`, `GET /s/*` con caché, ETag y 404, la configuración de la CDN, el estado en «Versiones» y Lighthouse en el CI. |
+| 0.59 | 2026-11-13 | Vista previa, versiones y restauración (3.17): la tabla `SitioVersion`, el sitio público desde la última versión, publicar, restaurar sin tocar el panel y la vista previa. |
+| 0.58 | 2026-11-13 | Menú y pie administrables (3.16): la tabla `SitioEnlace`, las reglas de rutas y niveles, las rutas `/sitio/navegacion` y `GET /publico/navegacion`. |
+| 0.53 | 2026-11-13 | Superadmin de plataforma (3.11 y 5): rutas `/sitio/*` solo para SUPERADMIN y el grupo «Sitio web» con «Resumen». |
+| 0.52 | 2026-11-13 | Kit de gamificación para el LMS (3.3.0.3): formato KIT_GAMIFICACION en la cola `export`, insignias SVG y PNG con resvg, plan y guía por LMS. |
+| 0.50 | 2026-11-13 | Comentarios del revisor del cliente (3.9): alcance por cliente y organización, texto plano inmutable, resolver solo el equipo con auditoría y sin cambiar la aprobación. |
+| 0.49 | 2026-11-13 | Conexiones IA y límite de gasto (3.8): conexión por organización leída en caliente, tipo real de cada trabajo, voz de Google o ElevenLabs, LIMITE_GASTO con auditoría y los 3 endpoints sin claves. |
 | 0.48 | 2026-11-13 | Rentabilidad y mediciones (3.7): el cálculo compartido, los parámetros por organización, el promedio de las mediciones con respaldo de supuestos y los permisos. |
 | 0.47 | 2026-11-13 | Resumen de costos de IA (3.6): `GET /costos`, días de Lima, trabajos sin proyecto por cliente, criterio del promedio por SCORM y permisos. |
 | 0.46 | 2026-11-13 | Kit desde un curso anterior: flujo de la extracción en la cola `ia`, los topes de lectura del ZIP, `TrabajoIA.resultado` y los 3 endpoints de la propuesta. |

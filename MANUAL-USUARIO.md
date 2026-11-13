@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.65 · actualizado con la tercera entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -30,7 +30,8 @@ Cada persona entra con su propio usuario y ve solo lo que le corresponde a su ro
 | **Diseño instruccional** | Crea proyectos, sube el material, lanza la generación, decide qué se conserva y aprueba las pantallas. |
 | **Diseño gráfico** | Prepara el kit de marca de cada cliente (colores, letras, logo, personaje y pantallas modelo) y corrige textos de las pantallas. |
 | **Producción** | Crea proyectos, sube material, sigue el avance de la generación y corrige textos de las pantallas. |
-| **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos. No puede modificar la configuración. |
+| **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos y comentar cada pantalla. No puede modificar la configuración. |
+| **Superadmin de la plataforma** | Administra el sitio comercial de Aptio SCORM desde el grupo **Sitio web**. No pertenece a ninguna empresa: no ve proyectos, clientes ni la sección Empresa. Nadie más ve el grupo Sitio web, ni siquiera Administración. |
 
 ---
 
@@ -71,6 +72,8 @@ Puedes pedir el enlace hasta 3 veces por hora.
   - **Inicio → Nuevo SCORM:** para crear un proyecto.
   - **Empresa → Clientes y kits:** los clientes y su identidad visual.
   - **Empresa → Rentabilidad:** cuánto cuesta cada SCORM hoy y con el generador, las horas medidas y el gasto en IA por proyecto, cliente y proveedor (solo administración y diseño instruccional).
+  - **Empresa → Conexiones IA:** qué proveedor y modelo usa cada tarea de IA, el gasto del mes y su límite (solo administración). Administración ve además, al pie del menú, el medidor **Costo de IA del mes**.
+  - **Empresa → Operación:** errores por proveedor, colas, tiempo y costo por etapa, y las copias de seguridad diarias con **Respaldar ahora** (solo administración).
 - **Arriba**, la ruta de dónde estás (por ejemplo, «Inicio / Proyecto») y tu nombre con tu rol.
 
 Aptio SCORM funciona en computadora, tableta y celular.
@@ -315,7 +318,7 @@ Si la pantalla cambió después de pedir la propuesta (por ejemplo, alguien corr
 
 **Aprobar todas las que no tienen observaciones.** Este botón, al pie de la lista, aprueba de una vez todas las pantallas sin observaciones pendientes. Las que tienen observaciones quedan pendientes para revisarlas una por una.
 
-Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Producción pueden corregir textos. Revisión del cliente puede mirar las pantallas, pero no cambiarlas.
+Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Producción pueden corregir textos. Revisión del cliente puede mirar las pantallas y comentarlas (8.25), pero no cambiarlas.
 
 **Regeneración automática al corregir la narración.** Si corriges la narración de una pantalla que ya tiene voz, al guardar se rehacen solas su voz, la boca del personaje y sus subtítulos en español. Las demás pantallas no se tocan. Debajo de **Textos** aparece la tarjeta **Regeneración** con tres marcas: **Voz ES**, **Boca** y **Subtítulos ES**.
 - **Regenerando…:** se está haciendo. Suele tardar unos segundos.
@@ -393,7 +396,7 @@ Desde el proyecto, **Exportar SCORM** abre **Entrega**. Primero eliges el **form
 - **Pantallas aprobadas.** Si quedan pantallas sin aprobar, al pulsar **Exportar SCORM 1.2** se pide confirmación: **Cancelar** (elegido de entrada) o **Exportar igual**. El enlace **Ir a revisión** te lleva a aprobarlas.
 - **Avance y reanudación** (si caben en lo que guarda el LMS), **archivos que faltan** (el paquete muestra su texto alternativo) y **esquema del curso**. Si el curso no cumple el esquema, el botón Exportar queda deshabilitado y ves qué corregir.
 
-Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**.
+Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**. Más abajo está la tarjeta del **kit de gamificación** para el LMS del cliente (ver 8.27).
 
 ### 8.10 Modo diagnóstico del paquete (para el soporte)
 
@@ -620,6 +623,243 @@ Arriba de **Costo de IA**, en **Empresa → Rentabilidad**, la calculadora compa
 
 **Registrar mediciones.** En **Mediciones**, escribe el proyecto (puede ser uno de la herramienta o uno anterior), elige **Hoy** o **Con el generador**, la etapa y las horas reales del equipo, sin contar la espera del cliente, y pulsa **Registrar**. Si te equivocas, pulsa **Borrar** en esa fila. Para comparar bien, mide al menos 2 proyectos completos por escenario, como dice la guía de medición.
 
+### 8.24 Conexiones IA: proveedor, modelo y límite de gasto por tarea
+
+En **Empresa → Conexiones IA** (solo administración) hay una fila por tarea: resumen, estructura y guion; pantallas animadas; traducción al inglés; control de calidad; voz; ilustraciones; boca del personaje y transcripción.
+1. En **Proveedor y modelo** elige el proveedor y, en las tareas de texto, el modelo de Claude. En **Voz** puedes elegir Google Text-to-Speech o ElevenLabs (Azure Speech llega más adelante) y escribir la voz en español y en inglés: se usa cuando la voz del kit es de otro proveedor. Ilustraciones, boca y transcripción tienen un proveedor fijo.
+2. **Clave** dice **Sí** o **No**: si el servidor tiene la clave de ese proveedor. La clave nunca se muestra ni se escribe aquí; la configura quien administra el servidor.
+3. Verás el **costo estimado por SCORM** y el **gasto del mes** (con la hora de Lima). En **Límite mensual (US$)** escribe el tope de esa tarea o déjalo vacío para no tener límite.
+4. Pulsa **Guardar** en la fila. El cambio vale para lo próximo que se genere: lo ya generado no se rehace.
+5. **Probar** hace una llamada mínima al proveedor y te dice si respondió y cuánto tardó. En el modo simulado responde «simulado, OK» sin costo.
+
+**Cuando una tarea llega a su límite.** Arriba aparece un aviso con las tareas al límite, la fila se marca **Al límite** y el medidor **Costo de IA del mes** del menú se pone en rojo. La IA de esa tarea se detiene antes de gastar: en **Producción**, la generación se queda en la etapa que la usaba con el aviso **Se alcanzó el límite de gasto de IA del mes**. Administración recibe además un correo la primera vez que una tarea llega a su límite en el mes. Sube el límite en Conexiones IA, vuelve al proyecto y pulsa **Continuar**: sigue desde esa etapa sin repetir lo hecho. El medidor compara lo gastado en el mes con la suma de los límites que definiste.
+
+### 8.25 Comentarios del cliente en Revisión
+
+En **Revisión**, cada pantalla tiene la tarjeta **Comentarios**, a la derecha. Ahí se conversa sobre esa pantalla sin cambiarla.
+
+**Si eres el revisor del cliente.** Entras a Revisión en **modo solo lectura**: recorres las pantallas y ves su origen y sus observaciones, pero no corriges textos, no apruebas, no abres el editor ni pides revisiones a la IA.
+1. Elige la pantalla en la lista de la izquierda.
+2. En **Comentar esta pantalla** escribe lo que quieres que cambie (hasta 1000 caracteres; el contador te avisa si te pasas).
+3. Pulsa **Comentar**. Tu comentario aparece con tu nombre, la marca **Cliente**, la fecha y el estado **Abierto**.
+
+Un comentario no se edita ni se borra después de publicarlo: si te equivocaste, escribe otro.
+
+**Si eres del equipo.** Arriba ves la cifra **Comentarios abiertos**, y cada miniatura con comentarios sin resolver lleva el contador 💬 con cuántos tiene. El filtro **Con comentarios** deja solo esas pantallas. Tú también puedes comentar. Cuando atiendas un comentario, pulsa **Resolver**: queda **Resuelto** con tu nombre y la fecha. Si hace falta volver a verlo, pulsa **Reabrir**. Resolver y reabrir lo hacen administración, diseño instruccional, diseño gráfico y producción.
+
+Comentar no cambia el estado de la pantalla: una pantalla aprobada sigue aprobada aunque tenga comentarios abiertos. Si el comentario lleva a corregir algo, la corrección sí la vuelve a borrador, como siempre. Cuando el revisor del cliente comenta, quien creó el proyecto y diseño instruccional reciben un correo con el comentario y el enlace a esa pantalla en Revisión. Los comentarios del equipo no envían correo.
+
+### 8.26 Operación y copias de seguridad
+
+En **Empresa → Operación** (solo administración) ves en una sola página cómo va la plataforma. **Actualizar** trae lo último.
+
+1. **Errores por proveedor.** Una fila por proveedor (Claude, Google, ElevenLabs…) con los errores de las últimas 24 horas y de los últimos 7 días, cuántos trabajos hubo y el último error con su fecha. Lo que se detuvo por el límite de gasto no cuenta como error: aparece aparte como «detenidos por el límite». Las filas «Plataforma (cola …)» son fallos de la propia herramienta, como armar un paquete.
+2. **Colas.** Cuántos trabajos esperan, cuántos están en curso y cuántos fallaron en cada cola (IA, voz, medios, paquetes y mantenimiento). Si dice que las colas no responden, avisa a quien administra el servidor.
+3. **Tiempo y costo por etapa.** Para las 11 etapas de la generación, cuántas veces terminaron bien en los últimos 30 días, cuánto tardan en promedio y cuánto cuestan.
+4. **Copias de seguridad.** Todos los días a las 03:00 (hora de Lima) se copia la base de datos y todos los archivos. Ves la última copia exitosa y la lista de los últimos 14 días con su fecha, estado (**Exitosa**, **Fallida** con su motivo, **En curso**), si fue programada o manual, su tamaño, cuánto tardó y cuántos archivos tiene. Las copias de más de 14 días se borran solas.
+
+**Respaldar ahora** pide una copia en ese momento, por ejemplo antes de un cambio grande. Aparece **En curso** y, en unos minutos, **Exitosa**. Mientras haya una en curso, el botón queda desactivado.
+
+Para recuperar una copia, pide a quien administra el servidor que la restaure: se restaura siempre en una base y un lugar de archivos nuevos, nunca encima de los que están en uso.
+
+
+### 8.27 Kit de gamificación para el LMS del cliente
+
+Cuando el cliente quiere gamificar en su propia plataforma, en **Entrega** está la tarjeta **Kit de gamificación para el LMS**.
+
+1. Elige el **LMS del cliente**. Empieza en el que dicen los datos del proyecto; puedes cambiarlo sin tocar el LMS del paquete SCORM.
+2. Elige cómo van los **nombres de las insignias**: en el **idioma del curso** o **ES + EN** (los dos nombres en cada insignia; la guía sale en español).
+3. Pulsa **Exportar kit**. El kit aparece en el **historial** como «Kit de gamificación», con su avance hasta **Listo** y el botón **Descargar**. El archivo se llama `<proyecto>-kit-<lms>-v<versión>.zip`.
+
+Dentro del ZIP encuentras:
+- **Insignias** con los colores, la tipografía y el logo de la marca del cliente, en PNG de 512 × 512 (para subir al LMS) y en SVG. Hay una por cápsula, una por módulo y una del curso: la de cápsula tiene un anillo, la de módulo dos y la del curso tres y una cinta. Si el curso ya tenía sus propias insignias definidas, se usan esas.
+- **La guía** (`guia-<lms>.html`), que abres en el navegador y puedes imprimir o guardar como PDF. Trae el plan (qué insignia se gana con qué y con qué nota mínima, por ejemplo 70 en LOTO), el orden en que se abren las cápsulas, los niveles sugeridos y los pasos en el LMS elegido.
+- `plan.json` con el mismo plan, para quien configure el LMS, y `LEEME.txt` con el contenido y los créditos.
+
+Los nombres de los menús de cada LMS cambian entre versiones: por eso la guía dice «Verificar con la versión del cliente». Revísala con quien administra el LMS antes de configurarlo.
+### 8.28 Sitio web (solo superadmin)
+
+Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Sitio web › Resumen**, que dice cuántas páginas del sitio están publicadas, programadas o en borrador, con el enlace **Ir a Páginas**. Las demás opciones del grupo son Contenido, Blog y SEO.
+
+En **Sitio web › Páginas** están todas las páginas del sitio comercial, con su ruta, idioma, estado y fecha:
+
+1. **Nueva página:** escribe el título, la ruta (empieza con `/` y solo lleva minúsculas, números y guiones, por ejemplo `/precios` o `/sectores/mineria`) y el idioma, y pulsa **Crear borrador**. No puede haber dos páginas con la misma ruta en el mismo idioma.
+2. **Publicar:** la página se ve en el sitio desde ese momento y entra al sitemap. Publicar una página también publica todo lo que tengas pendiente (ver «Publicar cambios y versiones»).
+3. **Programar:** elige el día y la hora **de Lima** y pulsa **Programar publicación**. La página se publica sola a esa hora (en menos de un minuto). La hora tiene que ser futura.
+4. **Pasar a borrador:** la página deja de verse en el sitio y sale del sitemap (también publica lo pendiente). Si cambias la ruta de una página publicada, la anterior lleva sola a la nueva (ver «SEO»).
+5. **Borrar:** solo para borradores. Pide confirmación y no se puede deshacer.
+
+Un borrador o una página programada no se ven en el sitio: quien abra su dirección recibe «no encontrada».
+
+**Menú principal y pie de página.** Debajo de la lista de páginas están las tarjetas **Menú principal** (los enlaces de la cabecera; el menú del celular muestra los mismos, en el mismo orden) y **Pie de página** (columnas, cada una con sus enlaces).
+
+1. **Agregar:** pulsa **Agregar enlace** (o **Agregar columna** en el pie), escribe el texto y la ruta y pulsa **Agregar**. Entra al final y **oculto**. La ruta es una página del sitio, como `/precios`, una sección, como `/#testimonios`, o una dirección que empiece con `https://`, que se abre en otra pestaña y se marca «Externo». Las columnas del pie no necesitan ruta.
+2. **Editar:** cambia el texto o la ruta y pulsa **Guardar**. Solo se acepta texto, sin etiquetas HTML, y no se aceptan direcciones con `http://` ni `javascript:`.
+3. **Mostrar u ocultar:** con el interruptor. Ocultar no borra: al volver a mostrarlo aparece igual. Ocultar una columna del pie oculta todos sus enlaces, y una columna sin enlaces visibles no se ve.
+4. **Cambiar el orden** con las flechas ↑ y ↓ (también con el teclado). En el pie, las columnas se ordenan entre sí y los enlaces dentro de su columna.
+5. **Borrar** pide confirmación. Borrar una columna borra también sus enlaces.
+
+La línea **En el sitio** de cada tarjeta muestra lo que verá el visitante cuando publiques. Los cambios del menú y del pie llegan al sitio con **Publicar cambios**.
+
+**Editar los bloques de una página.** En Páginas, pulsa **Editar** en la página que quieras. Se abre el **Editor de página** con sus bloques en el orden en que se ven en el sitio (Portada, Cifras, Logos de clientes, Testimonios…). Arriba a la derecha puedes cambiar a otra página.
+
+1. **Agregar bloque:** elige el tipo en la lista y pulsa **Agregar bloque**. Entra al final y **oculto**, para que no aparezca en el sitio antes de tiempo.
+2. **Mostrar u ocultar:** usa el interruptor de cada bloque. El contador «N visibles» se actualiza. Un bloque oculto se ve tachado y con línea punteada, y **conserva sus datos**: al volver a mostrarlo aparece igual que antes.
+3. **Cambiar el orden:** usa las flechas ↑ y ↓ de cada bloque (también con el teclado: Tab hasta la flecha y Enter). La flecha de subir del primero y la de bajar del último están desactivadas.
+4. **Borrar:** pide confirmación y se pierden los datos del bloque. Si solo quieres que no se vea, mejor ocúltalo.
+
+**Contenido del sitio.** En **Sitio web › Contenido** están los datos que usan los bloques de todas las páginas, en siete pestañas: Cifras, Testimonios, Logos, Funcionalidades, Pasos, LMS y Preguntas. Con el teclado, las flechas izquierda y derecha pasan de una pestaña a otra.
+
+1. **Agregar:** completa los campos y pulsa **Guardar**. El elemento entra al final y **oculto**.
+2. **Editar:** cambia los campos y pulsa **Guardar** (se activa solo cuando hay cambios). Solo se acepta texto: si escribes etiquetas HTML como `<b>`, se rechaza.
+3. **Mostrar u ocultar:** con el interruptor. Un elemento oculto deja de verse en **todas** las páginas y conserva sus datos.
+4. **Cambiar el orden** con las flechas ↑ y ↓, y **borrar** con confirmación.
+
+**Datos ficticios.** Si un dato es inventado (por ejemplo, un testimonio de ejemplo), marca su casilla **Ficticio**: aparece el distintivo «Ficticio» y sube el contador **Datos ficticios visibles** de arriba. Mientras haya alguno visible:
+
+- **En el sitio real (producción)** no se puede publicar: al pulsar **Publicar** o **Publicar cambios** aparece la lista de los datos ficticios y el botón **Ocultar todos los ficticios**, que los oculta y publica la página en un solo clic. Una página programada espera y se publica sola cuando ya no queda ninguno. El sitio real nunca muestra un dato ficticio.
+- **En el sitio de pruebas** la página se publica igual y aparece un aviso con la cantidad.
+
+El mismo botón **Ocultar todos los ficticios** está en Contenido. Ocultarlos no los borra ni les quita la marca.
+
+Las preguntas sin página salen en el bloque Preguntas de todas las páginas; si les pones una ruta (por ejemplo `/precios`), salen además solo en esa página. Los logos por ahora son solo el nombre. Un elemento se ve en el sitio solo si su página está publicada y su bloque está visible.
+
+Los cambios de bloques y de contenido llegan al sitio con **Publicar cambios**. Si la página está en borrador o programada, el sitio no muestra nada de ella. El SEO de la página está en la pestaña **SEO** del editor (ver «SEO»); la edición del contenido de cada bloque llegará en próximas entregas.
+
+**Vista previa.** Debajo de los bloques, en el Editor de página, la **Vista previa** muestra cómo queda la página con lo que hay ahora en el panel, aunque no esté publicada: el menú, los bloques visibles en su orden con los textos de sus elementos y el pie. Los datos ficticios salen marcados «Ficticio». Con **Escritorio (1280 px)** y **Celular (390 px)** cambias el ancho; en Escritorio desliza a los lados para ver toda la página. Se actualiza sola al mostrar, ocultar u ordenar un bloque. Por ahora muestra la estructura de la página; el diseño final de cada bloque llegará con el sitio público.
+
+**Publicar cambios y versiones.** Lo que cambias en bloques, contenido, menú y pie no se ve en el sitio hasta que publicas. Arriba de Páginas y del Editor de página está el distintivo **Cambios sin publicar** (o **Sitio al día**) y el botón **Publicar cambios**, que publica todo el sitio de una vez y guarda una **versión**. Publicar o pasar a borrador una página, o una página programada al llegar su hora, también crea una versión.
+
+La tarjeta **Versiones**, al final de Páginas, lista las últimas 50 con su número, fecha, quién la publicó y cómo (Publicar cambios, una página, programada o restauración). La que ve el público lleva **En el sitio**.
+
+Para volver atrás, pulsa **Restaurar** en una versión anterior y confirma con **Sí, restaurar**. El sitio vuelve a mostrar exactamente esa versión y se guarda como una versión nueva (por ejemplo, restaurar la 1 cuando el sitio está en la 3 crea la 4). Lo que estás editando en el panel **no cambia**: por eso, después de restaurar, puede aparecer **Cambios sin publicar**. En el sitio real no se puede restaurar una versión que tenga datos ficticios.
+
+**Ver el sitio.** En la tarjeta **Versiones**, el botón **Ver el sitio** abre en otra pestaña el sitio tal como lo ve el público. Después de cada publicación el sitio se prepara solo y el distintivo de la tarjeta lo indica:
+
+- **Preparando el sitio:** el sitio se está preparando; en unos segundos muestra la versión nueva. La tarjeta se actualiza sola.
+- **Sitio listo:** el público ya ve la versión que dice **En el sitio**.
+- **Error al preparar el sitio:** el público sigue viendo la versión anterior. La tarjeta muestra el motivo; se vuelve a intentar con la próxima publicación.
+
+El sitio público carga rápido en el celular y se puede recorrer con el teclado. En el celular el menú se abre con el botón **Menú**. Los enlaces a otros sitios se abren en otra pestaña. Una dirección que no existe muestra **Página no encontrada** con el botón **Ir al inicio**. Los cambios pueden tardar hasta un minuto en verse. En el sitio de pruebas, arriba aparece un aviso y cada dato ficticio lleva la marca «Dato de ejemplo».
+
+Si otra persona escribe la dirección del sitio web en el navegador, ve «Página no encontrada».
+
+### 8.29 Ajustes del sitio (solo superadmin)
+
+En **Configuración › Ajustes del sitio** el superadmin define los datos generales del sitio comercial. La vista tiene cuatro tarjetas y cada una se guarda con su propio botón. Si algo no es válido, la tarjeta lo dice antes de guardar.
+
+**Dominio e identidad.**
+
+1. **Dominio:** escribe solo el dominio, sin `https://` ni rutas (por ejemplo `aptioscorm.com`). Es la dirección que ven los buscadores.
+2. **Comprobar el dominio:** revisa si el dominio guardado abre con un certificado de seguridad válido. Muestra **SSL activo · vence** con la fecha, o el problema encontrado. El certificado lo gestiona el equipo que publica el sitio; aquí solo se comprueba.
+3. **Nombre del sitio:** sale en el título de cada página, en la cabecera y en el pie. Hasta 60 caracteres y solo texto.
+4. **Logo y favicon:** pulsa **Subir logo** o **Subir favicon** y elige un archivo SVG o PNG de hasta 200 KB. Se ve una miniatura y puedes cambiarlo o quitarlo. Sin logo, el sitio usa el de Aptio.
+
+El dominio, el nombre, el logo y el favicon llegan al sitio con **Publicar cambios** (en Sitio web › Páginas).
+
+**Contacto.**
+
+- **Botón de WhatsApp:** con el interruptor se muestra un botón verde flotante en todas las páginas del sitio. Para mostrarlo hay que escribir el número con el código de país (por ejemplo `+51 987 654 321`). El **mensaje inicial** es opcional y aparece escrito cuando el visitante abre el chat. El botón llega al sitio con **Publicar cambios**.
+- **Correo que recibe los leads:** vale desde que lo guardas. Con **Enviar correo de prueba** confirmas que llega.
+
+**Analítica.** Guarda los identificadores de Google Analytics 4 (empieza con `G-`), Tag Manager (empieza con `GTM-`) y Meta Pixel (de 10 a 20 dígitos). Todavía no se activan: lo harán con el aviso de cookies del sitio, y solo para los visitantes que acepten las cookies de analítica.
+
+**Mantenimiento.** Sirve para pausar el sitio mientras se hacen cambios grandes.
+
+1. Escribe, si quieres, un **mensaje para los visitantes** (por ejemplo «Volvemos hoy a las 3 p. m.»).
+2. Activa el interruptor **Modo mantenimiento** y confirma con **Sí, activar**.
+3. Desde ese momento, cualquier visitante que entre a cualquier página ve **Volvemos pronto** con tu mensaje. Los buscadores lo entienden como una pausa y no pierden las páginas.
+4. Tú, con tu sesión de superadmin, sigues viendo el sitio normal, con un aviso arriba que te recuerda que está en mantenimiento.
+5. Para terminar, apaga el interruptor. El cambio se aplica al instante, sin publicar.
+
+### 8.30 Landings por sector (solo superadmin)
+
+Una **landing de sector** es una página del sitio pensada para un sector (por ejemplo «Minería y energía»), con su propia portada, sus testimonios y sus preguntas. Se publica en la dirección `/sectores/` seguida del nombre del sector.
+
+**Crear una landing.**
+
+1. En **Sitio web › Páginas**, pulsa **Nueva landing de sector**.
+2. Escribe el **Sector** y elige el **Idioma**. Debajo ves la dirección que tendrá (por ejemplo `/sectores/mineria-y-energia`).
+3. Pulsa **Crear landing**. Se abre el **Editor de página** con la landing en **borrador** y los bloques de la plantilla ya puestos y **ocultos**: Portada, Cifras, Cómo funciona, Testimonios, Preguntas frecuentes, Blog y Llamada final.
+
+En la lista de Páginas, la columna **Tipo** marca las landings con **Sector** y el nombre del sector; las demás páginas dicen **General**.
+
+**Completar la landing.** En el Editor de página, la tarjeta **Página** tiene la sección **Landing de sector**:
+
+- **Sector:** debajo dice cuántos testimonios de ese sector hay. Si cambias el nombre, avisa cuántos dejan de coincidir. La dirección de la landing no cambia.
+- **Título** y **Texto de la portada:** es lo primero que ve el visitante, en lugar de la portada del inicio.
+- **Meta título:** el título que aparece en la pestaña del navegador y en los buscadores (hasta 60 caracteres). La meta descripción y el resto del SEO de la landing están en la pestaña **SEO** del editor (ver «SEO»).
+- **Categoría inicial del blog** (opcional): el bloque Blog empezará filtrado por esa categoría cuando el blog esté conectado.
+
+Pulsa **Guardar landing**. Solo se acepta texto, sin etiquetas HTML. Luego muestra los bloques que quieras con su interruptor.
+
+**Publicar.** Una landing **sin título y texto de portada o sin meta título no se puede publicar ni programar**: la sección dice qué falta y, si pulsas **Publicar** en Páginas, aparece el mismo aviso. Cuando está completa, dice «Tiene portada y meta título: se puede publicar». Publícala desde Páginas como cualquier otra página.
+
+**Qué muestra la landing en el sitio.**
+
+- **Testimonios:** los que tienen ese sector. Si no hay ninguno, muestra todos los testimonios visibles.
+- **Preguntas:** las asignadas a la dirección de la landing, las del inicio y las que no tienen página.
+- **Bloque Sectores del inicio y columna Sectores del pie:** listan solo las landings **publicadas**, con un enlace a cada una. Una landing en borrador no aparece y su dirección muestra «Página no encontrada».
+
+**Asignar testimonios a un sector.** En **Contenido › Testimonios**, el campo **Sector** de cada testimonio es una lista con **General** (vale para todas las landings) y los sectores de las landings creadas. Elige el sector, pulsa **Guardar** y publica los cambios.
+
+### 8.31 Sitio en inglés (solo superadmin)
+
+El sitio puede tener una versión en inglés, con sus propias páginas, contenido, menú y pie. Las páginas en inglés se publican en direcciones que empiezan con `/en` (por ejemplo `/en/precios`, y `/en` para el inicio).
+
+**Crear las páginas en inglés.** En **Sitio web › Páginas**, al crear una página o una landing elige el **Idioma** Inglés. Usa la misma dirección que su página en español (por ejemplo `/precios`): así el sitio sabe que son la misma página en dos idiomas.
+
+**Cargar el contenido en inglés.** En **Sitio web › Contenido**, arriba de las pestañas, elige **Inglés**. Verás solo los elementos en inglés (cifras, testimonios, preguntas…), con su propio orden. Agrega, ordena, muestra u oculta igual que en español; lo que hagas en un idioma no cambia el otro. Vuelve a **Español** para ver los de siempre.
+
+**Menú y pie en inglés.** En **Sitio web › Páginas**, arriba de las tarjetas **Menú principal** y **Pie de página**, elige **Inglés**. Las tarjetas muestran el menú y el pie de las páginas en inglés. Escribe las direcciones de los enlaces con `/en` (por ejemplo `/en/precios`). Un enlace de una columna del pie es del mismo idioma que su columna.
+
+**El selector ES · EN del sitio.** En la cabecera, y dentro del botón **Menú** en el celular, el visitante ve **ES · EN** para cambiar de idioma:
+
+- Aparece cuando el inicio del otro idioma (`/en` o `/`) está publicado.
+- Si la página que está viendo también está publicada en el otro idioma, lo lleva a esa misma página; si no, lo lleva al inicio de ese idioma.
+- Para ocultarlo, ve a **Configuración › Ajustes del sitio**, tarjeta **Idiomas**, y apaga **Mostrar selector ES/EN**. Viene encendido. El cambio llega al sitio con **Publicar cambios**.
+
+**Para los buscadores.** Cuando una página está publicada en los dos idiomas, el sitio les avisa a los buscadores que una es la traducción de la otra. Si una de las dos está en borrador, no lo hace.
+
+**Ten en cuenta:** los textos fijos de los bloques en inglés (por ejemplo los títulos de las secciones y la llamada final) son una traducción inicial que se revisará. Los datos ficticios en inglés también impiden publicar en producción y se ocultan con **Ocultar todos los ficticios**.
+
+### 8.32 Blog (solo superadmin)
+
+Los artículos del blog se escriben y se publican en WordPress. El sitio muestra, al final de cada página que tenga el bloque **Blog (WordPress)**, los artículos más nuevos con un filtro por categoría, y en el pie la columna **Últimos artículos** con los tres más nuevos. En **Sitio web › Blog** eliges qué se muestra.
+
+**Conectar el WordPress.** En la tarjeta **Conexión**, escribe la **URL de WordPress** (empieza con `https://`, por ejemplo `https://blog.tuempresa.com`), elige cada cuánto se **sincroniza** (cada 15 minutos, cada 30 minutos o cada hora), cuántos **artículos por filtro** muestra la sección (de 3 a 12; 6 por defecto) y si muestra la **imagen** y el **autor**. Pulsa **Guardar**: la primera sincronización empieza en unos segundos. Para desconectar, borra la URL y guarda: la sección Blog y la columna del pie dejan de salir.
+
+**Sincronizar ahora.** El botón de arriba trae enseguida lo publicado en WordPress, sin esperar la frecuencia. Solo llegan los artículos publicados y sin clave: los borradores, los privados y los protegidos con contraseña no se muestran. La tarjeta **Conexión** dice cuándo fue la última sincronización. Si WordPress no responde, verás el error en rojo; el sitio sigue mostrando los artículos de la última vez que funcionó.
+
+**Categorías.** Las categorías visibles son los filtros de la sección, en el orden de la lista; cámbialo con las flechas ↑ y ↓. Al lado de cada una ves cuántos artículos tiene. Apaga el interruptor para ocultar una categoría: deja de salir como filtro y sus artículos dejan de mostrarse, salvo los que también estén en otra categoría visible. Una categoría nueva en WordPress llega visible, al final.
+
+**Artículos.** La tabla lista los artículos publicados, del más nuevo al más viejo. Apaga **Mostrar** para ocultar uno; **Editar en WordPress** abre ese artículo en WordPress en otra pestaña. Lo que ocultes sigue oculto aunque lo edites en WordPress.
+
+**Sin publicar.** Todo lo de esta vista llega al sitio en unos segundos: no hace falta **Publicar cambios**.
+
+**En el sitio.** El visitante elige una categoría y ve sus artículos; funciona con el dedo, el ratón y el teclado (las flechas cambian de filtro). **Ver todos los artículos en el blog** lo lleva a WordPress. En una landing por sector, la sección empieza en su **Categoría inicial del blog** (8.30); si esa categoría está oculta, empieza en **Todas**.
+
+### 8.33 SEO (solo superadmin)
+
+**SEO de cada página.** En el editor de una página, la columna de la derecha tiene dos pestañas: **Página** y **SEO**. En **SEO** están:
+
+- **Ruta de la página:** si la página ya está publicada y la cambias, la ruta anterior lleva sola a la nueva (redirección 301) y lo ves en el aviso al guardar.
+- **Meta título:** el título de la pestaña del navegador y de Google, hasta 60 caracteres. El contador dice cuántos llevas y cuántos sobran. Si lo dejas vacío se usa el título de la página con el nombre del sitio.
+- **Meta descripción:** el texto que muestra Google bajo el título, hasta 160 caracteres, con su contador.
+- **URL canónica** (opcional): la dirección que Google debe tomar como la principal. Vacía, es la de la página. Puede ser una ruta del sitio, como `/precios`, o una dirección que empiece con `https://`.
+- **Datos estructurados:** ayudan a Google a entender la página. **WebPage** sirve para casi todas; **FAQPage** arma las preguntas visibles de la página; **Product**, para una página de producto o de planes.
+- **Indexar en buscadores:** apágalo para que Google no muestre la página; sale también del sitemap.
+
+La **Vista previa en Google** cambia mientras escribes. Pulsa **Guardar SEO**; si la página está publicada, llega al sitio con **Publicar cambios**.
+
+**Sitio web › SEO.** Reúne lo de todo el sitio:
+
+- **Problemas:** las páginas sin meta descripción, con títulos o descripciones demasiado largos o sin indexar, y las redirecciones que llevan a una página que no existe o no está publicada. Los más graves van primero. **Corregir** abre la pestaña SEO de esa página o la redirección.
+- **Redirecciones 301:** escribe la ruta vieja en **Desde** y la nueva en **Hacia** y pulsa **Agregar**. Las dos son rutas del sitio en minúsculas, como `/precios-2025` y `/precios`. No se acepta una redirección hacia sí misma, en círculo o en cadena, ni desde una página publicada o desde el inicio. Con el interruptor la activas o la pausas, y **Borrar** pide confirmación.
+- **robots.txt:** la vista previa muestra el archivo que leen los buscadores. En **Reglas extra** puedes sumar líneas `Allow:` y `Disallow:` (por ejemplo `Disallow: /gracias`) y comentarios que empiecen con `#`, y pulsa **Guardar reglas**. No se acepta bloquear todo el sitio.
+
+Las redirecciones y las reglas de robots.txt llegan al sitio con **Publicar cambios**. En el sitio de pruebas los buscadores siguen bloqueados.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -665,7 +905,8 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Voz, boca y subtítulos en inglés dentro del paquete con los dos idiomas.
 - Un paquete separado por cada idioma.
 - Control de calidad y otros formatos de entrega (SCORM 2004).
-- Otra ilustración desde la revisión y comentarios del cliente.
+- Otra ilustración desde la revisión.
+- Aviso por correo de los comentarios nuevos.
 
 ---
 
@@ -703,6 +944,23 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.51 | 2026-11-13 | Operación y copias de seguridad (4 y 8.26): errores por proveedor, colas, tiempo y costo por etapa, copias diarias con «Respaldar ahora», y los correos del límite de gasto (8.24) y del comentario del cliente (8.25). |
+| 0.52 | 2026-11-13 | Kit de gamificación para el LMS del cliente (8.27): insignias con la marca, plan, guía del LMS elegido y descarga desde el historial de Entrega. |
+| 0.53 | 2026-11-13 | Superadmin de la plataforma (2 y 8.28): el grupo «Sitio web» con «Resumen», solo para el superadmin. |
+| 0.54 | 2026-11-13 | Sitio web › Páginas (8.28): nueva página, publicar, programar en hora de Lima, pasar a borrador y borrar; el Resumen cuenta las páginas por estado. |
+| 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
+| 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
+| 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.65 | 2026-11-13 | SEO (8.33): la pestaña SEO del editor con meta título y descripción con contador, URL canónica, datos estructurados, «Indexar en buscadores» y la vista previa en Google; Sitio web › SEO con los problemas, las redirecciones 301 y robots.txt; la ruta de una página publicada ya se puede cambiar. |
+| 0.64 | 2026-11-13 | Blog (8.32): conectar WordPress, «Sincronizar ahora» y su error, ordenar y ocultar categorías, ocultar artículos y «Editar en WordPress», y en el sitio el filtro por categoría, «Últimos artículos» del pie y la categoría inicial de cada landing. |
+| 0.63 | 2026-11-13 | Sitio en inglés (8.31): páginas en `/en`, el selector Español / Inglés en Contenido y en Menú principal y Pie de página, el selector ES · EN del sitio y la tarjeta Idiomas de Ajustes del sitio con «Mostrar selector ES/EN». |
+| 0.62 | 2026-11-13 | Landings por sector (8.30): crear una landing, completar portada y meta título, publicarla, el bloque y la columna Sectores, y el sector de los testimonios. |
+| 0.61 | 2026-11-13 | Ajustes del sitio (8.29): dominio con su comprobación, nombre, logo y favicon, botón de WhatsApp, correo de leads, analítica y modo mantenimiento con la página «Volvemos pronto». |
+| 0.60 | 2026-11-13 | «Ver el sitio» y el estado del sitio público en la tarjeta Versiones (8.28): preparando, listo o error; el sitio rápido, con menú de celular y página no encontrada. |
+| 0.59 | 2026-11-13 | Publicar cambios, versiones, restaurar y vista previa en Escritorio y Celular (8.28). Los cambios de bloques, contenido, menú y pie llegan al sitio al publicar. |
+| 0.58 | 2026-11-13 | Menú principal y pie de página (8.28): agregar, editar, mostrar u ocultar, ordenar y borrar enlaces y columnas, y la línea «En el sitio». |
+| 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
+| 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |
 | 0.47 | 2026-11-13 | Costo de IA en Empresa → Rentabilidad: total, promedio por SCORM, filtros de periodo y cliente y las tablas por proyecto, cliente y proveedor (4 y 8.22). |
 | 0.46 | 2026-11-13 | Kit de marca desde un curso anterior o el manual de marca: «✦ Extraer de un curso anterior», la propuesta con sus evidencias, «Aplicar» sin guardar y «Descartar» (8.21). |
