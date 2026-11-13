@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.62 · actualizado con la décima entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.63 · actualizado con la primera entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -428,6 +428,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Pendiente:** la categoría del blog se guarda pero la usa la HU-1511 (CP-159, SUP-206); el SEO por página llega con la HU-1512 (SUP-205).
 - **Auditoría:** SITIO_PAGINA_CREADA con `tipo` y `sector`, y SITIO_PAGINA_EDITADA con los campos de landing cambiados.
 
+### 3.21 Sitio en español e inglés (HU-1510)
+
+- **Datos (REQ-069):** cada elemento de contenido y cada enlace del menú y del pie es de un idioma (`es` o `en`); lo que existía antes queda en español. El orden y la compactación al borrar van dentro de cada idioma. Las páginas ya tenían idioma: las de inglés viven en `/en…`.
+- **Publicación:** la versión arma cada página con el contenido de su idioma y guarda el menú y el pie de cada idioma. El ajuste «Mostrar selector ES/EN» (activo por defecto) entra en la versión, así que llega al sitio al publicar.
+- **Sitio:** las páginas en inglés usan su menú, su pie y los textos fijos en inglés (traducción pendiente de revisión, SUP-212). El selector ES · EN es HTML puro en la cabecera y el menú de celular: sale si el inicio del otro idioma está publicado y lleva a la misma ruta si está publicada en ese idioma, o a su inicio (CP-122). Los `hreflang` (es, en y x-default hacia el español) y los alternos del sitemap salen solo entre páginas publicadas en los dos idiomas. La 404 va en español.
+- **Ficticios:** los del inglés cuentan igual: salen en la lista, se ocultan con los demás y bloquean publicar en producción (RN-16-3).
+- **Auditoría:** las acciones de elementos y enlaces guardan el idioma; el ajuste queda en SITIO_AJUSTES_ACTUALIZADOS con `publicar` true.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -564,6 +572,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.63 | 2026-11-13 | Sitio en español e inglés (3.21): idioma por elemento y enlace con orden aparte, el menú y el pie de cada idioma en la versión, el selector ES · EN, `hreflang` y sitemap solo entre páginas publicadas en los dos idiomas, y los ficticios en inglés. |
 | 0.62 | 2026-11-13 | Landings por sector (3.20): la landing como página de tipo sector, la regla RN-16-9, qué entra en la versión, los testimonios y preguntas del sector, y el bloque y la columna Sectores. |
 | 0.61 | 2026-11-13 | Ajustes del sitio y modo mantenimiento (3.19): la fila de ajustes, lo que entra al publicar, la marca, el 503 para visitantes, el acceso del superadmin, «Comprobar el dominio» y la operación del mantenimiento. |
 | 0.60 | 2026-11-13 | Sitio público rápido y accesible (3.18): el pre-render en el worker, el puntero `sitio/actual.json`, `GET /s/*` con caché, ETag y 404, la configuración de la CDN, el estado en «Versiones» y Lighthouse en el CI. |

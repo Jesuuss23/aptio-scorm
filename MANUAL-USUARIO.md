@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.62 · actualizado con la décima entrega del Sprint 11 (13 de noviembre de 2026)**
+**Versión 0.63 · actualizado con la primera entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -803,6 +803,26 @@ Pulsa **Guardar landing**. Solo se acepta texto, sin etiquetas HTML. Luego muest
 
 **Asignar testimonios a un sector.** En **Contenido › Testimonios**, el campo **Sector** de cada testimonio es una lista con **General** (vale para todas las landings) y los sectores de las landings creadas. Elige el sector, pulsa **Guardar** y publica los cambios.
 
+### 8.31 Sitio en inglés (solo superadmin)
+
+El sitio puede tener una versión en inglés, con sus propias páginas, contenido, menú y pie. Las páginas en inglés se publican en direcciones que empiezan con `/en` (por ejemplo `/en/precios`, y `/en` para el inicio).
+
+**Crear las páginas en inglés.** En **Sitio web › Páginas**, al crear una página o una landing elige el **Idioma** Inglés. Usa la misma dirección que su página en español (por ejemplo `/precios`): así el sitio sabe que son la misma página en dos idiomas.
+
+**Cargar el contenido en inglés.** En **Sitio web › Contenido**, arriba de las pestañas, elige **Inglés**. Verás solo los elementos en inglés (cifras, testimonios, preguntas…), con su propio orden. Agrega, ordena, muestra u oculta igual que en español; lo que hagas en un idioma no cambia el otro. Vuelve a **Español** para ver los de siempre.
+
+**Menú y pie en inglés.** En **Sitio web › Páginas**, arriba de las tarjetas **Menú principal** y **Pie de página**, elige **Inglés**. Las tarjetas muestran el menú y el pie de las páginas en inglés. Escribe las direcciones de los enlaces con `/en` (por ejemplo `/en/precios`). Un enlace de una columna del pie es del mismo idioma que su columna.
+
+**El selector ES · EN del sitio.** En la cabecera, y dentro del botón **Menú** en el celular, el visitante ve **ES · EN** para cambiar de idioma:
+
+- Aparece cuando el inicio del otro idioma (`/en` o `/`) está publicado.
+- Si la página que está viendo también está publicada en el otro idioma, lo lleva a esa misma página; si no, lo lleva al inicio de ese idioma.
+- Para ocultarlo, ve a **Configuración › Ajustes del sitio**, tarjeta **Idiomas**, y apaga **Mostrar selector ES/EN**. Viene encendido. El cambio llega al sitio con **Publicar cambios**.
+
+**Para los buscadores.** Cuando una página está publicada en los dos idiomas, el sitio les avisa a los buscadores que una es la traducción de la otra. Si una de las dos está en borrador, no lo hace.
+
+**Ten en cuenta:** los textos fijos de los bloques en inglés (por ejemplo los títulos de las secciones y la llamada final) son una traducción inicial que se revisará. Los datos ficticios en inglés también impiden publicar en producción y se ocultan con **Ocultar todos los ficticios**.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -894,6 +914,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.63 | 2026-11-13 | Sitio en inglés (8.31): páginas en `/en`, el selector Español / Inglés en Contenido y en Menú principal y Pie de página, el selector ES · EN del sitio y la tarjeta Idiomas de Ajustes del sitio con «Mostrar selector ES/EN». |
 | 0.62 | 2026-11-13 | Landings por sector (8.30): crear una landing, completar portada y meta título, publicarla, el bloque y la columna Sectores, y el sector de los testimonios. |
 | 0.61 | 2026-11-13 | Ajustes del sitio (8.29): dominio con su comprobación, nombre, logo y favicon, botón de WhatsApp, correo de leads, analítica y modo mantenimiento con la página «Volvemos pronto». |
 | 0.60 | 2026-11-13 | «Ver el sitio» y el estado del sitio público en la tarjeta Versiones (8.28): preparando, listo o error; el sitio rápido, con menú de celular y página no encontrada. |
