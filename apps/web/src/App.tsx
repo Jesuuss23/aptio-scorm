@@ -1,7 +1,7 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION } from './api';
-import { MENU, resolverVista } from './menu';
+import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION, VEN_SITIO } from './api';
+import { GRUPO_SITIO, MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
 import { ClienteDetalle } from './vistas/ClienteDetalle';
@@ -22,6 +22,7 @@ import { Rentabilidad } from './vistas/Rentabilidad';
 import { ConexionesIA } from './vistas/ConexionesIA';
 import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
+import { SitioResumen } from './vistas/SitioResumen';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -56,7 +57,10 @@ export function App() {
 
   useEffect(() => {
     if (usuario === null && !PUBLICAS.includes(camino)) navegar('/ingresar');
-    if (usuario && camino === '/ingresar') navegar('/');
+    // HU-1501 · El superadmin no tiene organización: su panel es el grupo «Sitio web» (SUP-166).
+    const inicio = usuario && VEN_SITIO.includes(usuario.rol) ? '/sitio' : '/';
+    if (usuario && camino === '/ingresar') navegar(inicio);
+    else if (usuario && inicio === '/sitio' && !camino.startsWith('/sitio')) navegar('/sitio');
   }, [usuario, camino]);
 
   if (camino === '/clave') return <NuevaClave token={new URLSearchParams(busqueda).get('token') ?? ''} />;
@@ -79,8 +83,10 @@ export function App() {
   const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
   const venCostos = VEN_COSTOS.includes(usuario.rol);
   const veOperacion = VEN_OPERACION.includes(usuario.rol);
+  const veSitio = VEN_SITIO.includes(usuario.rol);
   // Nuevo SCORM y Rentabilidad solo aparecen a quien puede usarlos (RN-01-2: la API también lo valida).
-  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion)) })).filter((g) => g.items.length);
+  // HU-1501 · El superadmin ve solo «Sitio web»; el resto de los roles nunca lo ve (CP-109).
+  const menu = MENU.filter((g) => (g.nombre === GRUPO_SITIO) === veSitio).map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion)) })).filter((g) => g.items.length);
   return (
     <Estructura
       menu={menu}
@@ -113,6 +119,8 @@ export function App() {
         <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' ? (
         <Proyectos rol={usuario.rol} />
+      ) : vista?.activo === '/sitio' && veSitio ? (
+        <SitioResumen />
       ) : vista?.activo === '/operacion' && veOperacion ? (
         <OperacionVista />
       ) : vista?.activo === '/conexiones-ia' && veConexiones ? (
