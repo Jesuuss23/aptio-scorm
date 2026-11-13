@@ -23,6 +23,7 @@ export class PaginaSitioDto {
   @ApiProperty({ format: 'date-time', nullable: true, description: 'Última vez que pasó a PUBLICADA' }) publicadaEn: string | null;
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
   @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
+  @ApiPropertyOptional({ description: 'HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117)' }) avisoFicticios?: number;
 }
 
 class CamposAccion {
@@ -80,6 +81,7 @@ export class BloqueSitioCambioDto {
 /** HU-1504 · Elemento de contenido tal como lo ve el sitio público. */
 export class ElementoPublicoDto {
   @ApiProperty({ type: 'object', additionalProperties: true }) datos: Record<string, string | number>;
+  @ApiPropertyOptional({ description: 'HU-1505 · Solo en pruebas: el dato es inventado (en producción nunca sale)' }) ficticio?: boolean;
 }
 
 /** HU-1503 · Bloque tal como lo ve el sitio público: solo visibles y en su orden. */

@@ -2,12 +2,13 @@
 // funcionalidades, pasos, LMS y preguntas), una pestaña por colección. Cada elemento se edita y guarda, se sube o baja
 // con flechas (dedo, ratón y teclado), se muestra u oculta y se borra con confirmación. Un elemento nuevo entra oculto
 // (RN-16-2, CP-115); ocultarlo lo quita de todas las páginas sin borrar sus datos (CP-114). Solo texto (RN-16-7).
-// La marca «ficticio» llega con la HU-1505; Portada y Llamada final, con los ajustes del sitio (SUP-178).
+// HU-1505 · Casilla «Ficticio» y distintivo por elemento, contador de ficticios visibles del sitio y aviso con «Ocultar
+// todos los ficticios» (RN-16-3). Portada y Llamada final, con los ajustes del sitio (SUP-178).
 import { moverBloque } from '@aptio/schema/sitio-bloques';
 import { type CampoContenido, type Coleccion, COLECCIONES, COLECCIONES_CONTENIDO, camposDe, validarDatos } from '@aptio/schema/sitio-contenido';
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
-import { api, type ElementoSitio, ErrorApi } from '../api';
+import { api, type ElementoSitio, ErrorApi, type FicticiosSitio } from '../api';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
@@ -32,10 +33,14 @@ export function SitioContenido() {
   const [ocupado, setOcupado] = useState(false);
   const [nuevo, setNuevo] = useState(false);
   const [borrando, setBorrando] = useState<string | null>(null);
+  const [ficticios, setFicticios] = useState<FicticiosSitio | null>(null);
   const foco = useRef<string | null>(null);
   const lista = useRef<HTMLOListElement>(null);
   const pestanas = useRef<HTMLDivElement>(null);
   const info = COLECCIONES_CONTENIDO[coleccion];
+
+  const refrescarFicticios = () => api.ficticiosSitio().then(setFicticios, () => undefined);
+  useEffect(() => { void refrescarFicticios(); }, []);
 
   useEffect(() => {
     let vigente = true;
@@ -106,6 +111,23 @@ export function SitioContenido() {
     if (!r) return;
     reemplazar(r);
     setAnuncio(`«${titulo(coleccion, r.datos)}» ${r.visible ? 'se muestra en el sitio' : 'quedó oculto en todas las páginas; sus datos se conservan'}.`);
+    if (r.ficticio) void refrescarFicticios();
+  }
+
+  async function marcarFicticio(x: ElementoSitio, ficticio: boolean) {
+    const r = await hacer(() => api.cambiarElemento(x.id, { ficticio }), 'No se pudo cambiar la marca de ficticio');
+    if (!r) return;
+    reemplazar(r);
+    setAnuncio(`«${titulo(coleccion, r.datos)}» ${ficticio ? 'quedó marcado como ficticio' : 'ya no está marcado como ficticio'}.`);
+    void refrescarFicticios();
+  }
+
+  async function ocultarFicticios() {
+    const r = await hacer(() => api.ocultarFicticios(), 'No se pudieron ocultar los ficticios');
+    if (!r) return;
+    setFicticios(r);
+    setElementos((l) => (l ?? []).map((y) => (y.ficticio ? { ...y, visible: false } : y)));
+    setAviso({ tipo: 'ok', texto: r.ocultados === 1 ? 'Se ocultó 1 dato ficticio.' : `Se ocultaron ${r.ocultados} datos ficticios.` });
   }
 
   async function guardar(x: ElementoSitio, datos: Record<string, string | number>): Promise<boolean> {
@@ -131,12 +153,26 @@ export function SitioContenido() {
     setBorrando(null);
     setElementos((l) => (l ?? []).filter((y) => y.id !== x.id).map((y, orden) => ({ ...y, orden })));
     setAviso({ tipo: 'ok', texto: `«${titulo(coleccion, x.datos)}» se borró.` });
+    if (x.ficticio) void refrescarFicticios();
   }
 
   const visibles = elementos?.filter((x) => x.visible).length ?? 0;
+  const nFicticios = ficticios?.ficticios.length ?? 0;
+  const contador = ficticios ? <p className="contador-ficticios">Datos ficticios visibles: <b>{nFicticios}</b></p> : undefined;
   return (
     <>
-      <Cabecera titulo="Contenido" subtitulo="Textos y datos que usan los bloques de todas las páginas. Un elemento nuevo entra oculto; lo oculto se guarda y no aparece en ninguna página." />
+      <Cabecera titulo="Contenido" subtitulo="Textos y datos que usan los bloques de todas las páginas. Un elemento nuevo entra oculto; lo oculto se guarda y no aparece en ninguna página." accion={contador} />
+      {nFicticios > 0 && ficticios ? (
+        <div className="nota aviso confirmar-fila" role="region" aria-label="Datos ficticios visibles">
+          <span>
+            {nFicticios === 1 ? 'Hay 1 dato ficticio visible.' : `Hay ${nFicticios} datos ficticios visibles.`}{' '}
+            {ficticios.entorno === 'produccion'
+              ? 'En producción no se puede publicar ninguna página mientras sigan visibles, y el sitio no los muestra.'
+              : 'En pruebas se publica igual, con aviso; en producción quedaría bloqueado.'}
+          </span>
+          <button type="button" className="boton" disabled={ocupado} onClick={() => void ocultarFicticios()}>Ocultar todos los ficticios</button>
+        </div>
+      ) : null}
       <div className="opciones" role="tablist" aria-label="Colecciones de contenido" ref={pestanas}>
         {COLECCIONES.map((c) => (
           <button key={c} type="button" role="tab" id={`pestana-${c}`} className="opcion" aria-selected={coleccion === c} aria-controls="panel-contenido"
@@ -172,6 +208,8 @@ export function SitioContenido() {
                       alGuardar={(d) => guardar(x, d)}
                     />
                     <div className="elemento-acciones">
+                      {x.ficticio ? <span className="chip aviso">Ficticio</span> : null}
+                      <label className="casilla"><input type="checkbox" checked={x.ficticio} disabled={ocupado} onChange={(ev) => void marcarFicticio(x, ev.target.checked)} aria-label={`Ficticio: ${nombre}`} /> Ficticio</label>
                       <button type="button" role="switch" className="interruptor" aria-checked={x.visible} disabled={ocupado} onClick={() => void alternar(x)} aria-label={`Mostrar ${nombre}`}><span aria-hidden="true" /></button>
                       <span className="sec">{x.visible ? 'Visible' : 'Oculto'}</span>
                       <button type="button" className="boton" disabled={ocupado} aria-expanded={borrando === x.id} onClick={() => setBorrando(borrando === x.id ? null : x.id)} aria-label={`Borrar ${nombre}`}>Borrar</button>

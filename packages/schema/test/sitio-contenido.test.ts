@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aplicarOrden, compactarOrden, ordenAlFinal } from '../src/sitio-bloques.js';
-import { COLECCIONES, COLECCION_DE_BLOQUE, elementosDeBloque, esColeccion, esTextoPlano, mezclarDatos, validarDatos } from '../src/sitio-contenido.js';
+import { COLECCIONES, COLECCION_DE_BLOQUE, elementosDeBloque, esColeccion, esTextoPlano, mezclarDatos, nombreElemento, validarDatos } from '../src/sitio-contenido.js';
 
 const VALIDOS = {
   cifras: { valor: '4 días', etiqueta: 'para entregar una cápsula' },
@@ -17,6 +17,10 @@ describe('colecciones de contenido (HU-1504)', () => {
     expect(COLECCIONES).toEqual(['cifras', 'testimonios', 'logos', 'funcionalidades', 'pasos', 'lms', 'preguntas']);
     expect(Object.values(COLECCION_DE_BLOQUE).every(esColeccion)).toBe(true);
     expect([esColeccion('cifras'), esColeccion('planes'), esColeccion('toString')]).toEqual([true, false, false]);
+  });
+
+  it('nombra un elemento por su primer campo (HU-1505)', () => {
+    expect([nombreElemento('testimonios', VALIDOS.testimonios), nombreElemento('cifras', {}), nombreElemento('otra', {})]).toEqual(['Ana', 'cifra', 'otra']);
   });
 
   it('acepta los datos válidos de las 7 colecciones', () => {

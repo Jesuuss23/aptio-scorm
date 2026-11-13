@@ -2,12 +2,14 @@ import { Injectable, NotFoundException, UnprocessableEntityException } from '@ne
 import { Prisma, type SitioElemento } from '@aptio/db';
 import { ordenAlFinal, validarOrden } from '@aptio/schema/sitio-bloques';
 import { type Coleccion, type DatosContenido, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
+import { ficticiosVisibles } from '@aptio/schema/sitio-ficticios';
+import { entornoActual } from './entorno-sitio.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
-import type { ElementoSitioCambioDto, ElementoSitioDto } from './elementos.dto.js';
+import type { ElementoSitioCambioDto, ElementoSitioDto, FicticiosOcultadosDto, FicticiosSitioDto } from './elementos.dto.js';
 
 const aDto = (e: SitioElemento): ElementoSitioDto => ({
-  id: e.id, coleccion: e.coleccion, orden: e.orden, visible: e.visible, datos: e.datos as DatosContenido,
+  id: e.id, coleccion: e.coleccion, orden: e.orden, visible: e.visible, ficticio: e.ficticio, datos: e.datos as DatosContenido,
   creadoEn: e.creadoEn.toISOString(), actualizadoEn: e.actualizadoEn.toISOString(),
 });
 
@@ -35,19 +37,19 @@ export class ElementosService {
     return filas.map(aDto);
   }
 
-  async agregar(u: UsuarioSesion, coleccion: Coleccion, entrada: Record<string, unknown>): Promise<ElementoSitioDto> {
+  async agregar(u: UsuarioSesion, coleccion: Coleccion, entrada: Record<string, unknown>, ficticio = false): Promise<ElementoSitioDto> {
     const datos = this.validos(coleccion, entrada, false);
     const e = await this.bd.$transaction(async (tx) => {
       const actuales = await tx.sitioElemento.findMany({ where: { coleccion }, select: { id: true, orden: true, visible: true } });
-      return tx.sitioElemento.create({ data: { coleccion, orden: ordenAlFinal(actuales), visible: false, datos } });
+      return tx.sitioElemento.create({ data: { coleccion, orden: ordenAlFinal(actuales), visible: false, ficticio, datos } });
     });
-    await this.auditar(u, 'SITIO_ELEMENTO_AGREGADO', e.id, { coleccion, orden: e.orden, datos });
+    await this.auditar(u, 'SITIO_ELEMENTO_AGREGADO', e.id, { coleccion, orden: e.orden, ficticio, datos });
     return aDto(e);
   }
 
   async cambiar(u: UsuarioSesion, id: string, dto: ElementoSitioCambioDto): Promise<ElementoSitioDto> {
-    if (dto.datos === undefined && dto.visible === undefined) {
-      throw new UnprocessableEntityException({ codigo: 'SIN_CAMBIOS', mensaje: 'Indica datos o visible' });
+    if (dto.datos === undefined && dto.visible === undefined && dto.ficticio === undefined) {
+      throw new UnprocessableEntityException({ codigo: 'SIN_CAMBIOS', mensaje: 'Indica datos, visible o ficticio' });
     }
     const actual = await this.buscar(id);
     const coleccion = actual.coleccion as Coleccion;
@@ -58,10 +60,12 @@ export class ElementosService {
       if (JSON.stringify(datosNuevos) !== JSON.stringify(actual.datos)) data.datos = datosNuevos;
     }
     if (dto.visible !== undefined && dto.visible !== actual.visible) data.visible = dto.visible;
+    if (dto.ficticio !== undefined && dto.ficticio !== actual.ficticio) data.ficticio = dto.ficticio;
     if (!Object.keys(data).length) return aDto(actual);
     const e = await this.bd.sitioElemento.update({ where: { id }, data });
     if (data.datos) await this.auditar(u, 'SITIO_ELEMENTO_EDITADO', id, { coleccion, antes: actual.datos, despues: datosNuevos });
-    if (data.visible !== undefined) await this.auditar(u, e.visible ? 'SITIO_ELEMENTO_MOSTRADO' : 'SITIO_ELEMENTO_OCULTADO', id, { coleccion });
+    if (data.visible !== undefined) await this.auditar(u, e.visible ? 'SITIO_ELEMENTO_MOSTRADO' : 'SITIO_ELEMENTO_OCULTADO', id, { coleccion, ficticio: e.ficticio });
+    if (data.ficticio !== undefined) await this.auditar(u, e.ficticio ? 'SITIO_ELEMENTO_MARCADO_FICTICIO' : 'SITIO_ELEMENTO_DESMARCADO_FICTICIO', id, { coleccion });
     return aDto(e);
   }
 
@@ -85,6 +89,23 @@ export class ElementosService {
       await Promise.all(resto.map((r, orden) => (r.orden === orden ? null : tx.sitioElemento.update({ where: { id: r.id }, data: { orden } }))));
     });
     await this.auditar(u, 'SITIO_ELEMENTO_BORRADO', id, { coleccion: e.coleccion, visible: e.visible, datos: e.datos });
+  }
+
+  /** HU-1505 · Ficticios visibles del sitio, con el entorno (RN-16-3). */
+  async ficticios(): Promise<FicticiosSitioDto> {
+    const filas = await this.bd.sitioElemento.findMany({ where: { ficticio: true, visible: true } });
+    return { entorno: entornoActual(), ficticios: ficticiosVisibles(filas).map(aDto) };
+  }
+
+  /** HU-1505 · «Ocultar todos los ficticios»: los oculta de una vez y deja una fila en la auditoría con sus ids. */
+  async ocultarFicticios(u: UsuarioSesion): Promise<FicticiosOcultadosDto> {
+    const ids = await this.bd.$transaction(async (tx) => {
+      const visibles = await tx.sitioElemento.findMany({ where: { ficticio: true, visible: true }, select: { id: true, coleccion: true } });
+      if (visibles.length) await tx.sitioElemento.updateMany({ where: { id: { in: visibles.map((v) => v.id) } }, data: { visible: false } });
+      return visibles;
+    });
+    if (ids.length) await this.auditar(u, 'SITIO_FICTICIOS_OCULTADOS', null, { ocultados: ids.length, elementos: ids });
+    return { ...(await this.ficticios()), ocultados: ids.length };
   }
 
   private validos(coleccion: Coleccion, entrada: unknown, parcial: boolean): DatosContenido {

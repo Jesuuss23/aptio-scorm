@@ -2,14 +2,18 @@
 // publicada). Nueva página, Publicar, Programar con fecha y hora de Lima, Pasar a borrador y Borrar (solo borradores).
 // Solo el superadmin (ADR-011). HU-1503 · «Editar» abre el editor de bloques (PNT-26). SEO y landings de sector llegan
 // con sus historias.
+// HU-1505 · En producción, publicar con datos ficticios visibles da 409: se muestra la lista con «Ocultar todos los
+// ficticios», que los oculta y vuelve a publicar en un clic (CP-116). En pruebas se publica con aviso (CP-117).
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { type Coleccion, COLECCIONES_CONTENIDO } from '@aptio/schema/sitio-contenido';
 import { navegar } from '../ruta';
 import { type AccionPagina, api, ErrorApi, type PaginaSitio, type PaginaSitioCambio } from '../api';
 import { ESTADO_PAGINA, fechaHoraLima, limaAIso, MENSAJE_RUTA, minimoProgramable, NOMBRE_IDIOMA, RUTA_SITIO } from './sitio-paginas';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
-type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
+type Aviso = { tipo: 'ok' | 'error' | 'aviso'; texto: string } | null;
+type Bloqueo = { pagina: PaginaSitio; detalles: { id: string; coleccion: string; nombre: string }[]; mensaje: string } | null;
 type Abierto = { id: string; modo: 'programar' | 'borrar' } | null;
 
 export function SitioPaginas() {
@@ -19,6 +23,7 @@ export function SitioPaginas() {
   const [nueva, setNueva] = useState(false);
   const [abierto, setAbierto] = useState<Abierto>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [bloqueo, setBloqueo] = useState<Bloqueo>(null);
   const titulo = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -30,17 +35,38 @@ export function SitioPaginas() {
   async function cambiar(p: PaginaSitio, datos: PaginaSitioCambio, ok: string): Promise<boolean> {
     setOcupado(true);
     setAviso(null);
+    setBloqueo(null);
     try {
-      reemplazar(await api.cambiarPaginaSitio(p.id, datos));
-      setAviso({ tipo: 'ok', texto: ok });
+      const r = await api.cambiarPaginaSitio(p.id, datos);
+      reemplazar(r);
+      setAviso(r.avisoFicticios
+        ? { tipo: 'aviso', texto: `${ok} Aviso: hay ${r.avisoFicticios === 1 ? '1 dato ficticio visible' : `${r.avisoFicticios} datos ficticios visibles`}; en pruebas se publica igual, pero en producción quedaría bloqueado.` }
+        : { tipo: 'ok', texto: ok });
       setAbierto(null);
       return true;
     } catch (e) {
-      setAviso({ tipo: 'error', texto: mensajeDe(e, 'No se pudo cambiar la página') });
+      if (e instanceof ErrorApi && e.codigo === 'FICTICIOS_VISIBLES') {
+        setBloqueo({ pagina: p, mensaje: e.message, detalles: e.detalles as { id: string; coleccion: string; nombre: string }[] });
+      } else {
+        setAviso({ tipo: 'error', texto: mensajeDe(e, 'No se pudo cambiar la página') });
+      }
       return false;
     } finally {
       setOcupado(false);
     }
+  }
+
+  /** CP-116 · Oculta todos los ficticios visibles y vuelve a publicar la página que estaba bloqueada. */
+  async function ocultarYPublicar(b: NonNullable<Bloqueo>) {
+    setOcupado(true);
+    try {
+      await api.ocultarFicticios();
+    } catch (e) {
+      setOcupado(false);
+      return setAviso({ tipo: 'error', texto: mensajeDe(e, 'No se pudieron ocultar los ficticios') });
+    }
+    setOcupado(false);
+    await accion(b.pagina, 'publicar');
   }
 
   const accion = (p: PaginaSitio, a: AccionPagina) =>
@@ -77,7 +103,19 @@ export function SitioPaginas() {
           }}
         />
       ) : null}
-      {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
+      {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : aviso.tipo === 'aviso' ? 'aviso' : 'error'}`} role={aviso.tipo === 'error' ? 'alert' : 'status'}>{aviso.texto}</div> : null}
+      {bloqueo ? (
+        <div className="nota error" role="alert" aria-labelledby="bloqueo-titulo">
+          <p id="bloqueo-titulo"><b>«{bloqueo.pagina.titulo}» no se publicó.</b> {bloqueo.mensaje}</p>
+          <ul aria-label="Datos ficticios visibles">
+            {bloqueo.detalles.map((d) => <li key={d.id}>{d.nombre} <span>({COLECCIONES_CONTENIDO[d.coleccion as Coleccion]?.nombre ?? d.coleccion})</span></li>)}
+          </ul>
+          <div className="acciones-fila">
+            <button type="button" className="boton primario" disabled={ocupado} onClick={() => void ocultarYPublicar(bloqueo)}>Ocultar todos los ficticios</button>
+            <button type="button" className="boton" onClick={() => setBloqueo(null)}>Cerrar</button>
+          </div>
+        </div>
+      ) : null}
       {!paginas ? (!error ? <p className="sec" role="status">Cargando las páginas…</p> : null) : (
         <section className="tarjeta" aria-labelledby="sitio-paginas-titulo">
           <h2 id="sitio-paginas-titulo" ref={titulo} tabIndex={-1}>Páginas del sitio</h2>

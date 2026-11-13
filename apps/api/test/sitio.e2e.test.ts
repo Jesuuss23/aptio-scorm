@@ -7,12 +7,14 @@
 // permisos y auditoría.
 // HU-1504 · CP-114 y CP-115: contenido por colección (nace oculto, un testimonio oculto no sale en ninguna página),
 // cascada página → bloque → elemento, texto plano (RN-16-7), orden, permisos y auditoría.
+// HU-1505 · CP-116 y CP-117: ficticios visibles bloquean publicar en producción (409 con la lista) y en pruebas se
+// publica con aviso; «Ocultar todos los ficticios», la segunda defensa del sitio público, permisos y auditoría.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { hashearClave, prisma, publicarProgramadas, Rol } from '@aptio/db';
 import request from 'supertest';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
 import { LimitePublicoService } from '../src/sitio/limite-publico.js';
@@ -573,6 +575,131 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
         ['SITIO_ELEMENTO_OCULTADO', null], ['SITIO_ELEMENTO_BORRADO', null],
       ]);
       expect(filas[2]!.datos).toMatchObject({ coleccion: 'cifras', antes: { valor: '1' }, despues: { valor: '2' } });
+    });
+  });
+  describe('datos ficticios y bloqueo de publicación (HU-1505)', () => {
+    const ruta = (n: string) => `/prueba-${sufijo}-f-${n}`;
+    const marca = `zf-${sufijo}`;
+    const creados: string[] = [];
+    const entornoOriginal = process.env.SITIO_ENTORNO;
+    const enviar = (m: 'get' | 'post' | 'patch' | 'delete', r: string, b?: object, c = cookies.SUPERADMIN) => {
+      const req = request(servidor)[m](`/api/v1${r}`);
+      if (c) req.set('Cookie', c);
+      return b ? req.send(b) : req;
+    };
+    const publica = (r: string) => request(servidor).get('/api/v1/publico/paginas').query({ ruta: r, idioma: 'es' });
+    const reiniciarLimite = () => app.get(LimitePublicoService).reiniciar();
+    const testimonio = async (nombre: string, { ficticio = true, visible = true } = {}) => {
+      const r = await enviar('post', '/sitio/elementos', { coleccion: 'testimonios', ficticio, datos: { nombre: `${nombre} ${marca}`, cargo: 'Jefa', empresa: 'Inventada', texto: 'Muy útil.', estrellas: 5 } });
+      if (r.status !== 201) throw new Error(`testimonio: ${r.status} ${JSON.stringify(r.body)}`);
+      creados.push(r.body.id);
+      if (visible) await enviar('patch', `/sitio/elementos/${r.body.id}`, { visible: true });
+      return r.body as { id: string; ficticio: boolean; visible: boolean };
+    };
+    const pagina = async (n: string, tipos: string[] = ['testimonios']) => {
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta(n), titulo: n })).body.id as string;
+      for (const tipo of tipos) {
+        const b = (await enviar('post', `/sitio/paginas/${p}/bloques`, { tipo })).body.id as string;
+        await enviar('patch', `/sitio/paginas/${p}/bloques/${b}`, { visible: true });
+      }
+      return p;
+    };
+    const nombres = (r: { body: { bloques?: { elementos?: { datos: { nombre?: string }; ficticio?: boolean }[] }[] } }) =>
+      (r.body.bloques ?? []).flatMap((b) => b.elementos ?? []).filter((e) => e.datos.nombre?.endsWith(marca)).map((e) => [e.datos.nombre, e.ficticio ?? false]);
+
+    afterEach(async () => {
+      process.env.SITIO_ENTORNO = entornoOriginal;
+      await prisma.sitioElemento.updateMany({ where: { id: { in: creados } }, data: { visible: false } });
+    });
+    afterAll(async () => {
+      if (entornoOriginal === undefined) delete process.env.SITIO_ENTORNO;
+      await prisma.sitioElemento.deleteMany({ where: { id: { in: creados } } });
+    });
+
+    it('un elemento se crea y se marca o desmarca como ficticio, con auditoría', async () => {
+      const r = await enviar('post', '/sitio/elementos', { coleccion: 'logos', datos: { nombre: `Logo ${marca}` } });
+      creados.push(r.body.id);
+      expect(r.body).toMatchObject({ ficticio: false, visible: false });
+      const m = await enviar('patch', `/sitio/elementos/${r.body.id}`, { ficticio: true });
+      expect(m.body.ficticio).toBe(true);
+      await enviar('patch', `/sitio/elementos/${r.body.id}`, { ficticio: true }); // sin cambio: no audita
+      await enviar('patch', `/sitio/elementos/${r.body.id}`, { ficticio: false });
+      const filas = await prisma.auditoria.findMany({ where: { entidad: 'SitioElemento', entidadId: r.body.id }, orderBy: { creadoEn: 'asc' } });
+      expect(filas.map((f) => f.accion)).toEqual(['SITIO_ELEMENTO_AGREGADO', 'SITIO_ELEMENTO_MARCADO_FICTICIO', 'SITIO_ELEMENTO_DESMARCADO_FICTICIO']);
+    });
+
+    it('CP-116: en producción, con 2 testimonios ficticios visibles, publicar da 409 con la lista y la página no cambia', async () => {
+      delete process.env.SITIO_ENTORNO; // sin definir = producción
+      const [a, b] = [await testimonio('Ana'), await testimonio('Beto')];
+      await testimonio('Oculto', { visible: false });
+      await testimonio('Real', { ficticio: false });
+      const p = await pagina('cp116');
+      const r = await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      expect(r.status).toBe(409);
+      expect(r.body.codigo).toBe('FICTICIOS_VISIBLES');
+      const propios = (r.body.detalles as { id: string; coleccion: string; nombre: string }[]).filter((d) => d.nombre.endsWith(marca));
+      expect(propios).toEqual([{ id: a.id, coleccion: 'testimonios', nombre: `Ana ${marca}` }, { id: b.id, coleccion: 'testimonios', nombre: `Beto ${marca}` }]);
+      expect((await prisma.sitioPagina.findUniqueOrThrow({ where: { id: p } })).estado).toBe('BORRADOR');
+      // Crear y publicar de una vez también se bloquea.
+      expect((await enviar('post', '/sitio/paginas', { ruta: ruta('cp116-directa'), titulo: 'Directa', accion: 'publicar' })).status).toBe(409);
+      expect(await prisma.sitioPagina.count({ where: { ruta: ruta('cp116-directa') } })).toBe(0);
+
+      // «Ocultar todos los ficticios» y entonces se publica.
+      const lista = await enviar('get', '/sitio/ficticios');
+      expect(lista.body.entorno).toBe('produccion');
+      expect(lista.body.ficticios.map((x: { id: string }) => x.id)).toEqual(expect.arrayContaining([a.id, b.id]));
+      const o = await enviar('post', '/sitio/ficticios/ocultar');
+      expect(o.status).toBe(200);
+      expect(o.body).toMatchObject({ entorno: 'produccion', ficticios: [] });
+      expect(o.body.ocultados).toBeGreaterThanOrEqual(2);
+      const pub = await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      expect(pub.status).toBe(200);
+      expect(pub.body.avisoFicticios).toBeUndefined();
+      const auditoria = await prisma.auditoria.findFirstOrThrow({ where: { accion: 'SITIO_FICTICIOS_OCULTADOS' }, orderBy: { creadoEn: 'desc' } });
+      expect((auditoria.datos as { elementos: { id: string }[] }).elementos.map((e) => e.id)).toEqual(expect.arrayContaining([a.id, b.id]));
+    });
+
+    it('CP-117: en pruebas, con los mismos datos, se publica con aviso y el público los muestra marcados', async () => {
+      process.env.SITIO_ENTORNO = 'pruebas';
+      reiniciarLimite();
+      await testimonio('Ana');
+      await testimonio('Beto');
+      await testimonio('Real', { ficticio: false });
+      const p = await pagina('cp117');
+      const r = await enviar('patch', `/sitio/paginas/${p}`, { accion: 'publicar' });
+      expect(r.status).toBe(200);
+      expect(r.body.estado).toBe('PUBLICADA');
+      expect(r.body.avisoFicticios).toBeGreaterThanOrEqual(2);
+      expect((await enviar('get', '/sitio/ficticios')).body.entorno).toBe('pruebas');
+      expect(nombres(await publica(ruta('cp117')))).toEqual([[`Ana ${marca}`, true], [`Beto ${marca}`, true], [`Real ${marca}`, false]]);
+
+      // Segunda defensa: la misma página publicada, vista en producción, no muestra los ficticios.
+      process.env.SITIO_ENTORNO = 'produccion';
+      expect(nombres(await publica(ruta('cp117')))).toEqual([[`Real ${marca}`, false]]);
+    });
+
+    it('en producción la programada no se publica con ficticios visibles; al ocultarlos se publica sola', async () => {
+      delete process.env.SITIO_ENTORNO;
+      await testimonio('Programado');
+      const hora = new Date(Date.now() + 120_000);
+      const p = (await enviar('post', '/sitio/paginas', { ruta: ruta('programada'), titulo: 'Programada', accion: 'programar', publicarEn: hora.toISOString() })).body.id as string;
+      expect(await publicarProgramadas(prisma, new Date(hora.getTime() + 1000), 'produccion')).not.toContain(p);
+      expect(await publicarProgramadas(prisma, new Date(hora.getTime() + 31_000), 'produccion')).not.toContain(p);
+      expect((await prisma.sitioPagina.findUniqueOrThrow({ where: { id: p } })).estado).toBe('PROGRAMADA');
+      await enviar('post', '/sitio/ficticios/ocultar');
+      expect(await publicarProgramadas(prisma, new Date(hora.getTime() + 61_000), 'produccion')).toContain(p);
+      const acciones = (await prisma.auditoria.findMany({ where: { entidad: 'SitioPagina', entidadId: p }, orderBy: { creadoEn: 'asc' } })).map((a) => a.accion);
+      expect(acciones).toEqual(['SITIO_PAGINA_CREADA', 'SITIO_PAGINA_BLOQUEADA', 'SITIO_PAGINA_PUBLICADA']);
+    });
+
+    it('ficticios: solo el superadmin (403 y 401)', async () => {
+      const estados = [];
+      for (const rol of ROLES_ORGANIZACION) {
+        const c = cookies[rol]!;
+        estados.push([rol, (await enviar('get', '/sitio/ficticios', undefined, c)).status, (await enviar('post', '/sitio/ficticios/ocultar', undefined, c)).status]);
+      }
+      expect(estados).toEqual(ROLES_ORGANIZACION.map((rol) => [rol, 403, 403]));
+      expect([(await enviar('get', '/sitio/ficticios', undefined, '')).status, (await enviar('post', '/sitio/ficticios/ocultar', undefined, '')).status]).toEqual([401, 401]);
     });
   });
 });

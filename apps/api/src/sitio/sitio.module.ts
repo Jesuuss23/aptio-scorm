@@ -1,7 +1,7 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { BloquesController } from './bloques.controller.js';
 import { BloquesService } from './bloques.service.js';
-import { ElementosController } from './elementos.controller.js';
+import { ElementosController, FicticiosController } from './elementos.controller.js';
 import { ElementosService } from './elementos.service.js';
 import { LimitePublicoMiddleware, LimitePublicoService } from './limite-publico.js';
 import { PublicoController } from './publico.controller.js';
@@ -9,7 +9,7 @@ import { SitioController } from './sitio.controller.js';
 import { SitioService } from './sitio.service.js';
 
 /** M16 · Sitio web y contenido (fase comercial, ADR-011): administración solo del superadmin y rutas públicas. */
-@Module({ controllers: [SitioController, BloquesController, ElementosController, PublicoController], providers: [SitioService, BloquesService, ElementosService, LimitePublicoService] })
+@Module({ controllers: [SitioController, BloquesController, ElementosController, FicticiosController, PublicoController], providers: [SitioService, BloquesService, ElementosService, LimitePublicoService] })
 export class SitioModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     // El middleware revisa la ruta: solo cuenta `/api/v1/publico/*`.

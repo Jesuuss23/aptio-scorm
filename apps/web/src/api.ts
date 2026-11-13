@@ -589,6 +589,8 @@ export interface PaginaSitio {
   publicadaEn: string | null;
   creadoEn: string;
   actualizadoEn: string;
+  /** HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117). */
+  avisoFicticios?: number;
 }
 export type AccionPagina = 'borrador' | 'programar' | 'publicar';
 export interface PaginaSitioEntrada { ruta: string; idioma: 'es' | 'en'; titulo: string }
@@ -599,10 +601,14 @@ export interface ElementoSitio {
   coleccion: string;
   orden: number;
   visible: boolean;
+  /** HU-1505 · Dato inventado: si está visible, bloquea publicar en producción (RN-16-3). */
+  ficticio: boolean;
   datos: Record<string, string | number>;
   creadoEn: string;
   actualizadoEn: string;
 }
+/** HU-1505 · Ficticios visibles del sitio y el entorno (RN-16-3). */
+export interface FicticiosSitio { entorno: 'produccion' | 'pruebas'; ficticios: ElementoSitio[] }
 /** HU-1503 · Bloque de una página del sitio (REQ-066). Nace oculto (RN-16-2). */
 export interface BloqueSitio {
   id: string;
@@ -651,9 +657,11 @@ export const api = {
   borrarPaginaSitio: (id: string) => pedir<void>(`/sitio/paginas/${id}`, { method: 'DELETE' }),
   elementosSitio: (coleccion: string) => pedir<ElementoSitio[]>(`/sitio/elementos?coleccion=${encodeURIComponent(coleccion)}`),
   agregarElemento: (coleccion: string, datos: Record<string, string | number>) => pedir<ElementoSitio>('/sitio/elementos', json({ coleccion, datos })),
-  cambiarElemento: (id: string, cambio: { datos?: Record<string, string | number>; visible?: boolean }) => pedir<ElementoSitio>(`/sitio/elementos/${id}`, json(cambio, 'PATCH')),
+  cambiarElemento: (id: string, cambio: { datos?: Record<string, string | number>; visible?: boolean; ficticio?: boolean }) => pedir<ElementoSitio>(`/sitio/elementos/${id}`, json(cambio, 'PATCH')),
   ordenarElementos: (coleccion: string, orden: string[]) => pedir<ElementoSitio[]>('/sitio/elementos', json({ coleccion, orden }, 'PATCH')),
   borrarElemento: (id: string) => pedir<void>(`/sitio/elementos/${id}`, { method: 'DELETE' }),
+  ficticiosSitio: () => pedir<FicticiosSitio>('/sitio/ficticios'),
+  ocultarFicticios: () => pedir<FicticiosSitio & { ocultados: number }>('/sitio/ficticios/ocultar', { method: 'POST' }),
   bloquesPagina: (paginaId: string) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`),
   agregarBloque: (paginaId: string, tipo: string) => pedir<BloqueSitio>(`/sitio/paginas/${paginaId}/bloques`, json({ tipo })),
   ordenarBloques: (paginaId: string, orden: string[]) => pedir<BloqueSitio[]>(`/sitio/paginas/${paginaId}/bloques`, json({ orden }, 'PATCH')),

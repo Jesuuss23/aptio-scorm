@@ -162,6 +162,10 @@ paths:
         `publicarEn` sin `programar` da 422 PUBLICAR_EN_SIN_PROGRAMAR. La ruta no cambia en una PUBLICADA (422
         RUTA_PUBLICADA). Auditoría SITIO_PAGINA_EDITADA, SITIO_PAGINA_PUBLICADA, SITIO_PAGINA_PROGRAMADA o
         SITIO_PAGINA_A_BORRADOR. Una programada la publica sola la cola `mantenimiento` (cada 30 s, CP-111).
+        HU-1505: con `accion=publicar` en producción (`SITIO_ENTORNO`) y algún dato ficticio visible, 409
+        FICTICIOS_VISIBLES con `detalles` (id, coleccion, nombre) (CP-116); en pruebas publica y trae `avisoFicticios`
+        (CP-117). En producción la cola tampoco publica una programada mientras haya ficticios visibles: queda
+        SITIO_PAGINA_BLOQUEADA en la auditoría una vez.
       requestBody:
         required: true
         content:
@@ -482,6 +486,50 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /sitio/ficticios:
+    get:
+      tags:
+      - Sitio web
+      summary: Datos ficticios visibles del sitio y el entorno (HU-1505, RN-16-3)
+      operationId: get_sitio_ficticios
+      description: Solo SUPERADMIN. `entorno` sale de `SITIO_ENTORNO` (sin definir o con otro valor, `produccion`). La lista son los elementos con `ficticio` y `visible`, por colección y orden.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FicticiosSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /sitio/ficticios/ocultar:
+    post:
+      tags:
+      - Sitio web
+      summary: Ocultar todos los datos ficticios visibles (HU-1505, CP-116)
+      operationId: post_sitio_ficticios_ocultar
+      description: Solo SUPERADMIN. Pone `visible` en false a todos los ficticios visibles de una vez; conservan sus datos y su marca. Auditoría SITIO_FICTICIOS_OCULTADOS con sus ids.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/FicticiosSitio'
+                - type: object
+                  required:
+                  - ocultados
+                  properties:
+                    ocultados:
+                      type: integer
+                      minimum: 0
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
   /publico/paginas:
     get:
       tags:
@@ -3942,6 +3990,10 @@ components:
         actualizadoEn:
           type: string
           format: date-time
+        avisoFicticios:
+          type: integer
+          minimum: 1
+          description: HU-1505 · Solo al publicar en pruebas con datos ficticios visibles (CP-117)
     PaginaSitioEntrada:
       type: object
       additionalProperties: false
@@ -4109,6 +4161,7 @@ components:
       - coleccion
       - orden
       - visible
+      - ficticio
       - datos
       - creadoEn
       - actualizadoEn
@@ -4124,6 +4177,9 @@ components:
         visible:
           type: boolean
           description: Nace en false (RN-16-2)
+        ficticio:
+          type: boolean
+          description: HU-1505 · Dato inventado; visible, bloquea publicar en producción (RN-16-3)
         datos:
           $ref: '#/components/schemas/DatosElemento'
         creadoEn:
@@ -4153,6 +4209,9 @@ components:
           $ref: '#/components/schemas/ColeccionContenido'
         datos:
           $ref: '#/components/schemas/DatosElemento'
+        ficticio:
+          type: boolean
+          default: false
     ElementoSitioCambio:
       type: object
       additionalProperties: false
@@ -4161,6 +4220,23 @@ components:
           $ref: '#/components/schemas/DatosElemento'
         visible:
           type: boolean
+        ficticio:
+          type: boolean
+    FicticiosSitio:
+      type: object
+      required:
+      - entorno
+      - ficticios
+      properties:
+        entorno:
+          type: string
+          enum:
+          - produccion
+          - pruebas
+        ficticios:
+          type: array
+          items:
+            $ref: '#/components/schemas/ElementoSitio'
     OrdenElementos:
       type: object
       additionalProperties: false
@@ -4198,6 +4274,9 @@ components:
             properties:
               datos:
                 $ref: '#/components/schemas/DatosElemento'
+              ficticio:
+                type: boolean
+                description: HU-1505 · Solo en pruebas (en producción un ficticio nunca sale)
     PaginaPublica:
       type: object
       required:

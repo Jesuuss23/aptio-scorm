@@ -140,6 +140,8 @@ export interface OpcionesSimulacion {
   bloquesSitio?: BloqueSitioSim[];
   /** HU-1504 · Elementos de contenido del sitio. */
   elementosSitio?: ElementoSitioSim[];
+  /** HU-1505 · Entorno del sitio simulado (por defecto producción, como la API sin `SITIO_ENTORNO`). */
+  entornoSitio?: 'produccion' | 'pruebas';
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -373,12 +375,13 @@ export interface BloqueSitioSim {
 }
 /** HU-1504 · Elemento de contenido del sitio en la simulación. */
 export interface ElementoSitioSim {
-  id: string; coleccion: string; orden: number; visible: boolean; datos: Record<string, string | number>; creadoEn: string; actualizadoEn: string;
+  id: string; coleccion: string; orden: number; visible: boolean; ficticio?: boolean; datos: Record<string, string | number>; creadoEn: string; actualizadoEn: string;
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [] }: OpcionesSimulacion) {
-  const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ...e, datos: { ...e.datos } }));
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], entornoSitio = 'produccion' }: OpcionesSimulacion) {
+  const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
+  const ficticiosVisiblesSim = () => elementosSim.filter((e) => e.ficticio && e.visible);
   let elementosCreados = 0;
   const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ ...p }));
   const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
@@ -588,6 +591,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     // HU-1501 · Sitio web: solo el superadmin (CP-109); la lista está vacía hasta la HU-1502.
     // HU-1501 y HU-1502 · Sitio web › Páginas: solo el superadmin (CP-109), con las mismas reglas que la API.
     // HU-1504 · Contenido del sitio: mismas reglas que la API (oculto al final, datos validados, orden completo).
+    // HU-1505 · Ficticios visibles y «Ocultar todos los ficticios».
+    if (ruta === '/sitio/ficticios' || ruta === '/sitio/ficticios/ocultar') {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      let ocultados = 0;
+      if (ruta.endsWith('/ocultar')) for (const e of ficticiosVisiblesSim()) { e.visible = false; ocultados++; }
+      return responder(200, { entorno: entornoSitio, ficticios: ficticiosVisiblesSim(), ...(ruta.endsWith('/ocultar') ? { ocultados } : {}) });
+    }
     if (ruta === '/sitio/elementos' || ruta.startsWith('/sitio/elementos/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const ahora = new Date().toISOString();
@@ -603,7 +613,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         if (!esColeccion(b.coleccion)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'coleccion no válida' });
         const r = validarDatos(b.coleccion, b.datos);
         if (!r.ok) return invalido(r);
-        const e: ElementoSitioSim = { id: `00000000-0000-4000-9200-${String(++elementosCreados).padStart(12, '0')}`, coleccion: b.coleccion, orden: de(b.coleccion).length, visible: false, datos: r.datos, creadoEn: ahora, actualizadoEn: ahora };
+        const e: ElementoSitioSim = { id: `00000000-0000-4000-9200-${String(++elementosCreados).padStart(12, '0')}`, coleccion: b.coleccion, orden: de(b.coleccion).length, visible: false, ficticio: false, datos: r.datos, creadoEn: ahora, actualizadoEn: ahora };
         elementosSim.push(e);
         return responder(201, e);
       }
@@ -630,6 +640,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         e.datos = mezclarDatos(e.datos, r.datos);
       }
       if (b.visible !== undefined) e.visible = b.visible;
+      if ((b as { ficticio?: boolean }).ficticio !== undefined) e.ficticio = (b as { ficticio?: boolean }).ficticio;
       e.actualizadoEn = new Date(Date.now() + elementosCreados++).toISOString();
       return responder(200, e);
     }
@@ -688,6 +699,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         return responder(204);
       }
       const b = req.postDataJSON() as { accion?: 'borrador' | 'programar' | 'publicar'; publicarEn?: string; titulo?: string; ruta?: string };
+      const ficticios = b.accion === 'publicar' ? ficticiosVisiblesSim() : [];
+      if (ficticios.length && entornoSitio === 'produccion') {
+        return responder(409, {
+          codigo: 'FICTICIOS_VISIBLES', mensaje: `No se publica en producción con datos ficticios visibles: hay ${ficticios.length}. Ocúltalos o reemplázalos primero.`,
+          detalles: ficticios.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: String(Object.values(e.datos)[0] ?? e.coleccion) })),
+        });
+      }
       if (b.accion === 'publicar') Object.assign(p, { estado: 'PUBLICADA', publicadaEn: ahora, publicarEn: null });
       if (b.accion === 'borrador') Object.assign(p, { estado: 'BORRADOR', publicarEn: null });
       if (b.accion === 'programar') {
@@ -695,7 +713,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         Object.assign(p, { estado: 'PROGRAMADA', publicarEn: new Date(b.publicarEn).toISOString() });
       }
       p.actualizadoEn = ahora;
-      return responder(200, p);
+      return responder(200, ficticios.length ? { ...p, avisoFicticios: ficticios.length } : p);
     }
     // HU-1403 · Empresa › Operación: solo administración; «Respaldar ahora» deja una copia en curso (409 si ya hay una).
     if (ruta === '/operacion' || ruta === '/operacion/respaldar') {

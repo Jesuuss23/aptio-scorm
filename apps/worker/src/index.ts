@@ -11,6 +11,7 @@ import { correoDesdeEntorno } from './correo.js';
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
 import { prisma, publicarProgramadas } from '@aptio/db';
+import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { Queue, Worker } from 'bullmq';
 import { crearCascada } from './cascada.js';
@@ -128,7 +129,8 @@ const mantenedor = new Worker(
   async (job) => {
     if (job.name === TAREA_RESPALDO) return respaldar(job.data as DatosRespaldo);
     if (job.name === TAREA_PUBLICAR_PAGINAS) {
-      const ids = await publicarProgramadas(prisma);
+      // HU-1505 · En producción no publica mientras haya datos ficticios visibles (RN-16-3).
+      const ids = await publicarProgramadas(prisma, new Date(), entornoSitio(process.env.SITIO_ENTORNO));
       if (ids.length) console.log(`Publicadas ${ids.length} páginas programadas del sitio`);
       return { publicadas: ids.length };
     }
