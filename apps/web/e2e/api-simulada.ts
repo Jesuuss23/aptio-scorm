@@ -492,6 +492,46 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       proyecto(5, '00000000-0000-4000-8000-0000000000c2', 'Ética pública', { estado: 'GENERANDO' }),
     ]
     : [];
+  // HU-1403 · Copias de seguridad y estado de la operación simulados.
+  type RespaldoSim = { id: string; fecha: string; estado: string; origen: string; tamanoBytes: number | null; duracionMs: number | null; objetos: number | null; error: string | null };
+  const respaldosSim: RespaldoSim[] = [
+    { id: '00000000-0000-4000-8000-000000000002', fecha: '2026-11-12T08:00:00.000Z', estado: 'EXITOSO', origen: 'programado', tamanoBytes: 734_003_200, duracionMs: 185_000, objetos: 1_248, error: null },
+    { id: '00000000-0000-4000-8000-000000000001', fecha: '2026-11-11T08:00:00.000Z', estado: 'FALLIDO', origen: 'programado', tamanoBytes: null, duracionMs: 4_200, objetos: null, error: 'pg_dump terminó con código 1: connection refused' },
+  ];
+  const etapaSim = (etapa: string, nombre: string, ejecuciones: number, duracionPromedioMs: number | null, costoPromedioUsd: number) =>
+    ({ etapa, nombre, ejecuciones, duracionPromedioMs, costoPromedioUsd, costoTotalUsd: Math.round(costoPromedioUsd * ejecuciones * 10_000) / 10_000 });
+  const operacionSim = () => ({
+    generadoEn: '2026-11-13T06:00:00.000Z',
+    errores: {
+      desde24h: '2026-11-12T06:00:00.000Z', desde7d: '2026-11-07T05:00:00.000Z',
+      porProveedor: [
+        { proveedor: 'anthropic', errores24h: 1, errores7d: 3, trabajos7d: 142, detenidosPorLimite7d: 2, ultimoError: { mensaje: 'Salida no válida tras 3 intentos', en: '2026-11-13T03:10:00.000Z' } },
+        { proveedor: 'cola:export', errores24h: 0, errores7d: 1, trabajos7d: 1, detenidosPorLimite7d: 0, ultimoError: { mensaje: 'ENOSPC: sin espacio en disco', en: '2026-11-10T15:00:00.000Z' } },
+        { proveedor: 'google', errores24h: 0, errores7d: 0, trabajos7d: 60, detenidosPorLimite7d: 0, ultimoError: null },
+      ],
+    },
+    colas: [
+      { nombre: 'ia', pendientes: 2, activos: 1, fallidos: 3 }, { nombre: 'voz', pendientes: 0, activos: 0, fallidos: 0 },
+      { nombre: 'media', pendientes: 0, activos: 0, fallidos: 0 }, { nombre: 'export', pendientes: 0, activos: 0, fallidos: 1 },
+      { nombre: 'mantenimiento', pendientes: respaldosSim.some((r) => r.estado === 'EN_CURSO') ? 1 : 0, activos: 0, fallidos: 0 },
+    ],
+    etapas: {
+      desde: '2026-10-15T05:00:00.000Z',
+      porEtapa: [
+        etapaSim('RESUMEN_MATERIAL', 'Leer y resumir el material', 4, 95_000, 0.31), etapaSim('OBJETIVOS_ESTRUCTURA', 'Objetivos y estructura', 4, 62_000, 0.22),
+        etapaSim('STORYBOARD_GUION', 'Storyboard y guion', 4, 240_000, 0.55), etapaSim('PANTALLAS', 'Pantallas con el kit', 4, 410_000, 1.6),
+        etapaSim('ILUSTRACIONES', 'Ilustraciones', 0, null, 0), etapaSim('VOZ_ES', 'Voz en español', 3, 130_000, 1.3),
+        etapaSim('BOCA', 'Boca del personaje', 3, 48_000, 0), etapaSim('SUBTITULOS', 'Subtítulos', 3, 5_000, 0),
+        etapaSim('VERSION_EN', 'Versión en inglés', 1, 300_000, 0.5), etapaSim('CONTROL_CALIDAD', 'Control de calidad', 3, 75_000, 0.2),
+        etapaSim('PAQUETE', 'Paquete de prueba', 3, 12_000, 0),
+      ],
+    },
+    respaldos: {
+      retencionDias: 14, ultimoExitoso: respaldosSim.find((r) => r.estado === 'EXITOSO')?.fecha ?? null,
+      enCurso: respaldosSim.some((r) => r.estado === 'EN_CURSO'), lista: respaldosSim,
+    },
+  });
+
   await page.route('**/api/v1/**', async (route) => {
     const req = route.request();
     const ruta = new URL(req.url()).pathname.replace('/api/v1', '');
@@ -517,6 +557,16 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return token === 'vigente'
         ? responder(204)
         : responder(422, { codigo: 'ENLACE_NO_VALIDO', mensaje: 'Enlace no válido o vencido. Pide uno nuevo.' });
+    }
+    // HU-1403 · Empresa › Operación: solo administración; «Respaldar ahora» deja una copia en curso (409 si ya hay una).
+    if (ruta === '/operacion' || ruta === '/operacion/respaldar') {
+      if (usuario.rol !== 'ADMINISTRADOR') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
+      if (ruta === '/operacion/respaldar') {
+        if (respaldosSim.some((r) => r.estado === 'EN_CURSO')) return responder(409, { codigo: 'RESPALDO_EN_CURSO', mensaje: 'Ya hay una copia de seguridad en curso: espera a que termine' });
+        respaldosSim.unshift({ id: '00000000-0000-4000-8000-000000000003', fecha: '2026-11-13T06:00:00.000Z', estado: 'EN_CURSO', origen: 'manual', tamanoBytes: null, duracionMs: null, objetos: null, error: null });
+        return responder(202, { encolado: true });
+      }
+      return responder(200, operacionSim());
     }
     // HU-1304 · Conexiones IA: solo administración; nunca devuelven claves.
     if (ruta.startsWith('/conexiones-ia')) {

@@ -87,6 +87,9 @@ importers:
         specifier: ^7.8.2
         version: 7.8.2
     devDependencies:
+      '@aptio/respaldo':
+        specifier: workspace:*
+        version: link:../../packages/respaldo
       '@nestjs/testing':
         specifier: ^12.4.2
         version: 12.4.2(@nestjs/common@12.4.2(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.4.2)(@nestjs/platform-express@12.4.2)
@@ -226,6 +229,9 @@ importers:
       '@aptio/player':
         specifier: workspace:*
         version: link:../../packages/player
+      '@aptio/respaldo':
+        specifier: workspace:*
+        version: link:../../packages/respaldo
       '@aptio/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -253,6 +259,9 @@ importers:
       jszip:
         specifier: ^3.10.2
         version: 3.10.2
+      nodemailer:
+        specifier: ^10.4.0
+        version: 10.4.0
       pdfjs-dist:
         specifier: ^5.7.284
         version: 5.7.284
@@ -263,6 +272,9 @@ importers:
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
+      '@types/nodemailer':
+        specifier: ^8.0.2
+        version: 8.0.2
       pdf-lib:
         specifier: ^1.17.1
         version: 1.17.1
@@ -412,6 +424,34 @@ importers:
       happy-dom:
         specifier: 21.0.4
         version: 21.0.4
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/node@24.19.2)(happy-dom@21.0.4)(jiti@2.7.0)(lightningcss@1.33.0)(tsx@4.23.15)(yaml@2.9.1)
+
+  packages/respaldo:
+    dependencies:
+      '@aptio/almacen':
+        specifier: workspace:*
+        version: link:../almacen
+      '@aptio/db':
+        specifier: workspace:*
+        version: link:../db
+      '@aws-sdk/client-s3':
+        specifier: ^3.1165.0
+        version: 3.1165.0
+      dotenv:
+        specifier: ^18.0.9
+        version: 18.0.9
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
       typescript:
         specifier: ~5.9.3
         version: 5.9.3

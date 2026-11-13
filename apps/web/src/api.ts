@@ -8,6 +8,7 @@ import type { MarcadorVideo } from '@aptio/schema/marcadores';
 import type { EstadoTraduccion } from '@aptio/schema/traduccion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
+import type { Operacion } from '@aptio/schema/operacion';
 
 export interface Usuario {
   id: string;
@@ -570,6 +571,9 @@ export interface ResumenCostos {
 export const EDITAN_PARAMETROS: Rol[] = ['ADMINISTRADOR'];
 /** HU-1304 · Empresa › Conexiones IA y el medidor del mes: solo administración (la API responde 403 al resto). */
 export const VEN_CONEXIONES: Rol[] = ['ADMINISTRADOR'];
+/** HU-1403 · Empresa › Operación (errores, colas, etapas y copias de seguridad): solo administración. */
+export const VEN_OPERACION: Rol[] = ['ADMINISTRADOR'];
+export type { Operacion };
 export interface ConexionIA {
   tarea: 'TEXTO' | 'PANTALLAS' | 'TRADUCCION' | 'CALIDAD' | 'VOZ' | 'IMAGEN' | 'BOCA' | 'TRANSCRIPCION';
   nombre: string; proveedor: string; modelo: string;
@@ -599,6 +603,8 @@ export const api = {
     return pedir<ResumenCostos>(`/costos${q ? `?${q}` : ''}`);
   },
   conexionesIA: () => pedir<ConexionesIA>('/conexiones-ia'),
+  operacion: () => pedir<Operacion>('/operacion'),
+  respaldar: () => pedir<{ encolado: boolean }>('/operacion/respaldar', { method: 'POST' }),
   guardarConexionIA: (tarea: ConexionIA['tarea'], datos: ConexionEntrada) => pedir<ConexionIA>(`/conexiones-ia/${tarea.toLowerCase()}`, json(datos, 'PUT')),
   probarConexionIA: (tarea: ConexionIA['tarea']) => pedir<PruebaConexion>(`/conexiones-ia/${tarea.toLowerCase()}/probar`, { method: 'POST' }),
   parametrosNegocio: () => pedir<ParametrosGuardados>('/negocio/parametros'),

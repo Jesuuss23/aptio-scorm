@@ -32,6 +32,7 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@aptio/respaldo": "workspace:*",
     "@nestjs/testing": "^12.4.2",
     "@swc-node/register": "^1.12.1",
     "@swc/core": "^1.16.22",

@@ -10,6 +10,19 @@ export type NombreCola = (typeof COLAS)[number];
 /** HU-1202 · Tarea de la cola `export`: arma el paquete de una Exportacion (`trabajoId` es su id). */
 export const TAREA_EXPORTAR = 'EXPORTAR';
 
+/**
+ * HU-1404 y HU-1403 · Cola de mantenimiento, fuera de COLAS (no son trabajos de IA): el borrado de documentos vencidos y
+ * la copia de seguridad diaria, ambos a las 3:00 de Lima. «Respaldar ahora» encola la copia con el id fijo de la manual.
+ */
+export const COLA_MANTENIMIENTO = 'mantenimiento';
+export const TAREA_RESPALDO = 'respaldar';
+export const PATRON_RESPALDO = '0 3 * * *';
+export const ID_RESPALDO_MANUAL = 'respaldo-manual';
+export interface DatosRespaldo {
+  origen: 'programado' | 'manual';
+  solicitadoPorId?: string;
+}
+
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 
 /** Datos con los que se encola un trabajo. El detalle vive en TrabajoIA (base de datos). */

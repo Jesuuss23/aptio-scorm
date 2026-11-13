@@ -54,6 +54,8 @@ jobs:
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
       KMS_KEY_ID: alias/aptio-documentos
+      # pg_dump y pg_restore de la misma versión que el servidor (HU-1403, CP-108).
+      PG_BIN_DIR: /usr/lib/postgresql/16/bin
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -74,6 +76,8 @@ jobs:
         run: pnpm almacen:preparar
       - name: ffmpeg para la transcripción de video y audio (HU-0305)
         run: command -v ffmpeg || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg)
+      - name: Cliente de PostgreSQL 16 para las copias de seguridad (HU-1403)
+        run: test -x /usr/lib/postgresql/16/bin/pg_dump || (sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client-16)
       - name: Pruebas (Vitest)
         run: pnpm test
       - name: Salidas de IA del caso LOTO

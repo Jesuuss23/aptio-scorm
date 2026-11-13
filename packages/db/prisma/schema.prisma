@@ -698,3 +698,34 @@ model TokenAcceso {
 
   @@index([usuarioId, tipo])
 }
+
+/// HU-1403 · Estado de una copia de seguridad diaria (o pedida con «Respaldar ahora»).
+enum EstadoRespaldo {
+  EN_CURSO
+  EXITOSO
+  FALLIDO
+  /// Pasó la retención de 14 días: sus objetos se borraron del bucket de respaldos.
+  EXPIRADO
+}
+
+/// HU-1403 · Una copia de seguridad de la plataforma: volcado de PostgreSQL y copia de los objetos de S3 (CP-108).
+model Respaldo {
+  id              String         @id @default(uuid()) @db.Uuid
+  /// Inicio de la copia; da nombre a su carpeta en el bucket de respaldos.
+  fecha           DateTime       @default(now())
+  estado          EstadoRespaldo @default(EN_CURSO)
+  /// programado (03:00 de Lima) o manual («Respaldar ahora»).
+  origen          String         @default("programado")
+  solicitadoPorId String?        @db.Uuid
+  /// Bucket de respaldos y carpeta de esta copia (volcado, objetos y manifiesto).
+  bucket          String?
+  ubicacion       String?
+  claveVolcado    String?
+  objetos         Int?
+  tamanoBytes     BigInt?
+  duracionMs      Int?
+  error           String?
+  expiradoEn      DateTime?
+
+  @@index([fecha])
+}

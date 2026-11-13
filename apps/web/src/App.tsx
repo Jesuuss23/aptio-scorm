@@ -1,6 +1,6 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS } from './api';
+import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION } from './api';
 import { MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
@@ -20,6 +20,7 @@ import { VideoVista } from './vistas/VideoVista';
 import { PersonajeVozVista } from './vistas/PersonajeVozVista';
 import { Rentabilidad } from './vistas/Rentabilidad';
 import { ConexionesIA } from './vistas/ConexionesIA';
+import { OperacionVista } from './vistas/OperacionVista';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
@@ -77,8 +78,9 @@ export function App() {
       : [vista.grupo, vista.nombre];
   const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
   const venCostos = VEN_COSTOS.includes(usuario.rol);
+  const veOperacion = VEN_OPERACION.includes(usuario.rol);
   // Nuevo SCORM y Rentabilidad solo aparecen a quien puede usarlos (RN-01-2: la API también lo valida).
-  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones)) })).filter((g) => g.items.length);
+  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion)) })).filter((g) => g.items.length);
   return (
     <Estructura
       menu={menu}
@@ -111,6 +113,8 @@ export function App() {
         <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' ? (
         <Proyectos rol={usuario.rol} />
+      ) : vista?.activo === '/operacion' && veOperacion ? (
+        <OperacionVista />
       ) : vista?.activo === '/conexiones-ia' && veConexiones ? (
         <ConexionesIA alCambiar={refrescarMedidor} />
       ) : vista?.activo === '/rentabilidad' && venCostos ? (

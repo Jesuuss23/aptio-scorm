@@ -4,7 +4,7 @@
 import type { Almacen } from '@aptio/almacen';
 import { Prisma, type PrismaClient } from '@aptio/db';
 
-export const COLA_MANTENIMIENTO = 'mantenimiento';
+export { COLA_MANTENIMIENTO } from '@aptio/colas';
 export const TAREA_BORRADO = 'borrar-documentos-vencidos';
 /** Todos los días a las 3:00 de Lima. */
 export const PATRON_BORRADO = '0 3 * * *';
