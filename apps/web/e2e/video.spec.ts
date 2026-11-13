@@ -4,6 +4,8 @@
 // pasan axe WCAG 2.2 A/AA.
 // HU-0902 · Impedir adelantar (CP-081, RN-09-2): con la casilla activa, adelantar más allá de una pregunta pendiente
 // vuelve a su segundo, la muestra y avisa por qué.
+// HU-0903 · Pausas propuestas por la IA (CP-082): desde la transcripción llegan marcas en espera; se descarta una, se
+// aplican las demás y quedan en la línea; la que cae a menos de 2 s de otra del mismo tipo se omite y se avisa.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
@@ -177,4 +179,60 @@ test('CP-081 · con «Impedir adelantar», ir a 0:50 con la pregunta de 0:30 pen
   await video.evaluate((v: HTMLVideoElement) => { v.currentTime = 10; });
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeCloseTo(10, 1);
   await expect(tarjeta).toBeHidden();
+});
+
+test('CP-082 · «✦ Proponer pausas desde la transcripción»: se descarta una marca en espera y se aplican las demás', async ({ page }) => {
+  const aplicadas: { marcadorIds?: string[] }[] = [];
+  page.on('request', (r) => { if (r.method() === 'POST' && /\/propuestas\/[^/]+\/aplicar$/.test(r.url())) aplicadas.push(r.postDataJSON()); });
+  await page.goto(`/proyectos/${PROYECTO}/video?pantalla=p18`);
+  await expect(page.locator('.video-reloj')).toHaveText('0:00 / 1:00');
+  await page.getByRole('button', { name: '✦ Proponer pausas desde la transcripción' }).click();
+  await expect(panel(page).getByRole('status')).toHaveText('La IA propuso pausas: revisa las marcas en espera y aplica las que quieras.');
+
+  // Al menos una marca por cambio de tema, en espera sobre la línea y en el panel.
+  const propuesta = panel(page).getByRole('region', { name: '✦ Pausas propuestas por la IA' });
+  await expect(propuesta).toContainText('2 cambios de tema: Preparar y avisar (0:15), Apagar y aislar (0:35).');
+  const linea = page.getByRole('group', { name: 'Línea de marcadores' });
+  await expect(linea.getByRole('button', { name: /^Propuesta de la IA/ })).toHaveCount(5);
+  await expect(linea.getByRole('button', { name: 'Propuesta de la IA, Capítulo en 0:15: Preparar y avisar' })).toHaveAttribute('aria-pressed', 'true');
+  expect(await auditar(page, '.video-vista')).toEqual([]);
+
+  // Descartar una: desde la línea o desde la lista.
+  await linea.getByRole('button', { name: 'Propuesta de la IA, Pregunta en 0:50: ¿Qué se hace después de apagar?' }).click();
+  await expect(propuesta.getByRole('checkbox', { name: 'Pregunta en 0:50: ¿Qué se hace después de apagar?' })).not.toBeChecked();
+  await propuesta.getByRole('button', { name: 'Aplicar las elegidas (4)' }).click();
+  expect(aplicadas.at(-1)).toEqual({ marcadorIds: ['ia-1', 'ia-2', 'ia-3', 'ia-4'] });
+
+  // Quedan en la línea con ids nuevos; el punto de 0:21 se omitió por el de 0:20, y se dice por qué.
+  await expect(panel(page).getByRole('status')).toHaveText('Se aplicaron 3 pausas propuestas; quedan marcadas como de la IA hasta que las revises.');
+  await expect(panel(page).getByRole('note', { name: 'Pausas omitidas' })).toHaveText('Se omitió el punto de 0:21: queda a menos de 2 s de otro marcador del mismo tipo (0:20).');
+  await expect(propuesta).toHaveCount(0);
+  await expect(linea.getByRole('button', { name: /^Propuesta de la IA/ })).toHaveCount(0);
+  await expect(linea.getByRole('img', { name: 'Capítulo en 0:15: Preparar y avisar' })).toBeVisible();
+  await expect(linea.getByRole('img', { name: 'Capítulo en 0:35: Apagar y aislar' })).toBeVisible();
+  await expect(linea.getByRole('button', { name: 'Pregunta en 0:30: ¿A quién se avisa antes de detener la faja?' })).toBeVisible();
+  await expect(linea.getByRole('img', { name: /^Punto interactivo/ })).toHaveCount(1);
+  expect(await auditar(page, '.video-vista')).toEqual([]);
+
+  // Quedó guardado: se ve al volver a abrir la vista.
+  await page.reload();
+  await expect(linea.getByRole('button', { name: 'Pregunta en 0:30: ¿A quién se avisa antes de detener la faja?' })).toBeVisible();
+  await expect(linea.getByRole('img', { name: 'Capítulo en 0:15: Preparar y avisar' })).toBeVisible();
+});
+
+test('«↶ Deshacer» después de aplicar las pausas propuestas vuelve a la lista de antes', async ({ page }) => {
+  const ediciones = contarEdiciones(page);
+  await page.goto(`/proyectos/${PROYECTO}/video?pantalla=p18`);
+  await page.getByRole('button', { name: '✦ Proponer pausas desde la transcripción' }).click();
+  const propuesta = panel(page).getByRole('region', { name: '✦ Pausas propuestas por la IA' });
+  await propuesta.getByRole('button', { name: 'Aplicar las elegidas (5)' }).click();
+  const linea = page.getByRole('group', { name: 'Línea de marcadores' });
+  await expect(linea.getByRole('button', { name: /^Pregunta en/ })).toHaveCount(2);
+  await page.getByRole('button', { name: '↶ Deshacer' }).click();
+  await expect(panel(page).getByRole('status')).toHaveText('Cambio deshecho.');
+  expect(ediciones.at(-1)).toMatchObject({ motivo: 'deshacer' });
+  expect(ediciones.at(-1)!.marcadores!['p18-video']!.map((m) => m.id)).toEqual(['vm-1', 'vm-3']);
+  await expect(linea.getByRole('button', { name: /^Pregunta en/ })).toHaveCount(0);
+  await page.reload();
+  await expect(linea.getByRole('img', { name: /^Capítulo en/ })).toHaveCount(1);
 });

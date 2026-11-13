@@ -9,6 +9,8 @@ import { ConflictException, ForbiddenException, Injectable, NotFoundException, U
 import type { Prisma, Propuesta } from '@aptio/db';
 import { aplicarCorreccion, type CambioCorreccion, informeAlineacion, type PantallaAfectada, TAREA_CORRECCION } from '@aptio/schema/alineacion';
 import { aplicarPatron, type NavegacionPatron, type PropuestaPatron, TAREA_PATRON } from '@aptio/schema/navegacion';
+import type { MarcadorVideo } from '@aptio/schema/marcadores';
+import { aplicarPausas, type CambioTema, TAREA_PAUSAS } from '@aptio/schema/pausas';
 import type { OperacionPatch } from '@aptio/schema/patch';
 import { aplicarEnPantalla, type CambiosPropuesta, huellaPantalla, patchDe, TAREA_PROPUESTA, TIPOS_PROPUESTA, type Variante } from '@aptio/schema/propuesta';
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
@@ -31,6 +33,23 @@ const ALINEACION = 'alineacion';
 /** HU-1104 · Propuestas del curso entero: el patrón de navegación (IA-14). */
 const PATRON = 'patron';
 const DEL_CURSO = [ALINEACION, PATRON];
+// HU-0903 · Pausas del video propuestas desde la transcripción (IA-09 v2): de una pantalla, vencen si la pantalla cambió.
+const PAUSAS = 'pausas-video';
+type GuardadoPausas = { bloqueId: string; duracionMs: number; cambiosTema: CambioTema[]; marcadores: MarcadorVideo[]; observaciones: string[]; huella: string | null };
+type BloqueVideoDoc = { id: string; tipo: string; recursoId?: string; marcadores?: MarcadorVideo[] };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Todos los `id` de texto del documento: los marcadores nuevos no deben repetir ninguno. */
+function idsDe(valor: unknown, ids = new Set<string>()): Set<string> {
+  if (Array.isArray(valor)) for (const v of valor) idsDe(v, ids);
+  else if (valor && typeof valor === 'object') {
+    for (const [k, v] of Object.entries(valor)) {
+      if (k === 'id' && typeof v === 'string') ids.add(v);
+      else idsDe(v, ids);
+    }
+  }
+  return ids;
+}
 /** HU-1002 · Quienes piden, aplican y descartan la corrección de la alineación (los mismos que cambian niveles, M14). */
 const CORRIGEN_ALINEACION = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];
 function exigirCorrector(u: UsuarioSesion) {
@@ -66,6 +85,7 @@ export class PropuestasService {
   async pedir(u: UsuarioSesion, cursoId: string, dto: PropuestaSolicitudDto): Promise<Trabajo202Dto> {
     if (dto.tipo === ALINEACION) return this.pedirCorreccion(u, cursoId);
     if (dto.tipo === PATRON) return this.pedirPatron(u, cursoId, dto);
+    if (dto.tipo === PAUSAS) return this.pedirPausas(u, cursoId, dto);
     const c = await this.cursos.buscar(u, cursoId);
     if (!(TIPOS_PROPUESTA as readonly string[]).includes(dto.tipo)) {
       throw new UnprocessableEntityException({
@@ -132,6 +152,38 @@ export class PropuestasService {
     return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
   }
 
+  /**
+   * HU-0903 · «✦ Proponer pausas desde la transcripción»: encola IA-09 v2 con la transcripción del video de la pantalla
+   * (material del cliente del mismo recurso, HU-0305). Sin transcripción, 422 SIN_TRANSCRIPCION.
+   */
+  private async pedirPausas(u: UsuarioSesion, cursoId: string, dto: PropuestaSolicitudDto): Promise<Trabajo202Dto> {
+    if (!dto.pantallaId) throw new UnprocessableEntityException({ codigo: 'PANTALLA_REQUERIDA', mensaje: 'Indica la pantalla del video' });
+    const c = await this.cursos.buscar(u, cursoId);
+    const pantalla = pantallasDe(c.documento as unknown as CursoDoc).find((p) => p.id === dto.pantallaId);
+    if (!pantalla) throw new NotFoundException('Pantalla no encontrada');
+    const video = (pantalla.bloques as unknown as BloqueVideoDoc[]).find((b) => b.tipo === 'video');
+    if (!video) throw new UnprocessableEntityException({ codigo: 'BLOQUE_NO_EXISTE', mensaje: 'La pantalla no tiene video' });
+    // Solo un recurso subido (id de la base) puede tener material con transcripción.
+    const material = video.recursoId && UUID.test(video.recursoId)
+      ? (await this.bd.materialFuente.findMany({ where: { proyectoId: c.proyectoId, recursoId: video.recursoId, estado: 'listo' }, orderBy: { actualizadoEn: 'desc' } }))
+        .find((m) => Array.isArray(m.transcripcion) && m.transcripcion.length > 0)
+      : undefined;
+    if (!material) throw new UnprocessableEntityException({ codigo: 'SIN_TRANSCRIPCION', mensaje: 'Transcribe el video en Material del cliente' });
+    const t = await this.bd.trabajoIA.create({
+      data: { organizacionId: c.organizacionId, proyectoId: c.proyectoId, tarea: TAREA_PAUSAS, tipo: 'TEXTO', proveedor: '-', modelo: '-' },
+    });
+    try {
+      await this.colas.encolar('ia', {
+        trabajoId: t.id, organizacionId: c.organizacionId, tarea: TAREA_PAUSAS, pantallaId: dto.pantallaId,
+        propuesta: { cursoId: c.id, tipo: PAUSAS, bloqueId: video.id, materialId: material.id },
+      });
+    } catch (e) {
+      await this.bd.trabajoIA.update({ where: { id: t.id }, data: { estado: 'ERROR', error: 'No se pudo encolar' } });
+      throw e;
+    }
+    return { id: t.id, estado: 'EN_COLA', eventos: '/api/v1/eventos' };
+  }
+
   /** RN-05-4: al listar, una pendiente cuya pantalla cambió pasa a VENCIDA. */
   async listar(u: UsuarioSesion, cursoId: string, f: FiltroPropuestasDto): Promise<PropuestaDto[]> {
     const c = await this.cursos.buscar(u, cursoId);
@@ -158,6 +210,14 @@ export class PropuestasService {
         versionBase: p.versionBase, estado: p.estado, costoUsd, creadoEn: p.creadoEn.toISOString(),
       };
     }
+    if (p.tipo === PAUSAS) {
+      const g = p.cambios as unknown as GuardadoPausas;
+      return {
+        id: p.id, tipo: p.tipo, pantallaId: p.pantallaId, titulo: p.titulo, descripcion: p.descripcion, cambios: [],
+        pausas: { bloqueId: g.bloqueId, duracionMs: g.duracionMs, cambiosTema: g.cambiosTema, marcadores: g.marcadores, observaciones: g.observaciones },
+        versionBase: p.versionBase, estado: p.estado, costoUsd, creadoEn: p.creadoEn.toISOString(),
+      };
+    }
     const cambios = p.cambios as unknown as Guardado;
     return {
       id: p.id, tipo: p.tipo, pantallaId: p.pantallaId, titulo: p.titulo, descripcion: p.descripcion,
@@ -180,6 +240,7 @@ export class PropuestasService {
     if (p.tipo === ALINEACION) return this.aplicarCorreccion(u, p);
     if (p.tipo === PATRON) return this.aplicarPatronPropuesto(u, p);
     if (p.estado === 'VENCIDA') throw new ConflictException(VENCIDA);
+    if (p.tipo === PAUSAS && p.estado === 'PENDIENTE') return this.aplicarPausasPropuestas(u, p, dto.marcadorIds ?? []);
     if (p.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PROPUESTA_RESUELTA', mensaje: p.estado === 'APLICADA' ? 'Esta propuesta ya se aplicó' : 'Esta propuesta se descartó' });
     const guardado = p.cambios as unknown as Guardado;
     let patch: OperacionPatch[];
@@ -208,6 +269,48 @@ export class PropuestasService {
       });
       await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'APLICADA', resueltoPorId: u.id, resueltoEn: new Date() } });
       return r;
+    } catch (e) {
+      if (vencida) await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'VENCIDA' } });
+      throw e;
+    }
+  }
+
+  /**
+   * HU-0903 · Suma al video los marcadores elegidos (`marcadorIds`) si la pantalla no cambió desde la propuesta: ids
+   * nuevos, sin reemplazar los que ya tiene, y los que quedan a menos de 2 s de otro del mismo tipo se omiten y se dice
+   * por qué (`observaciones`). Versión nueva con motivo «propuesta»; se deshace como cualquier cambio del video.
+   */
+  private async aplicarPausasPropuestas(u: UsuarioSesion, p: Propuesta, marcadorIds: string[]): Promise<CambioResultadoDto> {
+    const g = p.cambios as unknown as GuardadoPausas;
+    if (!marcadorIds.length) throw new UnprocessableEntityException({ codigo: 'MARCADORES_REQUERIDOS', mensaje: 'Elige al menos un marcador para aplicar' });
+    let vencida = false;
+    let resultado: ReturnType<typeof aplicarPausas> | undefined;
+    try {
+      const r = await this.cursos.guardar(u, p.cursoId, null, 'propuesta', (doc) => {
+        if (huellaPantalla(doc, p.pantallaId!) !== g.huella) {
+          vencida = true;
+          throw new ConflictException(VENCIDA);
+        }
+        const recursos = (doc as unknown as { recursos?: { id: string; duracionMs?: number }[] }).recursos ?? [];
+        const ids = idsDe(doc);
+        const nueva = reemplazar(doc, p.pantallaId!, (pantalla) => {
+          const video = (pantalla.bloques as unknown as BloqueVideoDoc[]).find((b) => b.id === g.bloqueId && b.tipo === 'video');
+          if (!video) throw new UnprocessableEntityException({ codigo: 'PROPUESTA_NO_APLICA', mensaje: 'La propuesta no se puede aplicar: el video ya no está en la pantalla' });
+          try {
+            resultado = aplicarPausas(video.marcadores ?? [], g, marcadorIds, {
+              pantallaId: pantalla.id, ruta: `${pantalla.id}/${video.id}`, duracionMs: recursos.find((x) => x.id === video.recursoId)?.duracionMs, idsCurso: ids,
+            });
+          } catch (e) {
+            throw new UnprocessableEntityException({ codigo: 'PROPUESTA_NO_APLICA', mensaje: `La propuesta no se puede aplicar: ${(e as Error).message}` });
+          }
+          video.marcadores = resultado.marcadores;
+          return pantalla;
+        });
+        nueva.estado = 'borrador';
+        return { regenerando: [] as string[], estado: nueva.estado };
+      });
+      await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'APLICADA', resueltoPorId: u.id, resueltoEn: new Date() } });
+      return { ...r, agregados: resultado!.agregados, observaciones: resultado!.observaciones };
     } catch (e) {
       if (vencida) await this.bd.propuesta.update({ where: { id: p.id }, data: { estado: 'VENCIDA' } });
       throw e;

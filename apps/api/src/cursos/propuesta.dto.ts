@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 const recortar = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
 
@@ -25,6 +25,7 @@ export class FiltroPropuestasDto {
 
 export class AplicarPropuestaDto {
   @ApiPropertyOptional({ minimum: 0, description: 'Si la propuesta trae variantes' }) @IsOptional() @IsInt() @Min(0) varianteIndice?: number;
+  @ApiPropertyOptional({ type: [String], maxItems: 12, description: 'HU-0903 · Con `pausas-video`: los ids de los marcadores propuestos que se aplican (al menos uno); los demás quedan descartados' }) @IsOptional() @IsArray() @ArrayMaxSize(12) @IsString({ each: true }) marcadorIds?: string[];
 }
 
 export class Trabajo202Dto {
@@ -62,6 +63,20 @@ export class PatronPropuestoDto {
   @ApiProperty({ nullable: true, type: String, description: 'Lo que escribió la persona al crear' }) descripcion: string | null;
 }
 
+/** HU-0903 · Un cambio de tema que la IA vio en la transcripción. */
+export class CambioTemaDto {
+  @ApiProperty() tiempoMs: number;
+  @ApiProperty() tema: string;
+}
+/** HU-0903 · Las pausas propuestas desde la transcripción (salida de IA-09 v2, ya validada). */
+export class PausasPropuestasDto {
+  @ApiProperty() bloqueId: string;
+  @ApiProperty() duracionMs: number;
+  @ApiProperty({ type: [CambioTemaDto] }) cambiosTema: CambioTemaDto[];
+  @ApiProperty({ type: 'array', items: { $ref: '#/components/schemas/MarcadorVideo' }, description: 'Los marcadores propuestos, con ids provisionales («ia-N»)' }) marcadores: object[];
+  @ApiProperty({ type: [String] }) observaciones: string[];
+}
+
 export class PropuestaDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty() tipo: string;
@@ -72,6 +87,7 @@ export class PropuestaDto {
   @ApiPropertyOptional({ type: [VarianteDto], description: 'Las 3 variantes de «Ver 3 variantes»' }) vistaPrevia?: VarianteDto[];
   @ApiPropertyOptional({ type: [CorreccionDto], description: 'HU-1002 · Los cambios de la corrección de la alineación' }) correcciones?: CorreccionDto[];
   @ApiPropertyOptional({ type: PatronPropuestoDto, description: 'HU-1104 · El patrón propuesto (tipo `patron`)' }) patron?: PatronPropuestoDto;
+  @ApiPropertyOptional({ type: PausasPropuestasDto, description: 'HU-0903 · Las pausas propuestas (tipo `pausas-video`)' }) pausas?: PausasPropuestasDto;
   @ApiProperty() versionBase: number;
   @ApiProperty({ enum: ['PENDIENTE', 'APLICADA', 'DESCARTADA', 'VENCIDA'] }) estado: string;
   @ApiProperty() costoUsd: number;

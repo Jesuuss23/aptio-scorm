@@ -1,11 +1,12 @@
 // HU-0901 · Video interactivo (PNT-10, M09, CP-080): el video del cliente con su línea de marcadores. «+ Pregunta en
 // M:SS» agrega una pregunta en el segundo que se está viendo; el panel edita su enunciado, opciones, la correcta, la
 // retroalimentación y si es obligatoria. Se guarda solo, 1 s después del último cambio y solo si pasa las reglas de la
-// API (RN-09-1). Capítulos y puntos interactivos se ven y se conservan, pero todavía no se editan. «Impedir adelantar»
-// llega con la HU-0902 y «✦ Proponer pausas» con la HU-0903.
+// API (RN-09-1). Capítulos y puntos interactivos se ven y se conservan, pero todavía no se editan. HU-0902 · «Impedir
+// adelantar hasta responder». HU-0903 · «✦ Proponer pausas desde la transcripción» (IA-09 v2, CP-082): las pausas
+// propuestas se ven en la línea como marcas en espera; cada una se acepta o se descarta y «Aplicar las elegidas» las suma.
 import { Cabecera } from '@aptio/ui';
-import { type RefObject, useEffect, useRef, useState } from 'react';
-import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Proyecto, type Rol } from '../api';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
+import { api, type Curso, EDITAN_PANTALLAS, ErrorApi, type Propuesta, type Proyecto, type Rol } from '../api';
 import { navegar } from '../ruta';
 import type { CursoDoc } from '@aptio/schema/revision';
 import {
@@ -13,6 +14,9 @@ import {
 } from './video-marcadores';
 
 const ESPERA_GUARDAR_MS = 1000;
+// HU-0903 · Consulta del trabajo de la IA cada 1,5 s, hasta 2 minutos.
+const CADA_MS = 1500;
+const LIMITE_MS = 120_000;
 const mensajeDe = (e: unknown, otro: string) => (e instanceof ErrorApi ? e.message : otro);
 
 export function VideoVista({ proyectoId, pantallaId, rol, alCargar }: { proyectoId: string; pantallaId: string | null; rol: Rol; alCargar: (nombre: string) => void }) {
@@ -114,6 +118,12 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
   const [aviso, setAviso] = useState('');
   const [error, setError] = useState('');
   const reproductor = useRef<HTMLVideoElement>(null);
+  // HU-0903 · Pausas propuestas por la IA.
+  const [propuesta, setPropuesta] = useState<Propuesta | null>(null);
+  const [elegidas, setElegidas] = useState<ReadonlySet<string>>(new Set());
+  const [pedido, setPedido] = useState<{ trabajoId: string; desde: number } | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [omitidas, setOmitidas] = useState<string[]>([]);
 
   const duracion = duracionConocida ?? duracionVideo;
   const errores = erroresPorMarcador(borrador, duracion);
@@ -148,6 +158,100 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
     const t = setTimeout(() => { void guardarRef.current({ m: borrador, i: impedir }); }, ESPERA_GUARDAR_MS);
     return () => clearTimeout(t);
   }, [borrador, impedir, editan, pendiente, errores.size]);
+
+  // HU-0903 · La propuesta de pausas vigente de este video, al abrir y al terminar el trabajo de la IA.
+  const vigenteDe = useCallback((l: Propuesta[]) => l.find((x) => x.tipo === 'pausas-video' && x.estado === 'PENDIENTE'
+    && x.pantallaId === video.pantallaId && x.pausas?.bloqueId === video.bloqueId) ?? null, [video.pantallaId, video.bloqueId]);
+  const mostrarPropuesta = useCallback((p: Propuesta | null) => {
+    setPropuesta(p);
+    setElegidas(new Set(p?.pausas?.marcadores.map((m) => m.id) ?? []));
+  }, []);
+  const cargarPropuesta = useCallback(async () => {
+    const c = cursoRef.current;
+    if (!c || !editan) return;
+    mostrarPropuesta(vigenteDe(await api.propuestas(c.id).catch(() => [] as Propuesta[])));
+  }, [cursoRef, editan, mostrarPropuesta, vigenteDe]);
+  useEffect(() => {
+    const c = cursoRef.current;
+    if (!c || !editan) return;
+    let vigente = true;
+    api.propuestas(c.id).then((l) => { if (vigente) mostrarPropuesta(vigenteDe(l)); }, () => undefined);
+    return () => { vigente = false; };
+  }, [cursoRef, editan, mostrarPropuesta, vigenteDe]);
+  useEffect(() => {
+    if (!pedido) return;
+    const t = setTimeout(async () => {
+      try {
+        const trabajo = await api.trabajo(pedido.trabajoId);
+        if (trabajo.estado === 'COMPLETADO') {
+          setPedido(null);
+          setAviso('La IA propuso pausas: revisa las marcas en espera y aplica las que quieras.');
+          await cargarPropuesta();
+        } else if (trabajo.estado === 'ERROR' || trabajo.estado === 'CANCELADO' || Date.now() - pedido.desde > LIMITE_MS) {
+          setPedido(null);
+          setAviso('');
+          setError(trabajo.estado === 'ERROR' ? 'La IA no pudo proponer pausas. Intenta de nuevo.' : 'La propuesta tarda más de lo normal; vuelve a pedirla más tarde.');
+        } else {
+          setPedido((x) => (x ? { ...x } : x));
+        }
+      } catch {
+        setPedido((x) => (x ? { ...x } : x));
+      }
+    }, CADA_MS);
+    return () => clearTimeout(t);
+  }, [pedido, cargarPropuesta]);
+
+  const proponer = async () => {
+    const c = cursoRef.current;
+    if (!c) return;
+    setError('');
+    setOmitidas([]);
+    try {
+      const t = await api.pedirPausas(c.id, video.pantallaId);
+      mostrarPropuesta(null);
+      setPedido({ trabajoId: t.id, desde: Date.now() });
+      setAviso('La IA está leyendo la transcripción del video…');
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo pedir la propuesta'));
+    }
+  };
+  const elegir = (id: string, si: boolean) => setElegidas((x) => { const n = new Set(x); if (si) n.add(id); else n.delete(id); return n; });
+  const aplicarElegidas = async () => {
+    const c = cursoRef.current;
+    if (!c || !propuesta) return;
+    setOcupado(true);
+    setError('');
+    try {
+      const r = await api.aplicarPausas(propuesta.id, propuesta.pausas!.marcadores.filter((m) => elegidas.has(m.id)).map((m) => m.id));
+      // Se vuelve a leer el curso: los marcadores nuevos traen ids definitivos. «↶ Deshacer» vuelve a la lista de antes.
+      const nuevo = await api.curso(proyectoId);
+      cursoRef.current = nuevo;
+      const lista = ordenar(pantallasConVideo(nuevo.documento as unknown as CursoDoc).find((v) => v.bloqueId === video.bloqueId)?.marcadores ?? []);
+      setPila((p) => [...p, JSON.parse(guardada) as Version].slice(-30));
+      setBorrador(lista);
+      setGuardada(JSON.stringify({ m: lista, i: impedir }));
+      mostrarPropuesta(null);
+      setOmitidas(r.observaciones ?? []);
+      const n = r.agregados?.length ?? 0;
+      setAviso(`${n === 1 ? 'Se aplicó 1 pausa propuesta' : `Se aplicaron ${n} pausas propuestas`}; quedan marcadas como de la IA hasta que las revises.`);
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudieron aplicar las pausas'));
+      if (e instanceof ErrorApi && e.estado === 409) await cargarPropuesta();
+    } finally {
+      setOcupado(false);
+    }
+  };
+  const descartarPropuesta = async () => {
+    if (!propuesta) return;
+    setError('');
+    try {
+      await api.descartarPropuesta(propuesta.id);
+      mostrarPropuesta(null);
+      setAviso('Propuesta descartada.');
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo descartar la propuesta'));
+    }
+  };
 
   const cambiar = (id: string, f: (m: MarcadorVideo) => void) => {
     setAviso('');
@@ -217,11 +321,30 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
           ) : (
             <span key={m.id} className={`video-marca ${m.tipo}`} style={{ left: `${posicion(m.tiempoMs, largo)}%` }} role="img" aria-label={describir(m)} title={describir(m)} />
           ))}
+          {propuesta?.pausas?.marcadores.map((m) => (
+            <button
+              key={`ia-${m.id}`}
+              type="button"
+              className={`video-marca en-espera ${m.tipo}`}
+              style={{ left: `${posicion(m.tiempoMs, largo)}%` }}
+              aria-pressed={elegidas.has(m.id)}
+              aria-label={`Propuesta de la IA, ${describir(m)}`}
+              title={`${describir(m)} (en espera)`}
+              onClick={() => { elegir(m.id, !elegidas.has(m.id)); ir(m.tiempoMs); }}
+            >
+              <span aria-hidden="true">{m.tipo === 'pregunta' ? '?' : ''}</span>
+            </button>
+          ))}
         </div>
         <div className="fila video-acciones">
           <span className="num video-reloj" aria-live="off">{mmss(tiempoMs)}{duracion ? ` / ${mmss(duracion)}` : ''}</span>
           {editan ? <button type="button" className="boton primario" onClick={agregar}>+ Pregunta en {mmss(Math.floor(tiempoMs / 1000) * 1000)}</button> : null}
           {editan ? <button type="button" className="boton" onClick={deshacer} disabled={!pila.length}>↶ Deshacer</button> : null}
+          {editan ? (
+            <button type="button" className="boton ia" onClick={() => void proponer()} disabled={Boolean(pedido) || pendiente || errores.size > 0}>
+              {pedido ? 'Proponiendo pausas…' : '✦ Proponer pausas desde la transcripción'}
+            </button>
+          ) : null}
           <a className="boton" href={vistaPrevia} onClick={(e) => { e.preventDefault(); navegar(vistaPrevia); }}>▶ Probar en la vista previa</a>
         </div>
         <label className="video-obligatoria">
@@ -250,6 +373,35 @@ function EditorVideo({ video, url, duracionConocida, cursoRef, editan, proyectoI
             ))}
           </ul>
         ) : <p className="sec">Este video aún no tiene marcadores. Reproduce, detente donde quieras preguntar y pulsa «+ Pregunta».</p>}
+
+        {omitidas.length ? (
+          <div className="nota" role="note" aria-label="Pausas omitidas">
+            <ul>{omitidas.map((o) => <li key={o}>{o}</li>)}</ul>
+          </div>
+        ) : null}
+
+        {propuesta?.pausas ? (
+          <section className="video-propuesta" aria-labelledby="video-propuesta-titulo">
+            <h3 id="video-propuesta-titulo">✦ Pausas propuestas por la IA</h3>
+            <p className="sec">{propuesta.descripcion} Marca las que quieres aplicar; las demás se descartan.</p>
+            {propuesta.pausas.observaciones.length ? <ul className="nota">{propuesta.pausas.observaciones.map((o) => <li key={o}>{o}</li>)}</ul> : null}
+            <fieldset className="video-propuesta-lista">
+              <legend>Marcas en espera</legend>
+              {propuesta.pausas.marcadores.map((m) => (
+                <label key={m.id} className="video-obligatoria">
+                  <input type="checkbox" checked={elegidas.has(m.id)} onChange={(e) => elegir(m.id, e.target.checked)} />
+                  {describir(m)}
+                </label>
+              ))}
+            </fieldset>
+            <div className="fila">
+              <button type="button" className="boton primario" onClick={() => void aplicarElegidas()} disabled={ocupado || !elegidas.size || pendiente || errores.size > 0}>
+                Aplicar las elegidas ({elegidas.size})
+              </button>
+              <button type="button" className="boton" onClick={() => void descartarPropuesta()} disabled={ocupado}>Descartar la propuesta</button>
+            </div>
+          </section>
+        ) : null}
 
         {pregunta ? (
           <PanelPregunta

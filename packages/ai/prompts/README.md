@@ -14,7 +14,7 @@ Todas empiezan con el bloque común `_comun.md` (reglas, idioma, datos no confia
 | [IA-06](IA-06.v1.md) | Sugerir interacción | 4 · PANTALLAS (bajo pedido) | `ANTHROPIC_MODEL_RAPIDO` | 0.3 |
 | [IA-07](IA-07.v1.md) | Datos de una interacción | 4 · PANTALLAS | `ANTHROPIC_MODEL_RAPIDO` | 0.4 |
 | [IA-08](IA-08.v1.md) | Banco de preguntas | 4 · PANTALLAS (reto final) | `ANTHROPIC_MODEL_TEXTO` | 0.4 |
-| [IA-09](IA-09.v1.md) | Pausas y preguntas de video | 4 · PANTALLAS (pantalla de video) | `ANTHROPIC_MODEL_RAPIDO` | 0.3 |
+| [IA-09](IA-09.v2.md) | Pausas y preguntas de video | Video interactivo (bajo pedido, HU-0903; v1: 4 · PANTALLAS) | `ANTHROPIC_MODEL_RAPIDO` | 0.3 |
 | [IA-10](IA-10.v1.md) | Traducción ES↔EN | 9 · VERSION_EN | `ANTHROPIC_MODEL_RAPIDO` | 0.2 |
 | [IA-11](IA-11.v1.md) | Prompt de imagen | 5 · ILUSTRACIONES | `ANTHROPIC_MODEL_RAPIDO` | 0.5 |
 | [IA-12](IA-12.v2.md) (v2; [v1](IA-12.v1.md)) | Revisión de calidad | 10 · CONTROL_CALIDAD y Revisión (HU-0505) | `ANTHROPIC_MODEL_RAPIDO` | 0.1 |

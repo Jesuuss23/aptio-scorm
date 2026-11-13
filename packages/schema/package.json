@@ -38,6 +38,7 @@
     "./alineacion": "./src/alineacion.ts",
     "./navegacion": "./src/navegacion.ts",
     "./disparadores": "./src/disparadores.ts",
-    "./marcadores": "./src/marcadores.ts"
+    "./marcadores": "./src/marcadores.ts",
+    "./pausas": "./src/pausas.ts"
   }
 }

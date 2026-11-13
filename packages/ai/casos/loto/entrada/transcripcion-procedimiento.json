@@ -1,0 +1,84 @@
+{
+  "materialId": "loto-video-procedimiento",
+  "recursoId": "vid-procedimiento",
+  "nombre": "Procedimiento de bloqueo (video del cliente)",
+  "duracionMs": 150000,
+  "nota": "HU-0903 · Transcripción de referencia del video de p18: una introducción y 4 cambios de tema (0:30, 1:02, 1:35 y 2:05). Formato de MaterialFuente.transcripcion (HU-0305): desde y hasta en segundos.",
+  "segmentos": [
+    {
+      "desde": 0,
+      "hasta": 9.5,
+      "texto": "En este video verás cómo un técnico bloquea y etiqueta una faja transportadora antes de darle mantenimiento."
+    },
+    {
+      "desde": 9.5,
+      "hasta": 19,
+      "texto": "El bloqueo y etiquetado protege a quien trabaja en el equipo frente a un arranque inesperado."
+    },
+    {
+      "desde": 19,
+      "hasta": 30,
+      "texto": "Sigue con atención cada paso: al final tendrás que reconocerlos en tu propia área."
+    },
+    {
+      "desde": 30,
+      "hasta": 41,
+      "texto": "Primero, el técnico se prepara: identifica todas las fuentes de energía de la faja con el procedimiento del equipo."
+    },
+    {
+      "desde": 41,
+      "hasta": 52,
+      "texto": "Luego avisa a los afectados: al operador y al supervisor del turno, que el equipo quedará detenido."
+    },
+    {
+      "desde": 52,
+      "hasta": 62,
+      "texto": "Sin ese aviso, alguien podría intentar arrancar la faja mientras se trabaja en ella."
+    },
+    {
+      "desde": 62,
+      "hasta": 72.5,
+      "texto": "Ahora apaga el equipo con el control normal de parada y espera a que se detenga por completo."
+    },
+    {
+      "desde": 72.5,
+      "hasta": 84,
+      "texto": "Después aísla cada fuente: abre el seccionador eléctrico y cierra la válvula neumática."
+    },
+    {
+      "desde": 84,
+      "hasta": 95,
+      "texto": "Apagar no basta: mientras una fuente siga conectada, la energía puede volver."
+    },
+    {
+      "desde": 95,
+      "hasta": 106,
+      "texto": "Con las fuentes aisladas, coloca su candado personal en cada punto de bloqueo."
+    },
+    {
+      "desde": 106,
+      "hasta": 118,
+      "texto": "Y cuelga la tarjeta con su nombre, su área, la fecha, la hora y el motivo del bloqueo."
+    },
+    {
+      "desde": 118,
+      "hasta": 125,
+      "texto": "La llave del candado queda siempre con él: nadie más puede retirarlo."
+    },
+    {
+      "desde": 125,
+      "hasta": 133,
+      "texto": "Por último, verifica la energía cero: intenta arrancar la faja con el control local."
+    },
+    {
+      "desde": 133,
+      "hasta": 141,
+      "texto": "Y mide con el probador que no quede tensión ni presión acumulada."
+    },
+    {
+      "desde": 141,
+      "hasta": 150,
+      "texto": "Solo con la energía en cero empieza el mantenimiento. Al terminar, retira su candado y su tarjeta."
+    }
+  ]
+}
