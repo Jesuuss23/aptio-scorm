@@ -591,6 +591,27 @@ export interface PaginaSitio {
   actualizadoEn: string;
   /** HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117). */
   avisoFicticios?: number;
+  /** HU-1507 · Si el cambio publicó o retiró la página: la versión del sitio que creó. */
+  version?: number;
+}
+/** HU-1507 · Versión publicada del sitio (RN-16-5). */
+export interface VersionSitio {
+  numero: number;
+  creadoEn: string;
+  entorno: 'produccion' | 'pruebas';
+  origen: 'publicacion' | 'pagina' | 'programada' | 'restauracion';
+  restauradaDe: number | null;
+  publicadoPor: { id: string; nombre: string } | null;
+  paginas: number;
+  avisoFicticios?: number;
+}
+export interface VersionesSitio { entorno: 'produccion' | 'pruebas'; actual: number | null; pendientes: boolean; total: number; versiones: VersionSitio[] }
+export interface ElementoVistaPrevia { datos: Record<string, string | number>; ficticio?: boolean }
+export interface VistaPreviaPagina {
+  estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
+  entorno: 'produccion' | 'pruebas';
+  pagina: { ruta: string; idioma: string; titulo: string; publicadaEn: string | null; bloques: { tipo: string; ajustes: Record<string, unknown> | null; elementos?: ElementoVistaPrevia[] }[] };
+  navegacion: { menu: { texto: string; ruta: string; externo: boolean }[]; pie: { titulo: string; enlaces: { texto: string; ruta: string; externo: boolean }[] }[] };
 }
 export type AccionPagina = 'borrador' | 'programar' | 'publicar';
 export interface PaginaSitioEntrada { ruta: string; idioma: 'es' | 'en'; titulo: string }
@@ -678,6 +699,10 @@ export const api = {
   borrarElemento: (id: string) => pedir<void>(`/sitio/elementos/${id}`, { method: 'DELETE' }),
   ficticiosSitio: () => pedir<FicticiosSitio>('/sitio/ficticios'),
   ocultarFicticios: () => pedir<FicticiosSitio & { ocultados: number }>('/sitio/ficticios/ocultar', { method: 'POST' }),
+  publicarSitio: () => pedir<VersionSitio>('/sitio/publicar', { method: 'POST' }),
+  versionesSitio: () => pedir<VersionesSitio>('/sitio/versiones'),
+  restaurarVersionSitio: (numero: number) => pedir<VersionSitio>(`/sitio/versiones/${numero}/restaurar`, { method: 'POST' }),
+  vistaPreviaPagina: (paginaId: string) => pedir<VistaPreviaPagina>(`/sitio/paginas/${paginaId}/vista-previa`),
   navegacionSitio: () => pedir<NavegacionSitio>('/sitio/navegacion'),
   agregarEnlace: (datos: EnlaceSitioEntrada) => pedir<EnlaceSitio>('/sitio/navegacion', json(datos)),
   cambiarEnlace: (id: string, cambio: { texto?: string; ruta?: string | null; visible?: boolean }) => pedir<EnlaceSitio>(`/sitio/navegacion/${id}`, json(cambio, 'PATCH')),

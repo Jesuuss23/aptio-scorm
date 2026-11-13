@@ -2844,3 +2844,104 @@ ul.fila-chips {
   font-size: var(--texto-sm);
   overflow-wrap: anywhere;
 }
+
+/* HU-1507 · «Publicar cambios», versiones del sitio (PNT-25) y vista previa en el editor de página (PNT-26). */
+.acciones-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.publicar-cambios {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.versiones-sitio {
+  margin-top: 24px;
+}
+.versiones-sitio th[scope='row'] .chip {
+  margin-left: 8px;
+}
+.sitio-previa {
+  margin-top: 24px;
+}
+.sitio-previa .tarjeta-cabeza .acciones-fila {
+  margin: 0;
+}
+.sitio-previa-marco {
+  overflow-x: auto;
+  padding: 16px;
+  border: 1px solid var(--color-borde);
+  border-radius: 10px;
+  background: var(--color-suave);
+}
+.sitio-previa-marco:focus-visible {
+  outline: 2px solid var(--color-cobalto);
+  outline-offset: 2px;
+}
+.sitio-previa-pagina {
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--color-superficie);
+  color: var(--color-texto);
+  box-shadow: 0 1px 3px rgb(11 28 48 / 12%);
+}
+.vp-cabecera,
+.vp-pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 32px;
+}
+.vp-pie {
+  align-items: flex-start;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-borde);
+}
+.vp-menu,
+.vp-elementos,
+.vp-columna ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.vp-columna {
+  display: grid;
+  gap: 8px;
+}
+.vp-columna ul {
+  flex-direction: column;
+}
+.vp-bloques {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.vp-bloque {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--color-borde);
+  border-radius: 10px;
+}
+.vp-elementos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sitio-previa-pagina.celular .vp-cabecera,
+.sitio-previa-pagina.celular .vp-pie {
+  flex-direction: column;
+  align-items: flex-start;
+}

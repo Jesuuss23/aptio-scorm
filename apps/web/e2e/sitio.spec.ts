@@ -441,3 +441,110 @@ test('CP-118: el enlace «Casos» oculto no aparece en el menú del sitio; el pi
   await expect(page.getByRole('status').filter({ hasText: '«Legal» se borró.' })).toBeVisible();
   await expect(pie.getByRole('switch', { name: 'Mostrar Privacidad' })).toHaveCount(0);
 });
+
+// HU-1507 · Vista previa, versiones y restauración (REQ-068, RN-16-5).
+const INICIO_ID = '00000000-0000-4000-8000-000000000001';
+const PAG_INICIO = { ...PAG_PRECIOS, id: INICIO_ID, ruta: '/', titulo: 'Inicio', estado: 'PUBLICADA' as const, publicadaEn: F };
+const bloqueSim = (n: number, tipo: string, visible = true) => ({ id: `00000000-0000-4000-9100-00000000000${n}`, paginaId: INICIO_ID, tipo, orden: n, visible, ajustes: null, creadoEn: F, actualizadoEn: F });
+const sinViolaciones = async (page: Page) => {
+  const axe = await new AxeBuilder({ page }).withTags(REGLAS).include('main').analyze();
+  expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
+};
+
+test('CP-119: restaurar la versión 1 crea la 4, el sitio vuelve a la 1 y el panel no cambia', async ({ page }) => {
+  await simularApi(page, {
+    conSesion: true, rol: 'SUPERADMIN', versionSitio: true,
+    paginasSitio: [PAG_INICIO], bloquesSitio: [bloqueSim(0, 'hero'), bloqueSim(1, 'testimonios')],
+    elementosSitio: [testimonioSim(0, 'Mariana Paredes')], enlacesSitio: [enlaceSim(1, 'menu', 'Producto', '/funcionalidades/personaje', 0)],
+  });
+  await page.goto('/sitio/paginas');
+  const versiones = page.getByRole('region', { name: 'Versiones' });
+  const tabla = versiones.getByRole('table', { name: 'Versiones del sitio' });
+  await expect(tabla.getByRole('row', { name: /Versión 1/ })).toContainText('En el sitio');
+  await expect(page.getByText('Sitio al día')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Publicar cambios' })).toBeDisabled();
+
+  // v2: ocultar el bloque «Testimonios» en el editor y publicar.
+  await page.getByRole('button', { name: 'Editar Inicio' }).click();
+  await page.getByRole('switch', { name: 'Mostrar bloque Testimonios' }).click();
+  await expect(page.getByText('Cambios sin publicar')).toBeVisible();
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Se publicó la versión 2: el sitio ya muestra los cambios.' })).toBeVisible();
+  await expect(page.getByText('Sitio al día')).toBeVisible();
+
+  // v3: ocultar «Producto» del menú y publicar.
+  await page.getByRole('button', { name: 'Volver a Páginas' }).click();
+  await page.getByRole('region', { name: 'Menú principal' }).getByRole('switch', { name: 'Mostrar Producto' }).click();
+  await expect(page.getByText('Cambios sin publicar')).toBeVisible();
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Se publicó la versión 3' })).toBeVisible();
+  await expect(tabla.getByRole('row').filter({ hasText: /Versión \d/ })).toHaveCount(3);
+
+  // Restaurar la 1 con confirmación: se crea la 4 y el sitio queda igual a la 1.
+  await tabla.getByRole('button', { name: 'Restaurar la versión 1' }).click();
+  const confirmar = tabla.getByRole('group', { name: 'Confirmar la restauración de la versión 1' });
+  await expect(confirmar).toContainText('se crea la versión 4');
+  await sinViolaciones(page);
+  await confirmar.getByRole('button', { name: 'Sí, restaurar' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'El sitio volvió a la versión 1 y se creó la versión 4. Lo que editas en el panel no cambió.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Versiones' })).toBeFocused();
+  const v4 = tabla.getByRole('row', { name: /Versión 4/ });
+  await expect(v4).toContainText('Restauración de la versión 1');
+  await expect(v4).toContainText('En el sitio');
+  await expect(versiones.getByText('El sitio muestra la versión 4')).toBeVisible();
+  await expect(tabla.getByRole('button', { name: 'Restaurar la versión 4' })).toHaveCount(0);
+  // El panel conserva lo editado: «Producto» sigue oculto y el chip avisa que difiere del sitio.
+  await expect(page.getByRole('region', { name: 'Menú principal' }).getByRole('switch', { name: 'Mostrar Producto' })).toHaveAttribute('aria-checked', 'false');
+  await expect(page.getByText('Cambios sin publicar')).toBeVisible();
+  await sinViolaciones(page);
+});
+
+test('«Publicar cambios» en producción con ficticios: 409 con la lista y se resuelve en un clic', async ({ page }) => {
+  await simularApi(page, {
+    conSesion: true, rol: 'SUPERADMIN', entornoSitio: 'produccion',
+    paginasSitio: [PAG_INICIO], bloquesSitio: [bloqueSim(0, 'testimonios')],
+    elementosSitio: [{ ...testimonioSim(0, 'Mariana Paredes'), ficticio: true }, testimonioSim(1, 'Carlos Alarcón')],
+  });
+  await page.goto('/sitio/paginas');
+  await expect(page.getByText('Aún no hay versiones: el sitio no muestra nada.')).toBeVisible();
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
+  const alerta = page.getByRole('alert').filter({ hasText: 'Los cambios no se publicaron.' });
+  await expect(alerta.getByRole('list', { name: 'Datos ficticios' }).getByRole('listitem')).toHaveText(['Mariana Paredes (Testimonios)']);
+  await sinViolaciones(page);
+  await alerta.getByRole('button', { name: 'Ocultar todos los ficticios' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Se publicó la versión 1' })).toBeVisible();
+  await expect(page.getByRole('table', { name: 'Versiones del sitio' }).getByRole('row', { name: /Versión 1/ })).toContainText('Publicar cambios');
+});
+
+test('la vista previa muestra la página del panel con menú, bloques y pie en Escritorio y Celular', async ({ page }) => {
+  const legal = enlaceSim(2, 'pie', 'Legal', null, 0);
+  await simularApi(page, {
+    conSesion: true, rol: 'SUPERADMIN', entornoSitio: 'pruebas',
+    paginasSitio: [{ ...PAG_INICIO, estado: 'BORRADOR', publicadaEn: null }],
+    bloquesSitio: [bloqueSim(0, 'hero'), bloqueSim(1, 'testimonios'), bloqueSim(2, 'faq', false)],
+    elementosSitio: [{ ...testimonioSim(0, 'Mariana Paredes'), ficticio: true }, testimonioSim(1, 'Carlos Alarcón'), { ...testimonioSim(2, 'Oculta'), visible: false }],
+    enlacesSitio: [enlaceSim(1, 'menu', 'Producto', '/funcionalidades/personaje', 0), legal, enlaceSim(3, 'pie', 'Privacidad', '/privacidad', 0, legal.id)],
+  });
+  await page.goto(`/sitio/paginas/${INICIO_ID}`);
+  const tarjeta = page.getByRole('region', { name: 'Vista previa', exact: true });
+  await expect(tarjeta).toContainText('La página está en borrador: el sitio aún no la muestra.');
+  const escritorio = tarjeta.getByRole('button', { name: 'Escritorio (1280 px)' });
+  await expect(escritorio).toHaveAttribute('aria-pressed', 'true');
+  const marco = page.getByRole('region', { name: 'Vista previa de Inicio en escritorio, 1280 px' });
+  await expect(marco.getByRole('list', { name: 'Menú principal' }).getByRole('listitem')).toHaveText(['Producto']);
+  await expect(marco.getByRole('list', { name: 'Bloques visibles' }).locator(':scope > li > b')).toHaveText(['Portada', 'Testimonios']);
+  await expect(marco.locator('.vp-elementos li')).toHaveText(['Mariana ParedesFicticio', 'Carlos Alarcón']);
+  await expect(marco.getByRole('list', { name: 'Pie: Legal' }).getByRole('listitem')).toHaveText(['Privacidad']);
+  expect(await marco.locator('.sitio-previa-pagina').evaluate((n) => n.getBoundingClientRect().width)).toBe(1280);
+  await sinViolaciones(page);
+
+  await tarjeta.getByRole('button', { name: 'Celular (390 px)' }).click();
+  await expect(escritorio).toHaveAttribute('aria-pressed', 'false');
+  const celular = page.getByRole('region', { name: 'Vista previa de Inicio en celular, 390 px' });
+  expect(await celular.locator('.sitio-previa-pagina').evaluate((n) => n.getBoundingClientRect().width)).toBe(390);
+  await sinViolaciones(page);
+
+  // Al mostrar «Preguntas frecuentes» la vista previa se actualiza sin recargar.
+  await page.getByRole('switch', { name: 'Mostrar bloque Preguntas frecuentes' }).click();
+  await expect(celular.getByRole('list', { name: 'Bloques visibles' }).locator(':scope > li > b')).toHaveText(['Portada', 'Testimonios', 'Preguntas frecuentes']);
+});

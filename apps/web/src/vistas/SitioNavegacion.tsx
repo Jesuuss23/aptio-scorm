@@ -13,7 +13,7 @@ type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
 type Nuevo = { zona: 'menu' | 'pie'; padreId: string | null } | null;
 const claveNuevo = (n: NonNullable<Nuevo>) => `${n.zona}-${n.padreId ?? 'raiz'}`;
 
-export function NavegacionSitio() {
+export function NavegacionSitio({ alCambiar }: { alCambiar?: () => void } = {}) {
   const [nav, setNav] = useState<Navegacion | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
@@ -46,6 +46,7 @@ export function NavegacionSitio() {
     try {
       const r = await accion();
       setNav(await api.navegacionSitio());
+      alCambiar?.();
       return r;
     } catch (e) {
       setAviso({ tipo: 'error', texto: mensajeDe(e, defecto) });

@@ -1,6 +1,7 @@
 // HU-1502 · CP-111: la tarea `publicar-paginas` de la cola `mantenimiento` publica las páginas del sitio programadas
 // cuya hora ya llegó y no toca las futuras ni los borradores. PostgreSQL real.
 // HU-1505 · En producción no publica mientras haya datos ficticios visibles y audita el bloqueo una sola vez.
+// HU-1507 · Cada vuelta que publica algo crea una versión del sitio completo con origen `programada` (RN-16-5).
 import { prisma, publicarProgramadas } from '@aptio/db';
 import { afterAll, describe, expect, it } from 'vitest';
 
@@ -45,6 +46,19 @@ describe.skipIf(!hayBase && !process.env.CI)('publicación programada de página
     // Una segunda vuelta no vuelve a publicar ni a auditar.
     expect(await publicarProgramadas(prisma, ahora)).not.toContain(vencida.id);
     expect(await prisma.auditoria.count({ where: { entidad: 'SitioPagina', entidadId: vencida.id } })).toBe(1);
+  });
+
+  it('HU-1507 · la vuelta que publica crea una versión «programada» con la página; la que no publica, ninguna', async () => {
+    const ahora = new Date();
+    const p = await prisma.sitioPagina.create({ data: { ruta: ruta('version'), titulo: 'Con versión', estado: 'PROGRAMADA', publicarEn: new Date(ahora.getTime() - MIN) } });
+    const antes = (await prisma.sitioVersion.aggregate({ _max: { numero: true } }))._max.numero ?? 0;
+    expect(await publicarProgramadas(prisma, ahora, 'pruebas')).toContain(p.id);
+    const v = await prisma.sitioVersion.findFirstOrThrow({ orderBy: { numero: 'desc' } });
+    expect(v).toMatchObject({ numero: antes + 1, origen: 'programada', entorno: 'pruebas', publicadoPorId: null, restauradaDe: null });
+    expect((v.instantanea as { paginas: { ruta: string }[] }).paginas.map((x) => x.ruta)).toContain(ruta('version'));
+    expect(await prisma.auditoria.count({ where: { entidad: 'SitioVersion', entidadId: v.id, accion: 'SITIO_VERSION_PUBLICADA' } })).toBe(1);
+    await publicarProgramadas(prisma, ahora, 'pruebas');
+    expect((await prisma.sitioVersion.aggregate({ _max: { numero: true } }))._max.numero).toBe(antes + 1);
   });
 
   it('en producción, con un ficticio visible, la deja programada y audita SITIO_PAGINA_BLOQUEADA una sola vez', async () => {

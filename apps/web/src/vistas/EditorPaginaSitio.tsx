@@ -1,13 +1,17 @@
 // HU-1503 · Sitio web › Editor de página (PNT-26, REQ-066): los bloques de una página en su orden, con flechas para
 // subir y bajar (dedo, ratón y teclado), un interruptor para mostrar u ocultar, agregar del catálogo cerrado y borrar.
 // Un bloque nuevo va al final y oculto (RN-16-2); ocultarlo no borra sus datos (CP-112). Solo el superadmin (ADR-011).
-// La vista previa y el SEO llegan con la HU-1507 y las historias de cada bloque.
+// HU-1507 · «Publicar cambios» con el chip «Cambios sin publicar», y la vista previa en Escritorio y Celular. El SEO
+// llega con su historia.
 import { CATALOGO_BLOQUES, contarVisibles, fuenteBloque, moverBloque, nombreBloque, TIPOS_BLOQUE } from '@aptio/schema/sitio-bloques';
 import { Cabecera } from '@aptio/ui';
 import { useEffect, useRef, useState } from 'react';
 import { api, type BloqueSitio, ErrorApi, type PaginaSitio } from '../api';
 import { navegar } from '../ruta';
 import { ESTADO_PAGINA, NOMBRE_IDIOMA } from './sitio-paginas';
+import { usePublicacionSitio } from './publicacion-sitio';
+import { AccionPublicar, AvisosPublicacion } from './SitioVersiones';
+import { VistaPreviaSitio } from './SitioVistaPrevia';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
@@ -23,6 +27,8 @@ export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
   const [borrando, setBorrando] = useState<string | null>(null);
   const foco = useRef<string | null>(null);
   const lista = useRef<HTMLOListElement>(null);
+  const publicacion = usePublicacionSitio();
+  const [refresco, setRefresco] = useState(0);
 
   useEffect(() => {
     api.paginasSitio().then(setPaginas, (e: unknown) => setError(mensajeDe(e, 'No se pudieron cargar las páginas')));
@@ -46,8 +52,12 @@ export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
   async function hacer<T>(accion: () => Promise<T>, defecto: string): Promise<T | undefined> {
     setOcupado(true);
     setAviso(null);
+    publicacion.limpiar();
     try {
-      return await accion();
+      const r = await accion();
+      publicacion.recargar();
+      setRefresco((n) => n + 1);
+      return r;
     } catch (e) {
       setAviso({ tipo: 'error', texto: mensajeDe(e, defecto) });
       return undefined;
@@ -88,14 +98,19 @@ export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
     setAviso({ tipo: 'ok', texto: `«${nombreBloque(b.tipo)}» se borró de la página.` });
   }
 
-  const selector = paginas && paginas.length > 0 ? (
-    <label className="campo selector-pagina">
-      Página a editar
-      <select value={paginaId} onChange={(e) => navegar(`/sitio/paginas/${e.target.value}`)}>
-        {paginas.map((p) => <option key={p.id} value={p.id}>{p.titulo} ({p.ruta}{p.idioma === 'en' ? ', inglés' : ''})</option>)}
-      </select>
-    </label>
-  ) : undefined;
+  const selector = (
+    <div className="acciones-cabecera">
+      <AccionPublicar estado={publicacion} />
+      {paginas && paginas.length > 0 ? (
+        <label className="campo selector-pagina">
+          Página a editar
+          <select value={paginaId} onChange={(e) => navegar(`/sitio/paginas/${e.target.value}`)}>
+            {paginas.map((p) => <option key={p.id} value={p.id}>{p.titulo} ({p.ruta}{p.idioma === 'en' ? ', inglés' : ''})</option>)}
+          </select>
+        </label>
+      ) : null}
+    </div>
+  );
 
   const subtitulo = pagina
     ? `Bloques y visibilidad de «${pagina.titulo}» (${pagina.ruta}). Un bloque nuevo entra oculto; ocultarlo no borra sus datos.`
@@ -106,6 +121,7 @@ export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
       <Cabecera titulo="Editor de página" subtitulo={subtitulo} accion={selector} />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
+      <AvisosPublicacion estado={publicacion} />
       <p className="sr" role="status" aria-live="polite">{anuncio}</p>
       {!bloques ? (!error ? <p className="sec" role="status">Cargando los bloques…</p> : null) : (
         <div className="editor-pagina">
@@ -166,11 +182,12 @@ export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
                 <dt>Idioma</dt><dd>{NOMBRE_IDIOMA[pagina.idioma]}</dd>
               </dl>
             ) : null}
-            <p className="nota">Si la página está publicada, los cambios de bloques se ven en el sitio al momento. Si está en borrador o programada, el sitio no muestra nada de ella.</p>
+            <p className="nota">Los cambios de bloques llegan al sitio con «Publicar cambios». Si la página está en borrador o programada, el sitio no muestra nada de ella.</p>
             <button type="button" className="boton" onClick={() => navegar('/sitio/paginas')}>Volver a Páginas</button>
           </aside>
         </div>
       )}
+      {bloques ? <VistaPreviaSitio paginaId={paginaId} refresco={refresco} /> : null}
     </>
   );
 }
