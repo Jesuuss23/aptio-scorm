@@ -23,6 +23,7 @@ import { NegocioModule } from './negocio/negocio.module.js';
 import { ConexionesModule } from './conexiones/conexiones.module.js';
 import { OperacionModule } from './operacion/operacion.module.js';
 import { ComentariosModule } from './comentarios/comentarios.module.js';
+import { SitioModule } from './sitio/sitio.module.js';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { ComentariosModule } from './comentarios/comentarios.module.js';
     ConexionesModule,
     OperacionModule,
     ComentariosModule,
+    SitioModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

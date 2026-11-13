@@ -12,8 +12,8 @@
 | ADR-008 | Primero el generador, después el editor | Aceptada |
 | ADR-009 | Nube, ingreso con correo y clave (Google opcional) y documentos cifrados | Aceptada (proveedor de nube por confirmar) |
 | ADR-010 | Proveedores de IA solo con licencia comercial y planes de pago | Aceptada |
-| ADR-011 | Sitio comercial administrable desde un panel superadmin | Propuesta |
-| ADR-012 | Multi-organización, planes y facturación electrónica (reemplaza la decisión 13 de `CLAUDE.md`) | Propuesta |
+| ADR-011 | Sitio comercial administrable desde un panel superadmin | Aceptada (2026-11-13) |
+| ADR-012 | Multi-organización, planes y facturación electrónica (reemplaza la decisión 13 de `CLAUDE.md`) | Propuesta (se decide antes del S13) |
 
 ---
 
@@ -138,6 +138,7 @@
   - Módulos M16 y M17, épicas E15 y E16, sprints S11 y S12.
   - La prueba de HU-0110 se extiende al panel superadmin.
   - Las pantallas de Stitch quedan como referencia de marca (`docs/diseno/stitch/sitio/`).
+- **Estado:** aceptada el 2026-11-13 para empezar el S11. El segundo factor obligatorio del superadmin queda para una historia propia antes de producción (SUP-167).
 
 ## ADR-012 · Multi-organización, planes y facturación electrónica
 

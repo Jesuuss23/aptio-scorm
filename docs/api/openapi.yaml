@@ -47,6 +47,8 @@ tags:
   description: Proveedor y modelo por tarea (M13)
 - name: Plataforma
   description: Salud del servicio y operación (M15)
+- name: Sitio web
+  description: Sitio comercial administrable, solo superadmin de plataforma (M16, ADR-011)
 paths:
   /salud:
     get:
@@ -82,6 +84,29 @@ paths:
             text/event-stream:
               schema:
                 $ref: '#/components/schemas/EventoTrabajo'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /sitio/paginas:
+    get:
+      tags:
+      - Sitio web
+      summary: Páginas del sitio comercial (HU-1501)
+      operationId: get_sitio_paginas
+      description: |-
+        Solo SUPERADMIN de plataforma (ADR-011): todas las rutas `/sitio/*` responden 403 al administrador de una
+        organización y al resto de los roles (CP-109), y 401 sin sesión. La lista está vacía hasta que la HU-1502 agregue
+        las páginas con su estado (borrador, programada, publicada).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PaginaSitio'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -3433,6 +3458,34 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    PaginaSitio:
+      type: object
+      description: Página del sitio comercial (M16). Los campos de bloques, SEO y programación llegan con la HU-1502.
+      required:
+      - id
+      - ruta
+      - idioma
+      - titulo
+      - estado
+      properties:
+        id:
+          type: string
+        ruta:
+          type: string
+          example: /precios
+        idioma:
+          type: string
+          enum:
+          - es
+          - en
+        titulo:
+          type: string
+        estado:
+          type: string
+          enum:
+          - BORRADOR
+          - PROGRAMADA
+          - PUBLICADA
     Operacion:
       type: object
       required:

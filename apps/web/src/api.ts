@@ -575,6 +575,17 @@ export const EDITAN_PARAMETROS: Rol[] = ['ADMINISTRADOR'];
 export const VEN_CONEXIONES: Rol[] = ['ADMINISTRADOR'];
 /** HU-1403 · Empresa › Operación (errores, colas, etapas y copias de seguridad): solo administración. */
 export const VEN_OPERACION: Rol[] = ['ADMINISTRADOR'];
+/** HU-1501 · El grupo «Sitio web» es solo del superadmin de plataforma (ADR-011, CP-109). */
+export const VEN_SITIO: Rol[] = ['SUPERADMIN'];
+
+/** HU-1501 · Página del sitio comercial; la lista llega vacía hasta la HU-1502. */
+export interface PaginaSitio {
+  id: string;
+  ruta: string;
+  idioma: 'es' | 'en';
+  titulo: string;
+  estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
+}
 export type { Operacion };
 export interface ConexionIA {
   tarea: 'TEXTO' | 'PANTALLAS' | 'TRADUCCION' | 'CALIDAD' | 'VOZ' | 'IMAGEN' | 'BOCA' | 'TRANSCRIPCION';
@@ -606,6 +617,7 @@ export const api = {
   },
   conexionesIA: () => pedir<ConexionesIA>('/conexiones-ia'),
   operacion: () => pedir<Operacion>('/operacion'),
+  paginasSitio: () => pedir<PaginaSitio[]>('/sitio/paginas'),
   respaldar: () => pedir<{ encolado: boolean }>('/operacion/respaldar', { method: 'POST' }),
   guardarConexionIA: (tarea: ConexionIA['tarea'], datos: ConexionEntrada) => pedir<ConexionIA>(`/conexiones-ia/${tarea.toLowerCase()}`, json(datos, 'PUT')),
   probarConexionIA: (tarea: ConexionIA['tarea']) => pedir<PruebaConexion>(`/conexiones-ia/${tarea.toLowerCase()}/probar`, { method: 'POST' }),

@@ -558,6 +558,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         ? responder(204)
         : responder(422, { codigo: 'ENLACE_NO_VALIDO', mensaje: 'Enlace no válido o vencido. Pide uno nuevo.' });
     }
+    // HU-1501 · Sitio web: solo el superadmin (CP-109); la lista está vacía hasta la HU-1502.
+    if (ruta === '/sitio/paginas') {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      return responder(200, []);
+    }
     // HU-1403 · Empresa › Operación: solo administración; «Respaldar ahora» deja una copia en curso (409 si ya hay una).
     if (ruta === '/operacion' || ruta === '/operacion/respaldar') {
       if (usuario.rol !== 'ADMINISTRADOR') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
