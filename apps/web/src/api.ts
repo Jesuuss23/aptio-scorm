@@ -591,10 +591,19 @@ export interface PaginaSitio {
   tipo: 'general' | 'sector';
   sector: string | null;
   portada: { titulo: string; texto: string } | null;
+  /** HU-1512 · Meta título de cualquier página (en una landing, obligatorio para publicar). */
   metaTitulo: string | null;
   blogCategoriaInicial: string | null;
+  /** HU-1512 · SEO de la página (PNT-26). */
+  metaDescripcion: string | null;
+  canonical: string | null;
+  indexar: boolean;
+  datosEstructurados: 'WebPage' | 'FAQPage' | 'Product';
   creadoEn: string;
   actualizadoEn: string;
+  /** HU-1512 · Al cambiar la ruta de una publicada: la redirección 301 creada y el aviso. */
+  redireccion?: { id: string; desde: string; hacia: string };
+  avisoRedireccion?: string;
   /** HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117). */
   avisoFicticios?: number;
   /** HU-1507 · Si el cambio publicó o retiró la página: la versión del sitio que creó. */
@@ -665,7 +674,22 @@ export interface PaginaSitioCambio {
   ruta?: string; titulo?: string; accion?: AccionPagina; publicarEn?: string;
   /** HU-1514 · Solo en una landing por sector. */
   sector?: string; portada?: { titulo: string; texto: string } | null; metaTitulo?: string | null; blogCategoriaInicial?: string | null;
+  /** HU-1512 · SEO de cualquier página. */
+  metaDescripcion?: string | null; canonical?: string | null; indexar?: boolean; datosEstructurados?: PaginaSitio['datosEstructurados'];
 }
+/** HU-1512 · Redirección 301 del sitio público (CP-124). */
+export interface RedireccionSitio { id: string; desde: string; hacia: string; activa: boolean; creadoEn: string; actualizadoEn: string }
+/** HU-1512 · Un problema de la revisión SEO (PNT-29). */
+export interface ProblemaSeo {
+  tipo: 'sin-descripcion' | 'titulo-largo' | 'descripcion-larga' | 'sin-indexar' | 'redireccion-sin-destino' | 'redireccion-tapada';
+  severidad: 'alta' | 'media' | 'baja';
+  titulo: string;
+  detalle: string;
+  paginaId?: string;
+  redireccionId?: string;
+}
+/** HU-1512 · Sitio web › SEO (PNT-29). */
+export interface SeoSitio { robotsExtra: string; robotsVistaPrevia: string; redirecciones: RedireccionSitio[]; problemas: ProblemaSeo[] }
 /** HU-1504 · Elemento de contenido del sitio (cifras, testimonios, logos…). Nace oculto (RN-16-2). */
 export interface ElementoSitio {
   id: string;
@@ -761,6 +785,11 @@ export const api = {
   quitarMarcaSitio: (tipo: 'logo' | 'favicon') => pedir<AjustesSitio>(`/sitio/ajustes/marca/${tipo}`, { method: 'DELETE' }),
   correoPruebaSitio: () => pedir<{ para: string }>('/sitio/ajustes/correo-prueba', { method: 'POST' }),
   comprobarDominioSitio: () => pedir<ComprobacionDominio>('/sitio/ajustes/dominio/comprobar', { method: 'POST' }),
+  seoSitio: () => pedir<SeoSitio>('/sitio/seo'),
+  guardarRobotsSitio: (robotsExtra: string) => pedir<SeoSitio>('/sitio/seo', json({ robotsExtra }, 'PATCH')),
+  crearRedireccion: (datos: { desde: string; hacia: string; activa?: boolean }) => pedir<RedireccionSitio>('/sitio/seo/redirecciones', json(datos)),
+  cambiarRedireccion: (id: string, cambio: { desde?: string; hacia?: string; activa?: boolean }) => pedir<RedireccionSitio>(`/sitio/seo/redirecciones/${id}`, json(cambio, 'PATCH')),
+  borrarRedireccion: (id: string) => pedir<void>(`/sitio/seo/redirecciones/${id}`, { method: 'DELETE' }),
   blogSitio: () => pedir<BlogSitio>('/sitio/blog'),
   guardarBlogSitio: (cambios: CambiosBlogSitio) => pedir<BlogSitio>('/sitio/blog', json(cambios, 'PATCH')),
   sincronizarBlog: () => pedir<{ encolado: boolean }>('/sitio/blog/sincronizar', { method: 'POST' }),

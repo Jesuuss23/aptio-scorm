@@ -757,8 +757,16 @@ model SitioPagina {
   sector        String?
   /// Título y texto de la portada de una landing.
   portada       Json?
-  /// Meta título de una landing (RN-16-9); el SEO de cada página llega con la HU-1512.
+  /// Meta título (hasta 60, texto plano); si falta, se usa el título (HU-1512).
   metaTitulo    String?
+  /// HU-1512 · Meta descripción (hasta 160, texto plano).
+  metaDescripcion String?
+  /// HU-1512 · URL canónica propia: ruta interna `/…` o `https://…`; null = la del dominio.
+  canonical     String?
+  /// HU-1512 · false = `noindex`, fuera del sitemap y sin alternas hreflang (CP-125).
+  indexar       Boolean      @default(true)
+  /// HU-1512 · Tipo de datos estructurados JSON-LD: WebPage, FAQPage o Product.
+  datosEstructurados String  @default("WebPage")
   /// Categoría con que empieza filtrada la sección Blog de la landing (HU-1511, CP-159).
   blogCategoriaInicial String?
   creadoEn      DateTime     @default(now())
@@ -860,6 +868,25 @@ model SitioAjustes {
   datos            Json
   actualizadoPorId String?  @db.Uuid
   actualizadoEn    DateTime @updatedAt
+}
+
+/// HU-1512 · Redirección 301 del sitio público (CP-124): de una ruta interna a otra, sin cadenas ni bucles.
+model SitioRedireccion {
+  id            String   @id @default(uuid()) @db.Uuid
+  desde         String   @unique
+  hacia         String
+  activa        Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+/// HU-1512 · Ajustes SEO del sitio: una sola fila (`id` = "seo").
+model SitioSeo {
+  id              String   @id @default("seo")
+  /// Reglas extra de robots.txt (solo `Allow:`, `Disallow:` y comentarios).
+  robotsExtra     String   @default("")
+  actualizadoPorId String? @db.Uuid
+  actualizadoEn   DateTime @updatedAt
 }
 
 /// HU-1511 · Conexión del sitio con el WordPress del blog (REQ-070, PNT-28, RN-16-8): una sola fila (`id` = "blog").

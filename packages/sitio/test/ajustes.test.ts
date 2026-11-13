@@ -2,7 +2,7 @@
 // página de mantenimiento (CP-121) y las cabeceras del 503 y de la marca.
 import { describe, expect, it } from 'vitest';
 import { instantaneaDeEjemplo } from '../src/ejemplo.js';
-import { renderizarMantenimiento, renderizarPagina, renderizarSitio } from '../src/render.js';
+import { renderizarMantenimiento, renderizarPagina, renderizarSitio, sinJsonLd } from '../src/render.js';
 import { cabecerasSitio, resolverPedido } from '../src/servir.js';
 
 const op = { entorno: 'produccion' as const, sitioUrl: 'https://aptioscorm.com', base: '/s', anio: 2026 };
@@ -30,7 +30,7 @@ describe('ajustes del sitio en el HTML (HU-1509)', () => {
   it('el botón de WhatsApp es un enlace wa.me en otra pestaña, sin JavaScript', () => {
     const html = renderizarPagina(conSitio(), '/', 'es', op)!;
     expect(html).toContain('<a class="whatsapp" href="https://wa.me/51987654321?text=Hola" target="_blank" rel="noopener" aria-label="Escríbenos por WhatsApp (se abre en una pestaña nueva)">');
-    expect(html).not.toMatch(/<script|\son[a-z]+=/i);
+    expect(sinJsonLd(html)).not.toMatch(/<script|\son[a-z]+=/i);
     expect(renderizarPagina(instantaneaDeEjemplo(), '/', 'es', op)).not.toContain('class="whatsapp"');
     expect(renderizarPagina(instantaneaDeEjemplo(), '/', 'es', op)).toContain('<span>Aptio <b>SCORM</b></span>');
   });

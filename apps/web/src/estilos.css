@@ -3075,3 +3075,122 @@ ul.fila-chips {
   display: block;
   margin-top: 4px;
 }
+
+/* HU-1512 · SEO técnico: pestaña «SEO» del Editor de página (PNT-26) y vista Sitio web › SEO (PNT-29). */
+.pestanas-editor {
+  margin-bottom: 16px;
+}
+.ficha-seo .formulario-ajustes {
+  margin-top: 0;
+}
+.seo-indexar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+}
+.seo-serp-etiqueta {
+  display: block;
+  font-size: var(--texto-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--color-texto-sec);
+}
+.serp {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 12px;
+  background: var(--color-superficie);
+  overflow-wrap: anywhere;
+}
+.serp-url {
+  font-size: var(--texto-xs);
+  color: var(--color-texto-sec);
+}
+.serp-titulo {
+  font-size: var(--texto-base);
+  color: var(--color-cobalto);
+  font-weight: 600;
+}
+.serp-descripcion {
+  font-size: var(--texto-sm);
+  color: var(--color-texto);
+}
+.serp .chip {
+  justify-self: start;
+}
+.seo-vista {
+  display: grid;
+  gap: 24px;
+}
+.seo-problemas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.seo-problemas li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 12px;
+}
+.seo-problema-texto {
+  flex: 1 1 0;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.seo-redireccion-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin: 16px 0;
+}
+.seo-redireccion-form .campo {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+.seo-flecha {
+  padding-bottom: 10px;
+  color: var(--color-texto-sec);
+}
+.seo-redireccion-error {
+  flex-basis: 100%;
+  margin: 0;
+}
+.seo-ruta {
+  font-family: var(--fuente-num);
+  overflow-wrap: anywhere;
+}
+.seo-redirecciones tr.resaltada > * {
+  background: var(--color-cobalto-suave);
+}
+.seo-robots {
+  margin: 4px 0 16px;
+  padding: 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  background: var(--color-fondo);
+  font-family: var(--fuente-num);
+  font-size: var(--texto-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .seo-problemas li {
+    flex-wrap: wrap;
+  }
+  .seo-flecha {
+    display: none;
+  }
+}

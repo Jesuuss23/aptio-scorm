@@ -13,6 +13,7 @@ export const BASE_SITIO = 's';
  * HU-1508 · Sitio público pre-renderizado (REQ-109, DA-08), sin sesión: `GET /s/*` entrega el HTML de la versión
  * vigente, con ETag (304 si el navegador ya lo tiene) y la página 404 en HTML. Documentado a mano en openapi.yaml.
  * HU-1509 · Con el modo mantenimiento activo, 503 con la página de aviso para todos menos el superadmin (CP-121).
+ * HU-1512 · CP-124 · Una ruta sin página con una redirección activa en la versión vigente responde 301 a su destino.
  */
 @ApiExcludeController()
 @Controller()
@@ -34,6 +35,12 @@ export class SitioPublicoController {
       return;
     }
     const r = await this.sitio.servir(pedido);
+    // HU-1512 · CP-124 · Redirección permanente; la CDN la guarda como una página.
+    if (r.estado === 301) {
+      res.set({ 'Cache-Control': enMantenimiento ? 'private, no-store' : 'public, max-age=0, s-maxage=60', 'X-Content-Type-Options': 'nosniff' });
+      res.redirect(301, `/${BASE_SITIO}${r.hacia === '/' ? '' : r.hacia}`);
+      return;
+    }
     if (enMantenimiento && (r.tipo === 'pagina' || r.tipo === '404')) {
       const html = new TextDecoder().decode(r.cuerpo).replace('<body>', `<body><p class="aviso-pruebas" role="status">${AVISO_SUPERADMIN}</p>`);
       this.enviar(req, res, { ...r, cuerpo: new TextEncoder().encode(html) }, true);

@@ -11,7 +11,7 @@ import { esArchivoBlog } from '@aptio/schema/sitio-blog';
 import { archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
 
 export type Pedido =
-  | { tipo: 'pagina'; archivo: string }
+  | { tipo: 'pagina'; archivo: string; ruta: string }
   | { tipo: 'fuente'; archivo: string }
   | { tipo: 'marca'; archivo: string }
   | { tipo: 'blog'; archivo: string }
@@ -30,7 +30,7 @@ export function resolverPedido(ruta: string): Pedido | null {
   if (partes.length === 2 && partes[0] === CARPETA_MARCA) return esArchivoMarca(partes[1]!) ? { tipo: 'marca', archivo: partes[1]! } : null;
   if (partes.length === 2 && partes[0] === CARPETA_BLOG) return esArchivoBlog(partes[1]!) ? { tipo: 'blog', archivo: partes[1]! } : null;
   if (partes.length > 8 || !partes.every((p) => SEGMENTO.test(p))) return null;
-  return { tipo: 'pagina', archivo: archivoDeRuta(limpia) };
+  return { tipo: 'pagina', archivo: archivoDeRuta(limpia), ruta: limpia };
 }
 
 export const TIPOS_MIME = {

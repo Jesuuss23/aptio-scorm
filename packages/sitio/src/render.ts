@@ -12,6 +12,7 @@ import type { EnlacePublico, NavegacionPublica } from '@aptio/schema/sitio-naveg
 import { enlaceWhatsapp, NOMBRE_POR_DEFECTO, type SitioPublicado } from '@aptio/schema/sitio-ajustes';
 import type { SectorPublicado } from '@aptio/schema/sitio-sectores';
 import { type ArticuloPublico, type BlogPublico, categoriaInicial, ULTIMOS_BLOG } from '@aptio/schema/sitio-blog';
+import { rutaServida, tituloDePagina } from '@aptio/schema/sitio-seo';
 import { alternasDe, type Instantanea, navegacionDe, type PaginaServida, paginaServida } from '@aptio/schema/sitio-versiones';
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
@@ -58,9 +59,7 @@ const texto = (e: Elemento, campo: string): string => {
 };
 
 /** La ruta pública de una página: las de inglés van bajo `/en` (`/en` para el inicio). */
-export function rutaPublica(ruta: string, idioma: string): string {
-  return idioma === 'en' ? `/en${ruta === '/' ? '' : ruta}` : ruta;
-}
+export const rutaPublica = rutaServida;
 
 /** El objeto del bucket de una ruta pública: `/` → `index.html`, `/en/precios` → `en/precios/index.html`. */
 export function archivoDeRuta(rutaPublicaPedida: string): string {
@@ -329,8 +328,23 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
   }
 }
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', children }: {
-  titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string; children?: ReactNode;
+/** HU-1512 · Open Graph de una página: título, descripción, URL, tipo, nombre del sitio e idioma. */
+interface OpenGraph { titulo: string; descripcion: string; url: string; sitio: string; idioma: Idioma }
+
+/**
+ * HU-1512 · JSON dentro de `<script type="application/ld+json">`: el navegador no lo ejecuta, y `<`, `>`, `&` y los
+ * separadores de línea van escapados para que ningún texto pueda cerrar la etiqueta.
+ */
+export function jsonLdSeguro(datos: unknown): string {
+  return JSON.stringify(datos).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+}
+
+/** HU-1512 · El HTML sin sus bloques JSON-LD (para comprobar que no queda ningún otro `<script>`). */
+export const sinJsonLd = (html: string): string => html.replace(/<script type="application\/ld\+json">[^<]*<\/script>/g, '');
+
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, children }: {
+  titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
+  og?: OpenGraph; jsonLd?: unknown; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -342,6 +356,14 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       canonical ? h('link', { rel: 'canonical', href: canonical }) : null,
       alternas.map((a) => h('link', { key: a.hreflang, rel: 'alternate', hrefLang: a.hreflang, href: a.href })),
       h('meta', { name: 'robots', content: robots ?? (entorno === 'produccion' && canonical ? 'index, follow' : 'noindex, nofollow') }),
+      og ? h(Fragment, null,
+        h('meta', { property: 'og:title', content: og.titulo }),
+        h('meta', { property: 'og:description', content: og.descripcion }),
+        h('meta', { property: 'og:url', content: og.url }),
+        h('meta', { property: 'og:type', content: 'website' }),
+        h('meta', { property: 'og:site_name', content: og.sitio }),
+        h('meta', { property: 'og:locale', content: og.idioma === 'en' ? 'en_US' : 'es_PE' })) : null,
+      jsonLd ? h('script', { type: 'application/ld+json', dangerouslySetInnerHTML: { __html: jsonLdSeguro(jsonLd) } }) : null,
       h('meta', { name: 'theme-color', content: '#004ECC' }),
       favicon ? h('link', { rel: 'icon', href: `${base}/${CARPETA_MARCA}/${favicon.archivo}`, type: favicon.mime }) : null,
       lista.filter((f) => f.precargar).map((f) => h('link', { key: f.archivo, rel: 'preload', href: `${base}/${CARPETA_FUENTES}/${f.archivo}`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })),
@@ -395,13 +417,45 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
   const cuerpo = h(Fragment, null,
     hayH1 ? null : h('section', { className: 'titulo-pagina' }, h('div', { className: 'in' }, h('h1', null, p.titulo))),
     bloques);
+  // HU-1512 · El SEO de la página manda; una landing usa su meta título y el texto de su portada (RN-16-9).
+  const titulo = tituloDePagina({ ruta: p.ruta, titulo: p.titulo, metaTitulo: p.seo?.titulo ?? p.sector?.metaTitulo }, marca.nombre);
+  const descripcion = p.seo?.descripcion ?? p.sector?.portada.texto ?? TEXTOS[i].DESCRIPCION;
+  const canonical = canonicalDe(p.seo?.canonical, sinBarra(op.sitioUrl) + publica, op.sitioUrl);
+  const indexar = p.seo?.indexar !== false;
   return documento(h(Documento, {
-    // HU-1514 · Una landing usa su meta título y el texto de su portada como descripción (RN-16-9).
-    titulo: p.sector ? p.sector.metaTitulo : p.ruta === '/' ? `${marca.nombre} · ${p.titulo}` : `${p.titulo} · ${marca.nombre}`,
-    descripcion: p.sector?.portada.texto ?? TEXTOS[i].DESCRIPCION,
-    canonical: sinBarra(op.sitioUrl) + publica, alternas: alternasHref(inst, p.ruta, op.sitioUrl), idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
+    titulo, descripcion, canonical, alternas: alternasHref(inst, p.ruta, op.sitioUrl), idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
+    // CP-125 · Sin indexar: `noindex` (en pruebas ya va `noindex, nofollow` en todas).
+    ...(indexar || op.entorno !== 'produccion' ? {} : { robots: 'noindex' }),
     cssExtra: p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '',
+    og: { titulo, descripcion, url: canonical, sitio: marca.nombre, idioma: i },
+    jsonLd: datosEstructurados(p, { titulo, descripcion, url: canonical, idioma: i, marca, sitioUrl: op.sitioUrl }),
   }, h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: p.ruta, marca, landings, selector: selectorDe(inst, p.ruta, i) }, cuerpo)));
+}
+
+/** HU-1512 · El canonical: el propio (una ruta interna va con el dominio) o el de la página en el dominio publicado. */
+function canonicalDe(propio: string | undefined, porDefecto: string, sitioUrl: string): string {
+  if (!propio) return porDefecto;
+  return propio.startsWith('/') ? sinBarra(sitioUrl) + propio : propio;
+}
+
+/**
+ * HU-1512 · Los datos estructurados de una página (schema.org en JSON-LD): WebPage por defecto, FAQPage con las
+ * preguntas visibles de la página (si no tiene ninguna, WebPage) o Product; el inicio (`/` y `/en`) suma Organization.
+ */
+export function datosEstructurados(p: PaginaServida, d: { titulo: string; descripcion: string; url: string; idioma: Idioma; marca: Marca; sitioUrl: string }): Record<string, unknown> {
+  const preguntas = p.bloques.filter((b) => b.tipo === 'faq').flatMap((b) => b.elementos ?? [])
+    .map((e) => ({ pregunta: texto(e, 'pregunta'), respuesta: texto(e, 'respuesta') })).filter((q) => q.pregunta && q.respuesta);
+  const tipo = p.seo?.datos === 'FAQPage' && !preguntas.length ? 'WebPage' : (p.seo?.datos ?? 'WebPage');
+  const base = { '@type': tipo, name: d.titulo, description: d.descripcion, url: d.url, inLanguage: d.idioma === 'en' ? 'en' : 'es-PE' };
+  const nodo = tipo === 'FAQPage'
+    ? { ...base, mainEntity: preguntas.map((q) => ({ '@type': 'Question', name: q.pregunta, acceptedAnswer: { '@type': 'Answer', text: q.respuesta } })) }
+    : tipo === 'Product' ? { ...base, brand: { '@type': 'Brand', name: d.marca.nombre } } : base;
+  if (p.ruta !== '/') return { '@context': 'https://schema.org', ...nodo };
+  const organizacion = {
+    '@type': 'Organization', name: d.marca.nombre, url: `${sinBarra(d.sitioUrl)}/`,
+    ...(d.marca.logo ? { logo: `${sinBarra(d.sitioUrl)}/${CARPETA_MARCA}/${d.marca.logo.archivo}` } : {}),
+  };
+  return { '@context': 'https://schema.org', '@graph': [organizacion, nodo] };
 }
 
 /** La página 404 del sitio, con el menú y el pie de la versión (o sin ellos si aún no hay versión). */
@@ -440,7 +494,8 @@ const escaparXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
  */
 export function sitemapXml(inst: Pick<Instantanea, 'paginas'>, sitioUrl: string): string {
   const base = sinBarra(sitioUrl);
-  const filas = [...inst.paginas].sort((a, b) => a.idioma.localeCompare(b.idioma) || a.ruta.localeCompare(b.ruta));
+  // HU-1512 · CP-125 · Las páginas sin indexar no van en el sitemap.
+  const filas = inst.paginas.filter((p) => p.seo?.indexar !== false).sort((a, b) => a.idioma.localeCompare(b.idioma) || a.ruta.localeCompare(b.ruta));
   const urls = filas.map((p) => {
     const alternas = alternasHref(inst, p.ruta, sitioUrl).map((a) => `<xhtml:link rel="alternate" hreflang="${a.hreflang}" href="${escaparXml(a.href)}"/>`).join('');
     return `  <url><loc>${escaparXml(base + rutaPublica(p.ruta, p.idioma))}</loc>${p.publicadaEn ? `<lastmod>${p.publicadaEn}</lastmod>` : ''}${alternas}</url>`;
@@ -450,14 +505,19 @@ export function sitemapXml(inst: Pick<Instantanea, 'paginas'>, sitioUrl: string)
 
 /**
  * robots.txt: en producción permite todo y apunta al sitemap (HU-1511: y al del blog de WordPress, `wp-sitemap.xml`);
- * en pruebas no deja indexar nada.
+ * en pruebas no deja indexar nada. HU-1512 · En producción suma las reglas extra del superadmin (ya validadas:
+ * `@aptio/schema/sitio-seo`), dentro del grupo `User-agent: *`.
  */
-export function robotsTxt(op: OpcionesRender): string {
+export function robotsTxt(op: OpcionesRender, robotsExtra?: string | null): string {
   const blog = op.blog?.url ? `Sitemap: ${op.blog.url}/wp-sitemap.xml\n` : '';
+  const extra = robotsExtra?.trim() ? `${robotsExtra.trim()}\n` : '';
   return op.entorno === 'produccion'
-    ? `User-agent: *\nAllow: /\n\nSitemap: ${sinBarra(op.sitioUrl)}/sitemap.xml\n${blog}`
+    ? `User-agent: *\nAllow: /\n${extra}\nSitemap: ${sinBarra(op.sitioUrl)}/sitemap.xml\n${blog}`
     : 'User-agent: *\nDisallow: /\n';
 }
+
+/** HU-1512 · Archivo de la versión con sus redirecciones 301 (no se sirve: lo lee quien atiende `/s/*` antes del 404). */
+export const ARCHIVO_REDIRECCIONES = '_redirecciones.json';
 
 export interface ArchivoSitio { archivo: string; contenido: string; mime: string }
 
@@ -473,6 +533,7 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     ...paginas,
     { archivo: '404.html', contenido: renderizar404(inst, op), mime: html },
     { archivo: 'sitemap.xml', contenido: sitemapXml(inst, op.sitioUrl), mime: 'application/xml; charset=utf-8' },
-    { archivo: 'robots.txt', contenido: robotsTxt(op), mime: 'text/plain; charset=utf-8' },
+    { archivo: 'robots.txt', contenido: robotsTxt(op, inst.robotsExtra), mime: 'text/plain; charset=utf-8' },
+    ...(inst.redirecciones?.length ? [{ archivo: ARCHIVO_REDIRECCIONES, contenido: JSON.stringify(inst.redirecciones), mime: 'application/json' }] : []),
   ];
 }

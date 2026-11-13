@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { CLAVE_ACTUAL, claveBlog, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
+import { ARCHIVO_REDIRECCIONES, CLAVE_ACTUAL, claveBlog, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
 import { ajustesPublicados, type AjustesSitio } from '@aptio/schema/sitio-ajustes';
+import { redireccionDe } from '@aptio/schema/sitio-seo';
 import { AlmacenService } from '../recursos/almacen.service.js';
 
 /** Cuánto se confía en el puntero leído antes de volver a leerlo del bucket. La CDN, delante, guarda las páginas un minuto. */
@@ -11,6 +12,8 @@ const noExiste = (e: unknown) =>
   ['NoSuchKey', 'NotFound'].includes((e as { name?: string }).name ?? '') || (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404;
 
 export interface Respuesta { estado: 200 | 404 | 503; tipo: Pedido['tipo'] | '404' | '503'; cuerpo: Uint8Array; archivo?: string }
+/** HU-1512 · CP-124 · Una ruta con redirección activa en la versión vigente: 301 a su destino (ruta interna). */
+export interface Redireccion301 { estado: 301; hacia: string }
 
 /**
  * HU-1508 · Sirve el sitio pre-renderizado (DA-08): lee `sitio/actual.json` para saber qué versión se ve y entrega el
@@ -45,7 +48,7 @@ export class SitioPublicoService {
     return this.puntero.valor?.version ?? null;
   }
 
-  async servir(pedido: Pedido | null): Promise<Respuesta> {
+  async servir(pedido: Pedido | null): Promise<Respuesta | Redireccion301> {
     if (pedido?.tipo === 'fuente') {
       const f = leerFuente(pedido.archivo);
       return f ? { estado: 200, tipo: 'fuente', cuerpo: f } : this.noEncontrada(null);
@@ -64,8 +67,25 @@ export class SitioPublicoService {
     if (pedido) {
       const cuerpo = await this.leer(claveVersion(version, pedido.archivo), true);
       if (cuerpo) return { estado: 200, tipo: pedido.tipo, cuerpo };
+      // HU-1512 · CP-124 · Antes del 404, las redirecciones activas de la versión vigente (la página publicada manda).
+      if (pedido.tipo === 'pagina') {
+        const hacia = redireccionDe(await this.redirecciones(version), pedido.ruta);
+        if (hacia) return { estado: 301, hacia };
+      }
     }
     return this.noEncontrada(version);
+  }
+
+  /** Las redirecciones guardadas con la versión (sin archivo: ninguna). */
+  private async redirecciones(version: number): Promise<{ desde: string; hacia: string }[]> {
+    const bruto = await this.leer(claveVersion(version, ARCHIVO_REDIRECCIONES), true);
+    if (!bruto) return [];
+    try {
+      const lista = JSON.parse(new TextDecoder().decode(bruto)) as unknown;
+      return Array.isArray(lista) ? lista.filter((r): r is { desde: string; hacia: string } => typeof r?.desde === 'string' && typeof r?.hacia === 'string') : [];
+    } catch {
+      return [];
+    }
   }
 
   /** HU-1509 · CP-121 · El aviso de mantenimiento (503), con la marca y el mensaje de los ajustes. */

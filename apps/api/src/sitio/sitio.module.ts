@@ -16,6 +16,8 @@ import { LimitePublicoMiddleware, LimitePublicoService } from './limite-publico.
 import { NavegacionController } from './navegacion.controller.js';
 import { NavegacionService } from './navegacion.service.js';
 import { PublicoController } from './publico.controller.js';
+import { SeoController } from './seo.controller.js';
+import { SeoService } from './seo.service.js';
 import { SitioController } from './sitio.controller.js';
 import { SitioService } from './sitio.service.js';
 import { VersionesController } from './versiones.controller.js';
@@ -24,8 +26,8 @@ import { VersionesService } from './versiones.service.js';
 /** M16 · Sitio web y contenido (fase comercial, ADR-011): administración solo del superadmin y rutas públicas. */
 @Module({
   imports: [RecursosModule, CorreoModule],
-  controllers: [SitioController, BloquesController, ElementosController, FicticiosController, NavegacionController, VersionesController, PublicoController, SitioPublicoController, AjustesController, BlogController],
-  providers: [SitioService, VersionesService, PrerenderService, SitioPublicoService, AjustesService, BlogService, BloquesService, ElementosService, NavegacionService, LimitePublicoService],
+  controllers: [SitioController, BloquesController, ElementosController, FicticiosController, NavegacionController, VersionesController, PublicoController, SitioPublicoController, AjustesController, BlogController, SeoController],
+  providers: [SitioService, VersionesService, PrerenderService, SitioPublicoService, AjustesService, BlogService, SeoService, BloquesService, ElementosService, NavegacionService, LimitePublicoService],
 })
 export class SitioModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

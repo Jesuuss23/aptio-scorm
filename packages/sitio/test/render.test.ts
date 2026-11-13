@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { instantaneaDeEjemplo } from '../src/ejemplo.js';
 import { fuentes } from '../src/fuentes.js';
-import { archivoDeRuta, renderizar404, renderizarPagina, renderizarSitio, rutaPublica, sitemapXml } from '../src/render.js';
+import { archivoDeRuta, renderizar404, renderizarPagina, renderizarSitio, rutaPublica, sinJsonLd, sitemapXml } from '../src/render.js';
 
 const op = { entorno: 'produccion' as const, sitioUrl: 'https://aptioscorm.com/', base: '/s', anio: 2026 };
 const niveles = (html: string) => [...html.matchAll(/<h([1-6])\b/g)].map((m) => Number(m[1]));
@@ -10,7 +10,7 @@ describe('sitio público pre-renderizado (HU-1508)', () => {
   it('es un documento HTML5 completo, sin JavaScript, con metadatos y fuentes propias', () => {
     const html = renderizarPagina(instantaneaDeEjemplo(), '/', 'es', op)!;
     expect(html.startsWith('<!doctype html><html lang="es">')).toBe(true);
-    expect(html).not.toMatch(/<script|\son[a-z]+=/i);
+    expect(sinJsonLd(html)).not.toMatch(/<script|\son[a-z]+=/i);
     expect(html).toContain('<title>Aptio SCORM · Inicio</title>');
     expect(html).toMatch(/<meta name="description" content="[^"]{50,}"\/>/);
     expect(html).toContain('<link rel="canonical" href="https://aptioscorm.com/"/>');

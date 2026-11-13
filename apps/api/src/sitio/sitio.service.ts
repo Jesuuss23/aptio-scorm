@@ -6,7 +6,9 @@ import { paginaServida } from '@aptio/schema/sitio-versiones';
 import {
   aplicarCambiosSector, type CambiosSector, type DatosSector, faltantesParaPublicar, leerPortada, PLANTILLA_SECTOR, rutaSector,
 } from '@aptio/schema/sitio-sectores';
+import { aplicarCambiosSeo, type CambiosSeo, type DatosSeo, leerSeo, rutaServida, validarRedireccion } from '@aptio/schema/sitio-seo';
 import { SITIO_URL_POR_DEFECTO, sitemapXml } from '@aptio/sitio';
+import { rutasPublicadas } from './seo.service.js';
 import { entornoActual } from './entorno-sitio.js';
 import { VersionesService } from './versiones.service.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
@@ -17,6 +19,7 @@ import type { AccionPagina, PaginaPublicaDto, PaginaSitioCambioDto, PaginaSitioD
 const aDto = (p: SitioPagina): PaginaSitioDto => ({
   id: p.id, ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, estado: p.estado,
   tipo: p.tipo, sector: p.sector, portada: leerPortada(p.portada), metaTitulo: p.metaTitulo, blogCategoriaInicial: p.blogCategoriaInicial,
+  metaDescripcion: p.metaDescripcion, canonical: p.canonical, indexar: p.indexar, datosEstructurados: leerSeo(p).datosEstructurados,
   publicarEn: p.publicarEn?.toISOString() ?? null, publicadaEn: p.publicadaEn?.toISOString() ?? null,
   creadoEn: p.creadoEn.toISOString(), actualizadoEn: p.actualizadoEn.toISOString(),
 });
@@ -30,7 +33,13 @@ const diaExiste = (iso: string): boolean => {
 
 
 const CAMPOS_SECTOR = ['sector', 'portada', 'metaTitulo', 'blogCategoriaInicial'] as const;
+/** Lo que es solo de una landing (el meta título, desde la HU-1512, vale para cualquier página). */
+const CAMPOS_LANDING = ['sector', 'portada', 'blogCategoriaInicial'] as const;
 const cambiosSector = (dto: CambiosSector): boolean => CAMPOS_SECTOR.some((k) => dto[k] !== undefined);
+const cambiosLanding = (dto: CambiosSector): boolean => CAMPOS_LANDING.some((k) => dto[k] !== undefined);
+/** HU-1512 · El SEO de cualquier página; en una landing el meta título lo valida su ficha (RN-16-9). */
+const CAMPOS_SEO = ['metaTitulo', 'metaDescripcion', 'canonical', 'indexar', 'datosEstructurados'] as const;
+const cambiosSeo = (dto: CambiosSeo): boolean => CAMPOS_SEO.some((k) => dto[k] !== undefined);
 const datosDe = (p: SitioPagina): DatosSector => ({ sector: p.sector, portada: leerPortada(p.portada), metaTitulo: p.metaTitulo, blogCategoriaInicial: p.blogCategoriaInicial });
 const aColumnas = (d: DatosSector) => ({
   sector: d.sector, portada: d.portada ? (d.portada as unknown as Prisma.InputJsonValue) : Prisma.DbNull, metaTitulo: d.metaTitulo, blogCategoriaInicial: d.blogCategoriaInicial,
@@ -63,11 +72,12 @@ export class SitioService {
 
   async crear(u: UsuarioSesion, dto: PaginaSitioEntradaDto, ahora = new Date()): Promise<PaginaSitioDto> {
     if (dto.tipo === 'sector') return this.crearLanding(u, dto);
-    if (cambiosSector(dto)) throw new UnprocessableEntityException({ codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada, meta título y categoría del blog son solo de las landings por sector' });
+    if (cambiosLanding(dto)) throw new UnprocessableEntityException({ codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada y categoría del blog son solo de las landings por sector' });
+    const seo = dto.metaTitulo !== undefined ? this.validarSeo(leerSeo({}), { metaTitulo: dto.metaTitulo }) : null;
     const estado = this.estadoPedido(dto.accion ?? 'borrador', dto.publicarEn, ahora);
     const aviso = dto.accion === 'publicar' ? await this.versiones.revisarFicticios() : 0;
     try {
-      const p = await this.bd.sitioPagina.create({ data: { ruta: dto.ruta, idioma: dto.idioma ?? 'es', titulo: dto.titulo.trim(), ...estado } });
+      const p = await this.bd.sitioPagina.create({ data: { ruta: dto.ruta, idioma: dto.idioma ?? 'es', titulo: dto.titulo.trim(), ...(seo ? { metaTitulo: seo.metaTitulo } : {}), ...estado } });
       await this.auditar(u, 'SITIO_PAGINA_CREADA', p, { estado: p.estado, ...(aviso ? { ficticiosVisibles: aviso } : {}) });
       // HU-1507 · Crear una página ya publicada publica el sitio completo en una versión nueva (RN-16-5).
       const v = p.estado === 'PUBLICADA' ? await this.versiones.nuevaVersion(u, 'pagina') : null;
@@ -106,10 +116,12 @@ export class SitioService {
     const actual = await this.buscar(id);
     // HU-1514 · Los campos de la landing se validan juntos; publicar o programar exige portada y meta título (RN-16-9).
     let sector: DatosSector | null = null;
-    if (cambiosSector(dto)) {
-      if (actual.tipo !== 'sector') throw new UnprocessableEntityException({ codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada, meta título y categoría del blog son solo de las landings por sector' });
-      sector = this.validarSector(datosDe(actual), dto);
-    }
+    const landing = actual.tipo === 'sector';
+    if (cambiosLanding(dto) && !landing) throw new UnprocessableEntityException({ codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada y categoría del blog son solo de las landings por sector' });
+    if (landing && cambiosSector(dto)) sector = this.validarSector(datosDe(actual), dto);
+    // HU-1512 · SEO de la página (PNT-26): límites de 60 y 160, texto plano y canonical interno o https://.
+    const seoPedido: CambiosSeo = { metaTitulo: landing ? undefined : dto.metaTitulo, metaDescripcion: dto.metaDescripcion, canonical: dto.canonical, indexar: dto.indexar, datosEstructurados: dto.datosEstructurados };
+    const seo = cambiosSeo(seoPedido) ? this.validarSeo(leerSeo(actual), seoPedido) : null;
     const estadoFinal = dto.accion === 'publicar' ? 'PUBLICADA' : dto.accion === 'programar' ? 'PROGRAMADA' : dto.accion === 'borrador' ? 'BORRADOR' : actual.estado;
     if (actual.tipo === 'sector' && estadoFinal !== 'BORRADOR') {
       const faltan = faltantesParaPublicar(sector ?? datosDe(actual));
@@ -117,9 +129,6 @@ export class SitioService {
     }
     if (dto.publicarEn !== undefined && dto.accion !== 'programar') {
       throw new UnprocessableEntityException({ codigo: 'PUBLICAR_EN_SIN_PROGRAMAR', mensaje: 'publicarEn solo va con accion=programar' });
-    }
-    if (dto.ruta !== undefined && dto.ruta !== actual.ruta && actual.estado === 'PUBLICADA') {
-      throw new UnprocessableEntityException({ codigo: 'RUTA_PUBLICADA', mensaje: 'No se cambia la ruta de una página publicada: pásala a borrador primero' });
     }
     const datos: Prisma.SitioPaginaUpdateInput = {};
     const editado: Record<string, string> = {};
@@ -132,6 +141,15 @@ export class SitioService {
       }
       Object.assign(datos, aColumnas(sector));
     }
+    if (seo) {
+      const antes = leerSeo(actual);
+      for (const k of CAMPOS_SEO) {
+        if (seo[k] !== antes[k]) {
+          editado[k] = String(seo[k] ?? '');
+          Object.assign(datos, { [k]: seo[k] });
+        }
+      }
+    }
     if (dto.accion) Object.assign(datos, this.estadoPedido(dto.accion, dto.publicarEn, ahora));
     if (!Object.keys(editado).length && !dto.accion) return aDto(actual);
     // HU-1505 · CP-116 y CP-117: en producción no se publica con ficticios visibles; en pruebas, sí, con aviso.
@@ -139,13 +157,15 @@ export class SitioService {
     try {
       const p = await this.bd.sitioPagina.update({ where: { id }, data: datos });
       if (Object.keys(editado).length) await this.auditar(u, 'SITIO_PAGINA_EDITADA', p, { antes: { titulo: actual.titulo, ruta: actual.ruta }, ...editado });
+      // HU-1512 · La ruta de una página publicada cambió: la ruta anterior redirige (301) a la nueva.
+      const r301 = editado.ruta && actual.estado === 'PUBLICADA' ? await this.redirigirRutaAnterior(u, actual, p) : null;
       if (dto.accion) {
         await this.auditar(u, AUDITORIA[dto.accion], p, { desde: actual.estado, publicarEn: p.publicarEn?.toISOString() ?? null, ...(aviso ? { ficticiosVisibles: aviso } : {}) });
       }
       // HU-1507 · Publicar una página, o retirar una publicada (a borrador o programada), crea una versión del sitio
       // completo: lleva al sitio todos los cambios pendientes (RN-16-5).
       const v = dto.accion && (dto.accion === 'publicar' || actual.estado === 'PUBLICADA') ? await this.versiones.nuevaVersion(u, 'pagina') : null;
-      return { ...aDto(p), ...(aviso ? { avisoFicticios: aviso } : {}), ...(v ? { version: v.numero } : {}) };
+      return { ...aDto(p), ...(aviso ? { avisoFicticios: aviso } : {}), ...(v ? { version: v.numero } : {}), ...(r301 ?? {}) };
     } catch (e) {
       throw this.duplicada(e, dto.ruta ?? actual.ruta, actual.idioma);
     }
@@ -177,6 +197,33 @@ export class SitioService {
     // HU-1509 · El dominio de los ajustes publicados manda sobre SITIO_URL.
     const dominio = v?.instantanea.sitio?.dominio;
     return sitemapXml(v?.instantanea ?? { paginas: [] }, dominio ? `https://${dominio}` : this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO);
+  }
+
+  /**
+   * HU-1512 · Crea la redirección 301 de la ruta anterior de una página publicada a la nueva, si no hay ya una desde esa
+   * ruta y no forma un bucle ni una cadena con las activas. Si no se puede, la ruta cambia igual y el aviso dice por qué.
+   */
+  private async redirigirRutaAnterior(u: UsuarioSesion, antes: SitioPagina, p: SitioPagina): Promise<Pick<PaginaSitioDto, 'redireccion' | 'avisoRedireccion'>> {
+    const desde = rutaServida(antes.ruta, antes.idioma);
+    const hacia = rutaServida(p.ruta, p.idioma);
+    const r = validarRedireccion({ desde, hacia, activa: true }, await this.bd.sitioRedireccion.findMany(), await rutasPublicadas(this.bd));
+    if (!r.ok) return { avisoRedireccion: `No se creó la redirección 301 de ${desde} a ${hacia}: ${r.errores.map((e) => e.mensaje).join('. ')}` };
+    try {
+      const fila = await this.bd.sitioRedireccion.create({ data: r.redireccion });
+      await this.bd.auditoria.create({
+        data: { usuarioId: u.id, organizacionId: null, accion: 'SITIO_REDIRECCION_CREADA', entidad: 'SitioRedireccion', entidadId: fila.id, datos: { desde, hacia, activa: true, automatica: true, paginaId: p.id } },
+      });
+      return { redireccion: { id: fila.id, desde, hacia }, avisoRedireccion: `Se creó la redirección 301 de ${desde} a ${hacia}. Llega al sitio con «Publicar cambios».` };
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return { avisoRedireccion: `No se creó la redirección 301: ya hay una desde ${desde}` };
+      throw e;
+    }
+  }
+
+  private validarSeo(actual: DatosSeo, cambios: CambiosSeo): DatosSeo {
+    const r = aplicarCambiosSeo(actual, cambios);
+    if (!r.ok) throw new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+    return r.datos;
   }
 
   private validarSector(actual: DatosSector, dto: CambiosSector): DatosSector {
