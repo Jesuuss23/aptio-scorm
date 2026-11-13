@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.44 · actualizado con la cuarta entrega del Sprint 9 (13 de noviembre de 2026)**
+**Versión 0.45 · actualizado con la quinta entrega del Sprint 9 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -575,6 +575,20 @@ Si el video ya tiene su transcripción en **Material del cliente** (ahí se tran
 
 Prueba todo con **▶ Probar en la vista previa** (en modo Revisión puedes ir directo a la pantalla del video).
 
+### 8.20 Personaje y voz: usar el audio del cliente
+
+En el proyecto, el botón **Personaje y voz** muestra las narraciones en español con Ana al lado: al escuchar una, Ana la dice con la boca sincronizada. Cada narración muestra su estado (**Lista**, **Procesando…**, **Por regenerar** o **Error**).
+
+Si el cliente mandó una grabación (por ejemplo, la voz del gerente), súbela antes en **Material del cliente** y espera a que se transcriba. Luego, en la tarjeta **Audio del cliente**:
+1. Elige el **Audio** y la **Pantalla** donde va. Debajo ves lo que dice la grabación: será el texto de la narración.
+2. Si tiene ruido de fondo, pulsa **Limpiar ruido**. Se crea una versión limpia y con volumen parejo; el original no se toca. Escucha **Antes · original** y **Después · limpio** y elige en **Versión a usar**.
+3. Marca **El cliente autorizó usar esta grabación**. Sin esta casilla la grabación no se usa: la voz real de una persona solo va al curso con su autorización, y queda registrado quién la marcó y cuándo.
+4. Pulsa **Usar con boca automática**. En unos segundos la narración queda **Grabación del cliente** · **Lista**, con la boca de Ana y los subtítulos calculados desde la grabación. Así se ve en la vista previa y en el paquete.
+
+Si prefieres que la diga la voz del kit, pulsa **✦ Re-locutar con voz IA**: lo que dice la grabación pasa al texto de la narración y la voz de la IA lo dice de nuevo. **↶ Deshacer** vuelve al texto anterior.
+
+Una grabación no se regenera con la voz de la IA, aunque regeneres las narraciones o corrijas su texto. Para cambiarla, usa otra grabación o re-locútala. El revisor del cliente escucha las narraciones pero no ve esta tarjeta.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -657,6 +671,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.42 | 2026-11-12 | Video interactivo (8.19): la casilla «Impedir adelantar hasta responder» y lo que ve el participante al intentar adelantar. |
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
+| 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |

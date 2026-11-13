@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.44 · actualizado con la cuarta entrega del Sprint 9 (13 de noviembre de 2026)**
+**Versión 0.45 · actualizado con la quinta entrega del Sprint 9 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -258,6 +258,25 @@ sequenceDiagram
   K->>K: etapa 8: WebVTT solo para audios sin subtítulos
 ```
 
+### 3.3.3 Audio del cliente como narración (HU-0704)
+
+```mermaid
+sequenceDiagram
+  participant W as Web (Personaje y voz)
+  participant A as API
+  participant V as Cola voz
+  participant K as Worker
+  W->>A: POST /cursos/{id}/narraciones/{pid}/grabacion {materialId, autorizado, usarLimpio}
+  A->>A: 422 AUTORIZACION_REQUERIDA o AUDIO_NO_VALIDO · versión del curso con la transcripción
+  A->>V: GRABACION {materialId, recursoId, autorización}
+  A-->>W: 202 · Narracion GENERANDO
+  V->>K: MP3 con ffmpeg · boca (etapa 7) · WebVTT desde los segmentos
+  K->>K: Recurso SUBIDO «Grabación del cliente» · pista es generado · Narracion ACTUALIZADA
+  W->>A: GET /cursos/{id}/narraciones cada 1,5 s
+```
+
+La pista queda con `voz.proveedor: cliente` y `grabacion` (material, audio usado, quién autorizó y cuándo; RN-07-4). La etapa 6 no la vuelve a decir y conserva su recurso; corregir su texto no la regenera. El MP3 no tiene fecha de borrado: el borrado del material del cliente no lo toca. `POST /materiales/{id}/limpiar` encola en `media` la limpieza con `afftdn` y `loudnorm` a −16 LUFS: un MP3 nuevo del cliente con la retención del original, que no se pisa; sin ffmpeg queda en error y no se guarda nada. `relocutar` pone la transcripción con la voz del kit y encola la cascada.
+
 Solo se paga voz por lo que de verdad cambió. Con `pantallaIds` el pedido se limita a esas pantallas, y con `soloDesactualizadas: false` se fuerza una toma nueva. Inglés responde 422 hasta la HU-0901.
 
 ### 3.4 Revisión y aprobación de pantallas
@@ -396,6 +415,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.42 | 2026-11-12 | Impedir adelantar en el video (3.3.0.1): `reglasVideo` en el `PATCH`, 422 REGLA_VIDEO_NO_VALIDA y el bloqueo con aviso en el reproductor. |
 | 0.43 | 2026-11-12 | Pausas propuestas por la IA (3.3.0.1): `tipo: "pausas-video"`, 422 SIN_TRANSCRIPCION, `marcadorIds` al aplicar y `agregados` y `observaciones` en la respuesta. |
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
+| 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
 | 0.15 | 2026-11-10 | Retoques del elemento en `ajustes` (PATCH de pantalla, reproductor) y SUP-41. |
 | 0.14 | 2026-11-10 | Editor (PNT-21): edición en el lugar con el PATCH de pantalla y SUP-40. |
 | 0.13 | 2026-11-10 | Propuestas de la IA (IA-16 v2, aplicar, vencer y deshacer) y SUP-39. |
