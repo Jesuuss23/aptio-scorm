@@ -16,7 +16,8 @@ permissions:
 jobs:
   verificar:
     name: Lint, tipos y pruebas
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 fijo: ubuntu-latest (26.04) ya no trae postgresql-client-16 y el volcado debe ser de la misma versión que el servidor (HU-1403).
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     services:
       postgres:
