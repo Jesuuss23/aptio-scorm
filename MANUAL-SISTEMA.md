@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.45 · actualizado con la quinta entrega del Sprint 9 (13 de noviembre de 2026)**
+**Versión 0.46 · actualizado con la sexta entrega del Sprint 9 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -279,6 +279,27 @@ La pista queda con `voz.proveedor: cliente` y `grabacion` (material, audio usado
 
 Solo se paga voz por lo que de verdad cambió. Con `pantallaIds` el pedido se limita a esas pantallas, y con `soloDesactualizadas: false` se fuerza una toma nueva. Inglés responde 422 hasta la HU-0901.
 
+### 3.3.4 Kit desde un curso anterior o un manual de marca (HU-0206)
+
+```mermaid
+sequenceDiagram
+  participant W as Web (Clientes y kits)
+  participant A as API
+  participant Q as Cola ia
+  participant K as Worker
+  W->>A: subida firmada del ZIP o PDF (origen CLIENTE, sin proyecto)
+  W->>A: POST /clientes/{id}/kit/extraer {recursoId}
+  A->>A: 422 FORMATO_NO_VALIDO si no es ZIP ni PDF · TrabajoIA IA-18 con resultado {cliente, recurso}
+  A->>Q: IA-18 {kit: clienteId, recursoId}
+  A-->>W: 202
+  Q->>K: ZIP: solo .css .html .js .json con topes · PDF: setFont y colores de relleno
+  K->>K: sin colores → error SIN_COLORES · si hay: IA-18 v2, Ajv y contraste WCAG (3 intentos)
+  K->>K: resultado {evidencias, propuesta} · costo en TrabajoIA
+  W->>A: GET /clientes/{id}/kit/propuesta cada 1 s hasta lista o error
+```
+
+El ZIP se lee sin descomprimirlo entero: hasta 5000 entradas, 2 MB por archivo de texto, 20 MB en total y 400 archivos; el flujo se corta en el tope, así que una ZIP bomb no ocupa memoria, y las rutas con `..` o absolutas no se abren. Las fuentes propuestas son siempre de la lista cerrada del kit y la de la marca queda como aviso. El kit no cambia hasta que el equipo pulsa «Guardar kit», con el bloqueo de versión de siempre. `DELETE /clientes/{id}/kit/propuesta` la descarta (auditoría `KIT_PROPUESTA_DESCARTADA`). El productor y el revisor del cliente reciben 403.
+
 ### 3.4 Revisión y aprobación de pantallas
 
 1. Al terminar la etapa 4, el worker guarda con el curso las observaciones por reglas: longitud del texto, del dato destacado y de la narración, imagen sin texto alternativo y tres disposiciones iguales seguidas.
@@ -416,6 +437,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.43 | 2026-11-12 | Pausas propuestas por la IA (3.3.0.1): `tipo: "pausas-video"`, 422 SIN_TRANSCRIPCION, `marcadorIds` al aplicar y `agregados` y `observaciones` en la respuesta. |
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
+| 0.46 | 2026-11-13 | Kit desde un curso anterior: flujo de la extracción en la cola `ia`, los topes de lectura del ZIP, `TrabajoIA.resultado` y los 3 endpoints de la propuesta. |
 | 0.15 | 2026-11-10 | Retoques del elemento en `ajustes` (PATCH de pantalla, reproductor) y SUP-41. |
 | 0.14 | 2026-11-10 | Editor (PNT-21): edición en el lugar con el PATCH de pantalla y SUP-40. |
 | 0.13 | 2026-11-10 | Propuestas de la IA (IA-16 v2, aplicar, vencer y deshacer) y SUP-39. |

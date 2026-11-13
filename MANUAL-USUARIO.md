@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.45 · actualizado con la quinta entrega del Sprint 9 (13 de noviembre de 2026)**
+**Versión 0.46 · actualizado con la sexta entrega del Sprint 9 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -589,6 +589,16 @@ Si prefieres que la diga la voz del kit, pulsa **✦ Re-locutar con voz IA**: lo
 
 Una grabación no se regenera con la voz de la IA, aunque regeneres las narraciones o corrijas su texto. Para cambiarla, usa otra grabación o re-locútala. El revisor del cliente escucha las narraciones pero no ve esta tarjeta.
 
+### 8.21 Kit de marca desde un curso anterior o el manual de marca
+
+Si el cliente ya tiene un curso hecho por otra productora o un manual de marca, no hace falta copiar sus colores a mano. En **Empresa → Clientes y kits**, abre el cliente y, en **Kit de marca**, busca el panel **Desde un curso anterior**:
+1. Pulsa **✦ Extraer de un curso anterior** y elige el ZIP del curso (el paquete SCORM o la carpeta HTML comprimida) o el manual de marca en PDF. Se guarda como material del cliente.
+2. Mientras dice «Leyendo colores y tipografías…», se leen los estilos del curso o los colores y fuentes del PDF. No se abre ni se ejecuta nada del archivo: solo se leen sus textos.
+3. La propuesta muestra la paleta de 5 colores, las tipografías de títulos y textos, el estilo, la confianza y, en **Evidencias**, de dónde sale cada decisión. Si la marca usa una fuente que no es libre, lo avisa: «La marca usa Archivo en títulos; se propone Montserrat (libre)». Las fuentes propuestas siempre son de la lista del kit, que va dentro del paquete.
+4. Pulsa **Aplicar**: el formulario del kit se llena con la propuesta y la vista previa y las pantallas modelo cambian al momento. Todavía no se guardó nada: revisa, ajusta si quieres y pulsa **Guardar kit**.
+
+Si no te convence, pulsa **Descartar**. Si el archivo no tiene colores (por ejemplo, un PDF escaneado), te lo dice y te sugiere subir el paquete completo o el manual original. La paleta propuesta siempre cumple el contraste 4,5:1 del texto sobre el fondo y del blanco sobre el primario. Lo pueden hacer diseño gráfico, diseño instruccional y administración.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -672,6 +682,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.46 | 2026-11-13 | Kit de marca desde un curso anterior o el manual de marca: «✦ Extraer de un curso anterior», la propuesta con sus evidencias, «Aplicar» sin guardar y «Descartar» (8.21). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
 | 0.13 | 2026-11-10 | Ajustar con IA: pedir una propuesta, aplicarla, ver 3 variantes, descartar, deshacer y recalcular. |
