@@ -143,7 +143,7 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 6 en el generador', () => 
     await prisma.generacion.update({ where: { id: generacionId }, data: { estado: 'EN_COLA' } });
     const { s, pedidos } = contar();
     expect(await e.correr(generacionId, proveedorSimulado(), { ...hasta4, VOZ_ES: crearEtapaVoz({ sintetizar: s, subir, esperaMs: 0 }) })).toEqual({ estado: 'ERROR' });
-    expect((await etapaDe(generacionId, 'VOZ_ES')).detalle).toMatchObject({ texto: 'La voz de azure todavía no está disponible: elige una voz de Google en el kit' });
+    expect((await etapaDe(generacionId, 'VOZ_ES')).detalle).toMatchObject({ texto: 'La voz de azure todavía no está disponible: elige Google o ElevenLabs en Empresa › Conexiones IA' });
     expect(pedidos).toHaveLength(0);
   });
 });

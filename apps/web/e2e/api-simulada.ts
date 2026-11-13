@@ -13,6 +13,7 @@ import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { aplicarPausas, type PropuestaPausas } from '@aptio/schema/pausas';
 import { rangoPeriodo } from '../src/vistas/costos-periodo.ts';
 import { CLAVES_ETAPA, normalizarParametros, PARAMETROS_EJEMPLO } from '@aptio/schema/rentabilidad';
+import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from '@aptio/schema/conexiones';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 /** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
@@ -135,9 +136,10 @@ export interface OpcionesSimulacion {
   /**
    * Cómo avanza la generación simulada (una etapa por consulta): `normal` hace las etapas 1 a 3; `lenta` se queda en
    * la 3 para poder cancelarla (CP-045); `falla` da error en la 2 la primera vez (HU-0408); `ajena` responde 409 al
-   * lanzar porque otra persona ya la lanzó (CP-037).
+   * lanzar porque otra persona ya la lanzó (CP-037); `limite` (HU-1304) se detiene en la 2 con LIMITE_GASTO mientras la
+   * conexión de texto siga al tope de su límite mensual (CP-100).
    */
-  generacion?: 'normal' | 'lenta' | 'falla' | 'ajena';
+  generacion?: 'normal' | 'lenta' | 'falla' | 'ajena' | 'limite';
   /** HU-0703 · Narraciones «Por regenerar» (p. ej. las 4 con «pasos», SUP-36) hasta que se regeneran. */
   porRegenerar?: string[];
   /** HU-0503 · Cómo termina la cascada tras corregir una narración: avanza una etapa por consulta, o la voz falla. */
@@ -438,6 +440,27 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     mediciones: (medicionesIniciales ?? []).map((m, i) => ({ id: `00000000-0000-4000-8000-${String(800 + i).padStart(12, '0')}`, proyectoId: null, notas: null, registradoPor: 'Administración', creadoEn: '2026-11-10T10:00:00.000Z', ...m })),
   };
   const usuario = { ...USUARIO, ...(rol ? { rol } : {}) };
+  // HU-1304 · Conexiones IA de la organización: gasto del mes por tarea; con `generacion: 'limite'` el texto está al tope.
+  const GASTO_SIM: Record<string, number> = { TEXTO: 40, PANTALLAS: 9.3, TRADUCCION: 2.1, CALIDAD: 0.6, VOZ: 6.2 };
+  const conexionesSim = CONEXIONES.map((d) => ({
+    tarea: d.tarea, nombre: d.nombre, proveedor: d.proveedorPorDefecto, modelo: d.modelos[0] ?? d.modeloPorDefecto,
+    opciones: d.opciones.map((o) => ({ proveedor: o.proveedor, nombre: o.nombre, ...(o.proximamente ? { proximamente: true } : {}) })),
+    modelos: d.modelos, fijo: d.fijo, voces: d.tarea === 'VOZ' ? {} as { es?: string; en?: string } : null,
+    claveConfigurada: !['IMAGEN', 'TRANSCRIPCION'].includes(d.tarea), costoEstimadoScormUsd: d.costoEstimadoScorm, gastoMesUsd: GASTO_SIM[d.tarea] ?? 0,
+    limiteGastoMensualUsd: d.tarea === 'TEXTO' && generacion === 'limite' ? 40 : null as number | null, limiteAlcanzado: false, configurada: d.tarea === 'TEXTO' && generacion === 'limite',
+    actualizadoEn: null as string | null,
+  }));
+  const recalcularConexiones = () => {
+    for (const c of conexionesSim) c.limiteAlcanzado = c.limiteGastoMensualUsd !== null && c.gastoMesUsd >= c.limiteGastoMensualUsd;
+  };
+  recalcularConexiones();
+  const resumenConexiones = () => {
+    const limites = conexionesSim.flatMap((c) => (c.limiteGastoMensualUsd === null ? [] : [c.limiteGastoMensualUsd]));
+    return {
+      mes: '2026-11', modo: 'simulado', gastoMesUsd: Math.round(conexionesSim.reduce((n, c) => n + c.gastoMesUsd, 0) * 100) / 100,
+      limiteTotalUsd: limites.length ? limites.reduce((a, b) => a + b, 0) : null, conexiones: conexionesSim,
+    };
+  };
   const clientes = [
     clienteBase(CLIENTE_ID, 'Minera Andina', { lmsHabitual: 'Moodle 4.5 o superior', idiomas: ['es', 'en'], tieneKit: true }),
     clienteBase('00000000-0000-4000-8000-0000000000c2', 'Municipalidad de Lima'),
@@ -486,6 +509,34 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return token === 'vigente'
         ? responder(204)
         : responder(422, { codigo: 'ENLACE_NO_VALIDO', mensaje: 'Enlace no válido o vencido. Pide uno nuevo.' });
+    }
+    // HU-1304 · Conexiones IA: solo administración; nunca devuelven claves.
+    if (ruta.startsWith('/conexiones-ia')) {
+      if (usuario.rol !== 'ADMINISTRADOR') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
+      if (ruta === '/conexiones-ia' && req.method() === 'GET') return responder(200, resumenConexiones());
+      const m = ruta.match(/^\/conexiones-ia\/([a-z]+)(\/probar)?$/);
+      const tarea = m ? tareaDeRuta(m[1]!) : null;
+      const c = conexionesSim.find((x) => x.tarea === tarea);
+      if (!c) return responder(404, { codigo: 'TAREA_NO_EXISTE', mensaje: 'La tarea no es de la lista de Conexiones IA' });
+      if (m![2] && req.method() === 'POST') return responder(200, { ok: true, modo: 'simulado', proveedor: c.proveedor, modelo: c.modelo, mensaje: 'simulado, OK', latenciaMs: 3 });
+      if (req.method() === 'PUT') {
+        const d = req.postDataJSON() as { proveedor?: string; modelo?: string; voces?: { es?: string; en?: string }; limiteGastoMensualUsd?: number | null };
+        const def = definicionConexion(c.tarea);
+        if (d.modelo && def.modelos.length && !def.modelos.includes(d.modelo)) return responder(422, { codigo: 'MODELO_NO_VALIDO', mensaje: `${d.modelo} no tiene tarifa registrada` });
+        if (d.proveedor && d.proveedor !== c.proveedor) {
+          const o = def.opciones.find((x) => x.proveedor === d.proveedor);
+          if (!o || o.proximamente) return responder(422, { codigo: 'PROVEEDOR_NO_VALIDO', mensaje: `${d.proveedor} no está disponible` });
+          c.proveedor = d.proveedor;
+          c.modelo = d.proveedor === 'elevenlabs' ? 'eleven_multilingual_v2' : def.modeloPorDefecto;
+        }
+        if (d.modelo) c.modelo = d.modelo;
+        if (d.voces && c.voces) c.voces = { ...c.voces, ...d.voces };
+        if (d.limiteGastoMensualUsd !== undefined) c.limiteGastoMensualUsd = d.limiteGastoMensualUsd;
+        c.configurada = true;
+        c.actualizadoEn = new Date().toISOString();
+        recalcularConexiones();
+        return responder(200, c);
+      }
     }
     // HU-1303 · Parámetros por organización (ejemplo hasta guardar) y mediciones.
     if (ruta.startsWith('/negocio/')) {
@@ -623,6 +674,13 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const e = g.etapas.find((x) => x.estado === 'EN_CURSO');
       if (!e) return;
       if (generacion === 'lenta' && e.orden === 3) return;
+      const texto = conexionesSim.find((c) => c.tarea === 'TEXTO')!;
+      if (generacion === 'limite' && e.orden === 2 && texto.limiteAlcanzado) {
+        Object.assign(e, { estado: 'ERROR', detalle: mensajeLimiteGasto(texto.nombre, texto.gastoMesUsd, texto.limiteGastoMensualUsd!) });
+        g.estado = 'ERROR';
+        estadoDe(g.proyectoId, 'BORRADOR');
+        return;
+      }
       if (falla && e.orden === 2) {
         falla = false;
         Object.assign(e, { estado: 'ERROR', detalle: 'El proveedor de IA no respondió (529). Continúa en unos minutos.' });

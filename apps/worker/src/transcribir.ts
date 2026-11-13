@@ -6,6 +6,7 @@ import type { Prisma, PrismaClient } from '@aptio/db';
 import type { Redis } from 'ioredis';
 import type { Medios } from './extraer/medios.js';
 import type { TrabajoEnCola } from './procesar.js';
+import { vigilarLimite } from './conexiones.js';
 
 export const TAREA_TRANSCRIBIR = 'TRANSCRIBIR';
 /** Idioma por defecto del reconocimiento: el del cliente si es inglés, si no español (SUP-28). */
@@ -41,6 +42,8 @@ export function crearTranscriptor({ bd, redis, leer, medios, proveedor }: Depend
       data: { organizacionId, proyectoId: material.proyectoId, tarea: 'TRANSCRIPCION', tipo: 'TRANSCRIPCION', proveedor: proveedor.nombre, modelo: proveedor.modelo, estado: 'EN_CURSO' },
     });
     try {
+      // HU-1304 · El límite de gasto mensual de la transcripción se revisa antes de llamar al proveedor (CP-100).
+      await vigilarLimite(bd, organizacionId, 'TRANSCRIPCION', { proyectoId: material.proyectoId });
       const corte = await medios.tramos(await leer(recurso.claveS3), SEGUNDOS_POR_TRAMO);
       duracionS = corte.duracionS;
       const idioma = IDIOMA[material.proyecto.idiomas[0] ?? 'es'] ?? 'es-US';

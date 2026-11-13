@@ -559,6 +559,19 @@ export interface ResumenCostos {
 
 /** HU-1303 · Parámetros de rentabilidad: los edita administración; diseño instruccional los ve y registra mediciones. */
 export const EDITAN_PARAMETROS: Rol[] = ['ADMINISTRADOR'];
+/** HU-1304 · Empresa › Conexiones IA y el medidor del mes: solo administración (la API responde 403 al resto). */
+export const VEN_CONEXIONES: Rol[] = ['ADMINISTRADOR'];
+export interface ConexionIA {
+  tarea: 'TEXTO' | 'PANTALLAS' | 'TRADUCCION' | 'CALIDAD' | 'VOZ' | 'IMAGEN' | 'BOCA' | 'TRANSCRIPCION';
+  nombre: string; proveedor: string; modelo: string;
+  opciones: { proveedor: string; nombre: string; proximamente?: boolean }[];
+  modelos: string[]; fijo: boolean; voces: { es?: string; en?: string } | null; claveConfigurada: boolean;
+  costoEstimadoScormUsd: number; gastoMesUsd: number; limiteGastoMensualUsd: number | null; limiteAlcanzado: boolean;
+  configurada: boolean; actualizadoEn: string | null;
+}
+export interface ConexionesIA { mes: string; modo: 'simulado' | 'real'; gastoMesUsd: number; limiteTotalUsd: number | null; conexiones: ConexionIA[] }
+export interface ConexionEntrada { proveedor?: string; modelo?: string; voces?: { es?: string; en?: string }; limiteGastoMensualUsd?: number | null }
+export interface PruebaConexion { ok: boolean; modo: 'simulado' | 'real'; proveedor: string; modelo: string; mensaje: string; latenciaMs: number }
 export type ParametrosGuardados = ParametrosNegocio & { ejemplo: boolean; actualizadoEn: string | null };
 export interface MedicionHoras {
   id: string; proyectoRef: string; proyectoId: string | null; escenario: 'hoy' | 'generador'; etapa: string; horas: number;
@@ -576,6 +589,9 @@ export const api = {
     const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
     return pedir<ResumenCostos>(`/costos${q ? `?${q}` : ''}`);
   },
+  conexionesIA: () => pedir<ConexionesIA>('/conexiones-ia'),
+  guardarConexionIA: (tarea: ConexionIA['tarea'], datos: ConexionEntrada) => pedir<ConexionIA>(`/conexiones-ia/${tarea.toLowerCase()}`, json(datos, 'PUT')),
+  probarConexionIA: (tarea: ConexionIA['tarea']) => pedir<PruebaConexion>(`/conexiones-ia/${tarea.toLowerCase()}/probar`, { method: 'POST' }),
   parametrosNegocio: () => pedir<ParametrosGuardados>('/negocio/parametros'),
   guardarParametrosNegocio: (datos: ParametrosNegocio) => pedir<ParametrosGuardados>('/negocio/parametros', json(datos, 'PUT')),
   mediciones: () => pedir<MedicionHoras[]>('/negocio/mediciones'),

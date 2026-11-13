@@ -64,3 +64,18 @@ export function proveedorDesdeEntorno(entorno: NodeJS.ProcessEnv, simulado: () =
     ...(entorno.ANTHROPIC_ESFUERZO ? { esfuerzo: entorno.ANTHROPIC_ESFUERZO as Esfuerzo } : {}),
   });
 }
+
+/**
+ * HU-1304 · Prueba de conexión: una llamada mínima (1 token de salida) con el modelo elegido. No se registra en TrabajoIA.
+ * Devuelve el modelo que respondió; un error de la API se informa solo con su estado HTTP (nunca con la clave).
+ */
+export async function probarAnthropic(o: { apiKey: string; modelo: string; cliente?: Anthropic }): Promise<{ modelo: string }> {
+  const cliente = o.cliente ?? new Anthropic({ apiKey: o.apiKey, maxRetries: 0 });
+  try {
+    const r = await cliente.messages.create({ model: o.modelo, max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] });
+    return { modelo: r.model };
+  } catch (e) {
+    const estado = (e as { status?: number }).status;
+    throw new Error(estado ? `Anthropic respondió ${estado}` : 'Anthropic no respondió');
+  }
+}

@@ -1,6 +1,7 @@
 // HU-0401 y HU-0408 · Generar el SCORM desde el proyecto: las 11 etapas con su estado, detalle y costo, en vivo
 // (SSE con consulta periódica de respaldo). Se cancela conservando lo hecho (CP-045) y se continúa desde la etapa
 // con error o cancelada. Una sola generación activa por proyecto (CP-037).
+import { esLimiteGasto } from '@aptio/schema/conexiones';
 import { DETALLE_PROXIMAMENTE, NOMBRE_ETAPA } from '@aptio/schema/generacion';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
 import { api, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
@@ -9,6 +10,7 @@ import { EstructuraVista } from './EstructuraVista';
 import { GuionVista } from './GuionVista';
 import { PantallasVista } from './PantallasVista';
 import { VozVista } from './VozVista';
+import { sinCodigoLimite } from './conexiones-ia';
 import { ResumenMaterialVista } from './ResumenMaterialVista';
 
 const ACTIVAS = new Set<Generacion['estado']>(['EN_COLA', 'EN_CURSO']);
@@ -41,7 +43,7 @@ function titulo(g: Generacion): string {
 
 /** El chip ya dice el estado: la línea de detalle solo aparece cuando agrega algo. */
 function detalle(e: EtapaGeneracion): string {
-  if (e.detalle) return e.detalle;
+  if (e.detalle) return sinCodigoLimite(e.detalle);
   return e.estado === 'CANCELADO' ? 'Se detuvo antes de terminar; no se guardó nada de esta etapa' : '';
 }
 
@@ -116,6 +118,8 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, puedeRegenerar = fal
   }
 
   const retomable = g && (g.estado === 'ERROR' || g.estado === 'CANCELADO');
+  // HU-1304 · CP-100: la etapa se detuvo por el límite de gasto del mes (RN-04-7).
+  const porLimite = g?.estado === 'ERROR' ? g.etapas.find((e) => e.estado === 'ERROR' && esLimiteGasto(e.detalle)) : undefined;
   const pendientes = g?.etapas.filter((e) => e.detalle === DETALLE_PROXIMAMENTE).length ?? 0;
   return (
     <section className="tarjeta kit-bloque" aria-label="Generación del SCORM">
@@ -139,6 +143,16 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, puedeRegenerar = fal
       </div>
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {aviso ? <div className="nota aviso" role="status">{aviso}</div> : null}
+      {porLimite ? (
+        <div className="nota aviso limite-gasto" role="alert">
+          <span>
+            <b>Se alcanzó el límite de gasto de IA del mes</b> en «{NOMBRE_ETAPA[porLimite.etapa]}». Administración puede subirlo en Empresa › Conexiones IA; luego continúa desde esta etapa sin repetir lo hecho.
+          </span>
+          {puedeGenerar ? (
+            <button className="boton" type="button" disabled={ocupado} onClick={() => void accion(() => api.continuarGeneracion(g!.id), 'No se pudo continuar')}>Continuar</button>
+          ) : null}
+        </div>
+      ) : null}
       {g === undefined ? <p className="sec" role="status">Cargando generación…</p> : g === null ? (
         <p className="sec">
           {materialListo
