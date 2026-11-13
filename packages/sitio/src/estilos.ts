@@ -48,6 +48,11 @@ section{padding:96px 0}
 .wm{display:flex;align-items:center;gap:10px;font-family:var(--f-ui);font-weight:800;font-size:20px;letter-spacing:-.02em;text-decoration:none;color:var(--ink)}
 .wm .logo{width:32px;height:32px;border-radius:8px;background:var(--orange);display:grid;place-items:center;flex:none}
 .wm b{color:var(--b700);font-weight:800}
+.wm .logo-img{width:32px;height:32px;object-fit:contain;flex:none}
+.whatsapp{position:fixed;right:20px;bottom:20px;z-index:40;width:56px;height:56px;border-radius:50%;background:#1F7A4D;display:grid;place-items:center;box-shadow:0 10px 24px -10px rgba(11,28,48,.5)}
+.whatsapp:focus-visible{outline:3px solid var(--b700);outline-offset:3px}
+.mantenimiento{padding:120px 0;text-align:center}
+.mantenimiento p{margin:16px auto 0;color:var(--muted);max-width:32em}
 .nav-escritorio ul,.nav-celular ul{list-style:none;margin:0;padding:0}
 .nav-escritorio ul{display:flex;flex-wrap:wrap;gap:24px;font-family:var(--f-ui);font-size:14px;font-weight:700}
 .nav-escritorio a,.nav-celular a{color:var(--muted);text-decoration:none;display:inline-block;padding:12px 0}

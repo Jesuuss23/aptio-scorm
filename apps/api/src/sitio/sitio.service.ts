@@ -118,7 +118,9 @@ export class SitioService {
   /** CP-110 y CP-111 · Las páginas de la última versión. El inglés va bajo `/en` hasta que la HU-1510 sume hreflang (SUP-168). */
   async sitemap(): Promise<string> {
     const v = await ultimaVersion(this.bd);
-    return sitemapXml(v?.instantanea ?? { paginas: [] }, this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO);
+    // HU-1509 · El dominio de los ajustes publicados manda sobre SITIO_URL.
+    const dominio = v?.instantanea.sitio?.dominio;
+    return sitemapXml(v?.instantanea ?? { paginas: [] }, dominio ? `https://${dominio}` : this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO);
   }
 
   private async buscar(id: string): Promise<SitioPagina> {

@@ -617,6 +617,182 @@ paths:
           $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
+  /sitio/ajustes:
+    get:
+      tags:
+      - Sitio web
+      summary: Ajustes del sitio (HU-1509, PNT-38)
+      operationId: get_sitio_ajustes
+      description: |-
+        Solo SUPERADMIN. Una sola fila para la plataforma; sin ella, los valores por defecto (`nombre` Aptio SCORM, todo
+        lo demás vacío) y `actualizadoEn` null.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Sitio web
+      summary: Cambiar los ajustes del sitio (HU-1509, REQ-073)
+      operationId: patch_sitio_ajustes
+      description: |-
+        Solo SUPERADMIN. Se mezcla con lo guardado y se valida todo junto: dominio sin protocolo ni ruta (se guarda en
+        minúsculas), nombre en texto plano de hasta 60 caracteres, GA4 `G-…`, Tag Manager `GTM-…` y Meta Pixel de 10 a 20
+        dígitos (en mayúsculas), WhatsApp en E.164 (obligatorio si `visible`), correo de leads y aviso de mantenimiento
+        de hasta 280 caracteres. Un texto vacío se guarda como null. Nombre, dominio, logo, favicon y WhatsApp llegan al
+        sitio con «Publicar cambios» (entran en la instantánea); el correo de leads y el mantenimiento valen al instante.
+        Los IDs de analítica se guardan y se activan con el banner de cookies (SUP-200). 422 SIN_CAMBIOS si no trae nada y
+        NO_VALIDO con `detalles` (campo y mensaje). Auditoría SITIO_AJUSTES_ACTUALIZADOS y, al cambiar el mantenimiento,
+        SITIO_MANTENIMIENTO_ACTIVADO o SITIO_MANTENIMIENTO_DESACTIVADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjustesSitioCambio'
+      responses:
+        '200':
+          description: Los ajustes guardados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesSitio'
+        '400':
+          $ref: '#/components/responses/NoValido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/ajustes/marca/{tipo}:
+    parameters:
+    - name: tipo
+      in: path
+      required: true
+      schema:
+        type: string
+        enum:
+        - logo
+        - favicon
+    put:
+      tags:
+      - Sitio web
+      summary: Subir el logo o el favicon del sitio (HU-1509)
+      operationId: put_sitio_ajustes_marca
+      description: |-
+        Solo SUPERADMIN. El cuerpo es el archivo tal cual, SVG o PNG de hasta 200 KB. El SVG se sanea (sin scripts,
+        eventos ni enlaces externos) y el PNG se comprueba por su firma. Se guarda en el bucket como
+        `sitio/marca/{tipo}-{sha8}.{ext}`, se sirve en `/s/_marca/` con caché de un año y sale al sitio con «Publicar
+        cambios». 413 DEMASIADO_GRANDE si pasa de 200 KB; 422 ARCHIVO_NO_VALIDO si no es un SVG o un PNG válido; 404 con
+        otro `tipo`. Auditoría SITIO_AJUSTES_ACTUALIZADOS.
+      requestBody:
+        required: true
+        content:
+          image/svg+xml:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Los ajustes con el archivo nuevo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '413':
+          description: El archivo supera los 200 KB (DEMASIADO_GRANDE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Quitar el logo o el favicon del sitio (HU-1509)
+      operationId: delete_sitio_ajustes_marca
+      description: Solo SUPERADMIN. El sitio vuelve al logo o al favicon por defecto al publicar. El archivo queda en el bucket porque lo usan las versiones anteriores.
+      responses:
+        '200':
+          description: Los ajustes sin el archivo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /sitio/ajustes/correo-prueba:
+    post:
+      tags:
+      - Sitio web
+      summary: Enviar un correo de prueba al correo de leads (HU-1509)
+      operationId: post_sitio_ajustes_correo_prueba
+      description: Solo SUPERADMIN. Envía un correo de prueba a `correoLeads` (sin SMTP configurado, solo queda en el registro). 422 SIN_CORREO_LEADS si no hay correo guardado.
+      responses:
+        '200':
+          description: Enviado
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - para
+                properties:
+                  para:
+                    type: string
+                    format: email
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/ajustes/dominio/comprobar:
+    post:
+      tags:
+      - Sitio web
+      summary: Comprobar el certificado SSL del dominio guardado (HU-1509)
+      operationId: post_sitio_ajustes_dominio_comprobar
+      description: |-
+        Solo SUPERADMIN. Abre una conexión TLS al puerto 443 del dominio guardado (5 s como máximo) y devuelve si el
+        certificado es válido para ese dominio, su emisor y su vencimiento, o el error. No emite certificados: eso lo hace
+        el servicio que publica el sitio (HU-1405). 422 SIN_DOMINIO si no hay dominio guardado.
+      responses:
+        '200':
+          description: Resultado de la comprobación (también cuando el certificado no es válido)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComprobacionDominio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /sitio/paginas/{paginaId}/vista-previa:
     parameters:
     - name: paginaId
@@ -871,6 +1047,8 @@ paths:
           description: El navegador ya tiene esta versión (misma ETag)
         '404':
           $ref: '#/components/responses/PaginaSitioNoEncontrada'
+        '503':
+          $ref: '#/components/responses/SitioEnMantenimiento'
   /s/{ruta}:
     get:
       tags:
@@ -894,6 +1072,11 @@ paths:
         Caché: las páginas, el sitemap y robots llevan `Cache-Control: public, max-age=0, s-maxage=60, must-revalidate`
         (la CDN las guarda un minuto); las fuentes, `public, max-age=31536000, immutable`; la 404, `s-maxage=30`. Todas
         llevan `ETag`; con `If-None-Match` igual responde 304. Las páginas y la 404 llevan una CSP sin scripts.
+
+        HU-1509 · `_marca/{logo|favicon}-{hash8}.{svg|png}` sirve el logo y el favicon de los ajustes, con la misma caché
+        que las fuentes. Con el modo mantenimiento activo, toda ruta salvo fuentes y marca responde 503 con la página
+        «Volvemos pronto» (CP-121), salvo para el superadmin con sesión, que ve el sitio con un aviso arriba y
+        `Cache-Control: private, no-store`.
       parameters:
       - name: ruta
         in: path
@@ -929,6 +1112,8 @@ paths:
           description: El navegador ya tiene esta versión (misma ETag)
         '404':
           $ref: '#/components/responses/PaginaSitioNoEncontrada'
+        '503':
+          $ref: '#/components/responses/SitioEnMantenimiento'
   /operacion:
     get:
       tags:
@@ -4309,6 +4494,21 @@ components:
         text/html:
           schema:
             type: string
+    SitioEnMantenimiento:
+      description: HU-1509 · Modo mantenimiento activo (CP-121). La página «Volvemos pronto» en HTML (noindex), con el aviso de los ajustes.
+      headers:
+        Retry-After:
+          description: Segundos sugeridos para volver a intentar (600)
+          schema:
+            type: integer
+        Cache-Control:
+          description: private, no-store
+          schema:
+            type: string
+      content:
+        text/html:
+          schema:
+            type: string
   parameters:
     SiNoCoincide:
       name: If-None-Match
@@ -4924,6 +5124,178 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/EnlaceNavegacionPublico'
+    ArchivoMarcaSitio:
+      type: object
+      nullable: true
+      required:
+      - archivo
+      - mime
+      properties:
+        archivo:
+          type: string
+          pattern: ^(logo|favicon)-[0-9a-f]{8}\.(svg|png)$
+          example: logo-1a2b3c4d.svg
+        mime:
+          type: string
+          enum:
+          - image/svg+xml
+          - image/png
+    AjustesSitio:
+      type: object
+      description: HU-1509 · Ajustes del sitio (REQ-073, PNT-38).
+      required:
+      - dominio
+      - nombre
+      - logo
+      - favicon
+      - analitica
+      - whatsapp
+      - correoLeads
+      - mantenimiento
+      - actualizadoEn
+      properties:
+        dominio:
+          type: string
+          nullable: true
+          description: Sin protocolo ni ruta; null usa `SITIO_URL`
+          example: aptioscorm.com
+        nombre:
+          type: string
+          maxLength: 60
+          example: Aptio SCORM
+        logo:
+          $ref: '#/components/schemas/ArchivoMarcaSitio'
+        favicon:
+          $ref: '#/components/schemas/ArchivoMarcaSitio'
+        analitica:
+          type: object
+          required:
+          - ga4
+          - gtm
+          - metaPixel
+          properties:
+            ga4:
+              type: string
+              nullable: true
+              example: G-AB12CD34EF
+            gtm:
+              type: string
+              nullable: true
+              example: GTM-AB12CD3
+            metaPixel:
+              type: string
+              nullable: true
+              example: '123456789012345'
+        whatsapp:
+          type: object
+          required:
+          - visible
+          - numero
+          - mensaje
+          properties:
+            visible:
+              type: boolean
+            numero:
+              type: string
+              nullable: true
+              description: E.164
+              example: '+51987654321'
+            mensaje:
+              type: string
+              nullable: true
+              maxLength: 200
+        correoLeads:
+          type: string
+          nullable: true
+          format: email
+        mantenimiento:
+          type: object
+          required:
+          - activo
+          - mensaje
+          - desde
+          properties:
+            activo:
+              type: boolean
+            mensaje:
+              type: string
+              nullable: true
+              maxLength: 280
+            desde:
+              type: string
+              format: date-time
+              nullable: true
+        actualizadoEn:
+          type: string
+          format: date-time
+          nullable: true
+    AjustesSitioCambio:
+      type: object
+      description: Solo los campos que cambian; un texto vacío o null borra el valor. Logo y favicon se suben aparte.
+      properties:
+        dominio:
+          type: string
+          nullable: true
+        nombre:
+          type: string
+        analitica:
+          type: object
+          properties:
+            ga4:
+              type: string
+              nullable: true
+            gtm:
+              type: string
+              nullable: true
+            metaPixel:
+              type: string
+              nullable: true
+        whatsapp:
+          type: object
+          properties:
+            visible:
+              type: boolean
+            numero:
+              type: string
+              nullable: true
+            mensaje:
+              type: string
+              nullable: true
+        correoLeads:
+          type: string
+          nullable: true
+        mantenimiento:
+          type: object
+          properties:
+            activo:
+              type: boolean
+            mensaje:
+              type: string
+              nullable: true
+    ComprobacionDominio:
+      type: object
+      required:
+      - dominio
+      - ok
+      - venceEn
+      - emisor
+      - error
+      properties:
+        dominio:
+          type: string
+        ok:
+          type: boolean
+          description: El dominio responde por HTTPS con un certificado válido para él
+        venceEn:
+          type: string
+          format: date-time
+          nullable: true
+        emisor:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
     FicticiosSitio:
       type: object
       required:

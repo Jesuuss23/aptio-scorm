@@ -838,3 +838,12 @@ model SitioVersion {
   prerenderError     String?
   creadoEn           DateTime @default(now())
 }
+
+/// HU-1509 · Ajustes del sitio comercial (REQ-073, PNT-38): una sola fila (`id` = "sitio") con dominio, marca, analítica,
+/// WhatsApp, correo de leads y modo mantenimiento, validados con `@aptio/schema/sitio-ajustes`.
+model SitioAjustes {
+  id               String   @id @default("sitio")
+  datos            Json
+  actualizadoPorId String?  @db.Uuid
+  actualizadoEn    DateTime @updatedAt
+}

@@ -8,6 +8,7 @@ import { bloquesPublicos } from './sitio-bloques.js';
 import { COLECCION_DE_BLOQUE, elementosDeBloque, nombreElemento } from './sitio-contenido.js';
 import { elementosParaPublico, type EntornoSitio } from './sitio-ficticios.js';
 import { navegacionPublica, type NavegacionPublica } from './sitio-navegacion.js';
+import { ajustesPublicados, type AjustesSitio, type SitioPublicado } from './sitio-ajustes.js';
 
 export const ORIGENES_VERSION = ['publicacion', 'pagina', 'programada', 'restauracion'] as const;
 export type OrigenVersion = (typeof ORIGENES_VERSION)[number];
@@ -34,6 +35,8 @@ export interface Instantanea {
   formato: 1;
   paginas: PaginaInstantanea[];
   navegacion: NavegacionPublica;
+  /** HU-1509 · Nombre, dominio, logo, favicon y WhatsApp publicados. Falta en las versiones de antes de los ajustes. */
+  sitio?: SitioPublicado;
 }
 
 /** Filas tal como salen de la base (solo los campos que usa la armadora). */
@@ -85,12 +88,13 @@ export function armarPagina(p: FilaPagina, elementos: readonly FilaElemento[], e
 }
 
 /** La instantánea del sitio completo: solo las páginas PUBLICADAS, por ruta e idioma, y la navegación visible. */
-export function armarInstantanea(datos: { paginas: readonly FilaPagina[]; elementos: readonly FilaElemento[]; enlaces: readonly FilaEnlace[] }, entorno: EntornoSitio): Instantanea {
+export function armarInstantanea(datos: { paginas: readonly FilaPagina[]; elementos: readonly FilaElemento[]; enlaces: readonly FilaEnlace[]; ajustes?: AjustesSitio | null }, entorno: EntornoSitio): Instantanea {
   const paginas = datos.paginas
     .filter((p) => p.estado === 'PUBLICADA')
     .sort((a, b) => a.ruta.localeCompare(b.ruta) || a.idioma.localeCompare(b.idioma))
     .map((p) => armarPagina(p, datos.elementos, entorno));
-  return { formato: 1, paginas, navegacion: navegacionPublica(datos.enlaces) };
+  // Sin fila de ajustes la instantánea queda igual que antes de la HU-1509 (no marca cambios pendientes).
+  return { formato: 1, paginas, navegacion: navegacionPublica(datos.enlaces), ...(datos.ajustes ? { sitio: ajustesPublicados(datos.ajustes) } : {}) };
 }
 
 /** Las colecciones que usan los bloques: solo esas se leen de la base. */

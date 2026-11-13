@@ -2945,3 +2945,72 @@ ul.fila-chips {
   flex-direction: column;
   align-items: flex-start;
 }
+
+/* HU-1509 · Configuración › Ajustes del sitio (PNT-38): cuatro tarjetas en dos columnas, una en el celular. */
+.ajustes-sitio > .tarjeta {
+  display: grid;
+  gap: 16px;
+  flex-basis: 420px;
+}
+.formulario-ajustes {
+  display: grid;
+  gap: 12px;
+}
+.formulario-ajustes .campo {
+  display: grid;
+  gap: 6px;
+}
+.formulario-ajustes .sec,
+.marca-sitio > .sec,
+.ajustes-sitio .tarjeta > .nota,
+.formulario-ajustes .nota {
+  margin: 0;
+}
+.fila-interruptor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.fila-interruptor > span:first-child {
+  font-weight: 600;
+  min-width: 160px;
+}
+.ajustes-acciones {
+  margin-top: 4px;
+}
+.marca-sitio {
+  display: grid;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-borde);
+}
+.marca-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.marca-fila img,
+.marca-vacia {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+}
+.marca-vacia {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 40px;
+  padding: 0 8px;
+}
+.marca-fila label.boton {
+  cursor: pointer;
+}
+.marca-fila label.boton:has(input:focus-visible) {
+  outline: 2px solid var(--color-texto);
+  outline-offset: 2px;
+}

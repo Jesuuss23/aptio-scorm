@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CLAVE_ACTUAL, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404 } from '@aptio/sitio';
+import { CLAVE_ACTUAL, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
+import { ajustesPublicados, type AjustesSitio } from '@aptio/schema/sitio-ajustes';
 import { AlmacenService } from '../recursos/almacen.service.js';
 
 /** Cuánto se confía en el puntero leído antes de volver a leerlo del bucket. La CDN, delante, guarda las páginas un minuto. */
@@ -9,7 +10,7 @@ const MAX_OBJETOS = 300;
 const noExiste = (e: unknown) =>
   ['NoSuchKey', 'NotFound'].includes((e as { name?: string }).name ?? '') || (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404;
 
-export interface Respuesta { estado: 200 | 404; tipo: Pedido['tipo'] | '404'; cuerpo: Uint8Array }
+export interface Respuesta { estado: 200 | 404 | 503; tipo: Pedido['tipo'] | '404' | '503'; cuerpo: Uint8Array; archivo?: string }
 
 /**
  * HU-1508 · Sirve el sitio pre-renderizado (DA-08): lee `sitio/actual.json` para saber qué versión se ve y entrega el
@@ -49,6 +50,10 @@ export class SitioPublicoService {
       const f = leerFuente(pedido.archivo);
       return f ? { estado: 200, tipo: 'fuente', cuerpo: f } : this.noEncontrada(null);
     }
+    if (pedido?.tipo === 'marca') {
+      const m = await this.leer(claveMarca(pedido.archivo), true);
+      return m ? { estado: 200, tipo: 'marca', cuerpo: m, archivo: pedido.archivo } : this.noEncontrada(null);
+    }
     const version = await this.version();
     if (version === null) return this.noEncontrada(null);
     if (pedido) {
@@ -56,6 +61,12 @@ export class SitioPublicoService {
       if (cuerpo) return { estado: 200, tipo: pedido.tipo, cuerpo };
     }
     return this.noEncontrada(version);
+  }
+
+  /** HU-1509 · CP-121 · El aviso de mantenimiento (503), con la marca y el mensaje de los ajustes. */
+  mantenimiento(ajustes: AjustesSitio): Respuesta {
+    const html = renderizarMantenimiento({ sitio: ajustesPublicados(ajustes) }, opcionesRenderDesdeEnv(), ajustes.mantenimiento.mensaje);
+    return { estado: 503, tipo: '503', cuerpo: new TextEncoder().encode(html) };
   }
 
   private async noEncontrada(version: number | null): Promise<Respuesta> {

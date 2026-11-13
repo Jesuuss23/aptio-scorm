@@ -607,6 +607,27 @@ export interface VersionSitio {
   prerender: { estado: 'en_curso' | 'listo' | 'error'; en: string | null; error: string | null };
   avisoFicticios?: number;
 }
+/** HU-1509 · Ajustes del sitio (REQ-073, PNT-38). */
+export interface AjustesSitio {
+  dominio: string | null;
+  nombre: string;
+  logo: { archivo: string; mime: string } | null;
+  favicon: { archivo: string; mime: string } | null;
+  analitica: { ga4: string | null; gtm: string | null; metaPixel: string | null };
+  whatsapp: { visible: boolean; numero: string | null; mensaje: string | null };
+  correoLeads: string | null;
+  mantenimiento: { activo: boolean; mensaje: string | null; desde: string | null };
+  actualizadoEn: string | null;
+}
+export interface CambiosAjustesSitio {
+  dominio?: string | null;
+  nombre?: string;
+  analitica?: Partial<AjustesSitio['analitica']>;
+  whatsapp?: Partial<AjustesSitio['whatsapp']>;
+  correoLeads?: string | null;
+  mantenimiento?: { activo?: boolean; mensaje?: string | null };
+}
+export interface ComprobacionDominio { dominio: string; ok: boolean; venceEn: string | null; emisor: string | null; error: string | null }
 export interface VersionesSitio { entorno: 'produccion' | 'pruebas'; actual: number | null; pendientes: boolean; total: number; versiones: VersionSitio[] }
 export interface ElementoVistaPrevia { datos: Record<string, string | number>; ficticio?: boolean }
 export interface VistaPreviaPagina {
@@ -703,6 +724,12 @@ export const api = {
   ocultarFicticios: () => pedir<FicticiosSitio & { ocultados: number }>('/sitio/ficticios/ocultar', { method: 'POST' }),
   publicarSitio: () => pedir<VersionSitio>('/sitio/publicar', { method: 'POST' }),
   versionesSitio: () => pedir<VersionesSitio>('/sitio/versiones'),
+  ajustesSitio: () => pedir<AjustesSitio>('/sitio/ajustes'),
+  guardarAjustesSitio: (cambios: CambiosAjustesSitio) => pedir<AjustesSitio>('/sitio/ajustes', json(cambios, 'PATCH')),
+  subirMarcaSitio: (tipo: 'logo' | 'favicon', archivo: File) => pedir<AjustesSitio>(`/sitio/ajustes/marca/${tipo}`, { method: 'PUT', body: archivo, headers: { 'Content-Type': archivo.type } }),
+  quitarMarcaSitio: (tipo: 'logo' | 'favicon') => pedir<AjustesSitio>(`/sitio/ajustes/marca/${tipo}`, { method: 'DELETE' }),
+  correoPruebaSitio: () => pedir<{ para: string }>('/sitio/ajustes/correo-prueba', { method: 'POST' }),
+  comprobarDominioSitio: () => pedir<ComprobacionDominio>('/sitio/ajustes/dominio/comprobar', { method: 'POST' }),
   restaurarVersionSitio: (numero: number) => pedir<VersionSitio>(`/sitio/versiones/${numero}/restaurar`, { method: 'POST' }),
   vistaPreviaPagina: (paginaId: string) => pedir<VistaPreviaPagina>(`/sitio/paginas/${paginaId}/vista-previa`),
   navegacionSitio: () => pedir<NavegacionSitio>('/sitio/navegacion'),

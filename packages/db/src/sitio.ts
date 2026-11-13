@@ -2,6 +2,7 @@
 // publicación de las programadas que ya llegaron a su hora (CP-111).
 import { Prisma, type PrismaClient } from '@prisma/client';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
+import { leerAjustes, type AjustesSitio } from '@aptio/schema/sitio-ajustes';
 import { armarInstantanea, coleccionesDeBloques, leerInstantanea, type Instantanea, type OrigenVersion } from '@aptio/schema/sitio-versiones';
 
 type Bd = PrismaClient | Prisma.TransactionClient;
@@ -15,7 +16,17 @@ export async function armarInstantaneaActual(bd: Bd, entorno: EntornoSitio): Pro
   const colecciones = coleccionesDeBloques(paginas.flatMap((p) => p.bloques.filter((b) => b.visible).map((b) => b.tipo)));
   const elementos = colecciones.length ? await bd.sitioElemento.findMany({ where: { coleccion: { in: colecciones }, visible: true } }) : [];
   const enlaces = await bd.sitioEnlace.findMany({ where: { visible: true } });
-  return armarInstantanea({ paginas, elementos, enlaces }, entorno);
+  const ajustes = await leerAjustesSitio(bd);
+  return armarInstantanea({ paginas, elementos, enlaces, ajustes }, entorno);
+}
+
+/** HU-1509 · La fila única de ajustes del sitio. */
+export const ID_AJUSTES = 'sitio';
+
+/** HU-1509 · Los ajustes guardados, o null si todavía nadie los guardó (el sitio usa los valores por defecto). */
+export async function leerAjustesSitio(bd: Bd): Promise<AjustesSitio | null> {
+  const fila = await bd.sitioAjustes.findUnique({ where: { id: ID_AJUSTES } });
+  return fila ? leerAjustes(fila.datos) : null;
 }
 
 /** HU-1507 · La última versión publicada (la que ve el sitio), o null si todavía no hay ninguna. */

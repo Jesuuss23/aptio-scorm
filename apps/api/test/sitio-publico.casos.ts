@@ -1,3 +1,4 @@
+// Se carga desde sitio.e2e.test.ts para correr en serie con las demás pruebas del sitio (versiones y ajustes globales).
 // HU-1508 · CP-120 · El sitio público pre-renderizado en GET /s/* (DA-08, REQ-109), contra PostgreSQL, Redis y el S3
 // local reales: sin versión responde la 404 en HTML; con el puntero sirve el HTML de la versión con ETag y 304, las
 // fuentes con caché de un año, robots.txt, la 404 de la versión para lo no publicado y rechaza rutas raras.
