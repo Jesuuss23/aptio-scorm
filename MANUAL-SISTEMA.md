@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.64 · actualizado con la segunda entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.65 · actualizado con la tercera entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -367,7 +367,7 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 
 ### 3.12 Páginas con estados y programación (HU-1502)
 
-- **Estados (RN-16-6):** BORRADOR, PROGRAMADA y PUBLICADA en `SitioPagina`, única por ruta e idioma. `POST` y `PATCH /sitio/paginas` cambian el título, la ruta (no en una publicada) y el estado; `DELETE` solo en borrador. Cada cambio deja una fila `SITIO_PAGINA_*` en la auditoría, sin organización.
+- **Estados (RN-16-6):** BORRADOR, PROGRAMADA y PUBLICADA en `SitioPagina`, única por ruta e idioma. `POST` y `PATCH /sitio/paginas` cambian el título, la ruta (en una publicada crea la 301 de la anterior, HU-1512) y el estado; `DELETE` solo en borrador. Cada cambio deja una fila `SITIO_PAGINA_*` en la auditoría, sin organización.
 - **Sitio público:** `GET /publico/paginas?ruta=&idioma=` responde 404 si la página no está publicada (CP-110) y `GET /publico/sitemap.xml` lista solo las publicadas con `SITIO_URL` (el inglés bajo `/en`, SUP-168). Toda ruta `/publico/*` tiene un límite de 60 peticiones por minuto por IP (SUP-169).
 - **Programación (CP-111):** la tarea `publicar-paginas` de la cola `mantenimiento` corre cada 30 s y publica las programadas vencidas, con auditoría sin usuario; la cola atiende 2 tareas a la vez para que una copia de seguridad no la atrase (SUP-171).
 
@@ -425,7 +425,7 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Datos (REQ-092, PNT-25):** una landing es una fila de `SitioPagina` con `tipo = sector`, nombre del sector, portada (título y texto), meta título y categoría inicial del blog. Vive en `/sectores/{slug del sector}`; la ruta no cambia si cambia el sector (SUP-208).
 - **Creación:** nace en borrador con los bloques de la plantilla ocultos (SUP-210). RN-16-9: sin portada completa y meta título no se publica, no se programa y no se deja así si ya está publicada (422 LANDING_INCOMPLETA).
 - **Publicación:** solo una landing completa lleva `sector` en la instantánea. Sus testimonios son los de su sector, comparados por nombre sin mayúsculas, o todos los visibles si no hay ninguno (CP-157, SUP-209); sus preguntas, las de su ruta, las del inicio y las generales (SUP-207). El bloque «Sectores» del inicio y la columna «Sectores» del pie salen de las landings publicadas del idioma: una en borrador no está en la versión, así que no aparece y su ruta da 404 (CP-158).
-- **Pendiente:** la categoría del blog se guarda pero la usa la HU-1511 (CP-159, SUP-206); el SEO por página llega con la HU-1512 (SUP-205).
+- **Resuelto:** la categoría del blog la usa la HU-1511 (CP-159, SUP-206) y el SEO por página llegó con la HU-1512 (SUP-205, 3.23).
 - **Auditoría:** SITIO_PAGINA_CREADA con `tipo` y `sector`, y SITIO_PAGINA_EDITADA con los campos de landing cambiados.
 
 ### 3.21 Sitio en español e inglés (HU-1510)
@@ -443,6 +443,15 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Fuera de las versiones:** el blog no entra en la instantánea. Cada sincronización con cambios y cada cambio del panel que se ve en el sitio vuelven a renderizar la versión vigente, así que llegan en segundos sin «Publicar cambios».
 - **Sitio:** la sección Blog filtra por categoría sin JavaScript (un radio y una lista por filtro, con su número de artículos, CP-123); en una landing empieza en su categoría inicial (CP-159). El pie suma «Últimos artículos». Una categoría o un artículo ocultos no salen en ningún lado (CP-155). Sin WordPress conectado no hay sección ni columna. `robots.txt` enlaza el sitemap de WordPress.
 - **Auditoría:** SITIO_BLOG_ACTUALIZADO, SITIO_BLOG_SINCRONIZACION_PEDIDA, SITIO_BLOG_CATEGORIAS_ORDENADAS, SITIO_BLOG_CATEGORIA_OCULTADA o _MOSTRADA, SITIO_BLOG_ARTICULO_OCULTADO o _MOSTRADO, SITIO_BLOG_SINCRONIZADO y SITIO_BLOG_ERROR (solo cuando el error cambia).
+
+### 3.23 SEO técnico (HU-1512)
+
+- **Datos (REQ-071):** `SitioPagina` suma meta descripción, canonical, `indexar` y el tipo de datos estructurados (WebPage, FAQPage o Product). `SitioRedireccion` guarda las redirecciones 301 (origen único, destino y activa) y `SitioSeo`, las reglas extra de robots.txt. Todo entra en la instantánea, así que llega al sitio con «Publicar cambios» (SUP-225).
+- **Reglas:** meta título hasta 60 caracteres y meta descripción hasta 160 (también en las landings). La canonical es una ruta interna o `https://`. Las redirecciones van entre rutas internas en minúsculas, hasta 500, sin bucles ni cadenas, sin el inicio como origen y sin pisar una página publicada; las reglas de robots son solo `Allow`, `Disallow` y comentarios, hasta 50 líneas, sin bloquear todo el sitio (SUP-226 a SUP-228).
+- **Cambio de ruta (CP-124):** cambiar la ruta de una página publicada crea sola la 301 de la anterior, con auditoría marcada como automática, y la respuesta trae el aviso; reemplaza el 422 RUTA_PUBLICADA. El pre-render escribe las redirecciones de la versión en `_redirecciones.json` y `GET /s/*` responde 301 antes del 404. La CDN debe aplicar lo mismo (HU-1405).
+- **Sitio:** cada página lleva su título, descripción, canonical, Open Graph y JSON-LD (FAQPage con las preguntas visibles, Product con la marca sin precios, Organization en el inicio), escapado para que no cierre la etiqueta; la CSP lo permite porque no se ejecuta. Una página sin indexar lleva `noindex` en producción, sale del sitemap y de los hreflang (CP-125). robots.txt suma las reglas extra en producción; en pruebas bloquea todo (SUP-229).
+- **Problemas:** `GET /sitio/seo` analiza todas las páginas y las redirecciones: sin descripción (alta), descripción o título largos (media), sin indexar (baja), redirección sin destino (alta, o media si la página no está publicada) y redirección tapada por una página (baja). Google Search Console y el puntaje de auditoría quedan para después (SUP-224).
+- **Auditoría:** SITIO_ROBOTS_EDITADO, SITIO_REDIRECCION_CREADA, _EDITADA y _BORRADA; los cambios de SEO de una página van en SITIO_PAGINA_EDITADA.
 
 ## 4. Datos
 
@@ -536,6 +545,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-28:** la transcripción usa tramos de 55 s, y una palabra justo en el borde puede quedar partida. La etapa 1 todavía no lee transcripciones.
 - **SUP-193 a SUP-199:** el sitio público usa textos fijos del prototipo en varios bloques, omite la Franja de confianza en producción y el bloque Planes, usa Plus Jakarta Sans y Atkinson Hyperlegible, se sirve bajo `SITIO_BASE` detrás de la CDN, no invalida la caché al publicar (hasta 65 s) y Lighthouse aún no se midió detrás de la CDN real.
 - **SUP-205 a SUP-211:** de la landing sale ahora solo el meta título; la categoría del blog espera a la HU-1511; las preguntas de una landing son las de su ruta, del inicio y generales; la ruta no cambia con el sector; los testimonios se asignan por nombre del sector; la landing nace en borrador con la plantilla oculta; las landings de ejemplo están solo en el sitio de ejemplo y la simulación.
+- **SUP-224 a SUP-229:** Google Search Console y el puntaje de auditoría quedan para después; las redirecciones y robots llegan con «Publicar cambios» y la CDN debe aplicarlas; las redirecciones son internas, hasta 500, y el cambio de ruta crea la 301; robots solo con Allow, Disallow y comentarios; 60 y 160 caracteres; Product sin precios y Organization solo en el inicio.
 - **SUP-200 a SUP-204:** la analítica se guarda pero se activa con el banner de cookies; el superadmin se reconoce por la cookie de sesión durante el mantenimiento (dominio de cookie compartido y CDN sin caché de respuestas privadas); el certificado lo emite la CDN; logo y favicon de hasta 200 KB.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
@@ -580,6 +590,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.65 | 2026-11-13 | SEO técnico (3.23): los campos de SEO de la página, las redirecciones 301 y robots en la versión, la 301 automática al cambiar la ruta, Open Graph, JSON-LD y noindex, el analizador de problemas y la auditoría. |
 | 0.64 | 2026-11-13 | Blog desde WordPress (3.22): la copia de lectura, la sincronización con su frecuencia, sus límites y su error, el blog fuera de las versiones con re-render, la sección sin JavaScript, «Últimos artículos» y la auditoría. |
 | 0.63 | 2026-11-13 | Sitio en español e inglés (3.21): idioma por elemento y enlace con orden aparte, el menú y el pie de cada idioma en la versión, el selector ES · EN, `hreflang` y sitemap solo entre páginas publicadas en los dos idiomas, y los ficticios en inglés. |
 | 0.62 | 2026-11-13 | Landings por sector (3.20): la landing como página de tipo sector, la regla RN-16-9, qué entra en la versión, los testimonios y preguntas del sector, y el bloque y la columna Sectores. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.64 · actualizado con la segunda entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.65 · actualizado con la tercera entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -679,14 +679,14 @@ Dentro del ZIP encuentras:
 Los nombres de los menús de cada LMS cambian entre versiones: por eso la guía dice «Verificar con la versión del cliente». Revísala con quien administra el LMS antes de configurarlo.
 ### 8.28 Sitio web (solo superadmin)
 
-Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Sitio web › Resumen**, que dice cuántas páginas del sitio están publicadas, programadas o en borrador, con el enlace **Ir a Páginas**. Las demás opciones del grupo (Contenido, Blog, SEO) aparecerán a medida que estén disponibles.
+Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Sitio web › Resumen**, que dice cuántas páginas del sitio están publicadas, programadas o en borrador, con el enlace **Ir a Páginas**. Las demás opciones del grupo son Contenido, Blog y SEO.
 
 En **Sitio web › Páginas** están todas las páginas del sitio comercial, con su ruta, idioma, estado y fecha:
 
 1. **Nueva página:** escribe el título, la ruta (empieza con `/` y solo lleva minúsculas, números y guiones, por ejemplo `/precios` o `/sectores/mineria`) y el idioma, y pulsa **Crear borrador**. No puede haber dos páginas con la misma ruta en el mismo idioma.
 2. **Publicar:** la página se ve en el sitio desde ese momento y entra al sitemap. Publicar una página también publica todo lo que tengas pendiente (ver «Publicar cambios y versiones»).
 3. **Programar:** elige el día y la hora **de Lima** y pulsa **Programar publicación**. La página se publica sola a esa hora (en menos de un minuto). La hora tiene que ser futura.
-4. **Pasar a borrador:** la página deja de verse en el sitio y sale del sitemap (también publica lo pendiente). Mientras está publicada no se le puede cambiar la ruta.
+4. **Pasar a borrador:** la página deja de verse en el sitio y sale del sitemap (también publica lo pendiente). Si cambias la ruta de una página publicada, la anterior lleva sola a la nueva (ver «SEO»).
 5. **Borrar:** solo para borradores. Pide confirmación y no se puede deshacer.
 
 Un borrador o una página programada no se ven en el sitio: quien abra su dirección recibe «no encontrada».
@@ -724,7 +724,7 @@ El mismo botón **Ocultar todos los ficticios** está en Contenido. Ocultarlos n
 
 Las preguntas sin página salen en el bloque Preguntas de todas las páginas; si les pones una ruta (por ejemplo `/precios`), salen además solo en esa página. Los logos por ahora son solo el nombre. Un elemento se ve en el sitio solo si su página está publicada y su bloque está visible.
 
-Los cambios de bloques y de contenido llegan al sitio con **Publicar cambios**. Si la página está en borrador o programada, el sitio no muestra nada de ella. La edición del contenido de cada bloque y el SEO llegarán en próximas entregas.
+Los cambios de bloques y de contenido llegan al sitio con **Publicar cambios**. Si la página está en borrador o programada, el sitio no muestra nada de ella. El SEO de la página está en la pestaña **SEO** del editor (ver «SEO»); la edición del contenido de cada bloque llegará en próximas entregas.
 
 **Vista previa.** Debajo de los bloques, en el Editor de página, la **Vista previa** muestra cómo queda la página con lo que hay ahora en el panel, aunque no esté publicada: el menú, los bloques visibles en su orden con los textos de sus elementos y el pie. Los datos ficticios salen marcados «Ficticio». Con **Escritorio (1280 px)** y **Celular (390 px)** cambias el ancho; en Escritorio desliza a los lados para ver toda la página. Se actualiza sola al mostrar, ocultar u ordenar un bloque. Por ahora muestra la estructura de la página; el diseño final de cada bloque llegará con el sitio público.
 
@@ -788,7 +788,7 @@ En la lista de Páginas, la columna **Tipo** marca las landings con **Sector** y
 
 - **Sector:** debajo dice cuántos testimonios de ese sector hay. Si cambias el nombre, avisa cuántos dejan de coincidir. La dirección de la landing no cambia.
 - **Título** y **Texto de la portada:** es lo primero que ve el visitante, en lugar de la portada del inicio.
-- **Meta título:** el título que aparece en la pestaña del navegador y en los buscadores (hasta 70 caracteres).
+- **Meta título:** el título que aparece en la pestaña del navegador y en los buscadores (hasta 60 caracteres). La meta descripción y el resto del SEO de la landing están en la pestaña **SEO** del editor (ver «SEO»).
 - **Categoría inicial del blog** (opcional): el bloque Blog empezará filtrado por esa categoría cuando el blog esté conectado.
 
 Pulsa **Guardar landing**. Solo se acepta texto, sin etiquetas HTML. Luego muestra los bloques que quieras con su interruptor.
@@ -838,6 +838,27 @@ Los artículos del blog se escriben y se publican en WordPress. El sitio muestra
 **Sin publicar.** Todo lo de esta vista llega al sitio en unos segundos: no hace falta **Publicar cambios**.
 
 **En el sitio.** El visitante elige una categoría y ve sus artículos; funciona con el dedo, el ratón y el teclado (las flechas cambian de filtro). **Ver todos los artículos en el blog** lo lleva a WordPress. En una landing por sector, la sección empieza en su **Categoría inicial del blog** (8.30); si esa categoría está oculta, empieza en **Todas**.
+
+### 8.33 SEO (solo superadmin)
+
+**SEO de cada página.** En el editor de una página, la columna de la derecha tiene dos pestañas: **Página** y **SEO**. En **SEO** están:
+
+- **Ruta de la página:** si la página ya está publicada y la cambias, la ruta anterior lleva sola a la nueva (redirección 301) y lo ves en el aviso al guardar.
+- **Meta título:** el título de la pestaña del navegador y de Google, hasta 60 caracteres. El contador dice cuántos llevas y cuántos sobran. Si lo dejas vacío se usa el título de la página con el nombre del sitio.
+- **Meta descripción:** el texto que muestra Google bajo el título, hasta 160 caracteres, con su contador.
+- **URL canónica** (opcional): la dirección que Google debe tomar como la principal. Vacía, es la de la página. Puede ser una ruta del sitio, como `/precios`, o una dirección que empiece con `https://`.
+- **Datos estructurados:** ayudan a Google a entender la página. **WebPage** sirve para casi todas; **FAQPage** arma las preguntas visibles de la página; **Product**, para una página de producto o de planes.
+- **Indexar en buscadores:** apágalo para que Google no muestre la página; sale también del sitemap.
+
+La **Vista previa en Google** cambia mientras escribes. Pulsa **Guardar SEO**; si la página está publicada, llega al sitio con **Publicar cambios**.
+
+**Sitio web › SEO.** Reúne lo de todo el sitio:
+
+- **Problemas:** las páginas sin meta descripción, con títulos o descripciones demasiado largos o sin indexar, y las redirecciones que llevan a una página que no existe o no está publicada. Los más graves van primero. **Corregir** abre la pestaña SEO de esa página o la redirección.
+- **Redirecciones 301:** escribe la ruta vieja en **Desde** y la nueva en **Hacia** y pulsa **Agregar**. Las dos son rutas del sitio en minúsculas, como `/precios-2025` y `/precios`. No se acepta una redirección hacia sí misma, en círculo o en cadena, ni desde una página publicada o desde el inicio. Con el interruptor la activas o la pausas, y **Borrar** pide confirmación.
+- **robots.txt:** la vista previa muestra el archivo que leen los buscadores. En **Reglas extra** puedes sumar líneas `Allow:` y `Disallow:` (por ejemplo `Disallow: /gracias`) y comentarios que empiecen con `#`, y pulsa **Guardar reglas**. No se acepta bloquear todo el sitio.
+
+Las redirecciones y las reglas de robots.txt llegan al sitio con **Publicar cambios**. En el sitio de pruebas los buscadores siguen bloqueados.
 
 ## 9. Preguntas frecuentes
 
@@ -930,6 +951,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.65 | 2026-11-13 | SEO (8.33): la pestaña SEO del editor con meta título y descripción con contador, URL canónica, datos estructurados, «Indexar en buscadores» y la vista previa en Google; Sitio web › SEO con los problemas, las redirecciones 301 y robots.txt; la ruta de una página publicada ya se puede cambiar. |
 | 0.64 | 2026-11-13 | Blog (8.32): conectar WordPress, «Sincronizar ahora» y su error, ordenar y ocultar categorías, ocultar artículos y «Editar en WordPress», y en el sitio el filtro por categoría, «Últimos artículos» del pie y la categoría inicial de cada landing. |
 | 0.63 | 2026-11-13 | Sitio en inglés (8.31): páginas en `/en`, el selector Español / Inglés en Contenido y en Menú principal y Pie de página, el selector ES · EN del sitio y la tarjeta Idiomas de Ajustes del sitio con «Mostrar selector ES/EN». |
 | 0.62 | 2026-11-13 | Landings por sector (8.30): crear una landing, completar portada y meta título, publicarla, el bloque y la columna Sectores, y el sector de los testimonios. |
