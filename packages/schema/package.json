@@ -42,6 +42,7 @@
     "./pausas": "./src/pausas.ts",
     "./biblioteca": "./src/biblioteca.ts",
     "./grabacion": "./src/grabacion.ts",
-    "./extraccion-kit": "./src/extraccion-kit.ts"
+    "./extraccion-kit": "./src/extraccion-kit.ts",
+    "./rentabilidad": "./src/rentabilidad.ts"
   }
 }

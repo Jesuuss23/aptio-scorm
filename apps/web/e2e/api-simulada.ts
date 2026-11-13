@@ -12,6 +12,7 @@ import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparado
 import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { aplicarPausas, type PropuestaPausas } from '@aptio/schema/pausas';
 import { rangoPeriodo } from '../src/vistas/costos-periodo.ts';
+import { CLAVES_ETAPA, normalizarParametros, PARAMETROS_EJEMPLO } from '@aptio/schema/rentabilidad';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 /** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
@@ -123,6 +124,8 @@ function resumenCostos(q: URLSearchParams) {
 }
 
 export interface OpcionesSimulacion {
+  /** HU-1303 · Mediciones ya registradas. */
+  mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
   rol?: string;
   /** El próximo PUT del kit responde 409, como si otra persona hubiera guardado antes (CP-022). */
@@ -342,7 +345,7 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales }: OpcionesSimulacion) {
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -430,6 +433,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     return route.fulfill({ status: 200, body: '' });
   });
   let sesion = conSesion;
+  const negocio: { parametros: Record<string, unknown> | null; mediciones: Record<string, unknown>[] } = {
+    parametros: null,
+    mediciones: (medicionesIniciales ?? []).map((m, i) => ({ id: `00000000-0000-4000-8000-${String(800 + i).padStart(12, '0')}`, proyectoId: null, notas: null, registradoPor: 'Administración', creadoEn: '2026-11-10T10:00:00.000Z', ...m })),
+  };
   const usuario = { ...USUARIO, ...(rol ? { rol } : {}) };
   const clientes = [
     clienteBase(CLIENTE_ID, 'Minera Andina', { lmsHabitual: 'Moodle 4.5 o superior', idiomas: ['es', 'en'], tieneKit: true }),
@@ -479,6 +486,32 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return token === 'vigente'
         ? responder(204)
         : responder(422, { codigo: 'ENLACE_NO_VALIDO', mensaje: 'Enlace no válido o vencido. Pide uno nuevo.' });
+    }
+    // HU-1303 · Parámetros por organización (ejemplo hasta guardar) y mediciones.
+    if (ruta.startsWith('/negocio/')) {
+      const rolUsuario = usuario.rol;
+      if (!['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'].includes(rolUsuario)) return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
+      if (ruta === '/negocio/parametros' && req.method() === 'GET') return responder(200, negocio.parametros ?? { ...PARAMETROS_EJEMPLO, ejemplo: true, actualizadoEn: null });
+      if (ruta === '/negocio/parametros' && req.method() === 'PUT') {
+        if (rolUsuario !== 'ADMINISTRADOR') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
+        negocio.parametros = { ...normalizarParametros(req.postDataJSON()), ejemplo: false, actualizadoEn: new Date().toISOString() };
+        return responder(200, negocio.parametros);
+      }
+      if (ruta === '/negocio/mediciones' && req.method() === 'GET') return responder(200, negocio.mediciones);
+      if (ruta === '/negocio/mediciones' && req.method() === 'POST') {
+        const d = req.postDataJSON() as { proyectoRef?: string; proyectoId?: string; escenario: string; etapa: string; horas: number; notas?: string };
+        if (!['hoy', 'generador'].includes(d.escenario) || !(CLAVES_ETAPA as readonly string[]).includes(d.etapa) || !(d.horas >= 0)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'Datos no válidos' });
+        const m = { id: `00000000-0000-4000-8000-${String(900 + negocio.mediciones.length + 1).padStart(12, '0')}`, proyectoRef: d.proyectoRef!, proyectoId: d.proyectoId ?? null, escenario: d.escenario, etapa: d.etapa, horas: d.horas, notas: d.notas ?? null, registradoPor: usuario.nombre, creadoEn: new Date().toISOString() };
+        negocio.mediciones.unshift(m);
+        return responder(201, m);
+      }
+      const borrar = ruta.match(/^\/negocio\/mediciones\/([0-9a-f-]{36})$/);
+      if (borrar && req.method() === 'DELETE') {
+        const i = negocio.mediciones.findIndex((m) => m.id === borrar[1]);
+        if (i < 0) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Medición no encontrada' });
+        negocio.mediciones.splice(i, 1);
+        return responder(204);
+      }
     }
     if (ruta === '/costos' && req.method() === 'GET') {
       if (!['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'].includes(usuario.rol)) return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });

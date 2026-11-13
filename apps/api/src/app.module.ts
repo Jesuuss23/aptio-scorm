@@ -19,6 +19,7 @@ import { NavegacionModule } from './navegacion/navegacion.module.js';
 import { UsuariosModule } from './usuarios/usuarios.module.js';
 import { VozModule } from './voz/voz.module.js';
 import { CostosModule } from './costos/costos.module.js';
+import { NegocioModule } from './negocio/negocio.module.js';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { CostosModule } from './costos/costos.module.js';
     SaludModule,
     VozModule,
     CostosModule,
+    NegocioModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

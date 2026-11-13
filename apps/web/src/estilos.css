@@ -2325,3 +2325,186 @@ ul.fila-chips {
 .tabla-costos .chip {
   white-space: nowrap;
 }
+
+/* ---- HU-1303 · Rentabilidad: calculadora y mediciones ---- */
+.rent,
+.mediciones {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.rent-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rent-cabecera h2,
+.mediciones h2,
+.rent h3 {
+  margin: 0;
+}
+.rent-cifras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+.rent-cifras > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 200px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+}
+.rent-cifras dt {
+  font-size: var(--texto-sm);
+  color: var(--color-texto-sec);
+}
+.rent-cifras dd {
+  margin: 0;
+}
+.rent-cifras .desde {
+  color: var(--color-texto-sec);
+  text-decoration: line-through;
+}
+.rent-cifras .hacia {
+  font-family: var(--fuente-num);
+  font-size: var(--dato);
+  font-weight: 700;
+}
+.rent-cifras .hacia.bajo {
+  color: var(--color-error);
+}
+.rent-cifras dd.costos-nota {
+  font-size: var(--texto-xs);
+  color: var(--color-texto-sec);
+}
+.rent-columnas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.rent-principal {
+  flex: 2 1 480px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rent-datos {
+  flex: 1 1 280px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  padding: 12px 16px;
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+}
+.rent-datos > h3,
+.rent-datos > .nota,
+.rent-datos > .acciones-form,
+.rent-datos > p {
+  grid-column: 1 / -1;
+}
+.rent-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.rent-campo input {
+  width: 100%;
+}
+.rent-real {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--texto-xs);
+  color: var(--color-texto-sec);
+}
+.tabla-costos input.horas {
+  width: 80px;
+  text-align: right;
+  font-size: var(--texto-sm);
+  padding: 4px 6px;
+  border: 1px solid var(--color-borde);
+  border-radius: 6px;
+}
+.tabla-costos tbody th,
+.tabla-costos tfoot th {
+  font-weight: 400;
+  text-align: left;
+  padding: 8px;
+  border-bottom: 1px solid var(--color-borde);
+}
+.tabla-costos tfoot th,
+.tabla-costos tfoot td {
+  font-weight: 700;
+}
+.rent-barras {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rent-barras ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rent-barras li {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) 1fr auto;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--texto-sm);
+}
+.rent-pista {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--color-borde);
+}
+.rent-pista i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 6px;
+  background: var(--color-texto-sec);
+}
+.rent-pista i.costo-hoy { background: var(--color-error); }
+.rent-pista i.costo-generador { background: var(--color-validado, #1f7a5c); }
+.rent-pista i.precio-competencia { background: var(--color-texto); }
+.rent-pista i.precio-nuevo { background: var(--color-cobalto); }
+.rent-marca {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--color-texto);
+}
+.mediciones-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.mediciones-form .campo {
+  flex: 1 1 160px;
+}
+@media (max-width: 520px) {
+  .rent-barras li {
+    grid-template-columns: 1fr auto;
+  }
+  .rent-pista {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
