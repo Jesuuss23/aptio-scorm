@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.46 · actualizado con la sexta entrega del Sprint 9 (13 de noviembre de 2026)**
+**Versión 0.47 · actualizado con la primera entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -70,6 +70,7 @@ Puedes pedir el enlace hasta 3 veces por hora.
   - **Inicio → Proyectos:** la lista de todos tus proyectos.
   - **Inicio → Nuevo SCORM:** para crear un proyecto.
   - **Empresa → Clientes y kits:** los clientes y su identidad visual.
+  - **Empresa → Rentabilidad:** cuánto se gasta en IA por proyecto, cliente y proveedor (solo administración y diseño instruccional).
 - **Arriba**, la ruta de dónde estás (por ejemplo, «Inicio / Proyecto») y tu nombre con tu rol.
 
 Aptio SCORM funciona en computadora, tableta y celular.
@@ -599,6 +600,16 @@ Si el cliente ya tiene un curso hecho por otra productora o un manual de marca, 
 
 Si no te convence, pulsa **Descartar**. Si el archivo no tiene colores (por ejemplo, un PDF escaneado), te lo dice y te sugiere subir el paquete completo o el manual original. La paleta propuesta siempre cumple el contraste 4,5:1 del texto sobre el fondo y del blanco sobre el primario. Lo pueden hacer diseño gráfico, diseño instruccional y administración.
 
+### 8.22 Costo de IA en Rentabilidad
+
+En **Empresa → Rentabilidad**, la sección **Costo de IA** dice cuánto se gastó en IA, con el consumo que queda registrado en cada llamada a un proveedor (texto, imágenes y voz):
+1. Elige el periodo: **Este mes** (el de entrada), **Mes anterior** o **Todo**. Los meses se cuentan con la hora de Lima.
+2. Si quieres ver un solo cliente, elígelo en **Cliente**.
+3. Arriba ves el **Total del periodo**, el **Promedio por SCORM** y los **SCORM contados**. El promedio se calcula sobre los proyectos que ya tienen un paquete exportado; mientras no haya ninguno, sobre los proyectos con gasto, y debajo del monto se indica cuál de los dos se usó.
+4. Debajo, tres tablas: **Por proyecto** (con su cliente, las llamadas y si ya se exportó; el nombre abre el proyecto), **Por cliente** (lo de sus proyectos y lo hecho **sin proyecto**, como la propuesta del kit desde un curso anterior) y **Por proveedor y tarea**.
+
+Los montos están en dólares, como los cobra cada proveedor. La conversión a soles y la calculadora de rentabilidad llegan en la próxima entrega. Esta sección la ven administración y diseño instruccional; para los demás roles no aparece en el menú.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -682,6 +693,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.47 | 2026-11-13 | Costo de IA en Empresa → Rentabilidad: total, promedio por SCORM, filtros de periodo y cliente y las tablas por proyecto, cliente y proveedor (4 y 8.22). |
 | 0.46 | 2026-11-13 | Kit de marca desde un curso anterior o el manual de marca: «✦ Extraer de un curso anterior», la propuesta con sus evidencias, «Aplicar» sin guardar y «Descartar» (8.21). |
 | 0.15 | 2026-11-10 | Editor: elegir un elemento y cambiar su tamaño, color del kit, alineación y animación. |
 | 0.14 | 2026-11-10 | Editor: escribir directamente sobre la pantalla (doble clic, Enter guarda, Esc cancela). |
