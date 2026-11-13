@@ -49,6 +49,8 @@ tags:
   description: Salud del servicio y operación (M15)
 - name: Sitio web
   description: Sitio comercial administrable, solo superadmin de plataforma (M16, ADR-011)
+- name: Sitio público
+  description: Rutas sin sesión del sitio comercial, con límite de 60 peticiones por minuto por IP (M16)
 paths:
   /salud:
     get:
@@ -92,12 +94,12 @@ paths:
     get:
       tags:
       - Sitio web
-      summary: Páginas del sitio comercial (HU-1501)
+      summary: Páginas del sitio comercial (HU-1501, HU-1502)
       operationId: get_sitio_paginas
       description: |-
         Solo SUPERADMIN de plataforma (ADR-011): todas las rutas `/sitio/*` responden 403 al administrador de una
-        organización y al resto de los roles (CP-109), y 401 sin sesión. La lista está vacía hasta que la HU-1502 agregue
-        las páginas con su estado (borrador, programada, publicada).
+        organización y al resto de los roles (CP-109), y 401 sin sesión. Lista todas las páginas, ordenadas por ruta e
+        idioma, con su estado, `publicarEn` y `publicadaEn`.
       responses:
         '200':
           description: OK
@@ -111,6 +113,148 @@ paths:
           $ref: '#/components/responses/NoAutenticado'
         '403':
           $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Sitio web
+      summary: Crear una página (HU-1502)
+      operationId: post_sitio_paginas
+      description: |-
+        Solo SUPERADMIN. Nace en BORRADOR, o PROGRAMADA o PUBLICADA según `accion`. La ruta es `/` o
+        `/segmento[/segmento…]` con minúsculas, números y guiones (422). Auditoría SITIO_PAGINA_CREADA. 409 RUTA_EN_USO si
+        ya hay una página con esa ruta e idioma.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaginaSitioEntrada'
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /sitio/paginas/{paginaId}:
+    parameters:
+    - name: paginaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Sitio web
+      summary: Cambiar el título, la ruta o el estado de una página (HU-1502)
+      operationId: patch_sitio_paginas_id
+      description: |-
+        Solo SUPERADMIN. `accion`: `publicar` (PUBLICADA, `publicadaEn` = ahora, limpia `publicarEn`), `programar` (exige
+        `publicarEn` futuro con zona, 422 PUBLICAR_EN_REQUERIDO o PUBLICAR_EN_PASADO) o `borrador` (limpia `publicarEn`).
+        `publicarEn` sin `programar` da 422 PUBLICAR_EN_SIN_PROGRAMAR. La ruta no cambia en una PUBLICADA (422
+        RUTA_PUBLICADA). Auditoría SITIO_PAGINA_EDITADA, SITIO_PAGINA_PUBLICADA, SITIO_PAGINA_PROGRAMADA o
+        SITIO_PAGINA_A_BORRADOR. Una programada la publica sola la cola `mantenimiento` (cada 30 s, CP-111).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaginaSitioCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Sitio web
+      summary: Borrar una página en borrador (HU-1502)
+      operationId: delete_sitio_paginas_id
+      description: Solo SUPERADMIN y solo en BORRADOR (422 PAGINA_NO_BORRADOR si está programada o publicada). Auditoría SITIO_PAGINA_BORRADA.
+      responses:
+        '204':
+          description: Borrada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /publico/paginas:
+    get:
+      tags:
+      - Sitio público
+      summary: Una página publicada del sitio (HU-1502, CP-110)
+      operationId: get_publico_paginas
+      security: []
+      description: Sin sesión. 200 solo si la página está PUBLICADA; borrador, programada o inexistente dan 404 (CP-110). 429 DEMASIADAS_SOLICITUDES con más de 60 peticiones por minuto desde la misma IP en `/publico/*`.
+      parameters:
+      - name: ruta
+        in: query
+        required: true
+        schema:
+          type: string
+          example: /precios
+      - name: idioma
+        in: query
+        schema:
+          type: string
+          enum:
+          - es
+          - en
+          default: es
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaPublica'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/sitemap.xml:
+    get:
+      tags:
+      - Sitio público
+      summary: Sitemap con las páginas publicadas (HU-1502)
+      operationId: get_publico_sitemap
+      security: []
+      description: |-
+        Sin sesión. Solo las páginas PUBLICADAS, con `SITIO_URL` como dominio (por defecto https://aptioscorm.com) y la
+        fecha de publicación como `lastmod`. Las páginas en inglés van bajo `/en` hasta la HU-1510.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/xml:
+              schema:
+                type: string
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
   /operacion:
     get:
       tags:
@@ -3457,19 +3601,35 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    DemasiadasSolicitudes:
+      description: Más de 60 peticiones por minuto desde la misma IP en `/publico/*` (DEMASIADAS_SOLICITUDES, con Retry-After)
+      headers:
+        Retry-After:
+          description: Segundos hasta que se abre la siguiente ventana
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
     PaginaSitio:
       type: object
-      description: Página del sitio comercial (M16). Los campos de bloques, SEO y programación llegan con la HU-1502.
+      description: Página del sitio comercial (M16). Bloques (HU-1503), SEO (HU-1512) y landings de sector (HU-1514) llegan con sus historias.
       required:
       - id
       - ruta
       - idioma
       - titulo
       - estado
+      - publicarEn
+      - publicadaEn
+      - creadoEn
+      - actualizadoEn
       properties:
         id:
           type: string
+          format: uuid
         ruta:
           type: string
           example: /precios
@@ -3486,6 +3646,98 @@ components:
           - BORRADOR
           - PROGRAMADA
           - PUBLICADA
+        publicarEn:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo se publica sola (solo PROGRAMADA)
+        publicadaEn:
+          type: string
+          format: date-time
+          nullable: true
+          description: Última vez que pasó a PUBLICADA
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    PaginaSitioEntrada:
+      type: object
+      additionalProperties: false
+      required:
+      - ruta
+      - titulo
+      properties:
+        ruta:
+          type: string
+          maxLength: 200
+          pattern: ^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$
+          example: /precios
+        idioma:
+          type: string
+          enum:
+          - es
+          - en
+          default: es
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 120
+        accion:
+          $ref: '#/components/schemas/AccionPagina'
+        publicarEn:
+          type: string
+          format: date-time
+          example: '2026-11-20T09:00:00-05:00'
+          description: Solo con accion=programar; con zona horaria
+    PaginaSitioCambio:
+      type: object
+      additionalProperties: false
+      properties:
+        ruta:
+          type: string
+          maxLength: 200
+          pattern: ^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$
+          description: No se cambia en una página PUBLICADA (422 RUTA_PUBLICADA)
+        titulo:
+          type: string
+          minLength: 1
+          maxLength: 120
+        accion:
+          $ref: '#/components/schemas/AccionPagina'
+        publicarEn:
+          type: string
+          format: date-time
+          example: '2026-11-20T09:00:00-05:00'
+          description: Solo con accion=programar; con zona horaria y en el futuro
+    AccionPagina:
+      type: string
+      enum:
+      - borrador
+      - programar
+      - publicar
+      description: borrador (limpia publicarEn), programar (exige publicarEn futuro) o publicar (ahora)
+    PaginaPublica:
+      type: object
+      required:
+      - ruta
+      - idioma
+      - titulo
+      - publicadaEn
+      properties:
+        ruta:
+          type: string
+        idioma:
+          type: string
+          enum:
+          - es
+          - en
+        titulo:
+          type: string
+        publicadaEn:
+          type: string
+          format: date-time
     Operacion:
       type: object
       required:

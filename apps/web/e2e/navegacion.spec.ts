@@ -34,7 +34,17 @@ async function simularNavegacion(page: Page) {
   return { pedidos };
 }
 
+/**
+ * Espera que terminen las animaciones de entrada (también las del Shadow DOM del reproductor): a mitad del fundido de
+ * `.ap-entra` el texto tiene menos contraste del real y axe lo marca como color-contrast.
+ */
 async function auditar(page: Page, zona = 'main') {
+  await page.evaluate(async () => {
+    for (let i = 0; i < 2; i++) await new Promise((r) => requestAnimationFrame(r));
+    const raices = [document, ...[...document.querySelectorAll('*')].map((el) => el.shadowRoot).filter((s): s is ShadowRoot => Boolean(s))];
+    const todas = raices.flatMap((r) => r.getAnimations());
+    await Promise.all(todas.filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime))).map((a) => a.finished.catch(() => undefined)));
+  });
   const { violations } = await new AxeBuilder({ page }).include(zona).withTags(REGLAS).analyze();
   return violations.map((v) => `${v.id} (${v.impact}): ${v.nodes.slice(0, 3).map((n) => n.target.join(' ')).join(' | ')}`);
 }

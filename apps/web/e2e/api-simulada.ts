@@ -133,6 +133,8 @@ export interface ComentarioSim {
 export interface OpcionesSimulacion {
   /** HU-0506 · Comentarios del curso; pasa el mismo arreglo a dos páginas para que vean lo mismo. */
   comentarios?: ComentarioSim[];
+  /** HU-1502 · Páginas del sitio con que arranca la simulación. */
+  paginasSitio?: PaginaSitioSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -355,7 +357,15 @@ function transcripcionDe(nombre: string) {
 }
 
 /** Simula la API. `conSesion` decide qué responde GET /yo; `rol` cambia el rol del usuario. */
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [] }: OpcionesSimulacion) {
+/** HU-1502 · Página del sitio en la simulación (misma forma que la API). */
+export interface PaginaSitioSim {
+  id: string; ruta: string; idioma: 'es' | 'en'; titulo: string; estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
+  publicarEn: string | null; publicadaEn: string | null; creadoEn: string; actualizadoEn: string;
+}
+const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
+
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [] }: OpcionesSimulacion) {
+  const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ ...p }));
   const porRegenerar = new Set(desactualizadas);
   // HU-0503 · Consultas de narraciones desde que se encoló la cascada de cada pantalla.
   const cascadas = new Map<string, number>();
@@ -559,9 +569,38 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         : responder(422, { codigo: 'ENLACE_NO_VALIDO', mensaje: 'Enlace no válido o vencido. Pide uno nuevo.' });
     }
     // HU-1501 · Sitio web: solo el superadmin (CP-109); la lista está vacía hasta la HU-1502.
-    if (ruta === '/sitio/paginas') {
+    // HU-1501 y HU-1502 · Sitio web › Páginas: solo el superadmin (CP-109), con las mismas reglas que la API.
+    if (ruta === '/sitio/paginas' || ruta.startsWith('/sitio/paginas/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
-      return responder(200, []);
+      const ahora = new Date().toISOString();
+      const ordenar = () => paginasSim.sort((a, b) => a.ruta.localeCompare(b.ruta) || a.idioma.localeCompare(b.idioma));
+      const metodo = req.method();
+      if (ruta === '/sitio/paginas' && metodo === 'GET') return responder(200, ordenar());
+      if (ruta === '/sitio/paginas' && metodo === 'POST') {
+        const b = req.postDataJSON() as { ruta: string; titulo: string; idioma?: 'es' | 'en' };
+        if (!RUTA_SITIO_SIM.test(b.ruta)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'La ruta empieza con / y solo lleva minúsculas, números y guiones' });
+        const idioma = b.idioma ?? 'es';
+        if (paginasSim.some((p) => p.ruta === b.ruta && p.idioma === idioma)) return responder(409, { codigo: 'RUTA_EN_USO', mensaje: `Ya hay una página en ${b.ruta} en ${idioma === 'en' ? 'inglés' : 'español'}` });
+        const nueva: PaginaSitioSim = { id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: b.ruta, idioma, titulo: b.titulo, estado: 'BORRADOR', publicarEn: null, publicadaEn: null, creadoEn: ahora, actualizadoEn: ahora };
+        paginasSim.push(nueva);
+        return responder(201, nueva);
+      }
+      const p = paginasSim.find((x) => x.id === ruta.split('/')[3]);
+      if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La página no existe' });
+      if (metodo === 'DELETE') {
+        if (p.estado !== 'BORRADOR') return responder(422, { codigo: 'PAGINA_NO_BORRADOR', mensaje: 'Solo se borra una página en borrador: pásala a borrador primero' });
+        paginasSim.splice(paginasSim.indexOf(p), 1);
+        return responder(204);
+      }
+      const b = req.postDataJSON() as { accion?: 'borrador' | 'programar' | 'publicar'; publicarEn?: string; titulo?: string; ruta?: string };
+      if (b.accion === 'publicar') Object.assign(p, { estado: 'PUBLICADA', publicadaEn: ahora, publicarEn: null });
+      if (b.accion === 'borrador') Object.assign(p, { estado: 'BORRADOR', publicarEn: null });
+      if (b.accion === 'programar') {
+        if (!b.publicarEn || new Date(b.publicarEn).getTime() <= Date.now()) return responder(422, { codigo: 'PUBLICAR_EN_PASADO', mensaje: 'La fecha de publicación tiene que ser futura' });
+        Object.assign(p, { estado: 'PROGRAMADA', publicarEn: new Date(b.publicarEn).toISOString() });
+      }
+      p.actualizadoEn = ahora;
+      return responder(200, p);
     }
     // HU-1403 · Empresa › Operación: solo administración; «Respaldar ahora» deja una copia en curso (409 si ya hay una).
     if (ruta === '/operacion' || ruta === '/operacion/respaldar') {

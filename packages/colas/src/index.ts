@@ -18,6 +18,9 @@ export const COLA_MANTENIMIENTO = 'mantenimiento';
 export const TAREA_RESPALDO = 'respaldar';
 export const PATRON_RESPALDO = '0 3 * * *';
 export const ID_RESPALDO_MANUAL = 'respaldo-manual';
+/** HU-1502 · Publica las páginas del sitio programadas cuya hora ya llegó (CP-111): cada 30 s, antes del minuto. */
+export const TAREA_PUBLICAR_PAGINAS = 'publicar-paginas';
+export const CADA_PUBLICAR_PAGINAS_MS = 30_000;
 export interface DatosRespaldo {
   origen: 'programado' | 'manual';
   solicitadoPorId?: string;
