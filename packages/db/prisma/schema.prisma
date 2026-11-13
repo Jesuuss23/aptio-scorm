@@ -739,7 +739,7 @@ enum EstadoPagina {
 }
 
 /// HU-1502 · Página del sitio comercial (M16, ADR-011). De la plataforma, sin organización; solo la administra el
-/// superadmin. Bloques (HU-1503), SEO (HU-1512) y landings de sector (HU-1514) llegan con sus historias.
+/// superadmin. Bloques (HU-1503) y landings de sector (HU-1514); el SEO completo llega con la HU-1512.
 model SitioPagina {
   id            String       @id @default(uuid()) @db.Uuid
   /// `/` (inicio) o `/segmento[/segmento…]` con minúsculas, números y guiones.
@@ -751,6 +751,16 @@ model SitioPagina {
   publicarEn    DateTime?
   /// Última vez que pasó a PUBLICADA.
   publicadaEn   DateTime?
+  /// HU-1514 · `general` o `sector` (landing por sector, `@aptio/schema/sitio-sectores`).
+  tipo          String       @default("general")
+  /// Nombre del sector de una landing (los testimonios se emparejan por él, CP-157).
+  sector        String?
+  /// Título y texto de la portada de una landing.
+  portada       Json?
+  /// Meta título de una landing (RN-16-9); el SEO de cada página llega con la HU-1512.
+  metaTitulo    String?
+  /// Categoría con que empieza filtrada la sección Blog de la landing (HU-1511, CP-159).
+  blogCategoriaInicial String?
   creadoEn      DateTime     @default(now())
   actualizadoEn DateTime     @updatedAt
   bloques       SitioBloque[]

@@ -2,6 +2,7 @@ import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/
 import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
 import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
+import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
 import { cabecerasSitio, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -384,6 +385,8 @@ function transcripcionDe(nombre: string) {
 export interface PaginaSitioSim {
   id: string; ruta: string; idioma: 'es' | 'en'; titulo: string; estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
   publicarEn: string | null; publicadaEn: string | null; creadoEn: string; actualizadoEn: string;
+  /** HU-1514 · Landing por sector (sin el campo, una página general). */
+  tipo?: 'general' | 'sector'; sector?: string | null; portada?: { titulo: string; texto: string } | null; metaTitulo?: string | null; blogCategoriaInicial?: string | null;
 }
 /** HU-1503 · Bloque de una página del sitio en la simulación. */
 export interface BloqueSitioSim {
@@ -405,7 +408,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, ...e, datos: { ...e.datos } }));
   const ficticiosVisiblesSim = () => elementosSim.filter((e) => e.ficticio && e.visible);
   let elementosCreados = 0;
-  const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ ...p }));
+  const paginasSim: PaginaSitioSim[] = paginasSitio.map((p) => ({ tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null, ...p }));
   const bloquesSim: BloqueSitioSim[] = bloquesSitio.map((b) => ({ ...b }));
   let bloquesCreados = 0;
   // HU-1507 · Versiones del sitio: la instantánea se arma con la misma función que usa la API.
@@ -853,11 +856,23 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const metodo = req.method();
       if (ruta === '/sitio/paginas' && metodo === 'GET') return responder(200, ordenar());
       if (ruta === '/sitio/paginas' && metodo === 'POST') {
-        const b = req.postDataJSON() as { ruta: string; titulo: string; idioma?: 'es' | 'en' };
+        const b = req.postDataJSON() as { ruta: string; titulo: string; idioma?: 'es' | 'en'; tipo?: 'sector'; sector?: string };
+        // HU-1514 · La landing nace en borrador en /sectores/{sector} con la plantilla de bloques oculta (RN-16-9).
+        if (b.tipo === 'sector') {
+          const r = aplicarCambiosSector({ sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null }, { sector: b.sector ?? '' });
+          if (!r.ok) return responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+          const rutaLanding = rutaSector(r.datos.sector!);
+          const idioma = b.idioma ?? 'es';
+          if (paginasSim.some((p) => p.ruta === rutaLanding && p.idioma === idioma)) return responder(409, { codigo: 'RUTA_EN_USO', mensaje: `Ya hay una página en ${rutaLanding} en ${idioma === 'en' ? 'inglés' : 'español'}` });
+          const nueva: PaginaSitioSim = { id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: rutaLanding, idioma, titulo: r.datos.sector!, estado: 'BORRADOR', publicarEn: null, publicadaEn: null, creadoEn: ahora, actualizadoEn: ahora, tipo: 'sector', ...r.datos };
+          paginasSim.push(nueva);
+          PLANTILLA_SECTOR.forEach((tipo, orden) => bloquesSim.push({ id: `00000000-0000-4000-9000-${String(++bloquesCreados).padStart(12, '0')}`, paginaId: nueva.id, tipo, orden, visible: false, ajustes: null, creadoEn: ahora, actualizadoEn: ahora }));
+          return responder(201, nueva);
+        }
         if (!RUTA_SITIO_SIM.test(b.ruta)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'La ruta empieza con / y solo lleva minúsculas, números y guiones' });
         const idioma = b.idioma ?? 'es';
         if (paginasSim.some((p) => p.ruta === b.ruta && p.idioma === idioma)) return responder(409, { codigo: 'RUTA_EN_USO', mensaje: `Ya hay una página en ${b.ruta} en ${idioma === 'en' ? 'inglés' : 'español'}` });
-        const nueva: PaginaSitioSim = { id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: b.ruta, idioma, titulo: b.titulo, estado: 'BORRADOR', publicarEn: null, publicadaEn: null, creadoEn: ahora, actualizadoEn: ahora };
+        const nueva: PaginaSitioSim = { id: `00000000-0000-4000-8000-${String(paginasSim.length + 100).padStart(12, '0')}`, ruta: b.ruta, idioma, titulo: b.titulo, estado: 'BORRADOR', publicarEn: null, publicadaEn: null, creadoEn: ahora, actualizadoEn: ahora, tipo: 'general', sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null };
         paginasSim.push(nueva);
         return responder(201, nueva);
       }
@@ -900,7 +915,20 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         paginasSim.splice(paginasSim.indexOf(p), 1);
         return responder(204);
       }
-      const b = req.postDataJSON() as { accion?: 'borrador' | 'programar' | 'publicar'; publicarEn?: string; titulo?: string; ruta?: string };
+      const b = req.postDataJSON() as { accion?: 'borrador' | 'programar' | 'publicar'; publicarEn?: string; titulo?: string; ruta?: string } & CambiosSector;
+      // HU-1514 · Campos de la landing y RN-16-9: sin portada ni meta título no se publica ni se programa.
+      const actualSector = { sector: p.sector ?? null, portada: p.portada ?? null, metaTitulo: p.metaTitulo ?? null, blogCategoriaInicial: p.blogCategoriaInicial ?? null };
+      let datosSector = actualSector;
+      if (b.sector !== undefined || b.portada !== undefined || b.metaTitulo !== undefined || b.blogCategoriaInicial !== undefined) {
+        if (p.tipo !== 'sector') return responder(422, { codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada, meta título y categoría del blog son solo de las landings por sector' });
+        const r = aplicarCambiosSector(actualSector, b);
+        if (!r.ok) return responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+        datosSector = r.datos;
+      }
+      const estadoFinal = b.accion === 'publicar' ? 'PUBLICADA' : b.accion === 'programar' ? 'PROGRAMADA' : b.accion === 'borrador' ? 'BORRADOR' : p.estado;
+      const faltan = p.tipo === 'sector' && estadoFinal !== 'BORRADOR' ? faltantesParaPublicar(datosSector) : [];
+      if (faltan.length) return responder(422, { codigo: 'LANDING_INCOMPLETA', mensaje: `La landing no se puede publicar ni programar todavía: ${faltan.map((f) => f.mensaje.toLowerCase()).join(', ')}`, detalles: faltan });
+      if (p.tipo === 'sector') Object.assign(p, datosSector);
       const ficticios = b.accion === 'publicar' ? ficticiosVisiblesSim() : [];
       if (ficticios.length && entornoSitio === 'produccion') {
         return responder(409, {

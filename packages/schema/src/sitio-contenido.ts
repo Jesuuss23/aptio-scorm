@@ -184,9 +184,10 @@ export interface ElementoOrdenable extends BloqueOrdenable {
 
 /**
  * Elementos que ve el público en un bloque visible de una página publicada (RN-16-4): los visibles de su colección, en
- * orden. En Preguntas, las generales (sin página) más las de esa ruta.
+ * orden. En Preguntas, las generales (sin página) más las de esa ruta y las de `otrasRutas` (HU-1514: una landing de
+ * sector suma las del inicio).
  */
-export function elementosDeBloque<T extends ElementoOrdenable>(tipoBloque: string, rutaPagina: string, elementos: readonly T[]): T[] | null {
+export function elementosDeBloque<T extends ElementoOrdenable>(tipoBloque: string, rutaPagina: string, elementos: readonly T[], otrasRutas: readonly string[] = []): T[] | null {
   const coleccion = COLECCION_DE_BLOQUE[tipoBloque];
   if (!coleccion) return null;
   const propios = elementos.filter((e) => e.coleccion === coleccion);
@@ -194,6 +195,6 @@ export function elementosDeBloque<T extends ElementoOrdenable>(tipoBloque: strin
   if (coleccion !== 'preguntas') return visibles;
   return visibles.filter((e) => {
     const pagina = (e.datos as { pagina?: unknown } | null)?.pagina;
-    return typeof pagina !== 'string' || pagina === '' || pagina === rutaPagina;
+    return typeof pagina !== 'string' || pagina === '' || pagina === rutaPagina || otrasRutas.includes(pagina);
   });
 }

@@ -587,6 +587,12 @@ export interface PaginaSitio {
   estado: 'BORRADOR' | 'PROGRAMADA' | 'PUBLICADA';
   publicarEn: string | null;
   publicadaEn: string | null;
+  /** HU-1514 · `sector` en una landing por sector, con su nombre, portada, meta título y categoría inicial del blog. */
+  tipo: 'general' | 'sector';
+  sector: string | null;
+  portada: { titulo: string; texto: string } | null;
+  metaTitulo: string | null;
+  blogCategoriaInicial: string | null;
   creadoEn: string;
   actualizadoEn: string;
   /** HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117). */
@@ -637,8 +643,12 @@ export interface VistaPreviaPagina {
   navegacion: { menu: { texto: string; ruta: string; externo: boolean }[]; pie: { titulo: string; enlaces: { texto: string; ruta: string; externo: boolean }[] }[] };
 }
 export type AccionPagina = 'borrador' | 'programar' | 'publicar';
-export interface PaginaSitioEntrada { ruta: string; idioma: 'es' | 'en'; titulo: string }
-export interface PaginaSitioCambio { ruta?: string; titulo?: string; accion?: AccionPagina; publicarEn?: string }
+export type PaginaSitioEntrada = { ruta: string; idioma: 'es' | 'en'; titulo: string } | { tipo: 'sector'; sector: string; idioma: 'es' | 'en' };
+export interface PaginaSitioCambio {
+  ruta?: string; titulo?: string; accion?: AccionPagina; publicarEn?: string;
+  /** HU-1514 · Solo en una landing por sector. */
+  sector?: string; portada?: { titulo: string; texto: string } | null; metaTitulo?: string | null; blogCategoriaInicial?: string | null;
+}
 /** HU-1504 · Elemento de contenido del sitio (cifras, testimonios, logos…). Nace oculto (RN-16-2). */
 export interface ElementoSitio {
   id: string;

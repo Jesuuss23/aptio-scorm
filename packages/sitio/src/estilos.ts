@@ -106,6 +106,9 @@ section{padding:96px 0}
 .fcard h3{margin-top:8px}
 .fcard p{color:var(--muted);margin-top:8px}
 .fcard ul{margin:14px 0 0;padding-left:18px}
+.fcard.sector{display:block;height:100%;color:inherit;text-decoration:none}
+.fcard.sector:hover{border-color:var(--b700)}
+.fcard.sector .more{display:inline-block;margin-top:16px;font-family:var(--f-ui);font-size:14px;font-weight:700;color:var(--b700)}
 .lmscards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
 .lmscards li{background:#fff;border:1px solid var(--b200);border-radius:12px;padding:18px;text-align:center}
 .lmscards b{display:block;font-family:var(--f-ui);font-size:16px}

@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RUTA_SITIO } from '@aptio/db';
 import { TIPOS_BLOQUE } from '@aptio/schema/sitio-bloques';
-import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+import { TIPOS_PAGINA } from '@aptio/schema/sitio-sectores';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID, Matches, MaxLength, MinLength, ValidateIf, ValidateNested } from 'class-validator';
 
 export const IDIOMAS_SITIO = ['es', 'en'] as const;
 export const ESTADOS_PAGINA = ['BORRADOR', 'PROGRAMADA', 'PUBLICADA'] as const;
@@ -21,13 +23,41 @@ export class PaginaSitioDto {
   @ApiProperty({ enum: ESTADOS_PAGINA }) estado: string;
   @ApiProperty({ format: 'date-time', nullable: true, description: 'Cuándo se publica sola (solo PROGRAMADA)' }) publicarEn: string | null;
   @ApiProperty({ format: 'date-time', nullable: true, description: 'Última vez que pasó a PUBLICADA' }) publicadaEn: string | null;
+  @ApiProperty({ enum: TIPOS_PAGINA, description: 'HU-1514 · general o sector (landing por sector)' }) tipo: string;
+  @ApiProperty({ nullable: true, description: 'HU-1514 · Nombre del sector de una landing' }) sector: string | null;
+  @ApiProperty({ type: () => PortadaSectorDto, nullable: true, description: 'HU-1514 · Portada propia de una landing' }) portada: PortadaSectorDto | null;
+  @ApiProperty({ nullable: true, description: 'HU-1514 · Meta título de una landing (RN-16-9)' }) metaTitulo: string | null;
+  @ApiProperty({ nullable: true, description: 'HU-1514 · Categoría con que empieza filtrada la sección Blog (CP-159)' }) blogCategoriaInicial: string | null;
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
   @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
   @ApiPropertyOptional({ description: 'HU-1505 · Solo al publicar en pruebas: cuántos datos ficticios visibles hay (CP-117)' }) avisoFicticios?: number;
   @ApiPropertyOptional({ description: 'HU-1507 · Si el cambio publicó o retiró la página: la versión del sitio que creó' }) version?: number;
 }
 
-class CamposAccion {
+/** HU-1514 · Portada de una landing por sector. */
+export class PortadaSectorDto {
+  @ApiProperty({ maxLength: 120 }) titulo: string;
+  @ApiProperty({ maxLength: 300 }) texto: string;
+}
+
+class PortadaSectorCambioDto {
+  @ApiPropertyOptional({ maxLength: 120, nullable: true }) @IsOptional() @IsString() @MaxLength(400) titulo?: string | null;
+  @ApiPropertyOptional({ maxLength: 300, nullable: true }) @IsOptional() @IsString() @MaxLength(1000) texto?: string | null;
+}
+
+/** HU-1514 · Campos de una landing por sector; el detalle lo valida `aplicarCambiosSector`. */
+class CamposSector {
+  @ApiPropertyOptional({ maxLength: 60, example: 'Minería y energía', description: 'Nombre del sector (no «General»)' })
+  @IsOptional() @IsString() @MaxLength(200) sector?: string;
+  @ApiPropertyOptional({ type: PortadaSectorCambioDto, nullable: true })
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @ValidateNested() @Type(() => PortadaSectorCambioDto) portada?: PortadaSectorCambioDto | null;
+  @ApiPropertyOptional({ maxLength: 70, nullable: true })
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsString() @MaxLength(300) metaTitulo?: string | null;
+  @ApiPropertyOptional({ maxLength: 60, nullable: true })
+  @IsOptional() @ValidateIf((_o, v) => v !== null) @IsString() @MaxLength(200) blogCategoriaInicial?: string | null;
+}
+
+class CamposAccion extends CamposSector {
   @ApiPropertyOptional({ enum: ACCIONES_PAGINA, description: 'borrador (limpia publicarEn), programar (exige publicarEn en el futuro) o publicar (ahora)' })
   @IsOptional() @IsIn(ACCIONES_PAGINA, { message: 'accion debe ser borrador, programar o publicar' }) accion?: AccionPagina;
   @ApiPropertyOptional({ format: 'date-time', example: '2026-11-20T09:00:00-05:00', description: 'Solo con accion=programar; con zona horaria' })
@@ -35,11 +65,15 @@ class CamposAccion {
 }
 
 export class PaginaSitioEntradaDto extends CamposAccion {
-  @ApiProperty({ example: '/precios', pattern: RUTA_SITIO.source })
+  @ApiPropertyOptional({ enum: TIPOS_PAGINA, default: 'general', description: 'HU-1514 · sector crea una landing en borrador con la plantilla de bloques' })
+  @IsOptional() @IsIn(TIPOS_PAGINA, { message: 'tipo debe ser general o sector' }) tipo?: (typeof TIPOS_PAGINA)[number];
+  @ApiProperty({ example: '/precios', pattern: RUTA_SITIO.source, description: 'En una landing es opcional: por defecto /sectores/{sector}' })
+  @ValidateIf((o: PaginaSitioEntradaDto) => o.tipo !== 'sector' || o.ruta !== undefined)
   @IsString() @MaxLength(200) @Matches(RUTA_SITIO, { message: MENSAJE_RUTA }) ruta: string;
   @ApiPropertyOptional({ enum: IDIOMAS_SITIO, default: 'es' })
   @IsOptional() @IsIn(IDIOMAS_SITIO, { message: 'idioma debe ser es o en' }) idioma?: (typeof IDIOMAS_SITIO)[number];
-  @ApiProperty({ minLength: 1, maxLength: 120 })
+  @ApiProperty({ minLength: 1, maxLength: 120, description: 'En una landing es opcional: por defecto el sector' })
+  @ValidateIf((o: PaginaSitioEntradaDto) => o.tipo !== 'sector' || o.titulo !== undefined)
   @IsString() @MinLength(1) @MaxLength(120) titulo: string;
 }
 

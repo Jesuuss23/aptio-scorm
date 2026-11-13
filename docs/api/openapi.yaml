@@ -122,6 +122,11 @@ paths:
         Solo SUPERADMIN. Nace en BORRADOR, o PROGRAMADA o PUBLICADA según `accion`. La ruta es `/` o
         `/segmento[/segmento…]` con minúsculas, números y guiones (422). Auditoría SITIO_PAGINA_CREADA. 409 RUTA_EN_USO si
         ya hay una página con esa ruta e idioma.
+        HU-1514 · Con `tipo=sector` crea una landing por sector (REQ-092): basta `sector` (e `idioma`); la ruta es
+        `/sectores/{slug del sector}` y el título, el nombre del sector. Nace siempre en BORRADOR (422 LANDING_EN_BORRADOR
+        con `accion` distinta de `borrador` o con `publicarEn`) con los bloques de la plantilla ocultos (hero, metricas,
+        pasos, testimonios, faq, bloglista, cta). «General» no vale como sector (422 NO_VALIDO). Los campos de landing en
+        una página general dan 422 NO_ES_LANDING.
       requestBody:
         required: true
         content:
@@ -169,6 +174,10 @@ paths:
         HU-1507: `publicar` una página, o pasar a `borrador` o `programar` una PUBLICADA, crea una versión del sitio
         con origen `pagina` (el sitio completo del panel, RN-16-5) y la respuesta trae `version`. La cola crea una con
         origen `programada` al publicar las programadas.
+        HU-1514 · En una landing se cambian además `sector`, `portada`, `metaTitulo` y `blogCategoriaInicial` (texto
+        plano; vacío guarda null; en una página general, 422 NO_ES_LANDING). La ruta no cambia al cambiar el sector.
+        RN-16-9: una landing sin título y texto de portada y sin meta título no se publica ni se programa, ni se deja
+        así si ya está publicada o programada: 422 LANDING_INCOMPLETA con `detalles` (campo, mensaje).
       requestBody:
         required: true
         content:
@@ -4529,7 +4538,7 @@ components:
   schemas:
     PaginaSitio:
       type: object
-      description: Página del sitio comercial (M16). Bloques (HU-1503), SEO (HU-1512) y landings de sector (HU-1514) llegan con sus historias.
+      description: Página del sitio comercial (M16). Bloques (HU-1503) y landings por sector (HU-1514); el SEO por página llega con la HU-1512.
       required:
       - id
       - ruta
@@ -4540,7 +4549,39 @@ components:
       - publicadaEn
       - creadoEn
       - actualizadoEn
+      - tipo
+      - sector
+      - portada
+      - metaTitulo
+      - blogCategoriaInicial
       properties:
+        tipo:
+          type: string
+          enum:
+          - general
+          - sector
+          description: HU-1514 · `sector` es una landing por sector
+        sector:
+          type: string
+          nullable: true
+          maxLength: 60
+          example: Minería y energía
+          description: HU-1514 · Nombre del sector; con él se eligen los testimonios (sin mayúsculas ni espacios de más)
+        portada:
+          type: object
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/PortadaSector'
+        metaTitulo:
+          type: string
+          nullable: true
+          maxLength: 70
+          description: HU-1514 · El `<title>` de la landing
+        blogCategoriaInicial:
+          type: string
+          nullable: true
+          maxLength: 60
+          description: HU-1514 · Categoría con que empieza filtrado el bloque Blog (se usa con la HU-1511)
         id:
           type: string
           format: uuid
@@ -4584,13 +4625,57 @@ components:
           type: integer
           minimum: 1
           description: HU-1507 · Si el cambio publicó o retiró la página, la versión del sitio que creó
+    PortadaSector:
+      type: object
+      description: HU-1514 · La portada propia de una landing por sector
+      required:
+      - titulo
+      - texto
+      properties:
+        titulo:
+          type: string
+          maxLength: 120
+        texto:
+          type: string
+          maxLength: 300
+    PortadaSectorCambio:
+      type: object
+      additionalProperties: false
+      description: HU-1514 · Lo que no se manda se conserva; un texto vacío se borra; `portada=null` la borra entera
+      properties:
+        titulo:
+          type: string
+          nullable: true
+          maxLength: 120
+        texto:
+          type: string
+          nullable: true
+          maxLength: 300
     PaginaSitioEntrada:
       type: object
       additionalProperties: false
-      required:
-      - ruta
-      - titulo
+      description: '`ruta` y `titulo` son obligatorios salvo en una landing (`tipo=sector`), que pide `sector`.'
       properties:
+        tipo:
+          type: string
+          enum:
+          - general
+          - sector
+          default: general
+        sector:
+          type: string
+          maxLength: 60
+          description: HU-1514 · Obligatorio con tipo=sector
+        portada:
+          $ref: '#/components/schemas/PortadaSectorCambio'
+        metaTitulo:
+          type: string
+          nullable: true
+          maxLength: 70
+        blogCategoriaInicial:
+          type: string
+          nullable: true
+          maxLength: 60
         ruta:
           type: string
           maxLength: 200
@@ -4622,6 +4707,23 @@ components:
           maxLength: 200
           pattern: ^/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$
           description: No se cambia en una página PUBLICADA (422 RUTA_PUBLICADA)
+        sector:
+          type: string
+          maxLength: 60
+          description: HU-1514 · Solo landings; la ruta no cambia
+        portada:
+          type: object
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/PortadaSectorCambio'
+        metaTitulo:
+          type: string
+          nullable: true
+          maxLength: 70
+        blogCategoriaInicial:
+          type: string
+          nullable: true
+          maxLength: 60
         titulo:
           type: string
           minLength: 1
@@ -5374,11 +5476,31 @@ components:
           format: date-time
           nullable: true
           description: null solo en la vista previa de una página que aún no se publicó
+        sector:
+          $ref: '#/components/schemas/SectorPublicado'
         bloques:
           type: array
           description: Solo los visibles, en orden (HU-1503)
           items:
             $ref: '#/components/schemas/BloquePublico'
+    SectorPublicado:
+      type: object
+      description: HU-1514 · Solo en una landing por sector completa; los testimonios de su bloque ya vienen filtrados por sector (CP-157)
+      required:
+      - nombre
+      - portada
+      - metaTitulo
+      - blogCategoria
+      properties:
+        nombre:
+          type: string
+        portada:
+          $ref: '#/components/schemas/PortadaSector'
+        metaTitulo:
+          type: string
+        blogCategoria:
+          type: string
+          nullable: true
     Operacion:
       type: object
       required:

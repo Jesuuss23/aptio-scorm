@@ -4,10 +4,12 @@
 // (RN-16-2, CP-115); ocultarlo lo quita de todas las páginas sin borrar sus datos (CP-114). Solo texto (RN-16-7).
 // HU-1505 · Casilla «Ficticio» y distintivo por elemento, contador de ficticios visibles del sitio y aviso con «Ocultar
 // todos los ficticios» (RN-16-3). Portada y Llamada final, con los ajustes del sitio (SUP-178).
+// HU-1514 · En Testimonios, el Sector se elige de una lista: «General» y los sectores de las landings (CP-157).
 import { moverBloque } from '@aptio/schema/sitio-bloques';
 import { type CampoContenido, type Coleccion, COLECCIONES, COLECCIONES_CONTENIDO, camposDe, validarDatos } from '@aptio/schema/sitio-contenido';
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { SECTOR_GENERAL } from '@aptio/schema/sitio-sectores';
 import { api, type ElementoSitio, ErrorApi, type FicticiosSitio } from '../api';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
@@ -34,6 +36,7 @@ export function SitioContenido() {
   const [nuevo, setNuevo] = useState(false);
   const [borrando, setBorrando] = useState<string | null>(null);
   const [ficticios, setFicticios] = useState<FicticiosSitio | null>(null);
+  const [sectores, setSectores] = useState<string[]>([]);
   const foco = useRef<string | null>(null);
   const lista = useRef<HTMLOListElement>(null);
   const pestanas = useRef<HTMLDivElement>(null);
@@ -41,6 +44,10 @@ export function SitioContenido() {
 
   const refrescarFicticios = () => api.ficticiosSitio().then(setFicticios, () => undefined);
   useEffect(() => { void refrescarFicticios(); }, []);
+  useEffect(() => {
+    if (coleccion !== 'testimonios') return;
+    api.paginasSitio().then((l) => setSectores([...new Set(l.filter((p) => p.tipo === 'sector' && p.sector).map((p) => p.sector!))].sort((a, b) => a.localeCompare(b, 'es'))), () => undefined);
+  }, [coleccion]);
 
   useEffect(() => {
     let vigente = true;
@@ -190,7 +197,7 @@ export function SitioContenido() {
         </div>
         {error ? <div className="nota error" role="alert">{error}</div> : null}
         {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
-        {nuevo ? <FormularioElemento key={`nuevo-${coleccion}`} id="nuevo" coleccion={coleccion} ocupado={ocupado} etiqueta={`Nuevo elemento de ${info.nombre}`} alGuardar={agregar} alCancelar={() => setNuevo(false)} /> : null}
+        {nuevo ? <FormularioElemento key={`nuevo-${coleccion}`} id="nuevo" coleccion={coleccion} ocupado={ocupado} etiqueta={`Nuevo elemento de ${info.nombre}`} sectores={sectores} alGuardar={agregar} alCancelar={() => setNuevo(false)} /> : null}
         {!elementos ? (!error ? <p className="sec" role="status">Cargando…</p> : null)
           : elementos.length === 0 && !nuevo ? <p className="nota">Aún no hay elementos en {info.nombre}. Agrega el primero con «Agregar».</p>
           : (
@@ -204,7 +211,7 @@ export function SitioContenido() {
                       <button type="button" className="boton icono" data-paso="bajar" disabled={ocupado || i === elementos.length - 1} onClick={() => void mover(x, 1)} aria-label={`Bajar ${nombre}`}>↓</button>
                     </div>
                     <FormularioElemento
-                      key={`${x.id}-${x.actualizadoEn}`} id={x.id} coleccion={coleccion} datos={x.datos} ocupado={ocupado} etiqueta={`Editar ${nombre}`}
+                      key={`${x.id}-${x.actualizadoEn}`} id={x.id} coleccion={coleccion} datos={x.datos} ocupado={ocupado} etiqueta={`Editar ${nombre}`} sectores={sectores}
                       alGuardar={(d) => guardar(x, d)}
                     />
                     <div className="elemento-acciones">
@@ -231,8 +238,8 @@ export function SitioContenido() {
   );
 }
 
-function FormularioElemento({ id: idElemento, coleccion, datos, ocupado, etiqueta, alGuardar, alCancelar }: {
-  id: string; coleccion: Coleccion; datos?: Record<string, string | number>; ocupado: boolean; etiqueta: string;
+function FormularioElemento({ id: idElemento, coleccion, datos, ocupado, etiqueta, sectores = [], alGuardar, alCancelar }: {
+  id: string; coleccion: Coleccion; datos?: Record<string, string | number>; ocupado: boolean; etiqueta: string; sectores?: string[];
   alGuardar: (datos: Record<string, string | number>) => Promise<boolean>; alCancelar?: () => void;
 }) {
   const inicial = aBorrador(coleccion, datos ?? {});
@@ -259,6 +266,20 @@ function FormularioElemento({ id: idElemento, coleccion, datos, ocupado, etiquet
         const id = `${idBase}-${f.clave}`;
         const comunes = { id, value: borrador[f.clave], onChange: (ev: { target: { value: string } }) => setBorrador((b) => ({ ...b, [f.clave]: ev.target.value })) };
         const ancho = f.tipo === 'parrafo' || f.tipo === 'lista';
+        if (coleccion === 'testimonios' && f.clave === 'sector') {
+          // Vacío o «General»: vale para cualquier landing. Un sector que ya no tiene landing se conserva en la lista.
+          const actual = borrador.sector ?? '';
+          const opciones = [...sectores, ...(actual && actual !== SECTOR_GENERAL && !sectores.includes(actual) ? [actual] : [])];
+          return (
+            <label key={f.clave} className="campo" htmlFor={id}>
+              {f.etiqueta}
+              <select {...comunes} value={actual === SECTOR_GENERAL ? '' : actual}>
+                <option value="">{SECTOR_GENERAL}</option>
+                {opciones.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+          );
+        }
         return (
           <label key={f.clave} className={`campo${ancho ? ' ancho' : ''}`} htmlFor={id}>
             {f.etiqueta}{f.opcional ? ' (opcional)' : ''}
