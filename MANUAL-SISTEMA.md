@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.63 · actualizado con la primera entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.64 · actualizado con la segunda entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -436,6 +436,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Ficticios:** los del inglés cuentan igual: salen en la lista, se ocultan con los demás y bloquean publicar en producción (RN-16-3).
 - **Auditoría:** las acciones de elementos y enlaces guardan el idioma; el ajuste queda en SITIO_AJUSTES_ACTUALIZADOS con `publicar` true.
 
+### 3.22 Blog desde WordPress (HU-1511)
+
+- **Datos (REQ-070, RN-16-8):** WordPress es la fuente de los artículos. Aptio guarda la conexión (URL, frecuencia, artículos por filtro, imagen y autor, última sincronización y último error) y una copia de lectura de las categorías y de los artículos publicados sin clave, con su visibilidad y el orden de las categorías.
+- **Sincronización:** el worker revisa cada minuto y lee la API REST de WordPress cuando pasó la frecuencia (15, 30 o 60 minutos) o con «Sincronizar ahora». Lee hasta 100 categorías y los 100 artículos más nuevos, 10 s como máximo por pedido, sin seguir redirecciones y sin dominios que apunten a la red interna. Lo oculto sigue oculto; una categoría nueva entra visible al final; lo que WordPress deja de mandar se quita. La imagen destacada (hasta 800 px y 1 MB, JPEG, PNG o WebP) se copia al bucket y se sirve en `/s/_blog/`. Si WordPress falla, la copia queda y el error se guarda para el panel (CP-156).
+- **Fuera de las versiones:** el blog no entra en la instantánea. Cada sincronización con cambios y cada cambio del panel que se ve en el sitio vuelven a renderizar la versión vigente, así que llegan en segundos sin «Publicar cambios».
+- **Sitio:** la sección Blog filtra por categoría sin JavaScript (un radio y una lista por filtro, con su número de artículos, CP-123); en una landing empieza en su categoría inicial (CP-159). El pie suma «Últimos artículos». Una categoría o un artículo ocultos no salen en ningún lado (CP-155). Sin WordPress conectado no hay sección ni columna. `robots.txt` enlaza el sitemap de WordPress.
+- **Auditoría:** SITIO_BLOG_ACTUALIZADO, SITIO_BLOG_SINCRONIZACION_PEDIDA, SITIO_BLOG_CATEGORIAS_ORDENADAS, SITIO_BLOG_CATEGORIA_OCULTADA o _MOSTRADA, SITIO_BLOG_ARTICULO_OCULTADO o _MOSTRADO, SITIO_BLOG_SINCRONIZADO y SITIO_BLOG_ERROR (solo cuando el error cambia).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -572,6 +580,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.64 | 2026-11-13 | Blog desde WordPress (3.22): la copia de lectura, la sincronización con su frecuencia, sus límites y su error, el blog fuera de las versiones con re-render, la sección sin JavaScript, «Últimos artículos» y la auditoría. |
 | 0.63 | 2026-11-13 | Sitio en español e inglés (3.21): idioma por elemento y enlace con orden aparte, el menú y el pie de cada idioma en la versión, el selector ES · EN, `hreflang` y sitemap solo entre páginas publicadas en los dos idiomas, y los ficticios en inglés. |
 | 0.62 | 2026-11-13 | Landings por sector (3.20): la landing como página de tipo sector, la regla RN-16-9, qué entra en la versión, los testimonios y preguntas del sector, y el bloque y la columna Sectores. |
 | 0.61 | 2026-11-13 | Ajustes del sitio y modo mantenimiento (3.19): la fila de ajustes, lo que entra al publicar, la marca, el 503 para visitantes, el acceso del superadmin, «Comprobar el dominio» y la operación del mantenimiento. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.63 · actualizado con la primera entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.64 · actualizado con la segunda entrega del Sprint 12 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -823,6 +823,22 @@ El sitio puede tener una versión en inglés, con sus propias páginas, contenid
 
 **Ten en cuenta:** los textos fijos de los bloques en inglés (por ejemplo los títulos de las secciones y la llamada final) son una traducción inicial que se revisará. Los datos ficticios en inglés también impiden publicar en producción y se ocultan con **Ocultar todos los ficticios**.
 
+### 8.32 Blog (solo superadmin)
+
+Los artículos del blog se escriben y se publican en WordPress. El sitio muestra, al final de cada página que tenga el bloque **Blog (WordPress)**, los artículos más nuevos con un filtro por categoría, y en el pie la columna **Últimos artículos** con los tres más nuevos. En **Sitio web › Blog** eliges qué se muestra.
+
+**Conectar el WordPress.** En la tarjeta **Conexión**, escribe la **URL de WordPress** (empieza con `https://`, por ejemplo `https://blog.tuempresa.com`), elige cada cuánto se **sincroniza** (cada 15 minutos, cada 30 minutos o cada hora), cuántos **artículos por filtro** muestra la sección (de 3 a 12; 6 por defecto) y si muestra la **imagen** y el **autor**. Pulsa **Guardar**: la primera sincronización empieza en unos segundos. Para desconectar, borra la URL y guarda: la sección Blog y la columna del pie dejan de salir.
+
+**Sincronizar ahora.** El botón de arriba trae enseguida lo publicado en WordPress, sin esperar la frecuencia. Solo llegan los artículos publicados y sin clave: los borradores, los privados y los protegidos con contraseña no se muestran. La tarjeta **Conexión** dice cuándo fue la última sincronización. Si WordPress no responde, verás el error en rojo; el sitio sigue mostrando los artículos de la última vez que funcionó.
+
+**Categorías.** Las categorías visibles son los filtros de la sección, en el orden de la lista; cámbialo con las flechas ↑ y ↓. Al lado de cada una ves cuántos artículos tiene. Apaga el interruptor para ocultar una categoría: deja de salir como filtro y sus artículos dejan de mostrarse, salvo los que también estén en otra categoría visible. Una categoría nueva en WordPress llega visible, al final.
+
+**Artículos.** La tabla lista los artículos publicados, del más nuevo al más viejo. Apaga **Mostrar** para ocultar uno; **Editar en WordPress** abre ese artículo en WordPress en otra pestaña. Lo que ocultes sigue oculto aunque lo edites en WordPress.
+
+**Sin publicar.** Todo lo de esta vista llega al sitio en unos segundos: no hace falta **Publicar cambios**.
+
+**En el sitio.** El visitante elige una categoría y ve sus artículos; funciona con el dedo, el ratón y el teclado (las flechas cambian de filtro). **Ver todos los artículos en el blog** lo lleva a WordPress. En una landing por sector, la sección empieza en su **Categoría inicial del blog** (8.30); si esa categoría está oculta, empieza en **Todas**.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -914,6 +930,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.64 | 2026-11-13 | Blog (8.32): conectar WordPress, «Sincronizar ahora» y su error, ordenar y ocultar categorías, ocultar artículos y «Editar en WordPress», y en el sitio el filtro por categoría, «Últimos artículos» del pie y la categoría inicial de cada landing. |
 | 0.63 | 2026-11-13 | Sitio en inglés (8.31): páginas en `/en`, el selector Español / Inglés en Contenido y en Menú principal y Pie de página, el selector ES · EN del sitio y la tarjeta Idiomas de Ajustes del sitio con «Mostrar selector ES/EN». |
 | 0.62 | 2026-11-13 | Landings por sector (8.30): crear una landing, completar portada y meta título, publicarla, el bloque y la columna Sectores, y el sector de los testimonios. |
 | 0.61 | 2026-11-13 | Ajustes del sitio (8.29): dominio con su comprobación, nombre, logo y favicon, botón de WhatsApp, correo de leads, analítica y modo mantenimiento con la página «Volvemos pronto». |
