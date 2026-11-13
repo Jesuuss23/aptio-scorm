@@ -1,6 +1,6 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario } from './api';
+import { api, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_COSTOS } from './api';
 import { MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
@@ -18,6 +18,7 @@ import { AlineacionVista } from './vistas/AlineacionVista';
 import { NavegacionVista } from './vistas/NavegacionVista';
 import { VideoVista } from './vistas/VideoVista';
 import { PersonajeVozVista } from './vistas/PersonajeVozVista';
+import { Rentabilidad } from './vistas/Rentabilidad';
 
 const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
 
@@ -61,8 +62,9 @@ export function App() {
         : [vista.grupo, vista.activo === '/' ? 'Proyectos' : 'Clientes y kits', titulo || vista.nombre]
       : [vista.grupo, vista.nombre];
   const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
-  // Nuevo SCORM solo aparece a quien puede crear proyectos (RN-01-2: la API también lo valida).
-  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => i.ruta !== '/nuevo' || puedeCrear) }));
+  const venCostos = VEN_COSTOS.includes(usuario.rol);
+  // Nuevo SCORM y Rentabilidad solo aparecen a quien puede usarlos (RN-01-2: la API también lo valida).
+  const menu = MENU.map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos)) })).filter((g) => g.items.length);
   return (
     <Estructura
       menu={menu}
@@ -94,6 +96,8 @@ export function App() {
         <ProyectoDetalle key={vista.id} id={vista.id} rol={usuario.rol} alCargar={alCargar} />
       ) : vista?.activo === '/' ? (
         <Proyectos rol={usuario.rol} />
+      ) : vista?.activo === '/rentabilidad' && venCostos ? (
+        <Rentabilidad />
       ) : vista?.activo === '/nuevo' && puedeCrear ? (
         <NuevoScorm />
       ) : vista?.id ? (

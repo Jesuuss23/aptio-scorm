@@ -2235,3 +2235,93 @@ ul.fila-chips {
   opacity: 0.55;
   pointer-events: none;
 }
+
+/* ---- HU-1302 · Rentabilidad: costo de IA ---- */
+.costos {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.costos-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.costos-cabecera h2 {
+  margin: 0;
+}
+.costos-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.costos-filtros .campo {
+  min-width: 200px;
+}
+.costos-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.costos-cifras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+.costos-cifras > div {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 180px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-borde);
+  border-radius: 12px;
+}
+.costos-cifras dt {
+  font-size: var(--texto-sm);
+  color: var(--color-texto-sec);
+}
+.costos-cifras dd {
+  margin: 0;
+  font-family: var(--fuente-num);
+  font-size: var(--dato);
+  font-weight: 700;
+}
+.costos-cifras dd.costos-nota {
+  font-family: inherit;
+  font-weight: 400;
+  font-size: var(--texto-xs);
+  color: var(--color-texto-sec);
+}
+.tabla-costos {
+  overflow-x: auto;
+}
+.tabla-costos table {
+  border-collapse: collapse;
+  font-size: var(--texto-sm);
+  width: 100%;
+}
+.tabla-costos caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 6px;
+}
+.tabla-costos th,
+.tabla-costos td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-borde);
+}
+.tabla-costos .d {
+  text-align: right;
+}
+.tabla-costos .sec {
+  font-size: var(--texto-xs);
+}
+.tabla-costos td.num,
+.tabla-costos .chip {
+  white-space: nowrap;
+}

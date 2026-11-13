@@ -11,6 +11,7 @@ import { conservarRetoques } from '@aptio/schema/retoques';
 import { erroresDisparadores, purgarDisparadores } from '@aptio/schema/disparadores';
 import { erroresMarcadores } from '@aptio/schema/marcadores';
 import { aplicarPausas, type PropuestaPausas } from '@aptio/schema/pausas';
+import { rangoPeriodo } from '../src/vistas/costos-periodo.ts';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 /** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
@@ -68,6 +69,58 @@ export const KIT_MINERA = {
   contraste: { textoFondo: 16.2, cumpleAA: true },
   advertencias: [],
 };
+
+/** HU-1302 · Consumos simulados de TrabajoIA: `mes` 0 es este mes y -1 el anterior (CP-097). */
+const P_LOTO = '00000000-0000-4000-8000-000000000701';
+const P_ALTURA = '00000000-0000-4000-8000-000000000702';
+const P_CIUDADANO = '00000000-0000-4000-8000-000000000704';
+const MUNI_ID = '00000000-0000-4000-8000-0000000000c2';
+export const CONSUMOS_IA: { proyectoId: string | null; proyecto?: string; clienteId: string; cliente: string; exportado?: boolean; proveedor: string; tarea: string; usd: number; mes: 0 | -1 }[] = [
+  { proyectoId: P_LOTO, proyecto: 'Bloqueo y etiquetado', clienteId: CLIENTE_ID, cliente: 'Minera Andina', exportado: true, proveedor: 'anthropic', tarea: 'IA-05', usd: 1.2, mes: -1 },
+  { proyectoId: P_LOTO, proyecto: 'Bloqueo y etiquetado', clienteId: CLIENTE_ID, cliente: 'Minera Andina', exportado: true, proveedor: 'anthropic', tarea: 'IA-15', usd: 1.8, mes: 0 },
+  { proyectoId: P_LOTO, proyecto: 'Bloqueo y etiquetado', clienteId: CLIENTE_ID, cliente: 'Minera Andina', exportado: true, proveedor: 'google-tts', tarea: 'VOZ', usd: 0.6, mes: 0 },
+  { proyectoId: P_ALTURA, proyecto: 'Trabajo en altura', clienteId: CLIENTE_ID, cliente: 'Minera Andina', exportado: true, proveedor: 'anthropic', tarea: 'IA-05', usd: 1.4, mes: 0 },
+  { proyectoId: P_ALTURA, proyecto: 'Trabajo en altura', clienteId: CLIENTE_ID, cliente: 'Minera Andina', exportado: true, proveedor: 'openai-imagen', tarea: 'IA-11', usd: 2.2, mes: 0 },
+  { proyectoId: P_CIUDADANO, proyecto: 'Atención al ciudadano', clienteId: MUNI_ID, cliente: 'Municipalidad de Lima', proveedor: 'anthropic', tarea: 'IA-05', usd: 0.9, mes: 0 },
+  { proyectoId: null, clienteId: MUNI_ID, cliente: 'Municipalidad de Lima', proveedor: 'anthropic', tarea: 'IA-18', usd: 0.25, mes: 0 },
+];
+const r4 = (n: number) => Math.round(n * 10_000) / 10_000;
+function resumenCostos(q: URLSearchParams) {
+  const ahora = new Date();
+  const filas = CONSUMOS_IA.filter((f) => {
+    const desde = q.get('desde');
+    if (desde && rangoPeriodo(f.mes === 0 ? 'mes' : 'anterior', ahora).desde !== desde) return false;
+    if (q.get('clienteId') && f.clienteId !== q.get('clienteId')) return false;
+    return !q.get('proyectoId') || f.proyectoId === q.get('proyectoId');
+  });
+  const agrupar = <T extends object>(clave: (f: (typeof filas)[number]) => string | null, crear: (f: (typeof filas)[number]) => T) => {
+    const m = new Map<string, T & { llamadas: number; usd: number }>();
+    for (const f of filas) {
+      const k = clave(f);
+      if (k === null) continue;
+      const g = m.get(k) ?? { ...crear(f), llamadas: 0, usd: 0 };
+      g.llamadas += 1;
+      g.usd = r4(g.usd + f.usd);
+      m.set(k, g);
+    }
+    return [...m.values()].sort((x, y) => y.usd - x.usd);
+  };
+  const porProyecto = agrupar((f) => f.proyectoId, (f) => ({ proyectoId: f.proyectoId!, nombre: f.proyecto!, clienteId: f.clienteId, cliente: f.cliente, exportado: Boolean(f.exportado) }));
+  const porCliente = [...new Set(filas.map((f) => f.clienteId))].map((id) => {
+    const de = filas.filter((f) => f.clienteId === id);
+    const proyectosUsd = r4(de.filter((f) => f.proyectoId).reduce((s, f) => s + f.usd, 0));
+    const sinProyectoUsd = r4(de.filter((f) => !f.proyectoId).reduce((s, f) => s + f.usd, 0));
+    return { clienteId: id, nombre: de[0]!.cliente, proyectosUsd, sinProyectoUsd, usd: r4(proyectosUsd + sinProyectoUsd) };
+  }).sort((a, b) => b.usd - a.usd);
+  const porProveedorTarea = agrupar((f) => `${f.proveedor}|${f.tarea}`, (f) => ({ proveedor: f.proveedor, tarea: f.tarea }));
+  const exportados = porProyecto.filter((p) => p.exportado);
+  const base = exportados.length ? exportados : porProyecto;
+  return {
+    totalUsd: r4(filas.reduce((s, f) => s + f.usd, 0)), scormContados: base.length,
+    promedioPorScormUsd: base.length ? r4(base.reduce((s, p) => s + p.usd, 0) / base.length) : 0,
+    criterioPromedio: exportados.length ? 'exportados' : 'con-gasto', porProyecto, porCliente, porProveedorTarea,
+  };
+}
 
 export interface OpcionesSimulacion {
   conSesion: boolean;
@@ -426,6 +479,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return token === 'vigente'
         ? responder(204)
         : responder(422, { codigo: 'ENLACE_NO_VALIDO', mensaje: 'Enlace no válido o vencido. Pide uno nuevo.' });
+    }
+    if (ruta === '/costos' && req.method() === 'GET') {
+      if (!['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'].includes(usuario.rol)) return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'No tienes permiso para esta acción' });
+      return responder(200, resumenCostos(new URL(req.url()).searchParams));
     }
     if (ruta === '/clientes' && req.method() === 'GET') {
       const buscar = (new URL(req.url()).searchParams.get('buscar') ?? '').toLowerCase();
