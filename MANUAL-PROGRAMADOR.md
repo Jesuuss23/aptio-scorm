@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.49 · actualizado con la tercera entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -307,6 +307,8 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 
 - **Texto:** implementa `ProveedorTexto` (`nombre`, `modeloPara`, `completar`) y elígelo en `proveedorDesdeEntorno`.
 - **Transcripción:** implementa `ProveedorTranscripcion` (`packages/ai/src/transcripcion.ts`) y elígelo en `transcriptorDesdeEntorno`. En modo real sin clave, el proveedor debe fallar con un motivo y no inventar texto.
+- **Voz:** agrega su función en `packages/ai/src/voz.ts` (como `sintetizarGoogle` y `sintetizarElevenLabs`, con `fetch` inyectable para probar), despáchala por `pedido.proveedor` en `sintetizadorDesdeEntorno`, súmala a `PROVEEDORES_VOZ` (`etapas/voz.ts`), su tarifa a `costoVoz` y su licencia a `licenciaVoz`.
+- **Conexiones IA (HU-1304):** la lista cerrada, las opciones, los modelos con tarifa y el costo estimado viven en `@aptio/schema/conexiones` (`CONEXIONES`); un proveedor nuevo se agrega ahí con su `variableClave`. El worker lee la conexión con `conexionDe` y revisa el límite con `vigilarLimite` (`apps/worker/src/conexiones.ts`) antes de cada llamada que cuesta; `conModeloDe` (`ia.ts`) aplica el modelo de la conexión. La API está en `apps/api/src/conexiones/`; la web en `ConexionesIA.tsx`, `MedidorCostoIA.tsx` y `conexiones-ia.ts`. Pruebas: `conexiones.test.ts` del worker, `conexiones.e2e.test.ts` y `conexiones.spec.ts`.
 - Registra la tarifa y la licencia (`docs/19-proveedores-y-licencias.md`, ADR-010). Si no está verificada, déjala como supuesto.
 - Todo recurso GENERADO pasa por `conProcedencia` (`apps/worker/src/procedencia.ts`) con el proveedor, el modelo que respondió y la licencia; sin alguno de los tres no se guarda (REQ-062). Lo que hace la plataforma sin IA usa `PROVEEDOR_APTIO` y no sale en los créditos.
 
@@ -353,6 +355,7 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `GOOGLE_STT_API_KEY`, `GOOGLE_STT_MODELO` | worker | Transcripción |
 | `RHUBARB_PATH` | worker | Ejecutable de Rhubarb Lip Sync para la boca en modo real (vacío = `rhubarb` del PATH) |
 | `GOOGLE_TTS_API_KEY` | api, worker | Muestra de voz (api) y narración de la etapa 6 en modo real (worker) |
+| `ELEVENLABS_API_KEY` | api, worker | Voz de ElevenLabs en la etapa 6 y «Probar» en Conexiones IA (HU-1304) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | api | Ingreso con Google |
 
 Ninguna clave real va al repositorio.
@@ -408,6 +411,7 @@ Ninguna clave real va al repositorio.
 | 0.43 | 2026-11-12 | HU-0903: `@aptio/schema/pausas`, IA-09 v2 con `cambiosTema`, el worker `pausas.ts` y `PAUSAS_60S` en la API simulada. |
 | 0.44 | 2026-11-13 | HU-0609: `biblioteca.ts` del reproductor, `@aptio/schema/biblioteca`, el enlace de imágenes en `CursosService.editar`, `panel-imagenes.tsx` e `imagenes.spec.ts`. |
 | 0.45 | 2026-11-13 | HU-0704: `@aptio/schema/grabacion`, `GrabacionService`, `src/grabacion.ts` del worker (grabación y limpieza con ffmpeg), la protección en la etapa 6 y `PersonajeVozVista.tsx`. |
+| 0.49 | 2026-11-13 | HU-1304: `@aptio/schema/conexiones`, `conexiones.ts` y `conModeloDe` del worker, `sintetizarElevenLabs`, `probarAnthropic`, el módulo `conexiones` de la API, la migración por organización y `ConexionesIA.tsx` con el medidor. |
 | 0.48 | 2026-11-13 | HU-1303: `@aptio/schema/rentabilidad`, el módulo `negocio` de la API, la migración de parámetros por organización y la calculadora y las mediciones en `Rentabilidad.tsx`. |
 | 0.47 | 2026-11-13 | HU-1302: módulo `costos` de la API, `Rentabilidad.tsx`, `costos-periodo.ts`, `NOMBRE_TAREA` y `CONSUMOS_IA` en la API simulada. |
 | 0.46 | 2026-11-13 | HU-0206: `@aptio/schema/extraccion-kit`, la lectura segura del ZIP y el PDF en `src/extraer/kit.ts`, IA-18 v2 en `src/kit.ts`, `TrabajoIA.resultado`, `KitExtraccionService` y `PropuestaKit.tsx`. |

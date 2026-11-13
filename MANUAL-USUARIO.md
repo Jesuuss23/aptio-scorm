@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.49 · actualizado con la tercera entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -71,6 +71,7 @@ Puedes pedir el enlace hasta 3 veces por hora.
   - **Inicio → Nuevo SCORM:** para crear un proyecto.
   - **Empresa → Clientes y kits:** los clientes y su identidad visual.
   - **Empresa → Rentabilidad:** cuánto cuesta cada SCORM hoy y con el generador, las horas medidas y el gasto en IA por proyecto, cliente y proveedor (solo administración y diseño instruccional).
+  - **Empresa → Conexiones IA:** qué proveedor y modelo usa cada tarea de IA, el gasto del mes y su límite (solo administración). Administración ve además, al pie del menú, el medidor **Costo de IA del mes**.
 - **Arriba**, la ruta de dónde estás (por ejemplo, «Inicio / Proyecto») y tu nombre con tu rol.
 
 Aptio SCORM funciona en computadora, tableta y celular.
@@ -620,6 +621,17 @@ Arriba de **Costo de IA**, en **Empresa → Rentabilidad**, la calculadora compa
 
 **Registrar mediciones.** En **Mediciones**, escribe el proyecto (puede ser uno de la herramienta o uno anterior), elige **Hoy** o **Con el generador**, la etapa y las horas reales del equipo, sin contar la espera del cliente, y pulsa **Registrar**. Si te equivocas, pulsa **Borrar** en esa fila. Para comparar bien, mide al menos 2 proyectos completos por escenario, como dice la guía de medición.
 
+### 8.24 Conexiones IA: proveedor, modelo y límite de gasto por tarea
+
+En **Empresa → Conexiones IA** (solo administración) hay una fila por tarea: resumen, estructura y guion; pantallas animadas; traducción al inglés; control de calidad; voz; ilustraciones; boca del personaje y transcripción.
+1. En **Proveedor y modelo** elige el proveedor y, en las tareas de texto, el modelo de Claude. En **Voz** puedes elegir Google Text-to-Speech o ElevenLabs (Azure Speech llega más adelante) y escribir la voz en español y en inglés: se usa cuando la voz del kit es de otro proveedor. Ilustraciones, boca y transcripción tienen un proveedor fijo.
+2. **Clave** dice **Sí** o **No**: si el servidor tiene la clave de ese proveedor. La clave nunca se muestra ni se escribe aquí; la configura quien administra el servidor.
+3. Verás el **costo estimado por SCORM** y el **gasto del mes** (con la hora de Lima). En **Límite mensual (US$)** escribe el tope de esa tarea o déjalo vacío para no tener límite.
+4. Pulsa **Guardar** en la fila. El cambio vale para lo próximo que se genere: lo ya generado no se rehace.
+5. **Probar** hace una llamada mínima al proveedor y te dice si respondió y cuánto tardó. En el modo simulado responde «simulado, OK» sin costo.
+
+**Cuando una tarea llega a su límite.** Arriba aparece un aviso con las tareas al límite, la fila se marca **Al límite** y el medidor **Costo de IA del mes** del menú se pone en rojo. La IA de esa tarea se detiene antes de gastar: en **Producción**, la generación se queda en la etapa que la usaba con el aviso **Se alcanzó el límite de gasto de IA del mes**. Sube el límite en Conexiones IA, vuelve al proyecto y pulsa **Continuar**: sigue desde esa etapa sin repetir lo hecho. El medidor compara lo gastado en el mes con la suma de los límites que definiste.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -703,6 +715,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |
 | 0.47 | 2026-11-13 | Costo de IA en Empresa → Rentabilidad: total, promedio por SCORM, filtros de periodo y cliente y las tablas por proyecto, cliente y proveedor (4 y 8.22). |
 | 0.46 | 2026-11-13 | Kit de marca desde un curso anterior o el manual de marca: «✦ Extraer de un curso anterior», la propuesta con sus evidencias, «Aplicar» sin guardar y «Descartar» (8.21). |

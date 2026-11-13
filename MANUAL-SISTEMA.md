@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.48 · actualizado con la segunda entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.49 · actualizado con la tercera entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -330,6 +330,15 @@ La regla RN-13-1 vive en `@aptio/schema/rentabilidad`, que usan la API y la web 
 - **Parámetros:** uno por organización (`ParametrosNegocio.organizacionId`, migración aditiva); mientras no se guarden, `GET /negocio/parametros` devuelve el ejemplo del prototipo con `ejemplo: true`. `PUT` solo administración (auditoría PARAMETROS_NEGOCIO_GUARDADOS).
 - **Mediciones:** `MedicionProceso` por proyecto (id de la herramienta o nombre), escenario (`hoy` o `generador`) y una de las 8 etapas fijas. Con `GET /negocio/rentabilidad?fuente=mediciones`, cada proyecto suma sus horas por etapa y se promedia entre los proyectos del escenario; el que no tiene mediciones usa los supuestos y lo dice `respaldo`. Registrar y borrar (`DELETE /negocio/mediciones/{id}`, auditoría MEDICION_BORRADA): administración y diseño instruccional; los demás reciben 403 (SUP-143 a SUP-145).
 
+### 3.8 Conexiones IA y límite de gasto (HU-1304)
+
+Cada organización elige proveedor, modelo y límite mensual por tarea (`ConfigProveedor` con `organizacionId`, único por organización y tarea; migración aditiva). Sin fila guardada se usa el entorno, como antes.
+
+- **En caliente (CP-099, RN-13-2):** el worker lee la conexión al empezar cada trabajo; no hace falta reiniciarlo. En texto, `tareaRegistrada` registra el tipo real (texto, pantallas con IA-15/IA-16, traducción con IA-10, calidad con IA-12) y usa el modelo de la conexión, que debe tener tarifa en `TARIFAS`. En voz, la etapa 6 usa el proveedor activo: la voz del kit si es de ese proveedor o la voz por idioma de la conexión; una narración ya lista se conserva.
+- **Límite (CP-100, RN-04-7):** antes de llamar al proveedor (texto, voz y transcripción) se suma `TrabajoIA.costoUsd` de la organización y el tipo desde el día 1 del mes de Lima. Si llega al límite, el trabajo queda en error con «LIMITE_GASTO: …», se audita LIMITE_GASTO_ALCANZADO y no se llama al proveedor; la generación se continúa con `POST /generaciones/{id}/continuar` después de subirlo. El aviso por correo llega con HU-1403.
+- **API (solo administración):** `GET /conexiones-ia` (las 8 tareas con opciones, `claveConfigurada`, costo estimado, gasto del mes, límite y `limiteAlcanzado`, más el total del mes y la suma de límites para el medidor), `PUT /conexiones-ia/{tarea}` (auditoría CONEXION_IA_GUARDADA; 422 PROVEEDOR_NO_VALIDO, MODELO_NO_VALIDO o un campo de clave) y `POST /conexiones-ia/{tarea}/probar` (llamada mínima en modo real, «simulado, OK» en simulado; no se registra en TrabajoIA).
+- **Claves (RN-13-3):** solo en variables de entorno (`ANTHROPIC_API_KEY`, `GOOGLE_TTS_API_KEY`, `ELEVENLABS_API_KEY`); nunca se guardan ni se devuelven (SUP-146 a SUP-150).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -371,7 +380,7 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | Texto (etapas 1 a 3) | Anthropic Claude (`claude-opus-5-5` por defecto, SUP-23) | Salidas grabadas del caso LOTO | Integrado. Los prompts v2 de IA-04 e IA-05 todavía no se han evaluado con la clave real. |
 | Transcripción | Google Speech-to-Text v1 (`latest_long`) | Fragmentos de relleno cada 10 s, sin costo | Integrado. Sin probar con una clave real, y tarifa por minuto sin verificar (SUP-28). |
 | Boca (etapa 7) | Rhubarb Lip Sync 1.13 (MIT), local en el worker, con ffmpeg | Marcas por letras, sin costo | Integrado y probado en local con un MP3. Falta PT-01 con voz real e instalarlo en la imagen del worker (HU-1405). |
-| Voz (muestra y etapa 6) | Google Text-to-Speech (voces GA) | Silencio WAV de 65 ms por carácter, sin costo | Integrado. Sin probar con una clave real; tarifa supuesta de 16 USD por millón de caracteres (Neural2) y 30 USD (Chirp 3 HD), por confirmar (SUP-34). Azure y ElevenLabs todavía no. |
+| Voz (muestra y etapa 6) | Google Text-to-Speech (voces GA) | Silencio WAV de 65 ms por carácter, sin costo | Integrado. Sin probar con una clave real; tarifa supuesta de 16 USD por millón de caracteres (Neural2) y 30 USD (Chirp 3 HD), por confirmar (SUP-34). ElevenLabs desde HU-1304 (`eleven_multilingual_v2`), probado con `fetch` simulado y tarifa supuesta de 200 USD por millón de caracteres (SUP-147). Azure todavía no. |
 | Correo | SMTP (Mailpit en local) | — | Integrado. |
 
 Las licencias, el uso comercial y el tratamiento de datos de cada proveedor están en `docs/19-proveedores-y-licencias.md` (ADR-010). `PROVEEDORES_MODO` (`simulado` o `real`) elige el modo. En modo real sin clave, la transcripción falla con un motivo en vez de inventar texto.
@@ -453,6 +462,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.43 | 2026-11-12 | Pausas propuestas por la IA (3.3.0.1): `tipo: "pausas-video"`, 422 SIN_TRANSCRIPCION, `marcadorIds` al aplicar y `agregados` y `observaciones` en la respuesta. |
 | 0.44 | 2026-11-13 | Imágenes propias y biblioteca del kit: `pieza` y `decorativa` en los extras, el enlace al curso en el `PATCH`, 422 RECURSO_NO_VALIDO y el filtro `biblioteca`. |
 | 0.45 | 2026-11-13 | Audio del cliente: flujo de la grabación en la cola `voz`, la limpieza en `media`, la autorización (RN-07-4), la protección frente a la voz de la IA y los 4 endpoints nuevos. |
+| 0.49 | 2026-11-13 | Conexiones IA y límite de gasto (3.8): conexión por organización leída en caliente, tipo real de cada trabajo, voz de Google o ElevenLabs, LIMITE_GASTO con auditoría y los 3 endpoints sin claves. |
 | 0.48 | 2026-11-13 | Rentabilidad y mediciones (3.7): el cálculo compartido, los parámetros por organización, el promedio de las mediciones con respaldo de supuestos y los permisos. |
 | 0.47 | 2026-11-13 | Resumen de costos de IA (3.6): `GET /costos`, días de Lima, trabajos sin proyecto por cliente, criterio del promedio por SCORM y permisos. |
 | 0.46 | 2026-11-13 | Kit desde un curso anterior: flujo de la extracción en la cola `ia`, los topes de lectura del ZIP, `TrabajoIA.resultado` y los 3 endpoints de la propuesta. |
