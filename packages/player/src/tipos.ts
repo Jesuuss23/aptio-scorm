@@ -68,6 +68,10 @@ export interface ElementoExtra {
   tipo: 'titulo' | 'texto' | 'dato' | 'boton' | 'imagen' | 'insignia' | 'forma' | 'personaje';
   texto?: TextoI18n;
   recursoId?: string;
+  /** HU-0609 · Ilustración de la biblioteca del kit, en vez de un recurso (solo en `imagen`). */
+  pieza?: 'candado' | 'alerta' | 'tablero' | 'escena' | 'trofeo' | 'casco';
+  /** HU-0609 · Sin texto alternativo para el lector de pantalla (RN-14-3). */
+  decorativa?: boolean;
   x: number;
   y: number;
   ancho: number;

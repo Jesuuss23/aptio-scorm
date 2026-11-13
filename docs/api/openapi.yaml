@@ -1207,6 +1207,13 @@ paths:
         required: false
         schema:
           type: string
+      - name: biblioteca
+        in: query
+        required: false
+        description: HU-0609 · Biblioteca del proyecto (REQ-046) con solo las imágenes y SVG subidos o generados, sin el
+          material del cliente, hasta 100, cada uno con su URL firmada de 15 minutos.
+        schema:
+          type: boolean
       responses:
         '200':
           description: OK
@@ -1809,6 +1816,12 @@ paths:
         bloque no es un video de la pantalla. HU-0902 · `reglasVideo` fija, por id del bloque de video, «impedir adelantar»
         (CP-081) y conserva `porcentajeMinimo` si no se manda; 422 REGLA_VIDEO_NO_VALIDA si `impedirAdelantar` no es sí o
         no, el porcentaje sale de 0 a 100 o trae otros campos; BLOQUE_NO_EXISTE si el bloque no es un video de la pantalla.
+        HU-0609 · Un extra `imagen` muestra una pieza de la biblioteca del kit (`pieza`) o una imagen subida (`recursoId`),
+        no las dos. Si el `recursoId` es una imagen (PNG, JPEG o WebP) o un SVG subido o generado en el proyecto del curso y
+        aún no está en `recursos`, se suma con origen `subido` en la misma versión; una imagen subida que ya ningún elemento
+        usa sale de `recursos` (Deshacer revierte las dos cosas). 422 RECURSO_NO_VALIDO si el recurso no existe, es de otro
+        proyecto, es material del cliente o no es una imagen; EXTRA_NO_VALIDO si trae `pieza` y `recursoId` juntos, o
+        `pieza` o `decorativa` fuera de una imagen. El revisor del cliente no edita (403).
       parameters:
       - name: cursoId
         in: path
@@ -4900,7 +4913,7 @@ components:
           format: date-time
         urlsRecursos:
           type: object
-          description: HU-0702 · URL firmada (vence a los 15 minutos) de cada audio de narración del curso, por id de recurso. Solo en GET /proyectos/{proyectoId}/curso.
+          description: HU-0702 · URL firmada (vence a los 15 minutos) de cada audio de narración, video (HU-0901) e imagen o SVG (HU-0609) del curso, por id de recurso. Solo en GET /proyectos/{proyectoId}/curso.
           additionalProperties:
             type: string
             format: uri
@@ -5083,6 +5096,20 @@ components:
           $ref: '#/components/schemas/TextoI18n'
         recursoId:
           type: string
+        pieza:
+          type: string
+          description: HU-0609 · Pieza de la biblioteca del kit, en vez de recursoId (solo en una imagen); se dibuja con los
+            colores del kit.
+          enum:
+          - candado
+          - alerta
+          - tablero
+          - escena
+          - trofeo
+          - casco
+        decorativa:
+          type: boolean
+          description: HU-0609 · Imagen decorativa, sin texto alternativo para el lector de pantalla (RN-14-3).
         x:
           type: number
           minimum: 0

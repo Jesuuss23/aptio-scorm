@@ -1916,6 +1916,21 @@
         "recursoId": {
           "$ref": "#/$defs/id"
         },
+        "pieza": {
+          "description": "HU-0609 · Ilustración de la biblioteca del kit (solo en un extra imagen, en vez de recursoId): se dibuja con los colores del kit.",
+          "enum": [
+            "candado",
+            "alerta",
+            "tablero",
+            "escena",
+            "trofeo",
+            "casco"
+          ]
+        },
+        "decorativa": {
+          "description": "HU-0609 · Imagen decorativa: sin texto alternativo para el lector de pantalla (RN-14-3).",
+          "type": "boolean"
+        },
         "x": {
           "type": "number",
           "minimum": 0,

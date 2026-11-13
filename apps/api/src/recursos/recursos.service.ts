@@ -172,11 +172,14 @@ export class RecursosService {
             ...(f.tipo ? { tipo: f.tipo } : {}),
             ...(f.origen ? { origen: f.origen } : {}),
           },
+          // HU-0609 · La biblioteca del proyecto: imágenes y SVG propios o generados, nunca el material del cliente.
+          ...(f.biblioteca ? [{ tipo: { in: ['IMAGEN' as const, 'SVG' as const] }, origen: { in: ['SUBIDO' as const, 'GENERADO' as const, 'BIBLIOTECA' as const] } }] : []),
         ],
       },
       orderBy: { creadoEn: 'desc' },
-      take: 500,
+      take: f.biblioteca ? 100 : 500,
     });
+    if (f.biblioteca) return Promise.all(recursos.map(async (r) => aDto(r, await this.almacen.urlDescarga(r.claveS3, r.nombre))));
     return recursos.map((r) => aDto(r));
   }
 

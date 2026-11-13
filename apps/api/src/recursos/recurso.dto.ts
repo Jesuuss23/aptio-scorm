@@ -48,4 +48,6 @@ export class FiltroRecursosDto {
   @IsOptional() @IsUUID() proyectoId?: string;
   @IsOptional() @IsIn(TIPOS) tipo?: (typeof TIPOS)[number];
   @IsOptional() @IsIn(ORIGENES) origen?: (typeof ORIGENES)[number];
+  @ApiPropertyOptional({ description: 'HU-0609 · Biblioteca del proyecto: solo imágenes y SVG subidos o generados (no el material del cliente), con su URL firmada' })
+  @IsOptional() @Transform(({ value }) => value === true || value === 'true') biblioteca?: boolean;
 }
