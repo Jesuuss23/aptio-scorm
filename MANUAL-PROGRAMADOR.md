@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.49 · actualizado con la tercera entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.50 · actualizado con la cuarta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -411,6 +411,7 @@ Ninguna clave real va al repositorio.
 | 0.43 | 2026-11-12 | HU-0903: `@aptio/schema/pausas`, IA-09 v2 con `cambiosTema`, el worker `pausas.ts` y `PAUSAS_60S` en la API simulada. |
 | 0.44 | 2026-11-13 | HU-0609: `biblioteca.ts` del reproductor, `@aptio/schema/biblioteca`, el enlace de imágenes en `CursosService.editar`, `panel-imagenes.tsx` e `imagenes.spec.ts`. |
 | 0.45 | 2026-11-13 | HU-0704: `@aptio/schema/grabacion`, `GrabacionService`, `src/grabacion.ts` del worker (grabación y limpieza con ffmpeg), la protección en la etapa 6 y `PersonajeVozVista.tsx`. |
+| 0.50 | 2026-11-13 | HU-0506: el módulo `comentarios` de la API (alcance con `CursosService.buscar`), la migración `comentarios_resueltos`, `comentarios.ts` y `PanelComentarios.tsx` en Revisión, y `comentarios` compartibles en la API simulada. |
 | 0.49 | 2026-11-13 | HU-1304: `@aptio/schema/conexiones`, `conexiones.ts` y `conModeloDe` del worker, `sintetizarElevenLabs`, `probarAnthropic`, el módulo `conexiones` de la API, la migración por organización y `ConexionesIA.tsx` con el medidor. |
 | 0.48 | 2026-11-13 | HU-1303: `@aptio/schema/rentabilidad`, el módulo `negocio` de la API, la migración de parámetros por organización y la calculadora y las mediciones en `Rentabilidad.tsx`. |
 | 0.47 | 2026-11-13 | HU-1302: módulo `costos` de la API, `Rentabilidad.tsx`, `costos-periodo.ts`, `NOMBRE_TAREA` y `CONSUMOS_IA` en la API simulada. |

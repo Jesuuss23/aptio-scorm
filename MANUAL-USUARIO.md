@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.49 · actualizado con la tercera entrega del Sprint 10 (13 de noviembre de 2026)**
+**Versión 0.50 · actualizado con la cuarta entrega del Sprint 10 (13 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -30,7 +30,7 @@ Cada persona entra con su propio usuario y ve solo lo que le corresponde a su ro
 | **Diseño instruccional** | Crea proyectos, sube el material, lanza la generación, decide qué se conserva y aprueba las pantallas. |
 | **Diseño gráfico** | Prepara el kit de marca de cada cliente (colores, letras, logo, personaje y pantallas modelo) y corrige textos de las pantallas. |
 | **Producción** | Crea proyectos, sube material, sigue el avance de la generación y corrige textos de las pantallas. |
-| **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos. No puede modificar la configuración. |
+| **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos y comentar cada pantalla. No puede modificar la configuración. |
 
 ---
 
@@ -316,7 +316,7 @@ Si la pantalla cambió después de pedir la propuesta (por ejemplo, alguien corr
 
 **Aprobar todas las que no tienen observaciones.** Este botón, al pie de la lista, aprueba de una vez todas las pantallas sin observaciones pendientes. Las que tienen observaciones quedan pendientes para revisarlas una por una.
 
-Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Producción pueden corregir textos. Revisión del cliente puede mirar las pantallas, pero no cambiarlas.
+Solo Administración y Diseño instruccional aprueban. Diseño gráfico y Producción pueden corregir textos. Revisión del cliente puede mirar las pantallas y comentarlas (8.25), pero no cambiarlas.
 
 **Regeneración automática al corregir la narración.** Si corriges la narración de una pantalla que ya tiene voz, al guardar se rehacen solas su voz, la boca del personaje y sus subtítulos en español. Las demás pantallas no se tocan. Debajo de **Textos** aparece la tarjeta **Regeneración** con tres marcas: **Voz ES**, **Boca** y **Subtítulos ES**.
 - **Regenerando…:** se está haciendo. Suele tardar unos segundos.
@@ -632,6 +632,21 @@ En **Empresa → Conexiones IA** (solo administración) hay una fila por tarea: 
 
 **Cuando una tarea llega a su límite.** Arriba aparece un aviso con las tareas al límite, la fila se marca **Al límite** y el medidor **Costo de IA del mes** del menú se pone en rojo. La IA de esa tarea se detiene antes de gastar: en **Producción**, la generación se queda en la etapa que la usaba con el aviso **Se alcanzó el límite de gasto de IA del mes**. Sube el límite en Conexiones IA, vuelve al proyecto y pulsa **Continuar**: sigue desde esa etapa sin repetir lo hecho. El medidor compara lo gastado en el mes con la suma de los límites que definiste.
 
+### 8.25 Comentarios del cliente en Revisión
+
+En **Revisión**, cada pantalla tiene la tarjeta **Comentarios**, a la derecha. Ahí se conversa sobre esa pantalla sin cambiarla.
+
+**Si eres el revisor del cliente.** Entras a Revisión en **modo solo lectura**: recorres las pantallas y ves su origen y sus observaciones, pero no corriges textos, no apruebas, no abres el editor ni pides revisiones a la IA.
+1. Elige la pantalla en la lista de la izquierda.
+2. En **Comentar esta pantalla** escribe lo que quieres que cambie (hasta 1000 caracteres; el contador te avisa si te pasas).
+3. Pulsa **Comentar**. Tu comentario aparece con tu nombre, la marca **Cliente**, la fecha y el estado **Abierto**.
+
+Un comentario no se edita ni se borra después de publicarlo: si te equivocaste, escribe otro.
+
+**Si eres del equipo.** Arriba ves la cifra **Comentarios abiertos**, y cada miniatura con comentarios sin resolver lleva el contador 💬 con cuántos tiene. El filtro **Con comentarios** deja solo esas pantallas. Tú también puedes comentar. Cuando atiendas un comentario, pulsa **Resolver**: queda **Resuelto** con tu nombre y la fecha. Si hace falta volver a verlo, pulsa **Reabrir**. Resolver y reabrir lo hacen administración, diseño instruccional, diseño gráfico y producción.
+
+Comentar no cambia el estado de la pantalla: una pantalla aprobada sigue aprobada aunque tenga comentarios abiertos. Si el comentario lleva a corregir algo, la corrección sí la vuelve a borrador, como siempre. Por ahora no llega un correo con cada comentario nuevo; ese aviso viene en una próxima entrega.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -677,7 +692,8 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 - Voz, boca y subtítulos en inglés dentro del paquete con los dos idiomas.
 - Un paquete separado por cada idioma.
 - Control de calidad y otros formatos de entrega (SCORM 2004).
-- Otra ilustración desde la revisión y comentarios del cliente.
+- Otra ilustración desde la revisión.
+- Aviso por correo de los comentarios nuevos.
 
 ---
 
@@ -715,6 +731,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.43 | 2026-11-12 | Video interactivo (8.19): «✦ Proponer pausas desde la transcripción», las marcas en espera, «Aplicar las elegidas» y las pausas omitidas por estar a menos de 2 s de otra. |
 | 0.44 | 2026-11-13 | Editor: la pestaña «Imágenes» con la biblioteca del kit, «Subir imagen propia», las imágenes del proyecto, soltar una imagen sobre la pantalla, el aviso del texto alternativo y «Decorativa». |
 | 0.45 | 2026-11-13 | Personaje y voz: las narraciones con Ana y la tarjeta «Audio del cliente» (limpiar ruido con antes y después, la autorización del cliente, «Usar con boca automática» y «✦ Re-locutar con voz IA» con Deshacer). |
+| 0.50 | 2026-11-13 | Comentarios en Revisión (2 y 8.25): el revisor del cliente en solo lectura comenta cada pantalla; el equipo los ve por el contador y el filtro «Con comentarios», y los resuelve o reabre. |
 | 0.49 | 2026-11-13 | Conexiones IA (4 y 8.24): proveedor y modelo por tarea, voz de Google o ElevenLabs, clave Sí/No, gasto del mes, límite mensual, «Probar», el medidor «Costo de IA del mes» y «Continuar» tras subir el límite. |
 | 0.48 | 2026-11-13 | Rentabilidad: la calculadora hoy frente a con el generador, «Tus datos» con «Usar el real», Supuestos o Mediciones, el registro de mediciones y los soles en Costo de IA (4, 8.22 y 8.23). |
 | 0.47 | 2026-11-13 | Costo de IA en Empresa → Rentabilidad: total, promedio por SCORM, filtros de periodo y cliente y las tablas por proyecto, cliente y proveedor (4 y 8.22). |
