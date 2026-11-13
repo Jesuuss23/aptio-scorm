@@ -1,5 +1,5 @@
 export {
-  archivoDeRuta, type ArchivoSitio, CARPETA_MARCA, conDominio, type Marca, marcaDe, type OpcionesRender, renderizar404, renderizarMantenimiento, renderizarPagina, renderizarSitio, robotsTxt, rutaPublica, sitemapXml,
+  archivoDeRuta, type ArchivoSitio, CARPETA_MARCA, conDominio, landingsDe, type LandingPublica, type Marca, marcaDe, type OpcionesRender, renderizar404, renderizarMantenimiento, renderizarPagina, renderizarSitio, robotsTxt, rutaPublica, sitemapXml,
 } from './render.js';
 export { CARPETA_FUENTES, type Fuente, fuentes, leerFuente } from './fuentes.js';
 export { instantaneaDeEjemplo } from './ejemplo.js';

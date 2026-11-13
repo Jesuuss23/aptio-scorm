@@ -1,13 +1,15 @@
 // HU-1502 · Sitio web › Páginas (PNT-25, M16): las páginas del sitio comercial con su estado (borrador, programada,
 // publicada). Nueva página, Publicar, Programar con fecha y hora de Lima, Pasar a borrador y Borrar (solo borradores).
-// Solo el superadmin (ADR-011). HU-1503 · «Editar» abre el editor de bloques (PNT-26). SEO y landings de sector llegan
-// con sus historias.
+// Solo el superadmin (ADR-011). HU-1503 · «Editar» abre el editor de bloques (PNT-26). El SEO llega con su historia.
+// HU-1514 · «Nueva landing de sector» crea la landing en borrador con la plantilla y abre su editor; la columna Tipo
+// distingue General de Sector.
 // HU-1505 · En producción, publicar con datos ficticios visibles da 409: se muestra la lista con «Ocultar todos los
 // ficticios», que los oculta y vuelve a publicar en un clic (CP-116). En pruebas se publica con aviso (CP-117).
 // HU-1506 · Debajo de la tabla, las tarjetas «Menú principal» y «Pie de página» (CP-118).
 // HU-1507 · «Publicar cambios» con el chip «Cambios sin publicar» en la cabecera y la tarjeta «Versiones» (CP-119).
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { LIMITES_SECTOR, rutaSector, slugSector } from '@aptio/schema/sitio-sectores';
 import { type Coleccion, COLECCIONES_CONTENIDO } from '@aptio/schema/sitio-contenido';
 import { navegar } from '../ruta';
 import { type AccionPagina, api, ErrorApi, type PaginaSitio, type PaginaSitioCambio } from '../api';
@@ -25,7 +27,7 @@ export function SitioPaginas() {
   const [paginas, setPaginas] = useState<PaginaSitio[] | null>(null);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState<Aviso>(null);
-  const [nueva, setNueva] = useState(false);
+  const [nueva, setNueva] = useState<'general' | 'sector' | null>(null);
   const [abierto, setAbierto] = useState<Abierto>(null);
   const [ocupado, setOcupado] = useState(false);
   const [bloqueo, setBloqueo] = useState<Bloqueo>(null);
@@ -100,7 +102,8 @@ export function SitioPaginas() {
   const acciones = (
     <div className="acciones-cabecera">
       <AccionPublicar estado={publicacion} />
-      <button type="button" className="boton" onClick={() => { setNueva(true); setAviso(null); }} disabled={nueva}>Nueva página</button>
+      <button type="button" className="boton" onClick={() => { setNueva('sector'); setAviso(null); }} disabled={nueva !== null}>Nueva landing de sector</button>
+      <button type="button" className="boton" onClick={() => { setNueva('general'); setAviso(null); }} disabled={nueva !== null}>Nueva página</button>
     </div>
   );
   return (
@@ -108,16 +111,17 @@ export function SitioPaginas() {
       <Cabecera titulo="Páginas" subtitulo="Páginas del sitio comercial. Lo que cambies en bloques, contenido, menú y pie llega al sitio con «Publicar cambios»; publicar o retirar una página, o una programada a su hora, también publica todo lo pendiente." accion={acciones} />
       <AvisosPublicacion estado={publicacion} />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
-      {nueva ? (
+      {nueva === 'general' ? (
         <NuevaPagina
-          alCancelar={() => setNueva(false)}
+          alCancelar={() => setNueva(null)}
           alCrear={(p) => {
             setPaginas((l) => [...(l ?? []), p].sort((a, b) => a.ruta.localeCompare(b.ruta) || a.idioma.localeCompare(b.idioma)));
-            setNueva(false);
+            setNueva(null);
             setAviso({ tipo: 'ok', texto: `«${p.titulo}» se creó como borrador.` });
           }}
         />
       ) : null}
+      {nueva === 'sector' ? <NuevaLanding alCancelar={() => setNueva(null)} alCrear={(p) => navegar(`/sitio/paginas/${p.id}?nueva=1`)} /> : null}
       {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : aviso.tipo === 'aviso' ? 'aviso' : 'error'}`} role={aviso.tipo === 'error' ? 'alert' : 'status'}>{aviso.texto}</div> : null}
       {bloqueo ? (
         <div className="nota error" role="alert" aria-labelledby="bloqueo-titulo">
@@ -134,12 +138,13 @@ export function SitioPaginas() {
       {!paginas ? (!error ? <p className="sec" role="status">Cargando las páginas…</p> : null) : (
         <section className="tarjeta" aria-labelledby="sitio-paginas-titulo">
           <h2 id="sitio-paginas-titulo" ref={titulo} tabIndex={-1}>Páginas del sitio</h2>
-          {paginas.length === 0 ? <p className="nota">Aún no hay páginas. Crea la primera con «Nueva página».</p> : (
+          {paginas.length === 0 ? <p className="nota">Aún no hay páginas. Crea la primera con «Nueva página» o «Nueva landing de sector».</p> : (
             <div className="tabla-costos">
               <table aria-label="Páginas del sitio">
                 <thead>
                   <tr>
                     <th scope="col">Página</th>
+                    <th scope="col">Tipo</th>
                     <th scope="col">Idioma</th>
                     <th scope="col">Estado</th>
                     <th scope="col">Fecha</th>
@@ -180,6 +185,7 @@ function FilaPagina({ pagina: p, abierto, ocupado, alAbrir, alAccion, alPrograma
     <>
       <tr>
         <th scope="row"><b>{p.titulo}</b><span className="sec"> {p.ruta}</span></th>
+        <td>{p.tipo === 'sector' ? <><span className="chip ia">Sector</span><span className="sec"> {p.sector}</span></> : <span className="chip">General</span>}</td>
         <td>{NOMBRE_IDIOMA[p.idioma]}</td>
         <td><span className={`chip ${estado.chip}`}>{estado.texto}</span></td>
         <td>{fecha}</td>
@@ -194,11 +200,11 @@ function FilaPagina({ pagina: p, abierto, ocupado, alAbrir, alAccion, alPrograma
         </td>
       </tr>
       {abierto === 'programar' ? (
-        <tr><td colSpan={5}><Programar pagina={p} ocupado={ocupado} alCancelar={() => alAbrir(null)} alProgramar={alProgramar} /></td></tr>
+        <tr><td colSpan={6}><Programar pagina={p} ocupado={ocupado} alCancelar={() => alAbrir(null)} alProgramar={alProgramar} /></td></tr>
       ) : null}
       {abierto === 'borrar' ? (
         <tr>
-          <td colSpan={5}>
+          <td colSpan={6}>
             <div className="nota aviso confirmar-fila" role="group" aria-label={`Confirmar el borrado de ${p.titulo}`}>
               <span>¿Borrar «{p.titulo}» ({p.ruta})? No se puede deshacer.</span>
               <button type="button" className="boton peligro" disabled={ocupado} onClick={alBorrar}>Sí, borrar</button>
@@ -287,6 +293,54 @@ function NuevaPagina({ alCancelar, alCrear }: { alCancelar: () => void; alCrear:
         <button type="submit" className="boton primario" disabled={enviando}>{enviando ? 'Creando…' : 'Crear borrador'}</button>
         <button type="button" className="boton" onClick={alCancelar}>Cancelar</button>
       </form>
+      {error ? <div className="nota error" role="alert">{error}</div> : null}
+    </section>
+  );
+}
+
+/** HU-1514 · RN-16-9 · La landing nace en borrador, en /sectores/{sector}, con los bloques de la plantilla ocultos. */
+function NuevaLanding({ alCancelar, alCrear }: { alCancelar: () => void; alCrear: (p: PaginaSitio) => void }) {
+  const [sector, setSector] = useState('');
+  const [idioma, setIdioma] = useState<'es' | 'en'>('es');
+  const [error, setError] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const primero = useRef<HTMLInputElement>(null);
+  useEffect(() => primero.current?.focus(), []);
+
+  async function enviar(e: FormEvent) {
+    e.preventDefault();
+    if (!sector.trim()) return setError('Escribe el nombre del sector.');
+    if (!slugSector(sector)) return setError('El sector necesita al menos una letra o un número.');
+    setError('');
+    setEnviando(true);
+    try {
+      alCrear(await api.crearPaginaSitio({ tipo: 'sector', sector: sector.trim(), idioma }));
+    } catch (err) {
+      setError(mensajeDe(err, 'No se pudo crear la landing'));
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <section className="tarjeta" aria-labelledby="nueva-landing-titulo">
+      <h2 id="nueva-landing-titulo">Nueva landing de sector</h2>
+      <p className="sec">Se crea como borrador con los bloques de la plantilla (Portada, Cifras, Cómo funciona, Testimonios, Preguntas, Blog y Llamada final), ocultos. Para publicarla necesita la portada y el meta título.</p>
+      <form className="mediciones-form" onSubmit={enviar} aria-label="Nueva landing de sector" noValidate>
+        <label className="campo">
+          Sector
+          <input ref={primero} value={sector} onChange={(e) => setSector(e.target.value)} maxLength={LIMITES_SECTOR.sector} placeholder="Minería y energía" aria-describedby="nueva-landing-ruta" />
+        </label>
+        <label className="campo">
+          Idioma
+          <select value={idioma} onChange={(e) => setIdioma(e.target.value as 'es' | 'en')}>
+            <option value="es">Español</option>
+            <option value="en">Inglés</option>
+          </select>
+        </label>
+        <button type="submit" className="boton primario" disabled={enviando}>{enviando ? 'Creando…' : 'Crear landing'}</button>
+        <button type="button" className="boton" onClick={alCancelar}>Cancelar</button>
+      </form>
+      <p className="sec" id="nueva-landing-ruta">Ruta: {sector.trim() && slugSector(sector) ? rutaSector(sector) : '/sectores/…'}</p>
       {error ? <div className="nota error" role="alert">{error}</div> : null}
     </section>
   );

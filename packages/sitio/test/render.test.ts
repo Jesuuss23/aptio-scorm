@@ -66,7 +66,9 @@ describe('sitio público pre-renderizado (HU-1508)', () => {
     expect(en).toContain('Skip to content');
     expect(renderizarPagina(instantaneaDeEjemplo(), '/borrador', 'es', op)).toBeNull();
     expect(renderizarSitio(instantaneaDeEjemplo(), op).map((a) => a.archivo)).toEqual([
-      'en/index.html', 'index.html', 'funcionalidades/personaje/index.html', '404.html', 'sitemap.xml', 'robots.txt',
+      'en/index.html', 'index.html', 'funcionalidades/personaje/index.html', 'sectores/banca-y-seguros/index.html',
+      'sectores/educacion-superior/index.html', 'sectores/mineria-y-energia/index.html', 'sectores/retail-y-consumo/index.html',
+      '404.html', 'sitemap.xml', 'robots.txt',
     ]);
     expect(sitemapXml(instantaneaDeEjemplo(), op.sitioUrl)).toContain('<loc>https://aptioscorm.com/en</loc>');
   });

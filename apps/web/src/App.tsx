@@ -104,7 +104,7 @@ export function App() {
       pie={veConexiones && conexiones ? <MedidorCostoIA resumen={conexiones} /> : null}
     >
       {vista?.sub === 'editor-pagina' && veSitio ? (
-        <EditorPaginaSitio key={vista.id} paginaId={vista.id!} />
+        <EditorPaginaSitio key={vista.id} paginaId={vista.id!} nueva={new URLSearchParams(busqueda).has('nueva')} />
       ) : vista?.sub === 'vista-previa' ? (
         <VistaPrevia key={vista.id + busqueda} proyectoId={vista.id!} alCargar={alCargar} prueba={new URLSearchParams(busqueda)} />
       ) : vista?.sub === 'entrega' ? (

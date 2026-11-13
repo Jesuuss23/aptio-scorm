@@ -50,6 +50,8 @@ export const SECCIONES = {
   lms: { etiqueta: 'Entrega', titulo: 'Funciona con tu LMS', texto: 'El paquete cumple SCORM 1.2 de forma estricta. Para las plataformas más usadas dejamos además recomendaciones de configuración.' },
   testimonios: { etiqueta: 'Casos en Perú', titulo: 'Equipos que pasaron de semanas a días' },
   faq: { titulo: 'Preguntas frecuentes', texto: '¿No encuentras tu respuesta? Escríbenos o agenda una llamada.' },
+  /** HU-1514 · Bloque «Sectores» del inicio y columna del pie. */
+  sectores: { etiqueta: 'Sectores', titulo: 'Pensado para cómo capacita tu sector', verSolucion: 'Ver la solución' },
 } as const;
 
 export const PIE = {

@@ -10,6 +10,7 @@ import { COLECCION_DE_BLOQUE } from '@aptio/schema/sitio-contenido';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import type { EnlacePublico, NavegacionPublica } from '@aptio/schema/sitio-navegacion';
 import { enlaceWhatsapp, NOMBRE_POR_DEFECTO, type SitioPublicado } from '@aptio/schema/sitio-ajustes';
+import type { SectorPublicado } from '@aptio/schema/sitio-sectores';
 import { type Instantanea, type PaginaServida, paginaServida } from '@aptio/schema/sitio-versiones';
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
@@ -90,7 +91,17 @@ function Cabecera({ menu, base, idioma, actual, marca }: { menu: EnlacePublico[]
           h('nav', { className: 'nav-celular', 'aria-label': `${t.principal} (${t.menu.toLowerCase()})` }, lista()))) : null));
 }
 
-function Pie({ pie, base, idioma, anio, nombre }: { pie: NavegacionPublica['pie']; base: string; idioma: Idioma; anio: number; nombre: string }) {
+/** HU-1514 · Una landing publicada, para el bloque «Sectores» y la columna del pie. */
+export interface LandingPublica { nombre: string; ruta: string; titulo: string }
+
+/** Las landings de sector de la versión en un idioma, por nombre (solo están las publicadas: CP-158). */
+export function landingsDe(inst: Pick<Instantanea, 'paginas'>, idioma: string): LandingPublica[] {
+  return inst.paginas.filter((p) => p.idioma === idioma && p.sector)
+    .map((p) => ({ nombre: p.sector!.nombre, ruta: rutaPublica(p.ruta, p.idioma), titulo: p.sector!.portada.titulo }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+function Pie({ pie, base, idioma, anio, nombre, landings }: { pie: NavegacionPublica['pie']; base: string; idioma: Idioma; anio: number; nombre: string; landings: LandingPublica[] }) {
   const t = INTERFAZ[idioma];
   return h('footer', { className: 'sfoot', 'aria-label': t.pie },
     h('div', { className: 'in' },
@@ -98,7 +109,9 @@ function Pie({ pie, base, idioma, anio, nombre }: { pie: NavegacionPublica['pie'
         h('div', null, h('p', { className: 'flogo' }, nombre), h('p', { style: { marginTop: 12 } }, PIE.marca)),
         pie.map((c) => h('div', { key: c.titulo },
           h('h2', null, c.ruta ? h(Enlace, { e: { texto: c.titulo, ruta: c.ruta, externo: c.externo ?? false }, base }) : c.titulo),
-          h('ul', null, c.enlaces.map((e) => h('li', { key: e.ruta + e.texto }, h(Enlace, { e, base }))))))),
+          h('ul', null, c.enlaces.map((e) => h('li', { key: e.ruta + e.texto }, h(Enlace, { e, base })))))),
+        landings.length ? h('div', null, h('h2', null, SECCIONES.sectores.etiqueta),
+          h('ul', null, landings.map((l) => h('li', { key: l.ruta }, h('a', { href: `${base}${l.ruta}` }, l.nombre))))) : null),
       h('p', { className: 'bottom' }, `© ${anio} ${nombre}. ${t.derechos}`)));
 }
 
@@ -116,7 +129,7 @@ function Encabezado({ etiqueta, titulo, bajada, id }: { etiqueta?: string; titul
   return h('div', { className: 'sh' }, etiqueta ? h('span', { className: 'tagp' }, etiqueta) : null, h('h2', { id }, titulo), bajada ? h('p', null, bajada) : null);
 }
 
-interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string }
+interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[] }
 
 const Fic = ({ e, idioma }: { e: Elemento; idioma: Idioma }) => (e.ficticio ? h('span', { className: 'fic' }, INTERFAZ[idioma].ficticio) : null);
 
@@ -126,10 +139,12 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
   if (COLECCION_DE_BLOQUE[tipo] && els.length === 0) return null;
   switch (tipo) {
     case 'hero': {
-      const titulo = h(c.nivelPortada, null, HERO.titulo);
-      return h('section', { className: 'hero', 'aria-label': HERO.titulo },
+      // HU-1514 · En una landing, la portada propia y el nombre del sector como etiqueta.
+      const portada = c.sector ? { etiqueta: c.sector.nombre, titulo: c.sector.portada.titulo, texto: c.sector.portada.texto } : HERO;
+      const titulo = h(c.nivelPortada, null, portada.titulo);
+      return h('section', { className: 'hero', 'aria-label': portada.titulo },
         h('div', { className: 'in' },
-          h('span', { className: 'tagp' }, HERO.etiqueta), titulo, h('p', { className: 'lead' }, HERO.texto),
+          h('span', { className: 'tagp' }, portada.etiqueta), titulo, h('p', { className: 'lead' }, portada.texto),
           h('p', { className: 'facts' }, `${HERO.vinetas.join(', ')}.`),
           h('div', { className: 'cta-fila' },
             h('a', { className: 'btn primary', href: `${c.base}${HERO.cta1.ruta}` }, HERO.cta1.texto),
@@ -201,8 +216,16 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
         h('div', { className: 'vs2' },
           h('div', { className: 'old' }, h('h3', null, COMPARACION.antes.titulo), h('ul', null, COMPARACION.antes.puntos.map((p) => h('li', { key: p }, p)))),
           h('div', { className: 'new' }, h('h3', null, COMPARACION.ahora.titulo), h('ul', null, COMPARACION.ahora.puntos.map((p) => h('li', { key: p }, p)))))));
+    case 'sectores':
+      // HU-1514 · Las landings publicadas del mismo idioma; sin ninguna, el bloque no sale (CP-158).
+      if (!c.landings.length) return null;
+      return h('section', { id: 'sectores', 'aria-labelledby': id }, h('div', { className: 'in' },
+        h(Encabezado, { id, etiqueta: SECCIONES.sectores.etiqueta, titulo: SECCIONES.sectores.titulo }),
+        h('ul', { className: 'fcards' }, c.landings.map((l) => h('li', { key: l.ruta },
+          h('a', { className: 'fcard sector', href: `${c.base}${l.ruta}` },
+            h('h3', null, l.nombre), h('p', null, l.titulo), h('span', { className: 'more' }, SECCIONES.sectores.verSolucion)))))));
     default:
-      // Planes (S13), precios, comparativa, blog, sectores y agendador llegan con su historia (SUP-193).
+      // Planes (S13), precios, comparativa, blog y agendador llegan con su historia (SUP-193).
       return null;
   }
 }
@@ -226,14 +249,14 @@ function Documento({ titulo, descripcion, canonical, idioma, entorno, base, favi
     h('body', null, children));
 }
 
-function Marco({ nav, op, idioma, actual, marca, children }: { nav: NavegacionPublica; op: OpcionesRender; idioma: Idioma; actual: string; marca: Marca; children?: ReactNode }) {
+function Marco({ nav, op, idioma, actual, marca, landings, children }: { nav: NavegacionPublica; op: OpcionesRender; idioma: Idioma; actual: string; marca: Marca; landings: LandingPublica[]; children?: ReactNode }) {
   const t = INTERFAZ[idioma];
   return h(Fragment, null,
     h('a', { className: 'saltar', href: '#contenido' }, t.saltar),
     op.entorno === 'pruebas' ? h('p', { className: 'aviso-pruebas' }, t.pruebas) : null,
     h(Cabecera, { menu: nav.menu, base: op.base, idioma, actual, marca }),
     h('main', { id: 'contenido', tabIndex: -1 }, children),
-    h(Pie, { pie: nav.pie, base: op.base, idioma, anio: op.anio ?? new Date().getFullYear(), nombre: marca.nombre }),
+    h(Pie, { pie: nav.pie, base: op.base, idioma, anio: op.anio ?? new Date().getFullYear(), nombre: marca.nombre, landings }),
     marca.whatsapp ? h('a', { className: 'whatsapp', href: enlaceWhatsapp(marca.whatsapp), target: '_blank', rel: 'noopener', 'aria-label': `${t.whatsapp} ${t.pestanaNueva}` }, WHATSAPP) : null);
 }
 
@@ -251,10 +274,11 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
   if (!p) return null;
   const i = idiomaDe(p.idioma);
   const publica = rutaPublica(p.ruta, p.idioma);
+  const landings = landingsDe(inst, p.idioma);
   let hayH1 = false;
   const bloques = p.bloques.map((b, n) => {
     const portada = b.tipo === 'hero' || b.tipo === 'fhero';
-    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n) });
+    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings });
     if (nodo && portada) hayH1 = true;
     return nodo ? h(Fragment, { key: n }, nodo) : null;
   });
@@ -262,9 +286,11 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     hayH1 ? null : h('section', { className: 'titulo-pagina' }, h('div', { className: 'in' }, h('h1', null, p.titulo))),
     bloques);
   return documento(h(Documento, {
-    titulo: p.ruta === '/' ? `${marca.nombre} · ${p.titulo}` : `${p.titulo} · ${marca.nombre}`, descripcion: DESCRIPCION,
+    // HU-1514 · Una landing usa su meta título y el texto de su portada como descripción (RN-16-9).
+    titulo: p.sector ? p.sector.metaTitulo : p.ruta === '/' ? `${marca.nombre} · ${p.titulo}` : `${p.titulo} · ${marca.nombre}`,
+    descripcion: p.sector?.portada.texto ?? DESCRIPCION,
     canonical: sinBarra(op.sitioUrl) + publica, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
-  }, h(Marco, { nav: inst.navegacion, op, idioma: i, actual: p.ruta, marca }, cuerpo)));
+  }, h(Marco, { nav: inst.navegacion, op, idioma: i, actual: p.ruta, marca, landings }, cuerpo)));
 }
 
 /** La página 404 del sitio, con el menú y el pie de la versión (o sin ellos si aún no hay versión). */
@@ -273,7 +299,7 @@ export function renderizar404(inst: Instantanea | null, op: OpcionesRender, idio
   const t = INTERFAZ[i];
   const marca = marcaDe(inst);
   return documento(h(Documento, { titulo: `${t.noEncontrada} · ${marca.nombre}`, descripcion: t.noEncontradaTexto, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon },
-    h(Marco, { nav: inst?.navegacion ?? { menu: [], pie: [] }, op, idioma: i, actual: '', marca },
+    h(Marco, { nav: inst?.navegacion ?? { menu: [], pie: [] }, op, idioma: i, actual: '', marca, landings: inst ? landingsDe(inst, i) : [] },
       h('section', { className: 'no-encontrada' }, h('div', { className: 'in' },
         h('h1', null, t.noEncontrada), h('p', null, t.noEncontradaTexto),
         h('a', { className: 'btn primary', href: `${op.base}${i === 'en' ? '/en' : '/'}` }, t.volver))))));

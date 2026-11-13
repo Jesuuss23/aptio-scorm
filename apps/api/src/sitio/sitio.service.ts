@@ -3,6 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, type SitioPagina } from '@aptio/db';
 import { rutaSitioValida, ultimaVersion } from '@aptio/db';
 import { paginaServida } from '@aptio/schema/sitio-versiones';
+import {
+  aplicarCambiosSector, type CambiosSector, type DatosSector, faltantesParaPublicar, leerPortada, PLANTILLA_SECTOR, rutaSector,
+} from '@aptio/schema/sitio-sectores';
 import { SITIO_URL_POR_DEFECTO, sitemapXml } from '@aptio/sitio';
 import { entornoActual } from './entorno-sitio.js';
 import { VersionesService } from './versiones.service.js';
@@ -13,6 +16,7 @@ import type { AccionPagina, PaginaPublicaDto, PaginaSitioCambioDto, PaginaSitioD
 
 const aDto = (p: SitioPagina): PaginaSitioDto => ({
   id: p.id, ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, estado: p.estado,
+  tipo: p.tipo, sector: p.sector, portada: leerPortada(p.portada), metaTitulo: p.metaTitulo, blogCategoriaInicial: p.blogCategoriaInicial,
   publicarEn: p.publicarEn?.toISOString() ?? null, publicadaEn: p.publicadaEn?.toISOString() ?? null,
   creadoEn: p.creadoEn.toISOString(), actualizadoEn: p.actualizadoEn.toISOString(),
 });
@@ -24,6 +28,13 @@ const diaExiste = (iso: string): boolean => {
   return f.getUTCFullYear() === a && f.getUTCMonth() === m - 1 && f.getUTCDate() === d;
 };
 
+
+const CAMPOS_SECTOR = ['sector', 'portada', 'metaTitulo', 'blogCategoriaInicial'] as const;
+const cambiosSector = (dto: CambiosSector): boolean => CAMPOS_SECTOR.some((k) => dto[k] !== undefined);
+const datosDe = (p: SitioPagina): DatosSector => ({ sector: p.sector, portada: leerPortada(p.portada), metaTitulo: p.metaTitulo, blogCategoriaInicial: p.blogCategoriaInicial });
+const aColumnas = (d: DatosSector) => ({
+  sector: d.sector, portada: d.portada ? (d.portada as unknown as Prisma.InputJsonValue) : Prisma.DbNull, metaTitulo: d.metaTitulo, blogCategoriaInicial: d.blogCategoriaInicial,
+});
 
 const AUDITORIA: Record<AccionPagina, string> = {
   borrador: 'SITIO_PAGINA_A_BORRADOR', programar: 'SITIO_PAGINA_PROGRAMADA', publicar: 'SITIO_PAGINA_PUBLICADA',
@@ -51,6 +62,8 @@ export class SitioService {
   }
 
   async crear(u: UsuarioSesion, dto: PaginaSitioEntradaDto, ahora = new Date()): Promise<PaginaSitioDto> {
+    if (dto.tipo === 'sector') return this.crearLanding(u, dto);
+    if (cambiosSector(dto)) throw new UnprocessableEntityException({ codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada, meta título y categoría del blog son solo de las landings por sector' });
     const estado = this.estadoPedido(dto.accion ?? 'borrador', dto.publicarEn, ahora);
     const aviso = dto.accion === 'publicar' ? await this.versiones.revisarFicticios() : 0;
     try {
@@ -64,8 +77,44 @@ export class SitioService {
     }
   }
 
+  /**
+   * HU-1514 · RN-16-9 · Una landing nace en borrador, en `/sectores/{sector}` si no trae ruta, con los bloques de la
+   * plantilla ocultos (RN-16-2). Se publica después, cuando tenga portada y meta título.
+   */
+  private async crearLanding(u: UsuarioSesion, dto: PaginaSitioEntradaDto): Promise<PaginaSitioDto> {
+    if ((dto.accion && dto.accion !== 'borrador') || dto.publicarEn !== undefined) {
+      throw new UnprocessableEntityException({ codigo: 'LANDING_EN_BORRADOR', mensaje: 'Una landing de sector nace en borrador: complétala y publícala después' });
+    }
+    if (dto.sector === undefined) throw new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje: 'El sector es obligatorio', detalles: [{ campo: 'sector', mensaje: 'El sector es obligatorio' }] });
+    const datos = this.validarSector({ sector: null, portada: null, metaTitulo: null, blogCategoriaInicial: null }, dto);
+    const ruta = dto.ruta ?? rutaSector(datos.sector!);
+    const idioma = dto.idioma ?? 'es';
+    try {
+      const p = await this.bd.$transaction(async (tx) => {
+        const creada = await tx.sitioPagina.create({ data: { ruta, idioma, titulo: dto.titulo?.trim() || datos.sector!, tipo: 'sector', ...aColumnas(datos) } });
+        await tx.sitioBloque.createMany({ data: PLANTILLA_SECTOR.map((tipo, orden) => ({ paginaId: creada.id, tipo, orden, visible: false })) });
+        return creada;
+      });
+      await this.auditar(u, 'SITIO_PAGINA_CREADA', p, { estado: p.estado, tipo: 'sector', sector: p.sector });
+      return aDto(p);
+    } catch (e) {
+      throw this.duplicada(e, ruta, idioma);
+    }
+  }
+
   async cambiar(u: UsuarioSesion, id: string, dto: PaginaSitioCambioDto, ahora = new Date()): Promise<PaginaSitioDto> {
     const actual = await this.buscar(id);
+    // HU-1514 · Los campos de la landing se validan juntos; publicar o programar exige portada y meta título (RN-16-9).
+    let sector: DatosSector | null = null;
+    if (cambiosSector(dto)) {
+      if (actual.tipo !== 'sector') throw new UnprocessableEntityException({ codigo: 'NO_ES_LANDING', mensaje: 'Sector, portada, meta título y categoría del blog son solo de las landings por sector' });
+      sector = this.validarSector(datosDe(actual), dto);
+    }
+    const estadoFinal = dto.accion === 'publicar' ? 'PUBLICADA' : dto.accion === 'programar' ? 'PROGRAMADA' : dto.accion === 'borrador' ? 'BORRADOR' : actual.estado;
+    if (actual.tipo === 'sector' && estadoFinal !== 'BORRADOR') {
+      const faltan = faltantesParaPublicar(sector ?? datosDe(actual));
+      if (faltan.length) throw new UnprocessableEntityException({ codigo: 'LANDING_INCOMPLETA', mensaje: `La landing no se puede publicar ni programar todavía: ${faltan.map((f) => f.mensaje.toLowerCase()).join(', ')}`, detalles: faltan });
+    }
     if (dto.publicarEn !== undefined && dto.accion !== 'programar') {
       throw new UnprocessableEntityException({ codigo: 'PUBLICAR_EN_SIN_PROGRAMAR', mensaje: 'publicarEn solo va con accion=programar' });
     }
@@ -76,8 +125,15 @@ export class SitioService {
     const editado: Record<string, string> = {};
     if (dto.titulo !== undefined && dto.titulo.trim() !== actual.titulo) editado.titulo = datos.titulo = dto.titulo.trim();
     if (dto.ruta !== undefined && dto.ruta !== actual.ruta) editado.ruta = datos.ruta = dto.ruta;
+    if (sector) {
+      const antes = datosDe(actual);
+      for (const k of ['sector', 'portada', 'metaTitulo', 'blogCategoriaInicial'] as const) {
+        if (JSON.stringify(sector[k]) !== JSON.stringify(antes[k])) editado[k] = k === 'portada' ? JSON.stringify(sector[k]) : (sector[k] as string | null) ?? '';
+      }
+      Object.assign(datos, aColumnas(sector));
+    }
     if (dto.accion) Object.assign(datos, this.estadoPedido(dto.accion, dto.publicarEn, ahora));
-    if (!Object.keys(datos).length) return aDto(actual);
+    if (!Object.keys(editado).length && !dto.accion) return aDto(actual);
     // HU-1505 · CP-116 y CP-117: en producción no se publica con ficticios visibles; en pruebas, sí, con aviso.
     const aviso = dto.accion === 'publicar' ? await this.versiones.revisarFicticios() : 0;
     try {
@@ -121,6 +177,12 @@ export class SitioService {
     // HU-1509 · El dominio de los ajustes publicados manda sobre SITIO_URL.
     const dominio = v?.instantanea.sitio?.dominio;
     return sitemapXml(v?.instantanea ?? { paginas: [] }, dominio ? `https://${dominio}` : this.config.get<string>('SITIO_URL') || SITIO_URL_POR_DEFECTO);
+  }
+
+  private validarSector(actual: DatosSector, dto: CambiosSector): DatosSector {
+    const r = aplicarCambiosSector(actual, { sector: dto.sector, portada: dto.portada, metaTitulo: dto.metaTitulo, blogCategoriaInicial: dto.blogCategoriaInicial });
+    if (!r.ok) throw new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+    return r.datos;
   }
 
   private async buscar(id: string): Promise<SitioPagina> {

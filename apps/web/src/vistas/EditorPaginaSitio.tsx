@@ -2,7 +2,7 @@
 // subir y bajar (dedo, ratón y teclado), un interruptor para mostrar u ocultar, agregar del catálogo cerrado y borrar.
 // Un bloque nuevo va al final y oculto (RN-16-2); ocultarlo no borra sus datos (CP-112). Solo el superadmin (ADR-011).
 // HU-1507 · «Publicar cambios» con el chip «Cambios sin publicar», y la vista previa en Escritorio y Celular. El SEO
-// llega con su historia.
+// llega con su historia. HU-1514 · En una landing de sector, la ficha con sector, portada, meta título y blog.
 import { CATALOGO_BLOQUES, contarVisibles, fuenteBloque, moverBloque, nombreBloque, TIPOS_BLOQUE } from '@aptio/schema/sitio-bloques';
 import { Cabecera } from '@aptio/ui';
 import { useEffect, useRef, useState } from 'react';
@@ -12,15 +12,16 @@ import { ESTADO_PAGINA, NOMBRE_IDIOMA } from './sitio-paginas';
 import { usePublicacionSitio } from './publicacion-sitio';
 import { AccionPublicar, AvisosPublicacion } from './SitioVersiones';
 import { VistaPreviaSitio } from './SitioVistaPrevia';
+import { FichaLanding } from './FichaLanding';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
 
-export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
+export function EditorPaginaSitio({ paginaId, nueva = false }: { paginaId: string; nueva?: boolean }) {
   const [paginas, setPaginas] = useState<PaginaSitio[] | null>(null);
   const [bloques, setBloques] = useState<BloqueSitio[] | null>(null);
   const [error, setError] = useState('');
-  const [aviso, setAviso] = useState<Aviso>(null);
+  const [aviso, setAviso] = useState<Aviso>(nueva ? { tipo: 'ok', texto: 'La landing se creó como borrador con los bloques de la plantilla, ocultos. Completa la portada y el meta título, muestra los bloques que quieras y publícala desde Páginas.' } : null);
   const [anuncio, setAnuncio] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const [tipo, setTipo] = useState<string>(TIPOS_BLOQUE[0]!);
@@ -180,7 +181,11 @@ export function EditorPaginaSitio({ paginaId }: { paginaId: string }) {
                 <dt>Nombre</dt><dd>{pagina.titulo}</dd>
                 <dt>Ruta</dt><dd>{pagina.ruta}</dd>
                 <dt>Idioma</dt><dd>{NOMBRE_IDIOMA[pagina.idioma]}</dd>
+                <dt>Tipo</dt><dd>{pagina.tipo === 'sector' ? `Landing de sector · ${pagina.sector}` : 'General'}</dd>
               </dl>
+            ) : null}
+            {pagina?.tipo === 'sector' ? (
+              <FichaLanding key={pagina.id} pagina={pagina} alGuardar={(p) => { setPaginas((l) => (l ?? []).map((x) => (x.id === p.id ? p : x))); publicacion.recargar(); setRefresco((n) => n + 1); }} />
             ) : null}
             <p className="nota">Los cambios de bloques llegan al sitio con «Publicar cambios». Si la página está en borrador o programada, el sitio no muestra nada de ella.</p>
             <button type="button" className="boton" onClick={() => navegar('/sitio/paginas')}>Volver a Páginas</button>

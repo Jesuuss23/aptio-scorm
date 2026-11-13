@@ -9,6 +9,7 @@ import { COLECCION_DE_BLOQUE, elementosDeBloque, nombreElemento } from './sitio-
 import { elementosParaPublico, type EntornoSitio } from './sitio-ficticios.js';
 import { navegacionPublica, type NavegacionPublica } from './sitio-navegacion.js';
 import { ajustesPublicados, type AjustesSitio, type SitioPublicado } from './sitio-ajustes.js';
+import { sectorPublicado, type SectorPublicado, testimoniosDeSector } from './sitio-sectores.js';
 
 export const ORIGENES_VERSION = ['publicacion', 'pagina', 'programada', 'restauracion'] as const;
 export type OrigenVersion = (typeof ORIGENES_VERSION)[number];
@@ -30,6 +31,8 @@ export interface PaginaInstantanea {
   titulo: string;
   publicadaEn: string | null;
   bloques: BloqueInstantanea[];
+  /** HU-1514 · Solo en una landing de sector: su nombre, portada, meta título y categoría inicial del blog. */
+  sector?: SectorPublicado;
 }
 export interface Instantanea {
   formato: 1;
@@ -47,6 +50,12 @@ export interface FilaPagina {
   estado: string;
   publicadaEn: Date | string | null;
   bloques: { id: string; tipo: string; orden: number; visible: boolean; ajustes: unknown }[];
+  /** HU-1514 · `sector` en una landing; sin el campo (filas de antes), `general`. */
+  tipo?: string | null;
+  sector?: string | null;
+  portada?: unknown;
+  metaTitulo?: string | null;
+  blogCategoriaInicial?: string | null;
 }
 export interface FilaElemento {
   id: string;
@@ -75,10 +84,14 @@ const iso = (f: Date | string | null): string | null => (f === null ? null : typ
 export function armarPagina(p: FilaPagina, elementos: readonly FilaElemento[], entorno: EntornoSitio): PaginaInstantanea {
   const visibles = bloquesPublicos(p.bloques);
   const permitidos = elementosParaPublico(entorno, elementos.filter((e) => e.visible));
+  // HU-1514 · Una landing suma las preguntas del inicio y muestra los testimonios de su sector (CP-157).
+  const sector = sectorPublicado(p);
   return {
     ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: iso(p.publicadaEn),
+    ...(sector ? { sector } : {}),
     bloques: visibles.map((b) => {
-      const propios = elementosDeBloque(b.tipo, p.ruta, permitidos);
+      const todos = elementosDeBloque(b.tipo, p.ruta, permitidos, sector ? ['/'] : []);
+      const propios = todos && sector && b.tipo === 'testimonios' ? testimoniosDeSector(sector.nombre, todos) : todos;
       return {
         tipo: b.tipo, ajustes: (b.ajustes as Record<string, unknown> | null) ?? null,
         ...(propios ? { elementos: propios.map((e) => ({ id: e.id, coleccion: e.coleccion, datos: e.datos as Record<string, string | number>, ...(e.ficticio ? { ficticio: true as const } : {}) })) } : {}),
@@ -136,6 +149,7 @@ export interface PaginaServida {
   titulo: string;
   publicadaEn: string | null;
   bloques: { tipo: string; ajustes: Record<string, unknown> | null; elementos?: { datos: Record<string, string | number>; ficticio?: true }[] }[];
+  sector?: SectorPublicado;
 }
 
 /**
@@ -147,6 +161,7 @@ export function paginaServida(inst: Instantanea, ruta: string, idioma: string, e
   if (!p) return null;
   return {
     ruta: p.ruta, idioma: p.idioma, titulo: p.titulo, publicadaEn: p.publicadaEn,
+    ...(p.sector ? { sector: p.sector } : {}),
     bloques: p.bloques.map((b) => ({
       tipo: b.tipo, ajustes: b.ajustes,
       ...(b.elementos ? { elementos: elementosParaPublico(entorno, b.elementos.map((e) => ({ ...e, ficticio: e.ficticio ?? false }))).map((e) => ({ datos: e.datos, ...(e.ficticio ? { ficticio: true as const } : {}) })) } : {}),

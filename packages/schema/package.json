@@ -51,6 +51,7 @@
     "./sitio-contenido": "./src/sitio-contenido.ts",
     "./sitio-ficticios": "./src/sitio-ficticios.ts",
     "./sitio-navegacion": "./src/sitio-navegacion.ts",
+    "./sitio-sectores": "./src/sitio-sectores.ts",
     "./sitio-versiones": "./src/sitio-versiones.ts"
   }
 }
