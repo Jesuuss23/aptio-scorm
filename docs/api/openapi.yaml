@@ -3017,9 +3017,13 @@ paths:
         `generico`) con `modoIdioma: unico` (el primer idioma del curso, SUP-49) o `mismo-paquete` (HU-0804, español e
         inglés con el botón de idioma; abre en español). El perfil de LMS se
         guarda y solo cambia las recomendaciones: el paquete es el mismo (RN-12-1). Se exporta aunque haya pantallas sin
-        aprobar (SUP-51). Exportan administración, diseño instruccional y producción. 422 con `codigo`: ESQUEMA_NO_VALIDO
-        (con `detalles`), FORMATO_NO_DISPONIBLE, IDIOMA_NO_DISPONIBLE (`separados`) o TRADUCCION_INCOMPLETA (bilingüe con
-        textos sin inglés).'
+        aprobar (SUP-51). HU-1205 · `KIT_GAMIFICACION` arma el kit de gamificación (CP-095): insignias SVG y PNG de 512 px con
+        la marca del cliente (una por cápsula, una por módulo y una del curso, o las de `gamificacion.insignias`), `plan.json`
+        y `guia-<lms>.html` del LMS de `perfilLms`; sin él, el LMS del cliente según los datos técnicos del proyecto. Con
+        `mismo-paquete` los nombres van en español e inglés sin exigir todo el inglés. Se nombra
+        `<proyecto>-kit-<lms>-v<n>.zip` y se descarga desde el historial. Exportan administración, diseño instruccional y
+        producción. 422 con `codigo`: ESQUEMA_NO_VALIDO (con `detalles`), FORMATO_NO_DISPONIBLE (SCORM2004, JSON),
+        IDIOMA_NO_DISPONIBLE (`separados`) o TRADUCCION_INCOMPLETA (paquete bilingüe con textos sin inglés).'
       parameters:
       - name: cursoId
         in: path
@@ -7042,7 +7046,7 @@ components:
           - HTML
           - JSON
           - KIT_GAMIFICACION
-          description: SCORM12 o HTML (HU-1203, carpeta autocontenida sin LMS ni seguimiento, `<proyecto>-html-v<n>.zip`); los demás responden 422 FORMATO_NO_DISPONIBLE
+          description: SCORM12, HTML (HU-1203, carpeta autocontenida sin LMS ni seguimiento, `<proyecto>-html-v<n>.zip`) o KIT_GAMIFICACION (HU-1205, solo al exportar; `validar` responde 422); los demás responden 422 FORMATO_NO_DISPONIBLE
         perfilLms:
           type: string
           enum:
@@ -7052,7 +7056,7 @@ components:
           - chamilo
           - canvas
           default: generico
-          description: Solo agrega recomendaciones. En HTML se ignora y se guarda generico
+          description: Solo agrega recomendaciones. En HTML se ignora y se guarda generico. En KIT_GAMIFICACION es el LMS de la guía; sin él, el LMS del cliente según los datos técnicos del proyecto
         modoIdioma:
           type: string
           enum:
@@ -7292,6 +7296,18 @@ components:
           type: string
         archivos:
           type: integer
+        lms:
+          type: string
+          enum:
+          - generico
+          - moodle
+          - blackboard
+          - chamilo
+          - canvas
+          description: HU-1205 · LMS de la guía del kit de gamificación
+        insignias:
+          type: integer
+          description: HU-1205 · Insignias del kit de gamificación
     ConexionIA:
       type: object
       description: 'HU-1304 · Una tarea de la lista cerrada con su conexión. Nunca lleva claves (RN-13-3).'

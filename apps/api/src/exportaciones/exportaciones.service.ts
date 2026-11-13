@@ -5,11 +5,15 @@
 // HU-1203 · También HTML autocontenido: sin LMS, sin límite de subida ni modo diagnóstico, y perfil siempre «generico».
 // HU-0804 · `modoIdioma: 'mismo-paquete'` arma el paquete con español e inglés; sin todo el inglés escrito no se exporta
 // (TRADUCCION_INCOMPLETA). Los paquetes separados por idioma siguen en 422 IDIOMA_NO_DISPONIBLE.
+// HU-1205 · KIT_GAMIFICACION: insignias, plan y guía del LMS de `perfilLms`; sin él, el LMS del cliente que dicen los datos
+// técnicos del proyecto (SUP-164). No se valida antes: `validar` sigue siendo de SCORM 1.2 y HTML. Con `mismo-paquete`
+// los nombres van en los dos idiomas y lo que no tenga inglés queda en español con una advertencia (no bloquea).
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { TAREA_EXPORTAR } from '@aptio/colas';
 import type { Exportacion } from '@aptio/db';
 import { armarCreditos, codigoReproductor, cursoBilingue, type ModoIdioma, textosEnIngles, validarExportacion } from '@aptio/exporters';
 import { erroresCurso } from '@aptio/schema';
+import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
@@ -45,9 +49,9 @@ export class ExportacionesService {
     return c;
   }
 
-  private formatoDisponible(dto: ExportacionEntradaDto): { formato: 'SCORM12' | 'HTML'; modoIdioma: ModoIdioma } {
-    if (dto.formato !== 'SCORM12' && dto.formato !== 'HTML') {
-      throw new UnprocessableEntityException({ codigo: 'FORMATO_NO_DISPONIBLE', mensaje: `El formato ${dto.formato} todavía no está disponible: por ahora se exporta SCORM 1.2 o HTML` });
+  private formatoDisponible(dto: ExportacionEntradaDto, conKit = false): { formato: 'SCORM12' | 'HTML' | 'KIT_GAMIFICACION'; modoIdioma: ModoIdioma } {
+    if (dto.formato !== 'SCORM12' && dto.formato !== 'HTML' && !(conKit && dto.formato === 'KIT_GAMIFICACION')) {
+      throw new UnprocessableEntityException({ codigo: 'FORMATO_NO_DISPONIBLE', mensaje: `El formato ${dto.formato} todavía no está disponible: por ahora se exporta SCORM 1.2, HTML o el kit de gamificación` });
     }
     const modoIdioma = dto.modoIdioma ?? 'unico';
     if (modoIdioma === 'separados') {
@@ -59,7 +63,8 @@ export class ExportacionesService {
   /** HU-1201 · Valida el curso actual para el formato pedido. Responde 200 aunque haya errores: la web los lista. */
   async validar(u: UsuarioSesion, cursoId: string, dto: ExportacionEntradaDto): Promise<ValidacionDto> {
     const c = await this.curso(u, cursoId);
-    const { formato, modoIdioma } = this.formatoDisponible(dto);
+    // Sin kit: el formato es SCORM12 o HTML.
+    const { formato, modoIdioma } = this.formatoDisponible(dto) as { formato: 'SCORM12' | 'HTML'; modoIdioma: ModoIdioma };
     const doc = c.documento as { recursos?: { id?: unknown; tipo?: unknown; idioma?: unknown }[]; idiomas?: unknown[] } | null;
     const ids = (Array.isArray(doc?.recursos) ? doc.recursos : []).map((r) => r?.id).filter((id): id is string => typeof id === 'string' && UUID.test(id));
     const [filas, proyecto, organizacion] = await Promise.all([
@@ -89,13 +94,14 @@ export class ExportacionesService {
 
   async exportar(u: UsuarioSesion, cursoId: string, dto: ExportacionEntradaDto): Promise<ExportacionDto> {
     const c = await this.curso(u, cursoId);
-    const { formato, modoIdioma } = this.formatoDisponible(dto);
+    const { formato, modoIdioma } = this.formatoDisponible(dto, true);
     const html = formato === 'HTML';
+    const kit = formato === 'KIT_GAMIFICACION';
     const errores = erroresCurso(c.documento);
     if (errores.length) {
       throw new UnprocessableEntityException({ codigo: 'ESQUEMA_NO_VALIDO', mensaje: 'El curso no cumple el esquema: corrígelo antes de exportar', detalles: errores.slice(0, 10).map((e) => ({ mensaje: e })) });
     }
-    if (modoIdioma === 'mismo-paquete') {
+    if (modoIdioma === 'mismo-paquete' && !kit) {
       const { traducidos, total } = textosEnIngles(c.documento);
       if (traducidos < total) {
         throw new UnprocessableEntityException({ codigo: 'TRADUCCION_INCOMPLETA', mensaje: `Faltan ${total - traducidos} textos en inglés: tradúcelos en Idiomas` });
@@ -105,8 +111,13 @@ export class ExportacionesService {
         throw new UnprocessableEntityException({ codigo: 'ESQUEMA_NO_VALIDO', mensaje: 'El curso bilingüe no cumple el esquema: corrígelo antes de exportar', detalles: bilingues.slice(0, 10).map((e) => ({ mensaje: e })) });
       }
     }
+    let perfilLms: string = html ? 'generico' : (dto.perfilLms ?? 'generico');
+    if (kit && !dto.perfilLms) {
+      const p = await this.bd.proyecto.findFirst({ where: { id: c.proyectoId }, select: { datosTecnicos: true } });
+      perfilLms = perfilPropuesto(p?.datosTecnicos as Parameters<typeof perfilPropuesto>[0]).toLowerCase();
+    }
     const exp = await this.bd.exportacion.create({
-      data: { organizacionId: c.organizacionId, cursoId: c.id, versionCurso: c.version, formato, perfilLms: html ? 'generico' : (dto.perfilLms ?? 'generico'), modoIdioma, incluirDiagnostico: html ? false : (dto.incluirDiagnostico ?? true), creadoPorId: u.id },
+      data: { organizacionId: c.organizacionId, cursoId: c.id, versionCurso: c.version, formato, perfilLms, modoIdioma, incluirDiagnostico: html || kit ? false : (dto.incluirDiagnostico ?? true), creadoPorId: u.id },
     });
     await this.colas.encolar('export', { trabajoId: exp.id, organizacionId: c.organizacionId, tarea: TAREA_EXPORTAR });
     return this.dto(exp, null, null);

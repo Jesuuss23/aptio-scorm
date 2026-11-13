@@ -454,7 +454,7 @@ export interface Exportacion {
   versionCurso: number;
   estado: 'EN_COLA' | 'EN_CURSO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO';
   bytes: number | null;
-  informe: { errores: string[]; advertencias: string[]; recursosFaltantes?: string[]; idioma?: string; idiomas?: string[]; archivos?: number } | null;
+  informe: { errores: string[]; advertencias: string[]; recursosFaltantes?: string[]; idioma?: string; idiomas?: string[]; archivos?: number; lms?: string; insignias?: number } | null;
   motivo: string | null;
   nombreArchivo: string | null;
   /** Solo al pedir una exportación terminada: descarga firmada por 15 minutos. */
@@ -465,6 +465,8 @@ export type PerfilExportacion = 'generico' | 'moodle' | 'blackboard' | 'chamilo'
 /** HU-1201 · Validar antes de exportar: solo `errores` impiden exportar; el peso nunca bloquea (RN-12-2). */
 /** HU-1203 · Formatos que se exportan hoy: SCORM 1.2 y HTML autocontenido. */
 export type FormatoExportacion = 'SCORM12' | 'HTML';
+/** HU-1205 · El kit de gamificación se exporta pero no se valida antes. */
+export type FormatoPedido = FormatoExportacion | 'KIT_GAMIFICACION';
 /** HU-0804 · Un idioma (el primero del curso) o español e inglés en el mismo paquete. */
 export type ModoIdiomaExportacion = 'unico' | 'mismo-paquete';
 export interface Validacion {
@@ -664,7 +666,7 @@ export const api = {
   traducciones: (cursoId: string, estado?: EstadoTraduccion) => pedir<Traduccion[]>(`/cursos/${cursoId}/traducciones${estado ? `?estado=${estado}` : ''}`),
   traducir: (cursoId: string) => pedir<{ id: string; estado: EstadoTrabajo }>(`/cursos/${cursoId}/traducciones/traducir`, { method: 'POST' }),
   cambiarTraduccion: (id: string, datos: { en?: string; estado?: 'REVISADA' }) => pedir<Traduccion>(`/traducciones/${id}`, json(datos, 'PATCH')),
-  exportar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion; modoIdioma?: ModoIdiomaExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
+  exportar: (cursoId: string, datos: { formato: FormatoPedido; perfilLms: PerfilExportacion; modoIdioma?: ModoIdiomaExportacion }) => pedir<Exportacion>(`/cursos/${cursoId}/exportaciones`, json(datos)),
   validar: (cursoId: string, datos: { formato: FormatoExportacion; perfilLms: PerfilExportacion; modoIdioma?: ModoIdiomaExportacion }) => pedir<Validacion>(`/cursos/${cursoId}/validar`, json(datos)),
   exportaciones: (cursoId: string) => pedir<Exportacion[]>(`/cursos/${cursoId}/exportaciones`),
   exportacion: (id: string) => pedir<Exportacion>(`/exportaciones/${id}`),

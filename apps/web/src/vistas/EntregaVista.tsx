@@ -8,12 +8,14 @@
 // HU-1406 · «Créditos y licencias»: la procedencia de cada recurso generado y los créditos que llevará el paquete.
 // HU-0804 · «Idioma»: español o ES + EN en el mismo paquete. En el bilingüe la verificación cuenta los textos en inglés
 // (sin todos, no se exporta) y avisa de los desbordes y de la falta de voz en inglés, que no bloquean.
+// HU-1205 · «Kit de gamificación para el LMS» (PNT-16): se pide aparte y aparece en el mismo historial.
 import { Cabecera } from '@aptio/ui';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { api, type Curso, ErrorApi, EXPORTAN, type Exportacion, type FormatoExportacion, type ModoIdiomaExportacion, type PerfilExportacion, type Proyecto, type Rol, type Validacion } from '../api';
 import { navegar } from '../ruta';
 import { CreditosLicencias } from './CreditosLicencias';
+import { KitGamificacion } from './KitGamificacion';
 import { esAvisoIngles, esFaltaIngles, FORMATOS, LIMITE_SUSPEND, mb, megas, MODOS_IDIOMA, NOMBRE_FORMATO, PERFILES } from './entrega';
 
 const CONSULTA_MS = 2000;
@@ -312,6 +314,9 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
           ) : <p className="sec">Todavía no hay exportaciones de este curso.</p>}
         </section>
       </div>
+      {veHistorial ? (
+        <KitGamificacion cursoId={curso.id} version={curso.version} perfilInicial={perfilPropuesto(proyecto.datosTecnicos).toLowerCase() as PerfilExportacion} puedeExportar={puedeExportar} alPedir={(e) => setLista((l) => [e, ...l])} />
+      ) : null}
       <CreditosLicencias proyectoId={proyectoId} documento={curso.documento} creditos={veHistorial && v ? (v.creditos ?? null) : undefined} conVistaPrevia={veHistorial} />
     </>
   );

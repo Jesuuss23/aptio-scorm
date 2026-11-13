@@ -90,9 +90,15 @@ test.describe('conexiones IA (HU-1304)', () => {
     await expect(medidor(page)).toContainText('Al tope');
     expect(await violaciones(page, ['.limite-gasto', '.medidor-ia'])).toEqual([]);
 
-    // Continuar sin subir el límite vuelve a detenerse.
+    // Continuar sin subir el límite vuelve a detenerse. Se espera la respuesta de «continuar» (la generación pasa a
+    // EN_CURSO y el aviso se va) antes de esperar el aviso otra vez: si no, el aviso de antes ya cuenta como visible, se
+    // sale a Conexiones IA con la generación en curso y, al volver con el límite subido, ya no hay nada que continuar.
+    const continuada = page.waitForResponse((r) => r.request().method() === 'POST' && r.url().endsWith('/continuar'));
     await aviso.getByRole('button', { name: 'Continuar' }).click();
+    await continuada;
+    await expect(aviso).toHaveCount(0);
     await expect(aviso).toBeVisible({ timeout: 15_000 });
+    await expect(gen.getByRole('listitem', { name: 'Objetivos y estructura' })).toContainText('llegó a su límite de gasto del mes');
 
     // Administración sube el límite en Conexiones IA.
     await page.getByRole('navigation', { name: 'Menú principal' }).getByRole('link', { name: 'Conexiones IA' }).click();

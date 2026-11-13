@@ -12,9 +12,11 @@ export interface Procedencia {
 /** Subtítulos WebVTT con tiempos repartidos por letras sobre la duración del audio (HU-0801, SUP-37). */
 export const PROCEDENCIA_SUBTITULOS: Procedencia = { proveedor: PROVEEDOR_APTIO, modelo: 'subtitulos-por-letras v1', licencia: 'Generado por Aptio SCORM desde el guion' };
 
-/** El paquete que arma @aptio/exporters (HU-1202, HU-1203). */
+/** El paquete que arma @aptio/exporters (HU-1202, HU-1203, HU-1205: el kit de gamificación, sin IA). */
 export const procedenciaPaquete = (formato: string): Procedencia => ({
-  proveedor: PROVEEDOR_APTIO, modelo: formato === 'HTML' ? 'exportador-html v1' : 'exportador-scorm12 v1', licencia: 'Paquete generado por Aptio SCORM',
+  proveedor: PROVEEDOR_APTIO,
+  modelo: formato === 'HTML' ? 'exportador-html v1' : formato === 'KIT_GAMIFICACION' ? 'kit-gamificacion v1' : 'exportador-scorm12 v1',
+  licencia: 'Paquete generado por Aptio SCORM',
 });
 
 type DatosRecurso = { origen: string; nombre: string; proveedor?: string | null; modelo?: string | null; licencia?: string | null };

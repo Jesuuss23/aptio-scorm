@@ -8,9 +8,9 @@ export const MODOS_IDIOMA = ['unico', 'separados', 'mismo-paquete'] as const;
 
 /** HU-1202 · SCORM12 o HTML (HU-1203) en un idioma (SUP-49) o en los dos (HU-0804); el perfil no cambia el paquete (RN-12-1). */
 export class ExportacionEntradaDto {
-  @ApiProperty({ enum: FORMATOS, description: 'SCORM12 o HTML (HU-1203, sin LMS ni seguimiento); los demás responden 422 FORMATO_NO_DISPONIBLE' })
+  @ApiProperty({ enum: FORMATOS, description: 'SCORM12, HTML (HU-1203, sin LMS ni seguimiento) o KIT_GAMIFICACION (HU-1205: insignias, plan y guía del LMS de perfilLms; solo al exportar, no se valida); los demás responden 422 FORMATO_NO_DISPONIBLE' })
   @IsIn(FORMATOS) formato: (typeof FORMATOS)[number];
-  @ApiPropertyOptional({ enum: PERFILES_LMS, default: 'generico', description: 'Solo agrega recomendaciones; el paquete es el mismo. En HTML se ignora y se guarda generico' })
+  @ApiPropertyOptional({ enum: PERFILES_LMS, default: 'generico', description: 'Solo agrega recomendaciones; el paquete es el mismo. En HTML se ignora y se guarda generico. En KIT_GAMIFICACION es el LMS de la guía; sin él, el LMS del cliente en los datos técnicos del proyecto' })
   @IsOptional() @IsIn(PERFILES_LMS) perfilLms?: (typeof PERFILES_LMS)[number];
   @ApiPropertyOptional({ enum: MODOS_IDIOMA, default: 'unico', description: 'unico: el primer idioma del curso; mismo-paquete: español e inglés con el botón de idioma (HU-0804); separados responde 422 IDIOMA_NO_DISPONIBLE' })
   @IsOptional() @IsIn(MODOS_IDIOMA) modoIdioma?: (typeof MODOS_IDIOMA)[number];
@@ -26,6 +26,8 @@ export class InformeExportacionDto {
   @ApiPropertyOptional({ type: [String] }) recursosFaltantes?: string[];
   @ApiPropertyOptional() idioma?: string;
   @ApiPropertyOptional({ description: 'Archivos dentro del ZIP' }) archivos?: number;
+  @ApiPropertyOptional({ enum: PERFILES_LMS, description: 'HU-1205 · LMS de la guía del kit de gamificación' }) lms?: string;
+  @ApiPropertyOptional({ description: 'HU-1205 · Insignias del kit de gamificación' }) insignias?: number;
 }
 
 export class ExportacionDto {

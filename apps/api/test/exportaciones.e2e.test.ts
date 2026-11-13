@@ -4,6 +4,8 @@
 // HU-1201 · CP-090 · Validar antes de exportar: un paquete de 300 MB advierte con alternativas y se exporta igual (202).
 // HU-1203 · CP-093 · HTML se exporta (202) y se valida sin límite de subida; SCORM 2004 sigue en 422.
 // HU-0804 · ES + EN en el mismo paquete: 202 con todo el inglés escrito; sin él, validar lo dice y exportar responde 422.
+// HU-1205 · CP-095 · KIT_GAMIFICACION: 202 en la cola export con el LMS pedido o, sin él, el del cliente; con ES + EN no
+// exige el inglés; RBAC de M14 y aislamiento por organización en la descarga; SCORM 2004 sigue en 422.
 import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -11,6 +13,8 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Almacen, configDesdeEnv, prepararAlmacen } from '@aptio/almacen';
 import { crearCola, TAREA_EXPORTAR } from '@aptio/colas';
+import { construirKitGamificacion } from '@aptio/exporters';
+import JSZip from 'jszip';
 import { hashearClave, prisma, Rol } from '@aptio/db';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -272,6 +276,57 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('exportar SCORM 1.2 (HU
     expect((await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM2004' })).body.codigo).toBe('FORMATO_NO_DISPONIBLE');
     expect((await como('revisor').post(`/cursos/${cursoId}/validar`, { formato: 'SCORM12' })).status).toBe(403);
     expect((await como('instruccional').post(`/cursos/${randomUUID()}/validar`, { formato: 'SCORM12' })).status).toBe(404);
+  });
+
+  it('HU-1205 · CP-095 · el kit de gamificación se exporta (202) con el LMS del cliente, se descarga y respeta RBAC y organización', async () => {
+    await prisma.proyecto.update({ where: { id: proyectoId }, data: { datosTecnicos: { lms: 'Moodle 4.5 de la minera' } } });
+    // Sin LMS: el de los datos técnicos del proyecto; sin modo diagnóstico.
+    const r = await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'KIT_GAMIFICACION' });
+    expect({ status: r.status, body: r.body }).toMatchObject({ status: 202, body: { cursoId, formato: 'KIT_GAMIFICACION', perfilLms: 'moodle', modoIdioma: 'unico', versionCurso: 7, estado: 'EN_COLA' } });
+    expect((await crearCola('export').getJob(r.body.id))?.data).toEqual({ trabajoId: r.body.id, organizacionId: orgId, tarea: TAREA_EXPORTAR });
+    expect(await prisma.exportacion.findUniqueOrThrow({ where: { id: r.body.id } })).toMatchObject({ incluirDiagnostico: false });
+    // Con LMS elegido, ese; con ES + EN no pide todo el inglés (los nombres sin inglés quedan en español).
+    const chamilo = await como('productor').post(`/cursos/${cursoId}/exportaciones`, { formato: 'KIT_GAMIFICACION', perfilLms: 'chamilo', modoIdioma: 'mismo-paquete' });
+    expect(chamilo.status).toBe(202);
+    expect(chamilo.body).toMatchObject({ perfilLms: 'chamilo', modoIdioma: 'mismo-paquete' });
+    // RBAC de M14: diseño gráfico y el revisor del cliente no lo piden; SCORM 2004 sigue sin estar disponible.
+    for (const n of ['grafico', 'revisor']) expect((await como(n).post(`/cursos/${cursoId}/exportaciones`, { formato: 'KIT_GAMIFICACION' })).status).toBe(403);
+    expect((await como('instruccional').post(`/cursos/${cursoId}/exportaciones`, { formato: 'SCORM2004' })).body.codigo).toBe('FORMATO_NO_DISPONIBLE');
+    // validar sigue siendo de SCORM 1.2 y HTML.
+    expect((await como('instruccional').post(`/cursos/${cursoId}/validar`, { formato: 'KIT_GAMIFICACION' })).status).toBe(422);
+
+    // Lo que deja el worker: el ZIP del kit en S3 como PAQUETE y la exportación COMPLETADO.
+    const kit = await construirKitGamificacion({ curso: loto(), lms: 'moodle', idioma: 'es', png: () => new Uint8Array([0x89, 0x50, 0x4e, 0x47]) });
+    const recursoId = randomUUID();
+    const claveS3 = `org/${orgId}/${clienteId}/${recursoId}`;
+    await almacen.subir(claveS3, kit.zip, 'application/zip');
+    await prisma.recurso.create({ data: { id: recursoId, organizacionId: orgId, clienteId, proyectoId, tipo: 'PAQUETE', origen: 'GENERADO', claveS3, mime: 'application/zip', bytes: BigInt(kit.zip.byteLength), hash: 'x', nombre: 'bloqueo-y-etiquetado-kit-moodle-v7.zip', proveedor: 'aptio', modelo: 'kit-gamificacion v1', licencia: 'Paquete generado por Aptio SCORM' } });
+    await prisma.exportacion.update({ where: { id: r.body.id }, data: { estado: 'COMPLETADO', recursoId, bytes: BigInt(kit.zip.byteLength), informe: { errores: [], advertencias: [], lms: 'moodle', insignias: 3, archivos: 9 } } });
+
+    const lista = await como('grafico').get(`/cursos/${cursoId}/exportaciones`);
+    expect(lista.body.find((e: { id: string }) => e.id === r.body.id)).toMatchObject({ formato: 'KIT_GAMIFICACION', estado: 'COMPLETADO', nombreArchivo: 'bloqueo-y-etiquetado-kit-moodle-v7.zip' });
+    expect((await como('revisor').get(`/cursos/${cursoId}/exportaciones`)).status).toBe(403);
+    const ver = await como('productor').get(`/exportaciones/${r.body.id}`);
+    expect(ver.body).toMatchObject({ informe: { lms: 'moodle', insignias: 3 } });
+    const descarga = await fetch(ver.body.descargaUrl);
+    expect(descarga.status).toBe(200);
+    const zip = await JSZip.loadAsync(new Uint8Array(await descarga.arrayBuffer()));
+    expect(JSON.parse(await zip.file('plan.json')!.async('string'))).toMatchObject({ lms: 'moodle', notaMinima: 70 });
+    expect(zip.file('guia-moodle.html')).not.toBeNull();
+
+    // Desde otra organización, ni el kit ni su descarga.
+    const ajena = await prisma.organizacion.create({ data: { nombre: 'Otra kit', slug: `otra-kit-${sufijo}` } });
+    try {
+      const u = await prisma.usuario.create({ data: { nombre: 'ajeno', email: correo('ajeno-kit'), rol: Rol.DISENADOR_INSTRUCCIONAL, organizacionId: ajena.id, hashClave: await hashearClave(CLAVE), emailVerificado: true } });
+      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: u.email, clave: CLAVE });
+      const cookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      expect((await request(servidor).get(`/api/v1/exportaciones/${r.body.id}`).set('Cookie', cookie)).status).toBe(404);
+      expect((await request(servidor).get(`/api/v1/cursos/${cursoId}/exportaciones`).set('Cookie', cookie)).status).toBe(404);
+      expect((await request(servidor).post(`/api/v1/cursos/${cursoId}/exportaciones`).set('Cookie', cookie).send({ formato: 'KIT_GAMIFICACION' })).status).toBe(404);
+    } finally {
+      await prisma.usuario.deleteMany({ where: { organizacionId: ajena.id } });
+      await prisma.organizacion.delete({ where: { id: ajena.id } });
+    }
   });
 
   it('una exportación de otra organización no se ve (404)', async () => {

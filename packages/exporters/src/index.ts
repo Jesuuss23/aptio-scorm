@@ -1,5 +1,5 @@
 // @aptio/exporters · paquetes de entrega (M12). HU-1202: SCORM 1.2 de un solo SCO. HU-1201: validar antes de exportar.
-// HU-1203: HTML autocontenido. HU-1406: créditos de IA.
+// HU-1203: HTML autocontenido. HU-1406: créditos de IA. HU-1205: kit de gamificación para el LMS.
 export { armarContenido, comprimir, construirScorm12, type ContenidoPaquete, FECHA_ZIP, indexHtml, INICIAR_JS, type EntradaScorm12, type PaqueteScorm12, type RecursoPaquete } from './scorm12.ts';
 export { escaparXml, identificador, manifiestoScorm12, type DatosManifiesto } from './manifiesto.ts';
 export { codigoReproductor } from './reproductor.ts';
@@ -7,3 +7,7 @@ export { ALTERNATIVAS_PESO, avisoSinVozIngles, INTENTOS_PEOR_CASO, MB, type Peso
 export { construirHtml, type EntradaHtml, LEEME_HTML } from './html.ts';
 export { armarCreditos, avisoCreditos, esDeIa, nombreProveedor, type ProcedenciaRecurso, PROVEEDOR_APTIO } from './creditos.ts';
 export { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma, pantallasSinVozIngles, textosEnIngles } from './bilingue.ts';
+export {
+  ANILLOS, construirKitGamificacion, type CursoKit, type EntradaKitGamificacion, enIdioma, guiaHtml, type IdiomaKit, type InsigniaKit, insigniasDelCurso, type KitGamificacion,
+  LADO_INSIGNIA, lineas, LMS_KIT, type LmsKit, type MarcaKit, NOMBRE_LMS, type NivelInsignia, nombreLms, PALETA_KIT_BASE, type PlanGamificacion, planGamificacion, svgInsignia,
+} from './kit-gamificacion.ts';
