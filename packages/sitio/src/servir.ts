@@ -8,6 +8,7 @@ import { CARPETA_FUENTES } from './fuentes.js';
 import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { esArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import { esArchivoBlog } from '@aptio/schema/sitio-blog';
+import { ARCHIVO_CAPTACION, RUTA_GRACIAS } from './captacion.js';
 import { ARCHIVO_LLMS, archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
 
 export type Pedido =
@@ -15,7 +16,7 @@ export type Pedido =
   | { tipo: 'fuente'; archivo: string }
   | { tipo: 'marca'; archivo: string }
   | { tipo: 'blog'; archivo: string }
-  | { tipo: 'sitemap' | 'robots' | 'llms'; archivo: string };
+  | { tipo: 'sitemap' | 'robots' | 'llms' | 'script'; archivo: string };
 
 const SEGMENTO = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FUENTE = /^[a-z0-9-]+-[0-9a-f]{8}\.woff2$/;
@@ -27,6 +28,9 @@ export function resolverPedido(ruta: string): Pedido | null {
   if (limpia === '/robots.txt') return { tipo: 'robots', archivo: 'robots.txt' };
   // HU-1513 · Solo existe si la versión publicada trae contenido; si no, quien sirve responde 404.
   if (limpia === '/llms.txt') return { tipo: 'llms', archivo: ARCHIVO_LLMS };
+  // HU-1601 · El script de captación y la página de gracias: solo existen si la versión tiene un formulario.
+  if (limpia === `/${ARCHIVO_CAPTACION}`) return { tipo: 'script', archivo: ARCHIVO_CAPTACION };
+  if (limpia === `/${RUTA_GRACIAS}` || limpia === `/en/${RUTA_GRACIAS}`) return { tipo: 'pagina', archivo: `${limpia.slice(1)}.html`, ruta: limpia };
   const partes = limpia.split('/').slice(1).filter((p) => p !== '');
   if (partes.length === 2 && partes[0] === CARPETA_FUENTES) return FUENTE.test(partes[1]!) ? { tipo: 'fuente', archivo: partes[1]! } : null;
   if (partes.length === 2 && partes[0] === CARPETA_MARCA) return esArchivoMarca(partes[1]!) ? { tipo: 'marca', archivo: partes[1]! } : null;
@@ -43,10 +47,14 @@ export const TIPOS_MIME = {
   sitemap: 'application/xml; charset=utf-8',
   robots: 'text/plain; charset=utf-8',
   llms: 'text/plain; charset=utf-8',
+  script: 'text/javascript; charset=utf-8',
 } as const;
 
-/** Sin JavaScript ni recursos de fuera: la política permite solo estilos en línea y fuentes propias. */
-export const POLITICA_CONTENIDO = "default-src 'none'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+/**
+ * Sin recursos de fuera: estilos en línea y fuentes propias. HU-1601: solo se permiten scripts del mismo origen (el de
+ * captación; ninguno en línea ni externo) y los formularios solo se envían al mismo sitio.
+ */
+export const POLITICA_CONTENIDO = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 /** Tipo de un archivo de marca por su extensión. */
 export const mimeMarca = (archivo: string) => (archivo.endsWith('.png') ? 'image/png' : 'image/svg+xml');

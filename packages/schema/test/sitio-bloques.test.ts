@@ -17,8 +17,8 @@ import {
 const b = (id: string, orden: number, visible = false) => ({ id, orden, visible });
 
 describe('catálogo cerrado de bloques', () => {
-  it('trae los 18 tipos del prototipo con su nombre', () => {
-    expect(TIPOS_BLOQUE).toHaveLength(18);
+  it('trae los 18 tipos del prototipo y el formulario de contacto, con su nombre', () => {
+    expect(TIPOS_BLOQUE).toHaveLength(19);
     expect(nombreBloque('testimonios')).toBe('Testimonios');
     expect(nombreBloque('metricas')).toBe('Cifras');
     expect(fuenteBloque('logos')).toBe('Contenido › Logos');
