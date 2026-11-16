@@ -718,7 +718,18 @@ export interface LeadSitio {
   utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmTerm: string | null; utmContent: string | null;
   referente: string | null; idioma: 'es' | 'en'; etapa: string; consentimiento: boolean; consentimientoEn: string | null;
   totalContactos: number; historialContactos: { en: string; via: string; pagina: string; mensaje?: string }[]; creadoEn: string; actualizadoEn: string;
+  /** HU-1602 · La columna «CRM»: el resumen y el envío a cada conexión activa. */
+  crm: CrmLead;
 }
+export interface EnvioCrm { tipo: string; estado: 'pendiente' | 'enviado' | 'error' | string; intentos: number; motivo: string | null; enviadoEn: string | null }
+export interface CrmLead { estado: 'sincronizado' | 'pendiente' | 'error' | 'sin_envio'; texto: string; envios: EnvioCrm[] }
+/** HU-1602 · Una conexión de Leads y CRM (HubSpot, Pipedrive, Zoho o el webhook firmado). */
+export interface ConexionCrm {
+  tipo: 'hubspot' | 'pipedrive' | 'zoho' | 'webhook'; nombre: string; descripcion: string; activa: boolean; configurada: boolean; faltan: string[];
+  mapeo: Record<string, string> | null; mapeoPorDefecto: Record<string, string> | null; url: string | null; secreto: string | null; actualizadoEn: string | null;
+}
+export interface EstadoCrm { conexiones: ConexionCrm[]; campos: { campo: string; etiqueta: string }[]; cabeceraFirma: string; toleranciaSegundos: number }
+export interface CambioCrm { tipo: ConexionCrm['tipo']; activa?: boolean; mapeo?: Record<string, string>; url?: string | null }
 export interface ListaLeads { leads: LeadSitio[]; total: number; pagina: number; porPagina: number }
 export interface FiltroLeads { origen?: string; etapa?: string }
 const consultaLeads = (f: FiltroLeads & { pagina?: number; porPagina?: number }) => {
@@ -855,6 +866,12 @@ export const api = {
   leads: (f: FiltroLeads & { pagina?: number; porPagina?: number } = {}) => pedir<ListaLeads>(`/captacion/leads${consultaLeads(f)}`),
   cambiarEtapaLead: (id: string, etapa: string) => pedir<LeadSitio>(`/captacion/leads/${id}`, json({ etapa }, 'PATCH')),
   exportarLeads,
+  // HU-1602 · Conexiones con CRM y webhook firmado (PNT-34).
+  crm: () => pedir<EstadoCrm>('/captacion/crm'),
+  cambiarCrm: (c: CambioCrm) => pedir<EstadoCrm>('/captacion/crm', json(c, 'PATCH')),
+  regenerarSecretoCrm: () => pedir<EstadoCrm>('/captacion/crm/webhook/secreto', { method: 'POST' }),
+  probarCrm: (tipo: ConexionCrm['tipo']) => pedir<{ ok: boolean; mensaje: string }>(`/captacion/crm/${tipo}/probar`, { method: 'POST' }),
+  sincronizarLead: (id: string) => pedir<{ encolados: string[] }>(`/captacion/leads/${id}/sincronizar`, { method: 'POST' }),
   seoIaSitio: () => pedir<SeoIaSitio>('/sitio/seo-ia'),
   guardarSeoIaSitio: (cambios: { llmsTxt?: string; rastreadores?: Record<string, boolean> }) => pedir<SeoIaSitio>('/sitio/seo-ia', json(cambios, 'PATCH')),
   crearPreguntaIa: (pregunta: string) => pedir<PreguntaIa>('/sitio/seo-ia/preguntas', json({ pregunta })),
