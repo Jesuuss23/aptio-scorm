@@ -1057,3 +1057,40 @@ model LeadEnvio {
   @@unique([leadId, conexionId])
   @@index([estado])
 }
+
+/// HU-1603 · Un popup del sitio (REQ-076, PNT-31, RN-17-3): modal, deslizable o barra, con su disparador, sus páginas,
+/// su frecuencia y su resultado. Se sirve en vivo (`GET /s/_popups.json`): apagarlo vale sin republicar (CP-132).
+/// Reglas en `@aptio/schema/popups`.
+model SitioPopup {
+  id              String   @id @default(uuid()) @db.Uuid
+  nombre          String
+  /// modal | deslizable | barra
+  tipo            String
+  /// es | en
+  idioma          String   @default("es")
+  /// al_cargar | tiempo | desplazamiento | intencion_salida | clic_elemento
+  disparador      String
+  /// Segundos (tiempo) o porcentaje (desplazamiento); null en los demás.
+  valorDisparador Int?
+  /// Rutas exactas o con comodín final (`/blog/*`); `*` sola es todo el sitio.
+  paginas         Json     @default("[\"*\"]")
+  titulo          String
+  texto           String   @default("")
+  boton           String
+  /// pedir_correo | enlace_interno
+  accion          String
+  /// Solo en enlace_interno: ruta del sitio que empieza con `/`.
+  enlaceDestino   String?
+  /// Mínimo 7 (RN-17-3).
+  frecuenciaDias  Int      @default(7)
+  visible         Boolean  @default(false)
+  orden           Int      @default(0)
+  /// Dato inventado: nunca se sirve en producción.
+  ficticio        Boolean  @default(false)
+  impresiones     Int      @default(0)
+  conversiones    Int      @default(0)
+  creadoEn        DateTime @default(now())
+  actualizadoEn   DateTime @updatedAt
+
+  @@index([visible, idioma, orden])
+}

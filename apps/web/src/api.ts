@@ -9,6 +9,7 @@ import type { EstadoTraduccion } from '@aptio/schema/traduccion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
 import type { Operacion } from '@aptio/schema/operacion';
+import type { DatosPopup } from '@aptio/schema/popups';
 
 export interface Usuario {
   id: string;
@@ -712,6 +713,16 @@ export interface PropuestaIaSitio {
   creadoEn: string;
 }
 /** HU-1601 · Un lead del sitio con la atribución de su primer contacto (PNT-34). */
+/** HU-1603 · Un popup del sitio (PNT-31). */
+export interface PopupSitio extends DatosPopup {
+  id: string;
+  orden: number;
+  impresiones: number;
+  conversiones: number;
+  tasaConversion: number | null;
+  actualizadoEn: string;
+}
+
 export interface LeadSitio {
   id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null;
   origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
@@ -872,6 +883,13 @@ export const api = {
   regenerarSecretoCrm: () => pedir<EstadoCrm>('/captacion/crm/webhook/secreto', { method: 'POST' }),
   probarCrm: (tipo: ConexionCrm['tipo']) => pedir<{ ok: boolean; mensaje: string }>(`/captacion/crm/${tipo}/probar`, { method: 'POST' }),
   sincronizarLead: (id: string) => pedir<{ encolados: string[] }>(`/captacion/leads/${id}/sincronizar`, { method: 'POST' }),
+  // HU-1603 · Captación › Popups (PNT-31).
+  popups: () => pedir<{ popups: PopupSitio[] }>('/captacion/popups'),
+  crearPopup: (d: Partial<DatosPopup>) => pedir<PopupSitio>('/captacion/popups', json(d)),
+  cambiarPopup: (id: string, d: Partial<DatosPopup>) => pedir<PopupSitio>(`/captacion/popups/${id}`, json(d, 'PATCH')),
+  borrarPopup: (id: string) => pedir<void>(`/captacion/popups/${id}`, { method: 'DELETE' }),
+  ordenarPopups: (ids: string[]) => pedir<{ popups: PopupSitio[] }>('/captacion/popups/orden', json({ ids }, 'PUT')),
+  reiniciarPopup: (id: string) => pedir<PopupSitio>(`/captacion/popups/${id}/reiniciar`, { method: 'POST' }),
   seoIaSitio: () => pedir<SeoIaSitio>('/sitio/seo-ia'),
   guardarSeoIaSitio: (cambios: { llmsTxt?: string; rastreadores?: Record<string, boolean> }) => pedir<SeoIaSitio>('/sitio/seo-ia', json(cambios, 'PATCH')),
   crearPreguntaIa: (pregunta: string) => pedir<PreguntaIa>('/sitio/seo-ia/preguntas', json({ pregunta })),

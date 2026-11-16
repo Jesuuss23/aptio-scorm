@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { armarInstantanea, type FilaPagina, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { instantaneaDeEjemplo } from '../src/ejemplo.js';
-import { ARCHIVO_REDIRECCIONES, jsonLdSeguro, renderizarPagina, renderizarSitio, robotsTxt, sinJsonLd, sitemapXml } from '../src/render.js';
+import { ARCHIVO_REDIRECCIONES, jsonLdSeguro, renderizarPagina, renderizarSitio, robotsTxt, sinScriptsOpcionales, sitemapXml } from '../src/render.js';
 
 const op = { entorno: 'produccion' as const, sitioUrl: 'https://aptioscorm.com', base: '/s', anio: 2026 };
 const jsonLd = (html: string) => JSON.parse(/<script type="application\/ld\+json">([^<]*)<\/script>/.exec(html)![1]!) as Record<string, unknown>;
@@ -35,7 +35,7 @@ describe('metadatos de cada página', () => {
   it('los textos del SEO se escapan (RN-16-7)', () => {
     const html = renderizarPagina(sitio([fila('/a', 'es', { metaTitulo: 'Uno "dos" & <tres>', metaDescripcion: '</script><script>alert(1)</script>' })]), '/a', 'es', op)!;
     expect(html).toContain('<title>Uno &quot;dos&quot; &amp; &lt;tres&gt;</title>');
-    expect(sinJsonLd(html)).not.toMatch(/<script/);
+    expect(sinScriptsOpcionales(html)).not.toMatch(/<script/);
     expect(jsonLd(html)).toMatchObject({ name: 'Uno "dos" & <tres>', description: '</script><script>alert(1)</script>' });
     expect(jsonLdSeguro({ a: '</script>&\u2028' })).toBe('{"a":"\\u003c/script\\u003e\\u0026\\u2028"}');
   });

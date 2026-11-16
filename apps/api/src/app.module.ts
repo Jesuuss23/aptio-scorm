@@ -51,8 +51,9 @@ import { CaptacionModule } from './captacion/captacion.module.js';
     ConexionesModule,
     OperacionModule,
     ComentariosModule,
-    SitioModule,
+    // HU-1603 · Antes que el sitio: `GET /s/_popups.json` no debe caer en la ruta comodín `GET /s/*`.
     CaptacionModule,
+    SitioModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

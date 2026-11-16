@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { PARAMETROS_UTM } from '@aptio/schema/leads';
 import { ARCHIVO_CAPTACION, CLAVE_SESION, SCRIPT_CAPTACION } from '../src/captacion.js';
 import { instantaneaDeEjemplo } from '../src/ejemplo.js';
-import { renderizarErrorFormulario, renderizarPagina, renderizarSitio, sinJsonLd, tieneFormulario } from '../src/render.js';
+import { renderizarErrorFormulario, renderizarPagina, renderizarSitio, sinJsonLd, sinScriptsOpcionales, tieneFormulario } from '../src/render.js';
 import { cabecerasSitio, POLITICA_CONTENIDO, resolverPedido } from '../src/servir.js';
 
 const op = { entorno: 'produccion' as const, sitioUrl: 'https://aptioscorm.com', base: '/s', anio: 2026 };
@@ -70,17 +70,17 @@ describe('bloque Formulario de contacto', () => {
 });
 
 describe('script de captación', () => {
-  it('solo las versiones con formulario lo cargan, en todas sus páginas, como único script y del mismo origen', () => {
+  it('solo las versiones con formulario lo cargan, en todas sus páginas, del mismo origen y junto al de popups (HU-1603)', () => {
     const sin = instantaneaDeEjemplo();
     expect(tieneFormulario(sin)).toBe(false);
-    expect(sinJsonLd(renderizarPagina(sin, '/', 'es', op)!)).not.toContain('<script');
+    expect(sinScriptsOpcionales(renderizarPagina(sin, '/', 'es', op)!)).not.toContain('<script');
     expect(renderizarSitio(sin, op).map((a) => a.archivo)).not.toContain(ARCHIVO_CAPTACION);
 
     const inst = conFormulario('/funcionalidades/personaje');
     expect(tieneFormulario(inst)).toBe(true);
     // También en el inicio, que no tiene el formulario: ahí llega la visita con su UTM.
     const inicio = sinJsonLd(renderizarPagina(inst, '/', 'es', op)!);
-    expect(inicio.match(/<script[^>]*>/g)).toEqual(['<script src="/s/_captacion.js" defer="" data-base="/s">']);
+    expect(inicio.match(/<script[^>]*>/g)).toEqual(['<script src="/s/_captacion.js" defer="" data-base="/s">', '<script src="/s/_popups.js" defer="" data-base="/s">']);
     expect(inicio).not.toContain('fcontacto');
     const archivos = renderizarSitio(inst, op);
     expect(archivos.find((a) => a.archivo === ARCHIVO_CAPTACION)).toEqual({ archivo: '_captacion.js', contenido: SCRIPT_CAPTACION, mime: 'text/javascript; charset=utf-8' });

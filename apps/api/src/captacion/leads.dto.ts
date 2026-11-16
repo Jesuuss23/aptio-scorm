@@ -16,6 +16,7 @@ export class LeadEntradaDto {
   @ApiPropertyOptional({ example: '/precios', description: 'La página donde se envió' }) paginaFormulario?: string;
   @ApiPropertyOptional({ example: 'https://www.linkedin.com/' }) referente?: string;
   @ApiPropertyOptional({ enum: ['es', 'en'] }) idioma?: string;
+  @ApiPropertyOptional({ format: 'uuid', description: 'HU-1603 · Con vía popup: el popup donde se dejó el correo (suma su conversión)' }) popupId?: string;
   @ApiPropertyOptional({ example: 'linkedin' }) utm_source?: string;
   @ApiPropertyOptional() utm_medium?: string;
   @ApiPropertyOptional() utm_campaign?: string;

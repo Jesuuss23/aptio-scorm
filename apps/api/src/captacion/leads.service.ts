@@ -5,6 +5,7 @@ import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { CorreoService } from '../correo/correo.service.js';
 import { CrmService, crmDeLead } from './crm.service.js';
+import { PopupsService } from './popups.service.js';
 import type { ConsultaLeadsDto, FiltroLeadsDto, LeadDto, ListaLeadsDto } from './leads.dto.js';
 
 /** HU-1601 · Envíos por IP en cada ventana; más, 429 (aparte del límite general de /publico/*, SUP-169). */
@@ -38,7 +39,7 @@ export class LeadsService {
   /** HU-1602 · El último encolado al CRM en curso (la respuesta al visitante tampoco lo espera). */
   ultimoEnvio: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly correo: CorreoService, private readonly crm: CrmService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly correo: CorreoService, private readonly crm: CrmService, private readonly popups: PopupsService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -73,6 +74,8 @@ export class LeadsService {
     if (!r.ok) throw new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
     if (r.trampa) return { estado: 'descartado' };
     const { lead, nuevo } = await this.guardar(r.envio, ahora);
+    // HU-1603 · El correo dejado en un popup cuenta como su conversión (el `popupId` viene del script del sitio).
+    if (r.envio.via === 'popup') await this.popups.convertirPorCorreo((entrada as { popupId?: unknown } | null)?.popupId).catch((e: unknown) => this.log.warn(`No se pudo contar la conversión del popup: ${e instanceof Error ? e.message : String(e)}`));
     this.ultimoAviso = this.avisar(lead, nuevo, r.envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
     // HU-1602 · Al CRM y al webhook activos: el alta, o un contacto nuevo del mismo correo.
     this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));

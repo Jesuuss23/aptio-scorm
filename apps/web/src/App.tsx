@@ -28,6 +28,7 @@ import { SitioBlog } from './vistas/SitioBlog';
 import { SitioSeo } from './vistas/SitioSeo';
 import { SitioSeoIa } from './vistas/SitioSeoIa';
 import { CaptacionLeads } from './vistas/CaptacionLeads';
+import { CaptacionPopups } from './vistas/CaptacionPopups';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -143,6 +144,8 @@ export function App() {
         <SitioSeo />
       ) : vista?.activo === '/sitio/seo-ia' && veSitio ? (
         <SitioSeoIa />
+      ) : vista?.activo === '/captacion/popups' && veSitio ? (
+        <CaptacionPopups />
       ) : vista?.activo === '/captacion/leads' && veSitio ? (
         <CaptacionLeads />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
