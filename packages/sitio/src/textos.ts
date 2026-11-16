@@ -60,6 +60,46 @@ export const PIE = {
   marca: 'Cápsulas de microaprendizaje para equipos de capacitación. Un producto de AulasEducativas, hecho en Lima.',
 } as const;
 
+/** HU-1601 · El formulario de contacto, su confirmación y el aviso cuando el envío no se pudo guardar. */
+export const FORMULARIO = {
+  etiqueta: 'Contacto',
+  titulo: 'Cuéntanos qué necesitas',
+  texto: 'Déjanos tus datos y te escribimos en un día hábil.',
+  nombre: 'Nombre',
+  correo: 'Correo de trabajo',
+  empresa: 'Empresa (opcional)',
+  mensaje: 'Mensaje (opcional)',
+  consentimiento: 'Acepto el tratamiento de mis datos personales para que me contacten sobre Aptio SCORM (Ley 29733).',
+  privacidad: 'Política de privacidad',
+  trampa: 'No llenes este campo',
+  enviar: 'Enviar',
+  gracias: 'Recibimos tus datos',
+  graciasTexto: 'Gracias por escribirnos. Te contactaremos pronto al correo que nos dejaste.',
+  error: 'No pudimos enviar el formulario',
+  errorTexto: 'Revisa estos datos y vuelve a intentarlo:',
+  demasiados: 'Recibimos varios envíos seguidos desde tu conexión. Espera un minuto y vuelve a intentarlo.',
+  regresar: 'Volver al formulario',
+} as const;
+const FORMULARIO_EN = {
+  etiqueta: 'Contact',
+  titulo: 'Tell us what you need',
+  texto: 'Leave your details and we will write to you within one business day.',
+  nombre: 'Name',
+  correo: 'Work email',
+  empresa: 'Company (optional)',
+  mensaje: 'Message (optional)',
+  consentimiento: 'I agree to the processing of my personal data so that I can be contacted about Aptio SCORM (Peruvian Law 29733).',
+  privacidad: 'Privacy policy',
+  trampa: 'Do not fill in this field',
+  enviar: 'Send',
+  gracias: 'We received your details',
+  graciasTexto: 'Thank you for writing to us. We will contact you soon at the email you left.',
+  error: 'We could not send the form',
+  errorTexto: 'Check these details and try again:',
+  demasiados: 'We received several submissions in a row from your connection. Wait a minute and try again.',
+  regresar: 'Back to the form',
+} as const;
+
 /** Descripción por defecto de cada página hasta el SEO por página (HU-1512). */
 export const DESCRIPCION = 'Aptio SCORM genera cápsulas de microaprendizaje de 3 a 10 minutos con interacciones, personaje con voz, subtítulos e inglés, revisadas por tu equipo y listas para cualquier LMS.';
 
@@ -91,7 +131,7 @@ const HERO_EN = {
 
 /** Todos los textos fijos de un idioma. */
 export const TEXTOS = {
-  es: { HERO, CONFIANZA, CTA, FHERO, COMPARACION, SECCIONES, PIE, DESCRIPCION },
+  es: { HERO, CONFIANZA, CTA, FHERO, COMPARACION, SECCIONES, PIE, DESCRIPCION, FORMULARIO },
   en: {
     HERO: HERO_EN,
     CONFIANZA: { puntaje: '4.9', texto: 'out of 5 from 120 training teams' },
@@ -117,6 +157,7 @@ export const TEXTOS = {
       sectores: { etiqueta: 'Industries', titulo: 'Built for the way your industry trains', verSolucion: 'See the solution' },
       blog: { etiqueta: 'Blog', titulo: 'Ideas for better microlearning', texto: 'Guides from our production team. Filter by topic.', filtrar: 'Filter articles by category', todas: 'All', verTodos: 'See all articles on the blog', ultimos: 'Latest articles', por: 'By', articulos: 'articles', articulo: 'article' },
     },
+    FORMULARIO: FORMULARIO_EN,
     PIE: { marca: 'Microlearning capsules for training teams. A product by AulasEducativas, made in Lima.' },
     DESCRIPCION: 'Aptio SCORM builds 3 to 10 minute microlearning capsules with interactions, a speaking character, subtitles and English, reviewed by your team and ready for any LMS.',
   },

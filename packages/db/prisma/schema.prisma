@@ -980,3 +980,41 @@ model WpArticulo {
 
   @@index([fecha])
 }
+
+/// HU-1601 · Lead del sitio comercial (REQ-074, PNT-34, RN-17-1): uno por correo. La atribución es la del primer
+/// contacto (origen, vía, página de entrada y UTM) y no cambia; cada envío posterior suma al historial. Los campos del
+/// CRM llegan con la HU-1602. Reglas en `@aptio/schema/leads`.
+model Lead {
+  id                 String    @id @default(uuid()) @db.Uuid
+  /// En minúsculas y sin espacios.
+  correo             String    @unique
+  nombre             String    @default("")
+  empresa            String?
+  mensaje            String?
+  /// formulario | popup | chatbot | agendador | suscripcion | boletin | asistente_ia
+  origen             String
+  /// El canal que capturó el lead; difiere de `origen` cuando el referente es un asistente de IA.
+  via                String
+  paginaEntrada      String
+  paginaFormulario   String?
+  utmSource          String?
+  utmMedium          String?
+  utmCampaign        String?
+  utmTerm            String?
+  utmContent         String?
+  referente          String?
+  idioma             String    @default("es")
+  /// NUEVO | CONTACTADO | DEMO | PROPUESTA | GANADO | PERDIDO
+  etapa              String    @default("NUEVO")
+  consentimiento     Boolean   @default(false)
+  consentimientoEn   DateTime?
+  totalContactos     Int       @default(1)
+  /// [{ en, via, pagina, mensaje? }] con cada envío recibido, del más antiguo al más nuevo (hasta 50).
+  historialContactos Json      @default("[]")
+  creadoEn           DateTime  @default(now())
+  actualizadoEn      DateTime  @updatedAt
+
+  @@index([origen, creadoEn])
+  @@index([etapa, creadoEn])
+  @@index([creadoEn])
+}

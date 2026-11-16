@@ -51,6 +51,8 @@ tags:
   description: Sitio comercial administrable, solo superadmin de plataforma (M16, ADR-011)
 - name: Sitio público
   description: Rutas sin sesión del sitio comercial, con límite de 60 peticiones por minuto por IP (M16)
+- name: Captación
+  description: Leads del sitio con su origen y UTM, y el embudo comercial; la consulta es solo del superadmin (M17, ADR-011)
 paths:
   /salud:
     get:
@@ -1688,7 +1690,7 @@ paths:
 
         Caché: las páginas, el sitemap y robots llevan `Cache-Control: public, max-age=0, s-maxage=60, must-revalidate`
         (la CDN las guarda un minuto); las fuentes, `public, max-age=31536000, immutable`; la 404, `s-maxage=30`. Todas
-        llevan `ETag`; con `If-None-Match` igual responde 304. Las páginas y la 404 llevan una CSP sin scripts.
+        llevan `ETag`; con `If-None-Match` igual responde 304. Las páginas y la 404 llevan una CSP sin scripts de terceros (HU-1601: solo los propios).
 
         HU-1509 · `_marca/{logo|favicon}-{hash8}.{svg|png}` sirve el logo y el favicon de los ajustes, con la misma caché
         que las fuentes. HU-1511 · `_blog/{sha16}.{jpg|png|webp}` sirve las imágenes destacadas copiadas de WordPress,
@@ -1704,6 +1706,17 @@ paths:
         HU-1513 · `llms.txt` sirve el texto de Sitio web › SEO para IA (`text/plain`, con la caché de las páginas); si
         está vacío, la 404. robots.txt suma un grupo `User-agent: {nombre}` con `Disallow: /` por cada rastreador de IA
         bloqueado (CP-126).
+
+        HU-1601 · Con el bloque «Formulario de contacto» en la versión, sus páginas cargan el script propio
+        `_captacion.js` (`text/javascript`, con la caché de las páginas), que guarda en `sessionStorage` la página de
+        entrada, el referente externo y los `utm_*` de la primera visita y los copia al formulario; no usa cookies ni
+        terceros. Por eso la CSP de las páginas pasa a `script-src 'self'` y `form-action 'self'`. `_gracias` y
+        `en/_gracias` son la confirmación del envío (`noindex`). Sin JavaScript el formulario se envía igual, con la
+        página del formulario como entrada: el formulario hace `POST /s/_lead` (`application/x-www-form-urlencoded`, los
+        campos de `LeadEntrada`, que la CDN debe reenviar al origen) con el mismo registro que `POST /publico/leads`. Con
+        éxito, o con el campo trampa lleno, responde 303 a `/s/_gracias` (o `/s/en/_gracias`); con datos no válidos (422)
+        o demasiados envíos (429, con Retry-After), la página del sitio con los errores y «Volver al formulario», con
+        `Cache-Control: private, no-store`.
       parameters:
       - name: ruta
         in: path
@@ -1749,6 +1762,145 @@ paths:
           $ref: '#/components/responses/PaginaSitioNoEncontrada'
         '503':
           $ref: '#/components/responses/SitioEnMantenimiento'
+  /publico/leads:
+    post:
+      tags:
+      - Captación
+      summary: Registrar un lead desde el sitio con su origen y UTM (HU-1601, CP-128)
+      operationId: post_publico_leads
+      security: []
+      description: |-
+        Sin sesión. Lo usan el script del sitio y, en sus historias, el popup, el chatbot, el agendador y la suscripción
+        (`via`). Todo es texto plano no confiable (RN-16-7): el correo se guarda en minúsculas y `consentimiento` debe ser
+        true (Ley 29733; se guarda su fecha). Un referente de un asistente de IA (ChatGPT, Claude, Gemini, Perplexity,
+        Copilot y otros) o un `utm_source` igual da `origen = asistente_ia`, y `via` conserva el canal (RN-17-1).
+
+        Un solo lead por correo: si ya existe, conserva la atribución del primer contacto (origen, entrada, UTM y
+        referente), completa solo los datos que faltaban, suma el envío a `historialContactos` (los últimos 50) y sube
+        `totalContactos`. Con el campo trampa `website` lleno se responde igual y no se guarda nada. La respuesta nunca dice
+        si el correo ya existía. El aviso por correo va al «Correo de leads» de los ajustes sin bloquear la respuesta: si
+        falla, el lead queda guardado. 429 DEMASIADAS_SOLICITUDES con más de 5 envíos en 10 minutos desde la misma IP
+        (además del límite general de `/publico/*`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadEntrada'
+      responses:
+        '201':
+          description: Recibido (también cuando se descarta por el campo trampa)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeadRecibido'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /captacion/leads:
+    get:
+      tags:
+      - Captación
+      summary: Leads del sitio con su origen, entrada y UTM (HU-1601, PNT-34)
+      operationId: get_captacion_leads
+      description: Solo SUPERADMIN. Del más nuevo al más antiguo, filtrados por `origen` y `etapa`, de a 25 por página (máximo 50).
+      parameters:
+      - $ref: '#/components/parameters/OrigenLead'
+      - $ref: '#/components/parameters/EtapaLead'
+      - name: pagina
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: porPagina
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 25
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaLeads'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/leads/exportar.csv:
+    get:
+      tags:
+      - Captación
+      summary: Exportar los leads a CSV con los filtros aplicados (HU-1601, PNT-34)
+      operationId: get_captacion_leads_exportar
+      description: |-
+        Solo SUPERADMIN. Los mismos filtros que la lista, hasta 5 000 filas, en UTF-8 con BOM, separadas por comas y con
+        fin de línea CRLF. Toda celda va entre comillas y la que empieza con `=`, `+`, `-`, `@`, tabulador o retorno lleva
+        un apóstrofo delante, para que la hoja de cálculo no la ejecute como fórmula. Auditoría LEADS_EXPORTADOS con las
+        filas y los filtros.
+      parameters:
+      - $ref: '#/components/parameters/OrigenLead'
+      - $ref: '#/components/parameters/EtapaLead'
+      responses:
+        '200':
+          description: El archivo `leads-AAAA-MM-DD.csv`
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="leads-AAAA-MM-DD.csv"`'
+              schema:
+                type: string
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/leads/{leadId}:
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar la etapa de un lead en el embudo (HU-1601, PNT-34)
+      operationId: patch_captacion_lead
+      description: Solo SUPERADMIN. Auditoría LEAD_ETAPA_CAMBIADA con la etapa anterior y la nueva. 404 si el lead no existe.
+      parameters:
+      - name: leadId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeadCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Lead'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /operacion:
     get:
       tags:
@@ -5145,6 +5297,20 @@ components:
           schema:
             type: string
   parameters:
+    OrigenLead:
+      name: origen
+      in: query
+      description: HU-1601 · Solo los leads de este origen
+      schema:
+        type: string
+        enum: [formulario, popup, chatbot, agendador, suscripcion, boletin, asistente_ia]
+    EtapaLead:
+      name: etapa
+      in: query
+      description: HU-1601 · Solo los leads en esta etapa del embudo
+      schema:
+        type: string
+        enum: [NUEVO, CONTACTADO, DEMO, PROPUESTA, GANADO, PERDIDO]
     IdiomaSitio:
       name: idioma
       in: query
@@ -6574,6 +6740,200 @@ components:
               description: Páginas publicadas con datos estructurados FAQPage
             publicadas:
               type: integer
+    LeadEntrada:
+      type: object
+      description: HU-1601 · Texto plano no confiable; lo valida `@aptio/schema/leads`
+      required:
+      - correo
+      - consentimiento
+      properties:
+        correo:
+          type: string
+          maxLength: 254
+          example: rmendoza@nuevohorizonte.example
+        nombre:
+          type: string
+          maxLength: 120
+          description: Obligatorio en el formulario y el agendador
+        empresa:
+          type: string
+          maxLength: 160
+        mensaje:
+          type: string
+          maxLength: 2000
+        consentimiento:
+          description: Ley 29733. Debe ser true (o «on» desde el formulario HTML)
+          oneOf:
+          - type: boolean
+          - type: string
+        via:
+          type: string
+          enum: [formulario, popup, chatbot, agendador, suscripcion, boletin]
+          default: formulario
+          description: El canal que captura el lead
+        paginaEntrada:
+          type: string
+          maxLength: 300
+          example: /
+          description: La primera página de la sesión
+        paginaFormulario:
+          type: string
+          maxLength: 300
+          example: /precios
+          description: La página donde se envió
+        referente:
+          type: string
+          maxLength: 500
+          example: https://www.linkedin.com/
+        idioma:
+          type: string
+          enum: [es, en]
+        utm_source:
+          type: string
+          maxLength: 150
+          example: linkedin
+        utm_medium:
+          type: string
+          maxLength: 150
+        utm_campaign:
+          type: string
+          maxLength: 150
+        utm_term:
+          type: string
+          maxLength: 150
+        utm_content:
+          type: string
+          maxLength: 150
+        website:
+          type: string
+          description: Campo trampa. Debe llegar vacío; lleno, se responde igual y no se guarda nada
+    LeadRecibido:
+      type: object
+      required:
+      - recibido
+      properties:
+        recibido:
+          type: boolean
+          enum: [true]
+          description: Siempre true; no dice si el correo ya existía ni si se descartó
+    ContactoLead:
+      type: object
+      required:
+      - en
+      - via
+      - pagina
+      properties:
+        en:
+          type: string
+          format: date-time
+        via:
+          type: string
+          enum: [formulario, popup, chatbot, agendador, suscripcion, boletin]
+        pagina:
+          type: string
+        mensaje:
+          type: string
+    Lead:
+      type: object
+      description: HU-1601 · Un lead con la atribución de su primer contacto (PNT-34, RN-17-1)
+      required: [id, correo, nombre, empresa, mensaje, origen, via, paginaEntrada, paginaFormulario, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, referente, idioma, etapa, consentimiento, consentimientoEn, totalContactos, historialContactos, creadoEn, actualizadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        correo:
+          type: string
+          description: En minúsculas; uno por lead
+        nombre:
+          type: string
+        empresa:
+          type: string
+          nullable: true
+        mensaje:
+          type: string
+          nullable: true
+        origen:
+          type: string
+          enum: [formulario, popup, chatbot, agendador, suscripcion, boletin, asistente_ia]
+        via:
+          type: string
+          enum: [formulario, popup, chatbot, agendador, suscripcion, boletin]
+        paginaEntrada:
+          type: string
+        paginaFormulario:
+          type: string
+          nullable: true
+        utmSource:
+          type: string
+          nullable: true
+        utmMedium:
+          type: string
+          nullable: true
+        utmCampaign:
+          type: string
+          nullable: true
+        utmTerm:
+          type: string
+          nullable: true
+        utmContent:
+          type: string
+          nullable: true
+        referente:
+          type: string
+          nullable: true
+        idioma:
+          type: string
+          enum: [es, en]
+        etapa:
+          type: string
+          enum: [NUEVO, CONTACTADO, DEMO, PROPUESTA, GANADO, PERDIDO]
+        consentimiento:
+          type: boolean
+        consentimientoEn:
+          type: string
+          format: date-time
+          nullable: true
+        totalContactos:
+          type: integer
+        historialContactos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContactoLead'
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+    ListaLeads:
+      type: object
+      required:
+      - leads
+      - total
+      - pagina
+      - porPagina
+      properties:
+        leads:
+          type: array
+          description: Del más nuevo al más antiguo
+          items:
+            $ref: '#/components/schemas/Lead'
+        total:
+          type: integer
+          description: Leads que cumplen los filtros
+        pagina:
+          type: integer
+        porPagina:
+          type: integer
+    LeadCambio:
+      type: object
+      additionalProperties: false
+      required:
+      - etapa
+      properties:
+        etapa:
+          type: string
+          enum: [NUEVO, CONTACTADO, DEMO, PROPUESTA, GANADO, PERDIDO]
     SeoIaCambio:
       type: object
       additionalProperties: false

@@ -18,6 +18,8 @@ import { alternasDe, type Instantanea, navegacionDe, type PaginaServida, paginaS
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
 import { type Idioma, INTERFAZ, TEXTOS } from './textos.js';
+import { CAMPO_TRAMPA, LIMITES_LEAD, PARAMETROS_UTM } from '@aptio/schema/leads';
+import { ARCHIVO_CAPTACION, RUTA_GRACIAS, RUTA_LEAD, SCRIPT_CAPTACION, TIPO_FORMULARIO } from './captacion.js';
 
 export interface OpcionesRender {
   entorno: EntornoSitio;
@@ -170,7 +172,7 @@ function Encabezado({ etiqueta, titulo, bajada, id }: { etiqueta?: string; titul
   return h('div', { className: 'sh' }, etiqueta ? h('span', { className: 'tagp' }, etiqueta) : null, h('h2', { id }, titulo), bajada ? h('p', null, bajada) : null);
 }
 
-interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined }
+interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined; ruta: string; privacidad: boolean }
 
 const fechaBlog = (iso: string, idioma: Idioma) => new Date(iso).toLocaleDateString(idioma === 'en' ? 'en-US' : 'es-PE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Lima' });
 
@@ -323,11 +325,63 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
       // HU-1511 · Sin copia del blog o sin artículos visibles, el bloque no sale.
       if (!c.blog?.articulos.length) return null;
       return h(SeccionBlog, { blog: c.blog, c, id });
+    case TIPO_FORMULARIO:
+      return h(FormularioContacto, { c, id });
     default:
       // Planes (S13), precios, comparativa y agendador llegan con su historia (SUP-193).
       return null;
   }
 }
+
+/**
+ * HU-1601 · El formulario de contacto (RN-17-1). Es un formulario HTML normal: se envía sin JavaScript a
+ * `POST {base}/_lead`. Lleva la casilla obligatoria de consentimiento (Ley 29733), un campo trampa que las personas no
+ * ven y los campos ocultos de atribución, que el script de captación llena con la primera visita de la sesión.
+ */
+function FormularioContacto({ c, id }: { c: Contexto; id: string }) {
+  const T = TEXTOS[c.idioma].FORMULARIO;
+  const campo = (n: string) => `${id}-${n}`;
+  return h('section', { id: 'contacto', className: 'bg-ice', 'aria-labelledby': id }, h('div', { className: 'in' },
+    h(Encabezado, { id, etiqueta: T.etiqueta, titulo: T.titulo, bajada: T.texto }),
+    h('form', { className: 'fcontacto', method: 'post', action: `${c.base}/${RUTA_LEAD}`, 'data-captacion': '' },
+      h('div', { className: 'fc-dos' },
+        h('p', null, h('label', { htmlFor: campo('nombre') }, T.nombre), h('input', { id: campo('nombre'), name: 'nombre', type: 'text', required: true, maxLength: LIMITES_LEAD.nombre, autoComplete: 'name' })),
+        h('p', null, h('label', { htmlFor: campo('correo') }, T.correo), h('input', { id: campo('correo'), name: 'correo', type: 'email', required: true, maxLength: LIMITES_LEAD.correo, autoComplete: 'email' }))),
+      h('p', null, h('label', { htmlFor: campo('empresa') }, T.empresa), h('input', { id: campo('empresa'), name: 'empresa', type: 'text', maxLength: LIMITES_LEAD.empresa, autoComplete: 'organization' })),
+      h('p', null, h('label', { htmlFor: campo('mensaje') }, T.mensaje), h('textarea', { id: campo('mensaje'), name: 'mensaje', rows: 4, maxLength: LIMITES_LEAD.mensaje })),
+      h('p', { className: 'fc-trampa', 'aria-hidden': 'true' }, h('label', { htmlFor: campo('web') }, T.trampa), h('input', { id: campo('web'), name: CAMPO_TRAMPA, type: 'text', tabIndex: -1, autoComplete: 'off' })),
+      h('p', { className: 'fc-acepto' },
+        h('input', { id: campo('acepto'), name: 'consentimiento', type: 'checkbox', value: 'on', required: true }),
+        h('label', { htmlFor: campo('acepto') }, T.consentimiento, c.privacidad ? h(Fragment, null, ' ', h('a', { href: `${c.base}${rutaPublica('/privacidad', c.idioma)}` }, T.privacidad)) : null)),
+      h('input', { type: 'hidden', name: 'via', value: 'formulario' }),
+      h('input', { type: 'hidden', name: 'idioma', value: c.idioma }),
+      h('input', { type: 'hidden', name: 'paginaFormulario', value: c.ruta }),
+      h('input', { type: 'hidden', name: 'paginaEntrada', value: '' }),
+      h('input', { type: 'hidden', name: 'referente', value: '' }),
+      PARAMETROS_UTM.map((u) => h('input', { key: u, type: 'hidden', name: u, value: '' })),
+      h('p', null, h('button', { className: 'btn primary', type: 'submit' }, T.enviar)))));
+}
+
+/** HU-1601 · Estilos del formulario; solo van en las páginas que lo tienen. */
+export const CSS_FORMULARIO = [
+  '.fcontacto{max-width:640px;margin:32px auto 0;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;gap:16px}',
+  '.fcontacto p{margin:0}',
+  '.fc-dos{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}',
+  '.fcontacto label{display:block;font-family:var(--f-ui);font-size:14px;font-weight:700;margin-bottom:6px}',
+  '.fcontacto input[type=text],.fcontacto input[type=email],.fcontacto textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:#fff;border:1px solid #64748B;border-radius:8px;padding:10px 12px}',
+  '.fcontacto textarea{resize:vertical;min-height:112px}',
+  '.fcontacto input:focus-visible,.fcontacto textarea:focus-visible,.fcontacto button:focus-visible{outline:3px solid var(--b700);outline-offset:2px}',
+  '.fc-acepto{display:grid;grid-template-columns:24px minmax(0,1fr);gap:10px;align-items:start}',
+  '.fc-acepto input{width:24px;height:24px;margin:0;accent-color:var(--b700)}',
+  '.fc-acepto label{font-family:var(--f-body);font-weight:400;font-size:14px;color:var(--muted);margin:0}',
+  '.fc-trampa{position:absolute!important;left:-9999px;width:1px;height:1px;overflow:hidden}',
+  '.fcontacto button{cursor:pointer;min-height:48px}',
+  '.errores-formulario{display:inline-block;text-align:left;margin:16px auto 0;color:var(--ink)}',
+  '@media (max-width:640px){.fc-dos{grid-template-columns:minmax(0,1fr)}.fcontacto{padding:16px}}',
+].join('');
+
+/** HU-1601 · ¿La versión tiene algún formulario de contacto? Entonces todas sus páginas cargan el script de captación. */
+export const tieneFormulario = (inst: Pick<Instantanea, 'paginas'>): boolean => inst.paginas.some((p) => p.bloques.some((b) => b.tipo === TIPO_FORMULARIO));
 
 /** HU-1512 · Open Graph de una página: título, descripción, URL, tipo, nombre del sitio e idioma. */
 interface OpenGraph { titulo: string; descripcion: string; url: string; sitio: string; idioma: Idioma }
@@ -343,9 +397,11 @@ export function jsonLdSeguro(datos: unknown): string {
 /** HU-1512 · El HTML sin sus bloques JSON-LD (para comprobar que no queda ningún otro `<script>`). */
 export const sinJsonLd = (html: string): string => html.replace(/<script type="application\/ld\+json">[^<]*<\/script>/g, '');
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, children }: {
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, children }: {
   titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
-  og?: OpenGraph; jsonLd?: unknown; children?: ReactNode;
+  og?: OpenGraph; jsonLd?: unknown;
+  /** HU-1601 · Carga el script propio de captación (primera visita y UTM); la CSP solo permite scripts del mismo origen. */
+  captacion?: boolean; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -368,7 +424,8 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       h('meta', { name: 'theme-color', content: '#004ECC' }),
       favicon ? h('link', { rel: 'icon', href: `${base}/${CARPETA_MARCA}/${favicon.archivo}`, type: favicon.mime }) : null,
       lista.filter((f) => f.precargar).map((f) => h('link', { key: f.archivo, rel: 'preload', href: `${base}/${CARPETA_FUENTES}/${f.archivo}`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })),
-      h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO + cssExtra } })),
+      h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO + cssExtra } }),
+      captacion ? h('script', { src: `${base}/${ARCHIVO_CAPTACION}`, defer: true, 'data-base': base }) : null),
     h('body', null, children));
 }
 
@@ -408,10 +465,11 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
   const i = idiomaDe(p.idioma);
   const publica = rutaPublica(p.ruta, p.idioma);
   const landings = landingsDe(inst, p.idioma);
+  const privacidad = inst.paginas.some((x) => x.ruta === '/privacidad' && x.idioma === p.idioma);
   let hayH1 = false;
   const bloques = p.bloques.map((b, n) => {
     const portada = b.tipo === 'hero' || b.tipo === 'fhero';
-    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog });
+    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog, ruta: publica, privacidad });
     if (nodo && portada) hayH1 = true;
     return nodo ? h(Fragment, { key: n }, nodo) : null;
   });
@@ -427,7 +485,8 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     titulo, descripcion, canonical, alternas: alternasHref(inst, p.ruta, op.sitioUrl), idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
     // CP-125 · Sin indexar: `noindex` (en pruebas ya va `noindex, nofollow` en todas).
     ...(indexar || op.entorno !== 'produccion' ? {} : { robots: 'noindex' }),
-    cssExtra: p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '',
+    cssExtra: (p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '') + (p.bloques.some((b) => b.tipo === TIPO_FORMULARIO) ? CSS_FORMULARIO : ''),
+    captacion: tieneFormulario(inst),
     og: { titulo, descripcion, url: canonical, sitio: marca.nombre, idioma: i },
     jsonLd: datosEstructurados(p, { titulo, descripcion, url: canonical, idioma: i, marca, sitioUrl: op.sitioUrl }),
   }, h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: p.ruta, marca, landings, selector: selectorDe(inst, p.ruta, i) }, cuerpo)));
@@ -469,6 +528,37 @@ export function renderizar404(inst: Instantanea | null, op: OpcionesRender, idio
       h('section', { className: 'no-encontrada' }, h('div', { className: 'in' },
         h('h1', null, t.noEncontrada), h('p', null, t.noEncontradaTexto),
         h('a', { className: 'btn primary', href: `${op.base}${i === 'en' ? '/en' : '/'}` }, t.volver))))));
+}
+
+/** HU-1601 · La confirmación tras enviar el formulario (`{base}/_gracias`): con el menú y el pie, y sin indexar. */
+export function renderizarGracias(inst: Instantanea, op: OpcionesRender, idioma: string = 'es'): string {
+  const i = idiomaDe(idioma);
+  const T = TEXTOS[i].FORMULARIO;
+  const marca = marcaDe(inst);
+  return documento(h(Documento, { titulo: `${T.gracias} · ${marca.nombre}`, descripcion: T.graciasTexto, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon, robots: 'noindex, nofollow', captacion: true },
+    h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: '', marca, landings: landingsDe(inst, i) },
+      h('section', { className: 'no-encontrada' }, h('div', { className: 'in' },
+        h('h1', null, T.gracias), h('p', { role: 'status' }, T.graciasTexto),
+        h('a', { className: 'btn primary', href: `${op.base}${i === 'en' ? '/en' : '/'}` }, INTERFAZ[i].volver))))));
+}
+
+/**
+ * HU-1601 · El aviso cuando un envío sin JavaScript no se pudo guardar (422) o llegaron demasiados seguidos (429): la
+ * marca, los errores y el enlace para volver al formulario. Los mensajes son los de la validación, nunca lo que escribió
+ * el visitante, y todo se escapa (RN-16-7).
+ */
+export function renderizarErrorFormulario(inst: Pick<Instantanea, 'sitio'> | null, op: OpcionesRender, d: { errores: readonly string[]; volverA: string | null; demasiados?: boolean }, idioma: string = 'es'): string {
+  const i = idiomaDe(idioma);
+  const T = TEXTOS[i].FORMULARIO;
+  const marca = { ...marcaDe(inst), whatsapp: null };
+  return documento(h(Documento, { titulo: `${T.error} · ${marca.nombre}`, descripcion: T.error, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon, robots: 'noindex, nofollow', cssExtra: CSS_FORMULARIO },
+    h(Fragment, null,
+      h('header', { className: 'shead' }, h('div', { className: 'in' }, h('span', { className: 'wm' }, h(Marcador, { marca, base: op.base })))),
+      h('main', { id: 'contenido' },
+        h('section', { className: 'no-encontrada' }, h('div', { className: 'in' },
+          h('h1', null, T.error),
+          d.demasiados ? h('p', { role: 'alert' }, T.demasiados) : h('div', { role: 'alert' }, h('p', null, T.errorTexto), h('ul', { className: 'errores-formulario' }, d.errores.map((e) => h('li', { key: e }, e)))),
+          h('a', { className: 'btn primary', href: `${op.base}${d.volverA ? `${d.volverA === '/' ? '/' : d.volverA}#contacto` : i === 'en' ? '/en' : '/'}` }, d.volverA ? T.regresar : INTERFAZ[i].volver)))))));
 }
 
 /**
@@ -540,6 +630,12 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     { archivo: '404.html', contenido: renderizar404(inst, op), mime: html },
     { archivo: 'sitemap.xml', contenido: sitemapXml(inst, op.sitioUrl), mime: 'application/xml; charset=utf-8' },
     { archivo: 'robots.txt', contenido: robotsTxt(op, inst.robotsExtra, inst.rastreadoresBloqueados), mime: 'text/plain; charset=utf-8' },
+    // HU-1601 · Solo si alguna página publicada tiene el formulario: el script de captación y la página de gracias.
+    ...(tieneFormulario(inst) ? [
+      { archivo: ARCHIVO_CAPTACION, contenido: SCRIPT_CAPTACION, mime: 'text/javascript; charset=utf-8' },
+      { archivo: `${RUTA_GRACIAS}.html`, contenido: renderizarGracias(inst, op, 'es'), mime: html },
+      ...(inst.paginas.some((p) => p.idioma === 'en') ? [{ archivo: `en/${RUTA_GRACIAS}.html`, contenido: renderizarGracias(inst, op, 'en'), mime: html }] : []),
+    ] : []),
     ...(inst.llmsTxt?.trim() ? [{ archivo: ARCHIVO_LLMS, contenido: `${inst.llmsTxt.trim()}\n`, mime: 'text/plain; charset=utf-8' }] : []),
     ...(inst.redirecciones?.length ? [{ archivo: ARCHIVO_REDIRECCIONES, contenido: JSON.stringify(inst.redirecciones), mime: 'application/json' }] : []),
   ];

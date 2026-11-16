@@ -23,6 +23,8 @@ export const CATALOGO_BLOQUES = {
   bloglista: { nombre: 'Blog (WordPress)', fuente: 'Blog (WordPress)' },
   sectores: { nombre: 'Sectores', fuente: 'Páginas › Landings de sector' },
   agendador: { nombre: 'Agendador', fuente: 'Agendamiento' },
+  // HU-1601 · Cada envío entra a Captación › Leads y CRM con origen Formulario (RN-17-1).
+  formulario_contacto: { nombre: 'Formulario de contacto', fuente: 'Captación › Leads y CRM' },
 } as const satisfies Record<string, { nombre: string; fuente?: string }>;
 
 export type TipoBloque = keyof typeof CATALOGO_BLOQUES;
