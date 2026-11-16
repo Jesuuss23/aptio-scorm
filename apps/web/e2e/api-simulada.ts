@@ -9,7 +9,8 @@ import {
   aplicarMenciones, aplicarRastreadores, ASISTENTES_IA, estadoRastreadores, leerMenciones, type Menciones, type PropuestaIa, propuestasNuevas, type SalidaPropuestasIa,
   validarLlmsTxt, validarPreguntaObjetivo,
 } from '@aptio/schema/sitio-seo-ia';
-import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, renderizar404, renderizarMantenimiento, renderizarSitio, resolverPedido } from '@aptio/sitio';
+import { ETAPAS_LEAD, fusionarLead, leadNuevo, leadsACsv, leerHistorial, ORIGENES_LEAD, validarEnvioLead } from '@aptio/schema/leads';
+import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, renderizar404, renderizarErrorFormulario, renderizarMantenimiento, renderizarSitio, resolverPedido, RUTA_GRACIAS } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
@@ -175,6 +176,8 @@ export interface OpcionesSimulacion {
   robotsSitio?: string;
   /** HU-1513 · SEO para IA ya guardado: llms.txt, rastreadores bloqueados y preguntas objetivo. `iaFalla`: IA-19 no logra una salida válida. */
   seoIaSitio?: { llmsTxt?: string; bloqueados?: string[]; preguntas?: string[]; iaFalla?: boolean };
+  /** HU-1601 · Leads que ya están en Captación › Leads y CRM. */
+  leadsSitio?: LeadSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -407,6 +410,13 @@ export interface PaginaSitioSim {
   metaDescripcion?: string | null; canonical?: string | null; indexar?: boolean; datosEstructurados?: 'WebPage' | 'FAQPage' | 'Product';
 }
 /** HU-1512 · Redirección 301 en la simulación. */
+/** HU-1601 · Un lead del simulador, con la forma de la API (fechas en ISO). */
+export interface LeadSim {
+  id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null; origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
+  utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmTerm: string | null; utmContent: string | null; referente: string | null; idioma: string;
+  etapa: string; consentimiento: boolean; consentimientoEn: string | null; totalContactos: number; historialContactos: unknown[]; creadoEn: string; actualizadoEn: string;
+}
+
 export interface RedireccionSim { id: string; desde: string; hacia: string; activa: boolean; creadoEn?: string; actualizadoEn?: string }
 /** HU-1503 · Bloque de una página del sitio en la simulación. */
 export interface BloqueSitioSim {
@@ -422,7 +432,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {} }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [] }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -435,6 +445,27 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   let robotsSim = robotsSitio;
   // HU-1513 · SEO para IA: llms.txt y los rastreadores bloqueados viajan en la versión; las preguntas y las propuestas, no.
   let llmsSim = seoIaSitio.llmsTxt ?? '';
+  // HU-1601 · Los leads, con las mismas reglas que la API (un lead por correo, atribución del primer contacto).
+  const leadsSim: LeadSim[] = leadsSitio.map((l) => ({ ...l }));
+  let leadsSecuencia = 0;
+  /** Lo que llega del sitio (JSON o formulario): `null` si el campo trampa vino lleno; los errores si no valida. */
+  const capturarLeadSim = (entrada: unknown): { ok: true; lead: LeadSim | null } | { ok: false; errores: { campo: string; mensaje: string }[] } => {
+    const r = validarEnvioLead(entrada, '/s');
+    if (!r.ok) return r;
+    if (r.trampa) return { ok: true, lead: null };
+    const ahora = new Date();
+    const actual = leadsSim.find((l) => l.correo === r.envio.correo);
+    if (actual) {
+      const c = fusionarLead({ ...actual, consentimientoEn: actual.consentimientoEn ? new Date(actual.consentimientoEn) : null }, r.envio, ahora);
+      Object.assign(actual, { ...c, consentimientoEn: c.consentimientoEn?.toISOString() ?? actual.consentimientoEn, actualizadoEn: ahora.toISOString() });
+      return { ok: true, lead: actual };
+    }
+    const d = leadNuevo(r.envio, ahora);
+    leadsSecuencia += 1;
+    const lead: LeadSim = { ...d, id: `00000000-0000-4000-9700-${String(leadsSecuencia).padStart(12, '0')}`, etapa: 'NUEVO', consentimientoEn: d.consentimientoEn.toISOString(), creadoEn: ahora.toISOString(), actualizadoEn: ahora.toISOString() };
+    leadsSim.unshift(lead);
+    return { ok: true, lead };
+  };
   let bloqueadosSim: string[] = seoIaSitio.bloqueados ?? [];
   const preguntasIaSim: { id: string; pregunta: string; menciones: Menciones; creadoEn: string; actualizadoEn: string }[] = (seoIaSitio.preguntas ?? []).map((pregunta, i) => ({
     id: `00000000-0000-4000-b000-${String(i + 1).padStart(12, '0')}`, pregunta, menciones: leerMenciones(null), creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z',
@@ -564,6 +595,15 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-1508 · El sitio público pre-renderizado en /s/*: el HTML de la última versión, armado con el mismo paquete que el worker.
   await page.route(/^https?:\/\/[^/]+\/s(?:[/?#]|$)/, (route) => {
     const ruta = new URL(route.request().url()).pathname.slice(2) || '/';
+    // HU-1601 · El formulario de contacto sin JavaScript: 303 a la página de gracias, o la página con los errores (422).
+    if (route.request().method() === 'POST' && ruta === '/_lead') {
+      const cuerpo = Object.fromEntries(new URLSearchParams(route.request().postData() ?? ''));
+      const r = capturarLeadSim(cuerpo);
+      const en = cuerpo.idioma === 'en';
+      if (r.ok) return route.fulfill({ status: 303, headers: { Location: `/s${en ? '/en' : ''}/${RUTA_GRACIAS}`, 'Cache-Control': 'no-store' }, body: '' });
+      const html = renderizarErrorFormulario(null, { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s' }, { errores: r.errores.map((e) => e.mensaje), volverA: cuerpo.paginaFormulario?.replace(/^\/s/, '') || null }, en ? 'en' : 'es');
+      return route.fulfill({ status: 422, headers: { ...cabecerasSitio('404', html), 'Cache-Control': 'private, no-store' }, body: html });
+    }
     const pedido = resolverPedido(ruta);
     const op = { entorno: entornoSitio, sitioUrl: 'https://aptioscorm.com', base: '/s', blog: blogPublicoSim() } as const;
     // HU-1509 · CP-121 · En mantenimiento el visitante recibe el aviso (503); el superadmin con sesión ve el sitio con un aviso arriba.
@@ -1098,6 +1138,36 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       // HU-1507 · Publicar una página, o retirar una publicada, crea una versión del sitio (origen «pagina»).
       const version = b.accion === 'publicar' || (estabaPublicada && b.accion) ? nuevaVersionSim('pagina').numero : undefined;
       return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}), ...r301 });
+    }
+    // HU-1601 · La entrada pública de leads (popup, chatbot, agendador y suscripción) y Captación › Leads y CRM (PNT-34).
+    if (ruta === '/publico/leads' && req.method() === 'POST') {
+      const r = capturarLeadSim(req.postDataJSON());
+      return r.ok ? responder(201, { recibido: true }) : responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+    }
+    if (ruta === '/captacion/leads' || ruta.startsWith('/captacion/leads/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const q = new URL(req.url()).searchParams;
+      const origen = q.get('origen');
+      const etapa = q.get('etapa');
+      if ((origen && !(ORIGENES_LEAD as readonly string[]).includes(origen)) || (etapa && !(ETAPAS_LEAD as readonly string[]).includes(etapa))) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'Filtro no válido' });
+      const filtrados = leadsSim.filter((l) => (!origen || l.origen === origen) && (!etapa || l.etapa === etapa)).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+      if (ruta === '/captacion/leads' && req.method() === 'GET') {
+        const pagina = Number(q.get('pagina') ?? 1);
+        const porPagina = Number(q.get('porPagina') ?? 25);
+        return responder(200, { leads: filtrados.slice((pagina - 1) * porPagina, pagina * porPagina).map((l) => ({ ...l, historialContactos: leerHistorial(l.historialContactos) })), total: filtrados.length, pagina, porPagina });
+      }
+      if (ruta === '/captacion/leads/exportar.csv' && req.method() === 'GET') {
+        return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="leads-2026-11-16.csv"', 'Cache-Control': 'no-store' }, body: leadsACsv(filtrados) });
+      }
+      const id = ruta.split('/')[3];
+      const l = leadsSim.find((x) => x.id === id);
+      if (req.method() === 'PATCH') {
+        if (!l) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El lead no existe' });
+        const { etapa: nueva } = req.postDataJSON() as { etapa: string };
+        if (!(ETAPAS_LEAD as readonly string[]).includes(nueva)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'etapa no está en el catálogo' });
+        Object.assign(l, { etapa: nueva, actualizadoEn: new Date().toISOString() });
+        return responder(200, l);
+      }
     }
     // HU-1513 · Sitio web › SEO para IA (PNT-30): mismas reglas que la API; IA-19 responde la salida grabada del modo simulado.
     if (ruta === '/sitio/seo-ia' || ruta.startsWith('/sitio/seo-ia/')) {

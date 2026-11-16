@@ -711,6 +711,37 @@ export interface PropuestaIaSitio {
   creadoId?: string;
   creadoEn: string;
 }
+/** HU-1601 · Un lead del sitio con la atribución de su primer contacto (PNT-34). */
+export interface LeadSitio {
+  id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null;
+  origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
+  utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmTerm: string | null; utmContent: string | null;
+  referente: string | null; idioma: 'es' | 'en'; etapa: string; consentimiento: boolean; consentimientoEn: string | null;
+  totalContactos: number; historialContactos: { en: string; via: string; pagina: string; mensaje?: string }[]; creadoEn: string; actualizadoEn: string;
+}
+export interface ListaLeads { leads: LeadSitio[]; total: number; pagina: number; porPagina: number }
+export interface FiltroLeads { origen?: string; etapa?: string }
+const consultaLeads = (f: FiltroLeads & { pagina?: number; porPagina?: number }) => {
+  const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)]));
+  return q.size ? `?${q}` : '';
+};
+
+/** HU-1601 · El CSV de los leads con los filtros aplicados, como archivo para descargar. */
+async function exportarLeads(f: FiltroLeads): Promise<{ archivo: Blob; nombre: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1/captacion/leads/exportar.csv${consultaLeads(f)}`, { credentials: 'same-origin' });
+  } catch {
+    throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+  }
+  if (!res.ok) {
+    const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string };
+    throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'No se pudo exportar el CSV');
+  }
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'leads.csv';
+  return { archivo: await res.blob(), nombre };
+}
+
 export interface SeoIaSitio {
   llmsTxt: string;
   rastreadores: { nombre: string; permitido: boolean }[];
@@ -820,6 +851,10 @@ export const api = {
   crearRedireccion: (datos: { desde: string; hacia: string; activa?: boolean }) => pedir<RedireccionSitio>('/sitio/seo/redirecciones', json(datos)),
   cambiarRedireccion: (id: string, cambio: { desde?: string; hacia?: string; activa?: boolean }) => pedir<RedireccionSitio>(`/sitio/seo/redirecciones/${id}`, json(cambio, 'PATCH')),
   borrarRedireccion: (id: string) => pedir<void>(`/sitio/seo/redirecciones/${id}`, { method: 'DELETE' }),
+  // HU-1601 · Captación › Leads y CRM (PNT-34).
+  leads: (f: FiltroLeads & { pagina?: number; porPagina?: number } = {}) => pedir<ListaLeads>(`/captacion/leads${consultaLeads(f)}`),
+  cambiarEtapaLead: (id: string, etapa: string) => pedir<LeadSitio>(`/captacion/leads/${id}`, json({ etapa }, 'PATCH')),
+  exportarLeads,
   seoIaSitio: () => pedir<SeoIaSitio>('/sitio/seo-ia'),
   guardarSeoIaSitio: (cambios: { llmsTxt?: string; rastreadores?: Record<string, boolean> }) => pedir<SeoIaSitio>('/sitio/seo-ia', json(cambios, 'PATCH')),
   crearPreguntaIa: (pregunta: string) => pedir<PreguntaIa>('/sitio/seo-ia/preguntas', json({ pregunta })),

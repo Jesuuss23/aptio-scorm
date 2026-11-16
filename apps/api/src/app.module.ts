@@ -24,6 +24,7 @@ import { ConexionesModule } from './conexiones/conexiones.module.js';
 import { OperacionModule } from './operacion/operacion.module.js';
 import { ComentariosModule } from './comentarios/comentarios.module.js';
 import { SitioModule } from './sitio/sitio.module.js';
+import { CaptacionModule } from './captacion/captacion.module.js';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SitioModule } from './sitio/sitio.module.js';
     OperacionModule,
     ComentariosModule,
     SitioModule,
+    CaptacionModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
 })

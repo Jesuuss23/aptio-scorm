@@ -3290,3 +3290,50 @@ ul.fila-chips {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* HU-1601 · Captación › Leads y CRM (PNT-34). */
+.leads-cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-bottom: 16px;
+}
+.leads-cabeza h2 {
+  margin: 0;
+}
+.leads-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.leads-filtros label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+.tabla-leads th[scope='row'],
+.tabla-leads td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.leads-linea {
+  display: block;
+  font-size: var(--texto-xs);
+}
+.leads-contactos {
+  margin-left: 8px;
+}
+.leads-utm {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.leads-pie {
+  margin: 16px 0 0;
+}
