@@ -52,7 +52,7 @@ tags:
 - name: Sitio público
   description: Rutas sin sesión del sitio comercial, con límite de 60 peticiones por minuto por IP (M16)
 - name: Captación
-  description: Leads del sitio con su origen y UTM, y el embudo comercial; la consulta es solo del superadmin (M17, ADR-011)
+  description: Leads del sitio con su origen y UTM, el embudo comercial y su envío a CRM o a un webhook firmado; la consulta es solo del superadmin (M17, ADR-011)
 paths:
   /salud:
     get:
@@ -1781,6 +1781,9 @@ paths:
         si el correo ya existía. El aviso por correo va al «Correo de leads» de los ajustes sin bloquear la respuesta: si
         falla, el lead queda guardado. 429 DEMASIADAS_SOLICITUDES con más de 5 envíos en 10 minutos desde la misma IP
         (además del límite general de `/publico/*`).
+
+        HU-1602 · El lead (o el contacto nuevo del mismo correo) se encola a cada conexión activa de CRM y al webhook
+        (`lead.creado` o `lead.actualizado`), sin bloquear la respuesta.
       requestBody:
         required: true
         content:
@@ -1872,7 +1875,7 @@ paths:
       - Captación
       summary: Cambiar la etapa de un lead en el embudo (HU-1601, PNT-34)
       operationId: patch_captacion_lead
-      description: Solo SUPERADMIN. Auditoría LEAD_ETAPA_CAMBIADA con la etapa anterior y la nueva. 404 si el lead no existe.
+      description: Solo SUPERADMIN. Auditoría LEAD_ETAPA_CAMBIADA con la etapa anterior y la nueva. HU-1602 · La etapa nueva se encola a las conexiones activas (`lead.actualizado`). 404 si el lead no existe.
       parameters:
       - name: leadId
         in: path
@@ -1893,6 +1896,150 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Lead'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/leads/{leadId}/sincronizar:
+    post:
+      tags:
+      - Captación
+      summary: «Reintentar» el envío de un lead a sus CRM (HU-1602, RN-17-2)
+      operationId: post_captacion_lead_sincronizar
+      description: |-
+        Solo SUPERADMIN. Vuelve a poner en la cola `crm` el lead para cada conexión activa que no lo tiene enviado (las
+        que quedaron en «error» o siguen «pendiente»); las enviadas no se repiten. Responde los tipos encolados.
+        Auditoría LEAD_SINCRONIZACION_REINTENTADA. 422 SIN_CONEXIONES si no hay ninguna conexión activa; 503
+        COLA_NO_DISPONIBLE si Redis no responde (el envío queda en «error» con el motivo).
+      parameters:
+      - name: leadId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Encolado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sincronizacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '503':
+          description: COLA_NO_DISPONIBLE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /captacion/crm:
+    get:
+      tags:
+      - Captación
+      summary: Conexiones con HubSpot, Pipedrive, Zoho y el webhook firmado (HU-1602, PNT-34)
+      operationId: get_captacion_crm
+      description: |-
+        Solo SUPERADMIN, con `Cache-Control: no-store`. Las cuatro conexiones en orden fijo; las que nunca se guardaron
+        salen apagadas con el mapeo de por defecto. Las claves de HubSpot (`HUBSPOT_TOKEN`), Pipedrive (`PIPEDRIVE_TOKEN`)
+        y Zoho (`ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN` y `ZOHO_DOMINIO`, por defecto `com`) viven en
+        el entorno del servidor: aquí solo se dice cuáles faltan. El webhook trae su URL y su clave HMAC-SHA256.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrmEstado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Captación
+      summary: Activar o desactivar una conexión, su mapeo o la URL del webhook (HU-1602)
+      operationId: patch_captacion_crm
+      description: |-
+        Solo SUPERADMIN. Cambia una conexión por vez (`tipo`). `mapeo` solo en HubSpot, Pipedrive y Zoho: campos del
+        catálogo a propiedades del CRM (letras, números, `_` y `.`), sin repetir, con el correo siempre en su propiedad
+        (`email` o `Email`), que es la clave del alta o actualización. `url` solo en el webhook: https:// con dominio
+        público, puerto 443 y sin usuario (SSRF; al enviar también se comprueba que el dominio no resuelva a la red
+        interna). Activar un CRM sin sus variables de entorno da 422 FALTA_CLAVE; el webhook sin URL, 422 FALTA_URL;
+        activar el webhook sin clave la genera. Activar no envía los leads anteriores. Auditoría CRM_CONEXION_EDITADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrmCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrmEstado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/crm/webhook/secreto:
+    post:
+      tags:
+      - Captación
+      summary: Regenerar la clave del webhook (HU-1602)
+      operationId: post_captacion_crm_webhook_secreto
+      description: Solo SUPERADMIN. Una clave nueva (`whsec_` y 32 bytes al azar); la anterior deja de valer en el siguiente envío. Auditoría CRM_SECRETO_REGENERADO, sin la clave.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrmEstado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /captacion/crm/{tipo}/probar:
+    post:
+      tags:
+      - Captación
+      summary: «Enviar prueba» a una conexión (HU-1602, CP-130)
+      operationId: post_captacion_crm_probar
+      description: |-
+        Solo SUPERADMIN, en la misma solicitud. El webhook recibe el evento `lead.prueba` (un lead de ejemplo que el
+        receptor no debe guardar) con las cabeceras `X-Aptio-Firma: t=<unix>,v1=<hex>` (HMAC-SHA256 de `${t}.${cuerpo}`
+        con la clave del panel), `X-Aptio-Evento` y `X-Aptio-Entrega`. Un CRM recibe una lectura que solo comprueba la
+        clave. Cada pedido tiene 10 s y no sigue redirecciones. `ok` false trae el motivo sin claves. Auditoría
+        CRM_PRUEBA_ENVIADA. 422 FALTA_URL o FALTA_SECRETO en el webhook.
+      parameters:
+      - name: tipo
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [hubspot, pipedrive, zoho, webhook]
+      responses:
+        '200':
+          description: El resultado de la prueba
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PruebaCrm'
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -6836,7 +6983,7 @@ components:
     Lead:
       type: object
       description: HU-1601 · Un lead con la atribución de su primer contacto (PNT-34, RN-17-1)
-      required: [id, correo, nombre, empresa, mensaje, origen, via, paginaEntrada, paginaFormulario, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, referente, idioma, etapa, consentimiento, consentimientoEn, totalContactos, historialContactos, creadoEn, actualizadoEn]
+      required: [id, correo, nombre, empresa, mensaje, origen, via, paginaEntrada, paginaFormulario, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, referente, idioma, etapa, consentimiento, consentimientoEn, totalContactos, historialContactos, creadoEn, actualizadoEn, crm]
       properties:
         id:
           type: string
@@ -6905,6 +7052,8 @@ components:
         actualizadoEn:
           type: string
           format: date-time
+        crm:
+          $ref: '#/components/schemas/CrmLead'
     ListaLeads:
       type: object
       required:
@@ -6934,6 +7083,158 @@ components:
         etapa:
           type: string
           enum: [NUEVO, CONTACTADO, DEMO, PROPUESTA, GANADO, PERDIDO]
+    EnvioCrm:
+      type: object
+      required: [tipo, estado, intentos, motivo, enviadoEn]
+      properties:
+        tipo:
+          type: string
+          enum: [hubspot, pipedrive, zoho, webhook]
+        estado:
+          type: string
+          enum: [pendiente, enviado, error]
+        intentos:
+          type: integer
+          description: Intentos hechos en total (la cola hace 1 intento y 3 reintentos a los 30 s, 2 min y 8 min)
+        motivo:
+          type: string
+          nullable: true
+          description: El motivo del último error, sin claves (hasta 300 caracteres)
+        enviadoEn:
+          type: string
+          format: date-time
+          nullable: true
+    CrmLead:
+      type: object
+      description: HU-1602 · La columna «CRM» del lead. Un error manda, luego lo pendiente; todo enviado es «Sincronizado» (RN-17-2)
+      required: [estado, texto, envios]
+      properties:
+        estado:
+          type: string
+          enum: [sincronizado, pendiente, error, sin_envio]
+        texto:
+          type: string
+          example: 'Error: HubSpot respondió 500'
+        envios:
+          type: array
+          description: Solo las conexiones activas
+          items:
+            $ref: '#/components/schemas/EnvioCrm'
+    ConexionCrm:
+      type: object
+      required: [tipo, nombre, descripcion, activa, configurada, faltan, mapeo, mapeoPorDefecto, url, secreto, actualizadoEn]
+      properties:
+        tipo:
+          type: string
+          enum: [hubspot, pipedrive, zoho, webhook]
+        nombre:
+          type: string
+          example: HubSpot
+        descripcion:
+          type: string
+          example: Contactos
+        activa:
+          type: boolean
+        configurada:
+          type: boolean
+          description: 'CRM: sus variables de entorno están definidas. Webhook: tiene URL y clave'
+        faltan:
+          type: array
+          description: Variables de entorno que faltan, o `url` y `secreto` del webhook
+          items:
+            type: string
+          example: [HUBSPOT_TOKEN]
+        mapeo:
+          type: object
+          nullable: true
+          description: Campo del sitio a propiedad del CRM; null en el webhook
+          additionalProperties:
+            type: string
+          example:
+            correo: email
+            nombre: firstname
+        mapeoPorDefecto:
+          type: object
+          nullable: true
+          additionalProperties:
+            type: string
+        url:
+          type: string
+          nullable: true
+          description: Solo el webhook
+        secreto:
+          type: string
+          nullable: true
+          description: Solo el webhook. La clave HMAC-SHA256 para verificar la firma
+        actualizadoEn:
+          type: string
+          format: date-time
+          nullable: true
+    CrmEstado:
+      type: object
+      required: [conexiones, campos, cabeceraFirma, toleranciaSegundos]
+      properties:
+        conexiones:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConexionCrm'
+        campos:
+          type: array
+          description: Los campos del lead que se pueden mapear
+          items:
+            type: object
+            required: [campo, etiqueta]
+            properties:
+              campo:
+                type: string
+                enum: [nombre, correo, empresa, mensaje, origen, via, etapa, paginaEntrada, utmSource, utmMedium, utmCampaign, utmTerm, utmContent, idioma]
+              etiqueta:
+                type: string
+        cabeceraFirma:
+          type: string
+          example: X-Aptio-Firma
+        toleranciaSegundos:
+          type: integer
+          example: 300
+          description: Antigüedad máxima de una firma que el receptor debería aceptar
+    CrmCambio:
+      type: object
+      additionalProperties: false
+      required: [tipo]
+      properties:
+        tipo:
+          type: string
+          enum: [hubspot, pipedrive, zoho, webhook]
+        activa:
+          type: boolean
+        mapeo:
+          type: object
+          description: Solo HubSpot, Pipedrive y Zoho. Una propiedad vacía no se envía
+          additionalProperties:
+            type: string
+        url:
+          type: string
+          nullable: true
+          maxLength: 300
+          description: Solo el webhook. Vacía o null = sin URL
+    PruebaCrm:
+      type: object
+      required: [ok, mensaje]
+      properties:
+        ok:
+          type: boolean
+        mensaje:
+          type: string
+          example: El webhook respondió 204 a la entrega 6f1c2a90-5b7e-4d1a-9c3f-2e8b7a6d5c41
+    Sincronizacion:
+      type: object
+      required: [encolados]
+      properties:
+        encolados:
+          type: array
+          items:
+            type: string
+            enum: [hubspot, pipedrive, zoho, webhook]
     SeoIaCambio:
       type: object
       additionalProperties: false

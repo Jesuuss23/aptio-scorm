@@ -9,6 +9,7 @@ import {
   aplicarMenciones, aplicarRastreadores, ASISTENTES_IA, estadoRastreadores, leerMenciones, type Menciones, type PropuestaIa, propuestasNuevas, type SalidaPropuestasIa,
   validarLlmsTxt, validarPreguntaObjetivo,
 } from '@aptio/schema/sitio-seo-ia';
+import { CAMPOS_LEAD_CRM, DESCRIPCION_CRM, ETIQUETA_CAMPO_CRM, MAPEO_POR_DEFECTO, mapeoDe, NOMBRE_CRM, resumenCrm, tieneMapeo, TIPOS_CRM, type TipoCrm, validarMapeo, validarUrlWebhook, VARIABLES_CRM } from '@aptio/schema/crm';
 import { ETAPAS_LEAD, fusionarLead, leadNuevo, leadsACsv, leerHistorial, ORIGENES_LEAD, validarEnvioLead } from '@aptio/schema/leads';
 import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, renderizar404, renderizarErrorFormulario, renderizarMantenimiento, renderizarSitio, resolverPedido, RUTA_GRACIAS } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
@@ -178,6 +179,11 @@ export interface OpcionesSimulacion {
   seoIaSitio?: { llmsTxt?: string; bloqueados?: string[]; preguntas?: string[]; iaFalla?: boolean };
   /** HU-1601 · Leads que ya están en Captación › Leads y CRM. */
   leadsSitio?: LeadSim[];
+  /**
+   * HU-1602 · Conexiones de CRM: las guardadas, los CRM con su clave en el entorno y los envíos de cada lead
+   * (por id). `pruebaFalla`: el webhook responde 500 a «Enviar prueba».
+   */
+  crmSitio?: { conexiones?: Partial<Record<TipoCrm, { activa?: boolean; mapeo?: Record<string, string>; url?: string | null; secreto?: string | null }>>; claves?: TipoCrm[]; envios?: Record<string, EnvioSim[]>; pruebaFalla?: boolean };
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -417,6 +423,9 @@ export interface LeadSim {
   etapa: string; consentimiento: boolean; consentimientoEn: string | null; totalContactos: number; historialContactos: unknown[]; creadoEn: string; actualizadoEn: string;
 }
 
+/** HU-1602 · El envío de un lead a una conexión en la simulación. */
+export interface EnvioSim { tipo: TipoCrm; estado: 'pendiente' | 'enviado' | 'error'; intentos: number; motivo: string | null; enviadoEn: string | null }
+
 export interface RedireccionSim { id: string; desde: string; hacia: string; activa: boolean; creadoEn?: string; actualizadoEn?: string }
 /** HU-1503 · Bloque de una página del sitio en la simulación. */
 export interface BloqueSitioSim {
@@ -432,7 +441,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {} }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -448,6 +457,48 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-1601 · Los leads, con las mismas reglas que la API (un lead por correo, atribución del primer contacto).
   const leadsSim: LeadSim[] = leadsSitio.map((l) => ({ ...l }));
   let leadsSecuencia = 0;
+  // HU-1602 · Conexiones de CRM y envíos, con las mismas reglas que la API (la cola no corre: los envíos quedan pendientes).
+  const conexionesCrmSim = new Map(TIPOS_CRM.map((t) => [t, { activa: false, mapeo: {} as Record<string, string>, url: null as string | null, secreto: null as string | null, ...crmSitio.conexiones?.[t] }]));
+  const clavesCrmSim = new Set<TipoCrm>(crmSitio.claves ?? []);
+  const enviosSim = new Map<string, EnvioSim[]>(Object.entries(crmSitio.envios ?? {}).map(([k, v]) => [k, v.map((e) => ({ ...e }))]));
+  let secretosCrm = 0;
+  const secretoSim = () => `whsec_simulado${String(++secretosCrm).padStart(30, '0')}`;
+  const faltanCrm = (t: TipoCrm) => {
+    const c = conexionesCrmSim.get(t)!;
+    return tieneMapeo(t) ? (clavesCrmSim.has(t) ? [] : [...VARIABLES_CRM[t]]) : [...(c.url ? [] : ['url']), ...(c.secreto ? [] : ['secreto'])];
+  };
+  const estadoCrmSim = () => ({
+    conexiones: TIPOS_CRM.map((t) => {
+      const c = conexionesCrmSim.get(t)!;
+      const faltan = faltanCrm(t);
+      return {
+        tipo: t, nombre: NOMBRE_CRM[t], descripcion: DESCRIPCION_CRM[t], activa: c.activa, configurada: !faltan.length, faltan,
+        mapeo: tieneMapeo(t) ? mapeoDe(t, c.mapeo) : null, mapeoPorDefecto: tieneMapeo(t) ? MAPEO_POR_DEFECTO[t] : null,
+        url: t === 'webhook' ? c.url : null, secreto: t === 'webhook' ? c.secreto : null, actualizadoEn: null,
+      };
+    }),
+    campos: CAMPOS_LEAD_CRM.map((c) => ({ campo: c, etiqueta: ETIQUETA_CAMPO_CRM[c] })),
+    cabeceraFirma: 'X-Aptio-Firma', toleranciaSegundos: 300,
+  });
+  const crmDeLeadSim = (id: string) => {
+    const envios = (enviosSim.get(id) ?? []).filter((e) => conexionesCrmSim.get(e.tipo)?.activa).sort((a, b) => TIPOS_CRM.indexOf(a.tipo) - TIPOS_CRM.indexOf(b.tipo));
+    return { ...resumenCrm(envios), envios };
+  };
+  /** Pone el lead en «pendiente» para cada conexión activa (o solo las no enviadas). Devuelve los tipos. */
+  const encolarCrmSim = (id: string, soloPendientes = false) => {
+    const lista = enviosSim.get(id) ?? [];
+    const encolados: TipoCrm[] = [];
+    for (const t of TIPOS_CRM.filter((x) => conexionesCrmSim.get(x)!.activa)) {
+      let e = lista.find((x) => x.tipo === t);
+      if (soloPendientes && e?.estado === 'enviado') continue;
+      if (!e) lista.push((e = { tipo: t, estado: 'pendiente', intentos: 0, motivo: null, enviadoEn: null }));
+      Object.assign(e, { estado: 'pendiente', motivo: null });
+      encolados.push(t);
+    }
+    enviosSim.set(id, lista);
+    return encolados;
+  };
+  const leadConCrm = (l: LeadSim) => ({ ...l, historialContactos: leerHistorial(l.historialContactos), crm: crmDeLeadSim(l.id) });
   /** Lo que llega del sitio (JSON o formulario): `null` si el campo trampa vino lleno; los errores si no valida. */
   const capturarLeadSim = (entrada: unknown): { ok: true; lead: LeadSim | null } | { ok: false; errores: { campo: string; mensaje: string }[] } => {
     const r = validarEnvioLead(entrada, '/s');
@@ -458,12 +509,14 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (actual) {
       const c = fusionarLead({ ...actual, consentimientoEn: actual.consentimientoEn ? new Date(actual.consentimientoEn) : null }, r.envio, ahora);
       Object.assign(actual, { ...c, consentimientoEn: c.consentimientoEn?.toISOString() ?? actual.consentimientoEn, actualizadoEn: ahora.toISOString() });
+      encolarCrmSim(actual.id);
       return { ok: true, lead: actual };
     }
     const d = leadNuevo(r.envio, ahora);
     leadsSecuencia += 1;
     const lead: LeadSim = { ...d, id: `00000000-0000-4000-9700-${String(leadsSecuencia).padStart(12, '0')}`, etapa: 'NUEVO', consentimientoEn: d.consentimientoEn.toISOString(), creadoEn: ahora.toISOString(), actualizadoEn: ahora.toISOString() };
     leadsSim.unshift(lead);
+    encolarCrmSim(lead.id);
     return { ok: true, lead };
   };
   let bloqueadosSim: string[] = seoIaSitio.bloqueados ?? [];
@@ -1154,19 +1207,75 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (ruta === '/captacion/leads' && req.method() === 'GET') {
         const pagina = Number(q.get('pagina') ?? 1);
         const porPagina = Number(q.get('porPagina') ?? 25);
-        return responder(200, { leads: filtrados.slice((pagina - 1) * porPagina, pagina * porPagina).map((l) => ({ ...l, historialContactos: leerHistorial(l.historialContactos) })), total: filtrados.length, pagina, porPagina });
+        return responder(200, { leads: filtrados.slice((pagina - 1) * porPagina, pagina * porPagina).map(leadConCrm), total: filtrados.length, pagina, porPagina });
       }
       if (ruta === '/captacion/leads/exportar.csv' && req.method() === 'GET') {
         return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="leads-2026-11-16.csv"', 'Cache-Control': 'no-store' }, body: leadsACsv(filtrados) });
       }
       const id = ruta.split('/')[3];
       const l = leadsSim.find((x) => x.id === id);
+      // HU-1602 · «Reintentar» de la fila: vuelve a poner en la cola lo que no se envió.
+      if (ruta.endsWith('/sincronizar') && req.method() === 'POST') {
+        if (!l) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El lead no existe' });
+        if (!TIPOS_CRM.some((t) => conexionesCrmSim.get(t)!.activa)) return responder(422, { codigo: 'SIN_CONEXIONES', mensaje: 'Activa una conexión de CRM o el webhook antes de sincronizar' });
+        return responder(202, { encolados: encolarCrmSim(l.id, true) });
+      }
       if (req.method() === 'PATCH') {
         if (!l) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El lead no existe' });
         const { etapa: nueva } = req.postDataJSON() as { etapa: string };
         if (!(ETAPAS_LEAD as readonly string[]).includes(nueva)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'etapa no está en el catálogo' });
-        Object.assign(l, { etapa: nueva, actualizadoEn: new Date().toISOString() });
-        return responder(200, l);
+        if (l.etapa !== nueva) {
+          Object.assign(l, { etapa: nueva, actualizadoEn: new Date().toISOString() });
+          encolarCrmSim(l.id);
+        }
+        return responder(200, leadConCrm(l));
+      }
+    }
+    // HU-1602 · Conexiones de CRM y webhook firmado (PNT-34).
+    if (ruta === '/captacion/crm' || ruta.startsWith('/captacion/crm/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      if (ruta === '/captacion/crm' && req.method() === 'GET') return responder(200, estadoCrmSim());
+      if (ruta === '/captacion/crm' && req.method() === 'PATCH') {
+        const c = req.postDataJSON() as { tipo: TipoCrm; activa?: boolean; mapeo?: Record<string, unknown>; url?: string | null };
+        const x = conexionesCrmSim.get(c.tipo);
+        if (!x) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'tipo no está en el catálogo' });
+        const errores: { campo: string; mensaje: string }[] = [];
+        let mapeo: Record<string, string> | undefined;
+        let url: string | null | undefined;
+        if (c.mapeo !== undefined) {
+          if (!tieneMapeo(c.tipo)) errores.push({ campo: 'mapeo', mensaje: 'El webhook manda el lead completo: no tiene mapeo de campos' });
+          else {
+            const m = validarMapeo(c.tipo, c.mapeo);
+            if (m.ok) mapeo = m.mapeo as Record<string, string>;
+            else errores.push(...m.errores);
+          }
+        }
+        if (c.url !== undefined) {
+          const r = validarUrlWebhook(c.url);
+          if (r.ok) url = r.url;
+          else errores.push({ campo: 'url', mensaje: r.mensaje });
+        }
+        if (errores.length) return responder(422, { codigo: 'NO_VALIDO', mensaje: errores.map((e) => e.mensaje).join('. '), detalles: errores });
+        const activa = c.activa ?? x.activa;
+        if (activa && tieneMapeo(c.tipo) && !clavesCrmSim.has(c.tipo)) return responder(422, { codigo: 'FALTA_CLAVE', mensaje: `No se puede activar ${NOMBRE_CRM[c.tipo]}: define ${VARIABLES_CRM[c.tipo].join(', ')} en el entorno del servidor` });
+        if (activa && c.tipo === 'webhook' && !(url !== undefined ? url : x.url)) return responder(422, { codigo: 'FALTA_URL', mensaje: 'Para activar el webhook, escribe su URL https://' });
+        if (activa && c.tipo === 'webhook' && !x.secreto) x.secreto = secretoSim();
+        Object.assign(x, { activa, ...(mapeo ? { mapeo } : {}), ...(url !== undefined ? { url } : {}) });
+        return responder(200, estadoCrmSim());
+      }
+      if (ruta === '/captacion/crm/webhook/secreto' && req.method() === 'POST') {
+        conexionesCrmSim.get('webhook')!.secreto = secretoSim();
+        return responder(200, estadoCrmSim());
+      }
+      const probar = /^\/captacion\/crm\/([a-z]+)\/probar$/.exec(ruta);
+      if (probar && req.method() === 'POST') {
+        const t = probar[1] as TipoCrm;
+        if (!conexionesCrmSim.has(t)) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'La conexión no existe' });
+        if (t === 'webhook') {
+          if (!conexionesCrmSim.get(t)!.url) return responder(422, { codigo: 'FALTA_URL', mensaje: 'Escribe la URL del webhook antes de probarlo' });
+          return responder(200, crmSitio.pruebaFalla ? { ok: false, mensaje: 'Webhook respondió 500' } : { ok: true, mensaje: 'El webhook respondió 200 a la entrega 6f1c2a90-5b7e-4d1a-9c3f-2e8b7a6d5c41' });
+        }
+        return responder(200, clavesCrmSim.has(t) ? { ok: true, mensaje: `${NOMBRE_CRM[t]} aceptó la clave` } : { ok: false, mensaje: `Falta la clave: define ${VARIABLES_CRM[t].join(', ')} en el entorno del servidor` });
       }
     }
     // HU-1513 · Sitio web › SEO para IA (PNT-30): mismas reglas que la API; IA-19 responde la salida grabada del modo simulado.

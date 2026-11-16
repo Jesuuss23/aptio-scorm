@@ -3337,3 +3337,118 @@ ul.fila-chips {
 .leads-pie {
   margin: 16px 0 0;
 }
+
+/* HU-1602 · Leads y CRM: la columna «CRM» y las tarjetas de Conexiones, Mapeo de campos y Webhook (PNT-34). */
+.leads-crm {
+  min-width: 120px;
+}
+.leads-crm .chip {
+  display: inline-block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.leads-crm .boton {
+  display: block;
+  margin-top: 8px;
+}
+.crm-tarjetas {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+@media (min-width: 1024px) {
+  .crm-tarjetas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .crm-tarjetas > .tarjeta:last-child {
+    grid-column: 1 / -1;
+  }
+}
+.crm-tarjetas > .tarjeta {
+  min-width: 0;
+  margin: 0;
+}
+.crm-conexiones {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.crm-conexiones > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 8px 12px;
+}
+.crm-conexion-nombre {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.crm-selector,
+.crm-webhook-url label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.crm-selector select {
+  max-width: 240px;
+}
+.tabla-mapeo {
+  width: 100%;
+}
+.tabla-mapeo th[scope='row'] {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.tabla-mapeo input {
+  width: 100%;
+  min-width: 140px;
+  font-family: var(--fuente-mono, monospace);
+}
+.tabla-mapeo input[readonly] {
+  background: var(--color-fondo);
+  color: var(--color-texto);
+}
+.crm-webhook-url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.crm-webhook-url label {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.crm-clave {
+  display: grid;
+  gap: 8px;
+}
+.crm-clave-etiqueta {
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+.crm-secreto {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+.crm-guia-titulo {
+  margin: 24px 0 8px;
+}
+.crm-guia {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}

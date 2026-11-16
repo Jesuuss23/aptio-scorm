@@ -380,8 +380,8 @@ model TrabajoIA {
   resultado      Json?
   creadoEn       DateTime       @default(now())
 
-  proyecto     Proyecto?    @relation(fields: [proyectoId], references: [id])
-  generacion   Generacion?  @relation(fields: [generacionId], references: [id])
+  proyecto     Proyecto?     @relation(fields: [proyectoId], references: [id])
+  generacion   Generacion?   @relation(fields: [generacionId], references: [id])
   propuestas   Propuesta[]
   organizacion Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
@@ -742,37 +742,37 @@ enum EstadoPagina {
 /// HU-1502 · Página del sitio comercial (M16, ADR-011). De la plataforma, sin organización; solo la administra el
 /// superadmin. Bloques (HU-1503) y landings de sector (HU-1514); el SEO completo llega con la HU-1512.
 model SitioPagina {
-  id            String       @id @default(uuid()) @db.Uuid
+  id                   String        @id @default(uuid()) @db.Uuid
   /// `/` (inicio) o `/segmento[/segmento…]` con minúsculas, números y guiones.
-  ruta          String
-  idioma        String       @default("es")
-  titulo        String
-  estado        EstadoPagina @default(BORRADOR)
+  ruta                 String
+  idioma               String        @default("es")
+  titulo               String
+  estado               EstadoPagina  @default(BORRADOR)
   /// Fecha y hora en que se publica sola (solo en PROGRAMADA).
-  publicarEn    DateTime?
+  publicarEn           DateTime?
   /// Última vez que pasó a PUBLICADA.
-  publicadaEn   DateTime?
+  publicadaEn          DateTime?
   /// HU-1514 · `general` o `sector` (landing por sector, `@aptio/schema/sitio-sectores`).
-  tipo          String       @default("general")
+  tipo                 String        @default("general")
   /// Nombre del sector de una landing (los testimonios se emparejan por él, CP-157).
-  sector        String?
+  sector               String?
   /// Título y texto de la portada de una landing.
-  portada       Json?
+  portada              Json?
   /// Meta título (hasta 60, texto plano); si falta, se usa el título (HU-1512).
-  metaTitulo    String?
+  metaTitulo           String?
   /// HU-1512 · Meta descripción (hasta 160, texto plano).
-  metaDescripcion String?
+  metaDescripcion      String?
   /// HU-1512 · URL canónica propia: ruta interna `/…` o `https://…`; null = la del dominio.
-  canonical     String?
+  canonical            String?
   /// HU-1512 · false = `noindex`, fuera del sitemap y sin alternas hreflang (CP-125).
-  indexar       Boolean      @default(true)
+  indexar              Boolean       @default(true)
   /// HU-1512 · Tipo de datos estructurados JSON-LD: WebPage, FAQPage o Product.
-  datosEstructurados String  @default("WebPage")
+  datosEstructurados   String        @default("WebPage")
   /// Categoría con que empieza filtrada la sección Blog de la landing (HU-1511, CP-159).
   blogCategoriaInicial String?
-  creadoEn      DateTime     @default(now())
-  actualizadoEn DateTime     @updatedAt
-  bloques       SitioBloque[]
+  creadoEn             DateTime      @default(now())
+  actualizadoEn        DateTime      @updatedAt
+  bloques              SitioBloque[]
 
   @@unique([ruta, idioma])
   @@index([estado, publicarEn])
@@ -841,13 +841,13 @@ model SitioEnlace {
 /// HU-1507 · Versión publicada del sitio (REQ-068, RN-16-5): instantánea inmutable del sitio completo. El sitio público
 /// sirve solo la última. No se edita ni se borra; restaurar la N crea una nueva con la instantánea de N (CP-119).
 model SitioVersion {
-  id                 String   @id @default(uuid()) @db.Uuid
+  id                 String    @id @default(uuid()) @db.Uuid
   /// 1, 2, 3… sin repetir; la mayor es la que ve el sitio.
-  numero             Int      @unique
+  numero             Int       @unique
   /// Páginas publicadas con sus bloques y elementos visibles, y la navegación visible (`@aptio/schema/sitio-versiones`).
   instantanea        Json
   /// Quién publicó; null cuando la publica la plataforma (programada). Sin llave foránea: la versión no cambia aunque se borre el usuario.
-  publicadoPorId     String?  @db.Uuid
+  publicadoPorId     String?   @db.Uuid
   publicadoPorNombre String?
   /// produccion | pruebas
   entorno            String
@@ -856,10 +856,10 @@ model SitioVersion {
   /// Con origen restauracion: el número de la versión restaurada.
   restauradaDe       Int?
   /// HU-1508 · Pre-render del HTML al bucket: en_curso | listo | error.
-  prerenderEstado    String   @default("en_curso")
+  prerenderEstado    String    @default("en_curso")
   prerenderEn        DateTime?
   prerenderError     String?
-  creadoEn           DateTime @default(now())
+  creadoEn           DateTime  @default(now())
 }
 
 /// HU-1509 · Ajustes del sitio comercial (REQ-073, PNT-38): una sola fila (`id` = "sitio") con dominio, marca, analítica,
@@ -883,15 +883,15 @@ model SitioRedireccion {
 
 /// HU-1512 · Ajustes SEO del sitio: una sola fila (`id` = "seo").
 model SitioSeo {
-  id              String   @id @default("seo")
+  id                     String   @id @default("seo")
   /// Reglas extra de robots.txt (solo `Allow:`, `Disallow:` y comentarios).
-  robotsExtra     String   @default("")
+  robotsExtra            String   @default("")
   /// HU-1513 · Contenido de `/llms.txt` (texto plano, hasta 20 000 caracteres); vacío = el sitio responde 404.
-  llmsTxt         String   @default("")
+  llmsTxt                String   @default("")
   /// HU-1513 · Rastreadores de IA bloqueados en robots.txt (del catálogo de `@aptio/schema/sitio-seo-ia`); vacío = todos permitidos.
   rastreadoresBloqueados String[] @default([])
-  actualizadoPorId String? @db.Uuid
-  actualizadoEn   DateTime @updatedAt
+  actualizadoPorId       String?  @db.Uuid
+  actualizadoEn          DateTime @updatedAt
 }
 
 /// HU-1513 · Pregunta objetivo del SEO para IA (REQ-072, PNT-30): lo que la gente le pregunta a un asistente. El
@@ -927,22 +927,22 @@ model SitioPropuestaIa {
 /// HU-1511 · Conexión del sitio con el WordPress del blog (REQ-070, PNT-28, RN-16-8): una sola fila (`id` = "blog").
 /// El sitio no edita artículos: guarda una copia de lectura que sincroniza el worker.
 model SitioBlog {
-  id              String    @id @default("blog")
+  id             String    @id @default("blog")
   /// https://… del WordPress; null = sin conectar.
-  url             String?
+  url            String?
   /// Cada cuántos minutos se sincroniza: 15, 30 o 60.
-  frecuenciaMin   Int       @default(15)
+  frecuenciaMin  Int       @default(15)
   /// Cuántos artículos muestra la sección Blog por filtro.
-  porPagina       Int       @default(6)
-  mostrarImagen   Boolean   @default(true)
-  mostrarAutor    Boolean   @default(true)
+  porPagina      Int       @default(6)
+  mostrarImagen  Boolean   @default(true)
+  mostrarAutor   Boolean   @default(true)
   /// La última sincronización que terminó bien.
-  sincronizadoEn  DateTime?
+  sincronizadoEn DateTime?
   /// El último intento, bien o mal.
-  intentoEn       DateTime?
+  intentoEn      DateTime?
   /// El error del último intento (CP-156); null si terminó bien.
-  error           String?
-  actualizadoEn   DateTime  @updatedAt
+  error          String?
+  actualizadoEn  DateTime  @updatedAt
 }
 
 /// HU-1511 · Copia de una categoría de WordPress con su orden y visibilidad en la sección Blog (CP-155).
@@ -985,10 +985,10 @@ model WpArticulo {
 /// contacto (origen, vía, página de entrada y UTM) y no cambia; cada envío posterior suma al historial. Los campos del
 /// CRM llegan con la HU-1602. Reglas en `@aptio/schema/leads`.
 model Lead {
-  id                 String    @id @default(uuid()) @db.Uuid
+  id                 String      @id @default(uuid()) @db.Uuid
   /// En minúsculas y sin espacios.
-  correo             String    @unique
-  nombre             String    @default("")
+  correo             String      @unique
+  nombre             String      @default("")
   empresa            String?
   mensaje            String?
   /// formulario | popup | chatbot | agendador | suscripcion | boletin | asistente_ia
@@ -1003,18 +1003,57 @@ model Lead {
   utmTerm            String?
   utmContent         String?
   referente          String?
-  idioma             String    @default("es")
+  idioma             String      @default("es")
   /// NUEVO | CONTACTADO | DEMO | PROPUESTA | GANADO | PERDIDO
-  etapa              String    @default("NUEVO")
-  consentimiento     Boolean   @default(false)
+  etapa              String      @default("NUEVO")
+  consentimiento     Boolean     @default(false)
   consentimientoEn   DateTime?
-  totalContactos     Int       @default(1)
+  totalContactos     Int         @default(1)
   /// [{ en, via, pagina, mensaje? }] con cada envío recibido, del más antiguo al más nuevo (hasta 50).
-  historialContactos Json      @default("[]")
-  creadoEn           DateTime  @default(now())
-  actualizadoEn      DateTime  @updatedAt
+  historialContactos Json        @default("[]")
+  creadoEn           DateTime    @default(now())
+  actualizadoEn      DateTime    @updatedAt
+  envios             LeadEnvio[]
 
   @@index([origen, creadoEn])
   @@index([etapa, creadoEn])
   @@index([creadoEn])
+}
+
+/// HU-1602 · Una conexión con un CRM o el webhook firmado (REQ-075, RN-17-2). Una fila por tipo. Las claves de HubSpot,
+/// Pipedrive y Zoho viven en variables de entorno; el secreto del webhook se genera en el panel.
+model CrmConexion {
+  id            String      @id @default(uuid()) @db.Uuid
+  /// hubspot | pipedrive | zoho | webhook
+  tipo          String      @unique
+  activa        Boolean     @default(false)
+  /// { campoDelSitio: "propiedad del CRM" }; los campos sin propiedad no se envían.
+  mapeo         Json        @default("{}")
+  /// Solo el webhook: https, sin red interna.
+  url           String?
+  /// Solo el webhook: la clave HMAC-SHA256.
+  secreto       String?
+  creadoEn      DateTime    @default(now())
+  actualizadoEn DateTime    @updatedAt
+  envios        LeadEnvio[]
+}
+
+/// HU-1602 · El envío de un lead a una conexión: su estado, intentos y el motivo del último error (CP-129).
+model LeadEnvio {
+  id            String      @id @default(uuid()) @db.Uuid
+  leadId        String      @db.Uuid
+  lead          Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  conexionId    String      @db.Uuid
+  conexion      CrmConexion @relation(fields: [conexionId], references: [id], onDelete: Cascade)
+  /// pendiente | enviado | error
+  estado        String      @default("pendiente")
+  intentos      Int         @default(0)
+  motivo        String?
+  idExterno     String?
+  enviadoEn     DateTime?
+  creadoEn      DateTime    @default(now())
+  actualizadoEn DateTime    @updatedAt
+
+  @@unique([leadId, conexionId])
+  @@index([estado])
 }

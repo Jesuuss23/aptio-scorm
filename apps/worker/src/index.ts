@@ -3,10 +3,11 @@
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
-  COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
+  COLA_CRM, COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
   type DatosPrerender, idPrerender, idRehacerPrerender, TAREA_PRERENDER, CADA_BLOG_MS, type DatosBlog, TAREA_BLOG,
 } from '@aptio/colas';
 import { sincronizarBlog } from './blog.js';
+import { crearTrabajadorCrm } from './crm.js';
 import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
 import { configurarAvisoLimite } from './conexiones.js';
 import { correoDesdeEntorno } from './correo.js';
@@ -172,6 +173,9 @@ const mantenedor = new Worker(
   { connection: opcionesRedis(), prefix: prefijoColas(), concurrency: 2 },
 );
 mantenedor.on('failed', (job, err) => console.error(`[${COLA_MANTENIMIENTO}] ${job?.name ?? 'tarea'} falló: ${err.message}`));
+// HU-1602 · Envío de los leads a los CRM y al webhook firmado, con 3 reintentos de espera creciente (CP-129).
+const crm = crearTrabajadorCrm(prisma, { connection: opcionesRedis(), prefix: prefijoColas() });
+crm.on('failed', (job, err) => console.error(`[${COLA_CRM}] el envío ${job?.data.envioId} no entró (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 
 async function respaldar(datos: DatosRespaldo) {
   const r = await crearRespaldo({
@@ -188,10 +192,10 @@ async function respaldar(datos: DatosRespaldo) {
 for (const t of trabajadores) {
   t.on('failed', (job, err) => console.error(`[${t.name}] trabajo ${job?.data.trabajoId} falló: ${err.message}`));
 }
-console.log(`Worker escuchando las colas ${COLAS.join(', ')} en ${opcionesRedis().host}:${opcionesRedis().port}`);
+console.log(`Worker escuchando las colas ${[...COLAS, COLA_MANTENIMIENTO, COLA_CRM].join(', ')} en ${opcionesRedis().host}:${opcionesRedis().port}`);
 
 async function cerrar() {
-  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close()]);
+  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close(), crm.close()]);
   await cerrarOcr();
   redis.disconnect();
   await prisma.$disconnect();

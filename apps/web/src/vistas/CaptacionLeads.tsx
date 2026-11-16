@@ -1,10 +1,12 @@
 // HU-1601 · Captación › Leads y CRM (PNT-34, REQ-074, RN-17-1): los contactos que llegan del sitio con su origen, la
 // página de entrada y el UTM del primer contacto, la etapa del embudo (se cambia en la misma fila) y «Exportar CSV» con
-// los filtros aplicados. El envío a HubSpot, Pipedrive, Zoho o un webhook llega con la HU-1602. Solo el superadmin (ADR-011).
+// los filtros aplicados. HU-1602 (REQ-075, RN-17-2): la columna «CRM» con «Reintentar» y las tarjetas de Conexiones,
+// Mapeo de campos y Webhook. Solo el superadmin (ADR-011).
 import { ETAPAS_LEAD, etiquetaEtapa, etiquetaOrigen, ETIQUETA_ETAPA, ETIQUETA_ORIGEN, ORIGENES_LEAD, PARAMETROS_UTM, resumenUtm, CAMPO_UTM } from '@aptio/schema/leads';
 import { Cabecera } from '@aptio/ui';
 import { useEffect, useState } from 'react';
 import { api, ErrorApi, type FiltroLeads, type LeadSitio, type ListaLeads } from '../api';
+import { TarjetasCrm } from './CaptacionCrm';
 
 const POR_PAGINA = 25;
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
@@ -43,6 +45,17 @@ export function CaptacionLeads() {
     }
   }
 
+  async function reintentar(l: LeadSitio) {
+    setAviso(null);
+    try {
+      const { encolados } = await api.sincronizarLead(l.id);
+      await cargar(filtro, pagina);
+      setAviso({ tipo: 'ok', texto: encolados.length ? `${l.nombre || l.correo} volvió a la cola de envío.` : `${l.nombre || l.correo} ya estaba enviado a todas las conexiones activas.` });
+    } catch (e) {
+      setAviso({ tipo: 'error', texto: `No se reintentó el envío: ${mensajeDe(e, 'inténtalo de nuevo')}` });
+    }
+  }
+
   async function exportar() {
     setExportando(true);
     setAviso(null);
@@ -69,7 +82,7 @@ export function CaptacionLeads() {
 
   return (
     <>
-      <Cabecera titulo="Leads y CRM" subtitulo="Contactos que llegan del sitio, su origen y la página por la que entraron."
+      <Cabecera titulo="Leads y CRM" subtitulo="Contactos que llegan del sitio, su origen y su sincronización con el CRM."
         accion={<button type="button" className="boton" disabled={exportando || !lista} onClick={() => void exportar()}>{exportando ? 'Exportando…' : 'Exportar CSV'}</button>} />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
@@ -106,11 +119,12 @@ export function CaptacionLeads() {
                     <th scope="col">Origen</th>
                     <th scope="col">Entrada</th>
                     <th scope="col">Etapa</th>
+                    <th scope="col">CRM</th>
                     <th scope="col">Fecha</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {lista.leads.map((l) => <FilaLead key={l.id} lead={l} alCambiarEtapa={(e) => void cambiarEtapa(l, e)} />)}
+                  {lista.leads.map((l) => <FilaLead key={l.id} lead={l} alCambiarEtapa={(e) => void cambiarEtapa(l, e)} alReintentar={() => void reintentar(l)} />)}
                 </tbody>
               </table>
             </div>
@@ -124,11 +138,14 @@ export function CaptacionLeads() {
         )}
         <p className="sec leads-pie">Cada correo es un solo lead: el origen, la entrada y el UTM son los de su primer contacto. Si vuelve a escribir, se suma a su historial.</p>
       </section>
+      <TarjetasCrm alAvisar={setAviso} />
     </>
   );
 }
 
-function FilaLead({ lead: l, alCambiarEtapa }: { lead: LeadSitio; alCambiarEtapa: (etapa: string) => void }) {
+const CLASE_CRM: Record<string, string> = { sincronizado: 'validado', pendiente: 'aviso', error: 'error', sin_envio: '' };
+
+function FilaLead({ lead: l, alCambiarEtapa, alReintentar }: { lead: LeadSitio; alCambiarEtapa: (etapa: string) => void; alReintentar: () => void }) {
   const nombre = l.nombre || l.correo;
   const utm = PARAMETROS_UTM.filter((p) => l[CAMPO_UTM[p]]);
   return (
@@ -155,6 +172,10 @@ function FilaLead({ lead: l, alCambiarEtapa }: { lead: LeadSitio; alCambiarEtapa
         <select aria-label={`Etapa de ${nombre}`} value={l.etapa} onChange={(e) => alCambiarEtapa(e.target.value)}>
           {ETAPAS_LEAD.map((x) => <option key={x} value={x}>{ETIQUETA_ETAPA[x]}</option>)}
         </select>
+      </td>
+      <td className="leads-crm">
+        <span className={`chip ${CLASE_CRM[l.crm.estado] ?? ''}`}>{l.crm.texto}</span>
+        {l.crm.estado === 'error' || l.crm.estado === 'pendiente' ? <button type="button" className="boton chico" aria-label={`Reintentar el envío de ${nombre}`} onClick={alReintentar}>Reintentar</button> : null}
       </td>
       <td>{fechaLima(l.creadoEn)}<span className="sec leads-linea">{horaLima(l.creadoEn)}</span></td>
     </tr>
