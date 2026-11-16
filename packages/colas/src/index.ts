@@ -46,6 +46,22 @@ export interface DatosRespaldo {
   solicitadoPorId?: string;
 }
 
+/**
+ * HU-1602 · Envío de un lead a un CRM o al webhook (RN-17-2, CP-129). Fuera de COLAS: no es un trabajo de una
+ * organización. Un trabajo por envío (lead y conexión): 1 intento y 3 reintentos a los 30 s, 2 min y 8 min; `entrega`
+ * es la misma en los reintentos, así el receptor del webhook descarta los repetidos.
+ */
+export const COLA_CRM = 'crm';
+export const TAREA_CRM = 'crm-enviar';
+export const ESPERAS_CRM_MS = [30_000, 120_000, 480_000] as const;
+export const INTENTOS_CRM = ESPERAS_CRM_MS.length + 1;
+export interface DatosEnvioCrm { envioId: string; evento: 'lead.creado' | 'lead.actualizado'; entrega: string }
+/** La espera antes del reintento `n` (1, 2 o 3), con las esperas dadas (las pruebas las acortan). */
+export const esperaCrm = (n: number, esperas: readonly number[] = ESPERAS_CRM_MS) => esperas[Math.min(Math.max(n, 1), esperas.length) - 1]!;
+export const opcionesTareaCrm = (entrega: string) => ({
+  jobId: `crm-${entrega}`, attempts: INTENTOS_CRM, backoff: { type: 'crm' }, removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
+});
+
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 
 /** Datos con los que se encola un trabajo. El detalle vive en TrabajoIA (base de datos). */

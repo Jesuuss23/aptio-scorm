@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ESTADOS_ENVIO, TIPOS_CRM } from '@aptio/schema/crm';
 import { ETAPAS_LEAD, LIMITES_LEAD, ORIGENES_LEAD, VIAS_LEAD } from '@aptio/schema/leads';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
@@ -34,6 +35,22 @@ export class ContactoLeadDto {
   @ApiPropertyOptional() mensaje?: string;
 }
 
+/** HU-1602 · El envío del lead a una conexión activa. */
+export class EnvioCrmDto {
+  @ApiProperty({ enum: TIPOS_CRM }) tipo: string;
+  @ApiProperty({ enum: ESTADOS_ENVIO }) estado: string;
+  @ApiProperty() intentos: number;
+  @ApiProperty({ type: String, nullable: true, description: 'El motivo del último error, sin claves' }) motivo: string | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) enviadoEn: string | null;
+}
+
+/** HU-1602 · La columna «CRM» del lead: un error manda, luego lo pendiente; todo enviado es «Sincronizado» (RN-17-2). */
+export class CrmLeadDto {
+  @ApiProperty({ enum: ['sincronizado', 'pendiente', 'error', 'sin_envio'] }) estado: string;
+  @ApiProperty({ example: 'Error: HubSpot respondió 500' }) texto: string;
+  @ApiProperty({ type: [EnvioCrmDto], description: 'Solo las conexiones activas' }) envios: EnvioCrmDto[];
+}
+
 /** HU-1601 · Un lead con su atribución de primer contacto (PNT-34). */
 export class LeadDto {
   @ApiProperty({ format: 'uuid' }) id: string;
@@ -59,6 +76,7 @@ export class LeadDto {
   @ApiProperty({ type: [ContactoLeadDto] }) historialContactos: ContactoLeadDto[];
   @ApiProperty({ format: 'date-time' }) creadoEn: string;
   @ApiProperty({ format: 'date-time' }) actualizadoEn: string;
+  @ApiProperty({ type: CrmLeadDto }) crm: CrmLeadDto;
 }
 
 export class FiltroLeadsDto {

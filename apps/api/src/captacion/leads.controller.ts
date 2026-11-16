@@ -1,9 +1,11 @@
-import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Patch, Query, Res } from '@nestjs/common';
-import { ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiProduces, ApiTags, ApiUnauthorizedResponse, ApiUnprocessableEntityResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, Header, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import { ApiAcceptedResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiProduces, ApiServiceUnavailableResponse, ApiTags, ApiUnauthorizedResponse, ApiUnprocessableEntityResponse } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { ConsultaLeadsDto, FiltroLeadsDto, LeadCambioDto, LeadDto, ListaLeadsDto } from './leads.dto.js';
+import { SincronizacionDto } from './crm.dto.js';
+import { CrmService } from './crm.service.js';
 import { LeadsService } from './leads.service.js';
 
 /** HU-1601 · Captación › Leads y CRM (REQ-074, PNT-34): solo el superadmin; 403 al resto y 401 sin sesión. */
@@ -14,7 +16,7 @@ import { LeadsService } from './leads.service.js';
 @Controller('captacion/leads')
 @Roles('SUPERADMIN')
 export class LeadsController {
-  constructor(private readonly leads: LeadsService) {}
+  constructor(private readonly leads: LeadsService, private readonly crm: CrmService) {}
 
   @Get()
   @ApiOkResponse({ type: ListaLeadsDto })
@@ -40,5 +42,16 @@ export class LeadsController {
   @ApiUnprocessableEntityResponse({ description: 'NO_VALIDO: etapa fuera del catálogo' })
   cambiar(@UsuarioActual() u: UsuarioSesion, @Param('leadId', ParseUUIDPipe) id: string, @Body() dto: LeadCambioDto): Promise<LeadDto> {
     return this.leads.cambiarEtapa(u, id, dto.etapa);
+  }
+
+  /** HU-1602 · «Reintentar»: vuelve a encolar el lead en las conexiones activas que no lo tienen enviado (RN-17-2). */
+  @Post(':leadId/sincronizar')
+  @HttpCode(202)
+  @ApiAcceptedResponse({ type: SincronizacionDto })
+  @ApiNotFoundResponse({ description: 'El lead no existe' })
+  @ApiUnprocessableEntityResponse({ description: 'SIN_CONEXIONES: no hay ninguna conexión activa' })
+  @ApiServiceUnavailableResponse({ description: 'COLA_NO_DISPONIBLE: Redis no respondió' })
+  async sincronizar(@UsuarioActual() u: UsuarioSesion, @Param('leadId', ParseUUIDPipe) id: string): Promise<SincronizacionDto> {
+    return { encolados: await this.crm.sincronizar(u, id) };
   }
 }

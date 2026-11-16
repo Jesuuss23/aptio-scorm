@@ -4,19 +4,22 @@ import { etiquetaOrigen, fusionarLead, leadNuevo, leadsACsv, leerHistorial, LIMI
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { CorreoService } from '../correo/correo.service.js';
+import { CrmService, crmDeLead } from './crm.service.js';
 import type { ConsultaLeadsDto, FiltroLeadsDto, LeadDto, ListaLeadsDto } from './leads.dto.js';
 
 /** HU-1601 · Envíos por IP en cada ventana; más, 429 (aparte del límite general de /publico/*, SUP-169). */
 export const LIMITE_LEADS = { envios: 5, ventanaMs: 10 * 60_000 } as const;
 
 type FilaLead = Prisma.LeadGetPayload<object>;
+type FilaLeadCrm = Prisma.LeadGetPayload<{ include: { envios: { include: { conexion: true } } } }>;
+const CON_ENVIOS = { envios: { include: { conexion: true } } } as const;
 
-export const aLeadDto = (l: FilaLead): LeadDto => ({
+export const aLeadDto = (l: FilaLeadCrm): LeadDto => ({
   id: l.id, correo: l.correo, nombre: l.nombre, empresa: l.empresa, mensaje: l.mensaje, origen: l.origen, via: l.via,
   paginaEntrada: l.paginaEntrada, paginaFormulario: l.paginaFormulario, utmSource: l.utmSource, utmMedium: l.utmMedium, utmCampaign: l.utmCampaign,
   utmTerm: l.utmTerm, utmContent: l.utmContent, referente: l.referente, idioma: l.idioma, etapa: l.etapa, consentimiento: l.consentimiento,
   consentimientoEn: l.consentimientoEn?.toISOString() ?? null, totalContactos: l.totalContactos, historialContactos: leerHistorial(l.historialContactos),
-  creadoEn: l.creadoEn.toISOString(), actualizadoEn: l.actualizadoEn.toISOString(),
+  creadoEn: l.creadoEn.toISOString(), actualizadoEn: l.actualizadoEn.toISOString(), crm: crmDeLead(l.envios),
 });
 
 export type ResultadoCaptura = { estado: 'guardado'; leadId: string; nuevo: boolean } | { estado: 'descartado' };
@@ -32,8 +35,10 @@ export class LeadsService {
   private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
   /** El último aviso por correo en curso (las pruebas lo esperan; la respuesta al visitante no). */
   ultimoAviso: Promise<void> = Promise.resolve();
+  /** HU-1602 · El último encolado al CRM en curso (la respuesta al visitante tampoco lo espera). */
+  ultimoEnvio: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly correo: CorreoService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly correo: CorreoService, private readonly crm: CrmService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -69,6 +74,8 @@ export class LeadsService {
     if (r.trampa) return { estado: 'descartado' };
     const { lead, nuevo } = await this.guardar(r.envio, ahora);
     this.ultimoAviso = this.avisar(lead, nuevo, r.envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
+    // HU-1602 · Al CRM y al webhook activos: el alta, o un contacto nuevo del mismo correo.
+    this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
     return { estado: 'guardado', leadId: lead.id, nuevo };
   }
 
@@ -120,19 +127,21 @@ export class LeadsService {
     const porPagina = q.porPagina ?? 25;
     const where = this.donde(q);
     const [filas, total] = await Promise.all([
-      this.bd.lead.findMany({ where, orderBy: [{ creadoEn: 'desc' }, { id: 'asc' }], skip: (pagina - 1) * porPagina, take: porPagina }),
+      this.bd.lead.findMany({ where, orderBy: [{ creadoEn: 'desc' }, { id: 'asc' }], skip: (pagina - 1) * porPagina, take: porPagina, include: CON_ENVIOS }),
       this.bd.lead.count({ where }),
     ]);
     return { leads: filas.map(aLeadDto), total, pagina, porPagina };
   }
 
   async cambiarEtapa(u: UsuarioSesion, id: string, etapa: string): Promise<LeadDto> {
-    const actual = await this.bd.lead.findUnique({ where: { id } });
+    const actual = await this.bd.lead.findUnique({ where: { id }, include: CON_ENVIOS });
     if (!actual) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El lead no existe' });
     if (actual.etapa === etapa) return aLeadDto(actual);
-    const lead = await this.bd.lead.update({ where: { id }, data: { etapa } });
+    await this.bd.lead.update({ where: { id }, data: { etapa } });
     await this.auditar(u, 'LEAD_ETAPA_CAMBIADA', id, { antes: actual.etapa, etapa });
-    return aLeadDto(lead);
+    // HU-1602 · La etapa nueva llega al CRM; si la cola no responde, el envío queda en «error» y la fila lo muestra.
+    await this.crm.encolar(id, 'lead.actualizado');
+    return aLeadDto(await this.bd.lead.findUniqueOrThrow({ where: { id }, include: CON_ENVIOS }));
   }
 
   /** El CSV con los filtros aplicados (hasta 5000, del más nuevo al más antiguo). Es exportar datos personales: se audita. */
