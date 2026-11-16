@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.67 · actualizado con la quinta entrega del Sprint 12 (16 de noviembre de 2026)**
+**Versión 0.68 · actualizado con la sexta entrega del Sprint 12 (16 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -906,6 +906,14 @@ Cada correo es un solo lead: el origen, la entrada y la campaña son los de su p
 
 **Filtrar y exportar.** Usa **Origen** y **Etapa** para ver solo una parte. **Exportar CSV** descarga los leads con los filtros que elegiste, listos para abrir en una hoja de cálculo (hasta 5 000 por archivo). Cada exportación queda registrada.
 
+**Enviar los leads al CRM.** Debajo de la lista hay tres tarjetas:
+
+- **Conexiones:** HubSpot, Pipedrive, Zoho CRM y Webhook, cada uno con su interruptor. Cada CRM dice **Clave configurada** o **Falta la clave**; la clave la configura el equipo técnico en el servidor, no se escribe en el panel. Al activar una conexión se le envían los leads nuevos, los que vuelven a escribir y cada cambio de etapa; los leads anteriores no se envían.
+- **Mapeo de campos:** elige el CRM y escribe, para cada campo del sitio (nombre, empresa, origen, etapa, UTM…), la propiedad del CRM donde va. Un campo vacío no se envía. El correo va siempre a su propiedad, porque con él el CRM encuentra el contacto y no lo duplica. **Volver al de por defecto** recupera el mapeo inicial.
+- **Webhook:** para enviar los leads a otro sistema. Escribe su dirección (empieza con https://) y pulsa **Guardar URL**. La **clave para verificar la firma** se crea al activar el webhook: **Copiar** la copia para pegarla en tu sistema y **Regenerar** crea otra (pide confirmación; la anterior deja de valer). **Enviar prueba** manda un lead de ejemplo. La tarjeta explica cómo tu sistema comprueba que el envío viene de Aptio SCORM.
+
+La columna **CRM** de cada lead dice **Sincronizado**, **Pendiente**, **Error** con el motivo, o **Sin enviar** si no había conexiones activas. Si un CRM no recibe el lead, se reintenta solo 3 veces (a los 30 segundos, 2 minutos y 8 minutos); si sigue sin entrar, queda en Error. Corrige la causa (por ejemplo, la clave o el mapeo) y pulsa **Reintentar** en la fila.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -997,6 +1005,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.68 | 2026-11-16 | Leads y CRM (8.35): enviar los leads a HubSpot, Pipedrive, Zoho o un webhook, con las tarjetas Conexiones, Mapeo de campos y Webhook (copiar y regenerar la clave, enviar prueba), la columna CRM y «Reintentar». |
 | 0.67 | 2026-11-16 | Leads y CRM (8.35): el bloque «Formulario de contacto» con su casilla de aceptación, la lista de leads con origen, entrada, campaña, etapa editable y fecha, los filtros por origen y etapa, y «Exportar CSV». |
 | 0.66 | 2026-11-13 | SEO para IA (8.34): preguntas objetivo con la marca de cada asistente, permitir o bloquear rastreadores de IA, llms.txt con «Armar con las páginas publicadas» y las sugerencias de la IA con «Crear borrador» y «Descartar». |
 | 0.65 | 2026-11-13 | SEO (8.33): la pestaña SEO del editor con meta título y descripción con contador, URL canónica, datos estructurados, «Indexar en buscadores» y la vista previa en Google; Sitio web › SEO con los problemas, las redirecciones 301 y robots.txt; la ruta de una página publicada ya se puede cambiar. |

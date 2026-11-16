@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.67 · actualizado con la quinta entrega del Sprint 12 (16 de noviembre de 2026)**
+**Versión 0.68 · actualizado con la sexta entrega del Sprint 12 (16 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -472,6 +472,16 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Panel (PNT-34):** `GET /captacion/leads` (filtros por origen y etapa, de a 25), `GET /captacion/leads/exportar.csv` (hasta 5 000 filas, UTF-8 con BOM, celdas con fórmulas neutralizadas) y `PATCH /captacion/leads/{id}` (etapa), solo del superadmin.
 - **Auditoría:** LEAD_ETAPA_CAMBIADA y LEADS_EXPORTADOS. La creación de un lead no se audita; la retención de los leads queda pendiente con producto (SUP-237).
 
+### 3.26 Integración con CRM (HU-1602)
+
+- **Datos (REQ-075, RN-17-2):** `CrmConexion` (una por tipo: hubspot, pipedrive, zoho, webhook; activa, mapeo, URL y clave del webhook) y `LeadEnvio` (por lead y conexión: pendiente, enviado o error, intentos, motivo, id externo y fecha), con la migración `20261116220000_crm`.
+- **Claves:** las de HubSpot, Pipedrive y Zoho viven en el entorno de la API y del worker (`HUBSPOT_TOKEN`, `PIPEDRIVE_TOKEN`, `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_DOMINIO`); el panel solo dice cuáles faltan y no deja activar sin ellas. La clave del webhook se genera en el panel y se guarda en la base (SUP-241).
+- **Envío:** el alta de un lead, un contacto nuevo y el cambio de etapa encolan un trabajo por conexión activa en la cola `crm`. El worker hace alta o actualización por correo, con 10 s por pedido y sin seguir redirecciones; 1 intento y 3 reintentos a los 30 s, 2 min y 8 min ante errores pasajeros. Al agotarlos, o ante un error que no cambia al repetir, el envío queda en «error» con el motivo sin claves (CP-129, SUP-242). Encolar nunca hace fallar la captura del lead.
+- **Webhook (CP-130):** `POST` en JSON con `X-Aptio-Firma: t=<unix>,v1=<hex>` (HMAC-SHA256 de `${t}.${cuerpo}`), `X-Aptio-Evento` y `X-Aptio-Entrega`. Solo https:// con dominio público; antes de cada envío se comprueba que no resuelva a la red interna (SSRF). Se recomienda al receptor rechazar firmas de más de 5 minutos (SUP-244).
+- **Panel (PNT-34):** `GET` y `PATCH /captacion/crm`, `POST /captacion/crm/webhook/secreto`, `POST /captacion/crm/{tipo}/probar` y `POST /captacion/leads/{id}/sincronizar`, solo del superadmin. La lista de leads trae el estado CRM de cada conexión activa.
+- **Auditoría:** CRM_CONEXION_EDITADA, CRM_SECRETO_REGENERADO (sin la clave), CRM_PRUEBA_ENVIADA y LEAD_SINCRONIZACION_REINTENTADA.
+- **Sin verificar:** los clientes de HubSpot, Pipedrive y Zoho están probados solo con respuestas simuladas (SUP-243). Enviar leads a terceros es tratamiento por un encargado (Ley 29733, SUP-245).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -545,6 +555,7 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 
 Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 
+- **SUP-241 a SUP-245:** las claves de los CRM viven en el entorno (pasarán a un gestor de secretos); los clientes de HubSpot, Pipedrive y Zoho no se probaron con cuentas reales; enviar leads a terceros espera la revisión legal.
 - **SUP-237 a SUP-239:** los leads no tienen todavía retención ni borrado a pedido del titular; el límite de envíos es por instancia (pasará a Redis); la CDN debe reenviar `POST /_lead` al origen.
 - **SUP-81 a SUP-84:** la voz en inglés por defecto (`en-US-Neural2-F`) aún no se probó con una clave real de Google; en inglés solo se aplica la pronunciación en inglés; se regenera un idioma por vez sobre la última generación; las marcas de palabra siguen el español.
 - **SUP-72 a SUP-74:** el espacio de un texto es un límite de caracteres por componente, no una medición del texto dibujado; solo se marca el inglés. Un Desborde puede aceptarse largo con «Marcar revisado». El modo simulado deja en Desborde la tarjeta «Cilindros y mangueras» de LOTO.
@@ -610,6 +621,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.68 | 2026-11-16 | Integración con CRM (3.26): `CrmConexion` y `LeadEnvio`, la cola `crm` con 3 reintentos de espera creciente, el webhook firmado con HMAC-SHA256 y su comprobación SSRF, las claves en el entorno y la auditoría; SUP-241 a SUP-245 en los supuestos. |
 | 0.67 | 2026-11-16 | Leads con origen y UTM (3.25): el modelo `Lead` con la atribución del primer contacto, el formulario sin JavaScript y el script propio con `sessionStorage`, la CSP con `script-src 'self'`, la API pública con límite y campo trampa, el panel con CSV y su auditoría; SUP-237 a SUP-239 en los supuestos. |
 | 0.66 | 2026-11-13 | SEO para IA (3.24): llms.txt y los rastreadores de IA en la versión, las preguntas objetivo con menciones marcadas a mano, IA-19 dentro de la API con el consumo y el límite de la plataforma, y las propuestas que solo crean borradores. |
 | 0.65 | 2026-11-13 | SEO técnico (3.23): los campos de SEO de la página, las redirecciones 301 y robots en la versión, la 301 automática al cambiar la ruta, Open Graph, JSON-LD y noindex, el analizador de problemas y la auditoría. |
