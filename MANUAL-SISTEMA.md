@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.66 · actualizado con la cuarta entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.67 · actualizado con la quinta entrega del Sprint 12 (16 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -463,6 +463,15 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Costo:** el consumo es un `TrabajoIA` sin organización, fuera del costo y del límite de las organizaciones. El modelo y el límite mensual de la plataforma salen de la conexión de texto sin organización (`ConfigProveedor`), que todavía no tiene pantalla; al llegar al límite responde 422 LIMITE_GASTO (SUP-234).
 - **Auditoría:** SITIO_LLMS_EDITADO, SITIO_RASTREADORES_EDITADOS, SITIO_PREGUNTA_IA_CREADA, _EDITADA, _REVISADA y _BORRADA, SITIO_PROPUESTAS_IA_PEDIDAS, SITIO_PROPUESTA_IA_BORRADOR y _DESCARTADA, y LIMITE_GASTO_ALCANZADO.
 
+### 3.25 Leads con origen y UTM (HU-1601)
+
+- **Datos (REQ-074, RN-17-1):** el modelo `Lead` (migración `20261113220000_leads`) guarda un lead por correo, en minúsculas: contacto, atribución del primer contacto (origen, vía, página de entrada, página del formulario, los cinco `utm_*`, referente e idioma), etapa del embudo, consentimiento con su fecha (Ley 29733), `totalContactos` e `historialContactos` (los últimos 50). Un nuevo envío del mismo correo conserva la atribución, completa los datos que faltaban y suma al historial (SUP-236).
+- **Atribución:** un referente o un `utm_source` de un asistente de IA (ChatGPT, Claude, Gemini, Perplexity, Copilot y otros) da origen `asistente_ia` y la vía conserva el canal. Las reglas viven en `@aptio/schema/leads`, las mismas en la API, el sitio y la web.
+- **Captura en el sitio:** el bloque «Formulario de contacto» es un formulario HTML que hace `POST /s/_lead` (303 a `_gracias` o la página con los errores) y funciona sin JavaScript. Como la CDN no reenvía el query string, el script propio `/s/_captacion.js` guarda en `sessionStorage` la entrada, el referente externo y el UTM de la primera visita y los copia al formulario; no usa cookies ni terceros. La CSP de las páginas pasa a `script-src 'self'` y `form-action 'self'` (SUP-238). La CDN debe reenviar `POST /_lead` al origen.
+- **API pública:** `POST /publico/leads` (para el popup, el chatbot, el agendador y la suscripción en sus historias) valida texto plano, correo, consentimiento y el campo trampa `website`, que descarta sin decirlo. Límite de 5 envíos en 10 minutos por IP, en memoria de la instancia (SUP-239). El aviso al «Correo de leads» se envía sin bloquear la respuesta y su falla no pierde el lead.
+- **Panel (PNT-34):** `GET /captacion/leads` (filtros por origen y etapa, de a 25), `GET /captacion/leads/exportar.csv` (hasta 5 000 filas, UTF-8 con BOM, celdas con fórmulas neutralizadas) y `PATCH /captacion/leads/{id}` (etapa), solo del superadmin.
+- **Auditoría:** LEAD_ETAPA_CAMBIADA y LEADS_EXPORTADOS. La creación de un lead no se audita; la retención de los leads queda pendiente con producto (SUP-237).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -536,6 +545,7 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 
 Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 
+- **SUP-237 a SUP-239:** los leads no tienen todavía retención ni borrado a pedido del titular; el límite de envíos es por instancia (pasará a Redis); la CDN debe reenviar `POST /_lead` al origen.
 - **SUP-81 a SUP-84:** la voz en inglés por defecto (`en-US-Neural2-F`) aún no se probó con una clave real de Google; en inglés solo se aplica la pronunciación en inglés; se regenera un idioma por vez sobre la última generación; las marcas de palabra siguen el español.
 - **SUP-72 a SUP-74:** el espacio de un texto es un límite de caracteres por componente, no una medición del texto dibujado; solo se marca el inglés. Un Desborde puede aceptarse largo con «Marcar revisado». El modo simulado deja en Desborde la tarjeta «Cilindros y mangueras» de LOTO.
 - **SUP-66 a SUP-71:** el glosario se exige como palabra completa («no traducir» con sus mayúsculas); editar el inglés lo deja Revisado y un español cambiado vuelve a Pendiente; no hay «Marcar todo como revisado»; IA-10 v2 aún no se corrió con un modelo real y la voz en inglés llega con la HU-0804.
@@ -600,6 +610,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.67 | 2026-11-16 | Leads con origen y UTM (3.25): el modelo `Lead` con la atribución del primer contacto, el formulario sin JavaScript y el script propio con `sessionStorage`, la CSP con `script-src 'self'`, la API pública con límite y campo trampa, el panel con CSV y su auditoría; SUP-237 a SUP-239 en los supuestos. |
 | 0.66 | 2026-11-13 | SEO para IA (3.24): llms.txt y los rastreadores de IA en la versión, las preguntas objetivo con menciones marcadas a mano, IA-19 dentro de la API con el consumo y el límite de la plataforma, y las propuestas que solo crean borradores. |
 | 0.65 | 2026-11-13 | SEO técnico (3.23): los campos de SEO de la página, las redirecciones 301 y robots en la versión, la 301 automática al cambiar la ruta, Open Graph, JSON-LD y noindex, el analizador de problemas y la auditoría. |
 | 0.64 | 2026-11-13 | Blog desde WordPress (3.22): la copia de lectura, la sincronización con su frecuencia, sus límites y su error, el blog fuera de las versiones con re-render, la sección sin JavaScript, «Últimos artículos» y la auditoría. |

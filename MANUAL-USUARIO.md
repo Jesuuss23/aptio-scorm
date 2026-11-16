@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.66 · actualizado con la cuarta entrega del Sprint 12 (13 de noviembre de 2026)**
+**Versión 0.67 · actualizado con la quinta entrega del Sprint 12 (16 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -888,6 +888,24 @@ Cada vez más personas preguntan a un asistente de IA (ChatGPT, Claude, Gemini, 
 
 Los cambios en los rastreadores y en llms.txt llegan al sitio con **Publicar cambios**. En el sitio de pruebas todos los rastreadores siguen bloqueados.
 
+### 8.35 Leads y CRM (solo superadmin)
+
+Un **lead** es una persona que deja sus datos en el sitio para que ventas la contacte. **Captación › Leads y CRM** muestra todos los que llegan, con el canal por el que llegaron y la página por la que entraron al sitio.
+
+**Recibir leads.** Agrega el bloque **Formulario de contacto** a una página del sitio (por ejemplo, Contacto) y publícala. El formulario pide nombre, correo de trabajo, empresa y mensaje (estos dos, opcionales) y la casilla de aceptación del tratamiento de datos personales (Ley 29733), que es obligatoria. Si tienes publicada la página `/privacidad`, la casilla la enlaza. Al enviarlo, la persona ve «Recibimos tus datos» y, si configuraste el **correo que recibe los leads** en Ajustes del sitio, llega un aviso a ese correo. El formulario funciona aunque el navegador tenga desactivado JavaScript.
+
+**La lista.** Cada fila es un lead, del más nuevo al más antiguo, de a 25 por página:
+
+- **Contacto:** nombre, empresa y correo. Si la persona escribió más de una vez, dice cuántos contactos lleva.
+- **Origen:** el canal (Formulario, Popup, Chatbot, Agendador, Suscripción, Boletín). Si llegó desde un asistente de IA como ChatGPT o Perplexity, dice **Asistente IA** y debajo «vía» el canal por el que dejó sus datos.
+- **Entrada:** la primera página que visitó y la campaña (UTM) del enlace por el que llegó, por ejemplo «linkedin / social», o «directo» si no venía de una campaña.
+- **Etapa:** dónde está en el embudo: Nuevo, Contactado, Demo, Propuesta, Ganado o Perdido. Cámbiala en la misma fila; el cambio queda registrado.
+- **Fecha:** cuándo llegó, en hora de Lima.
+
+Cada correo es un solo lead: el origen, la entrada y la campaña son los de su primer contacto. Si vuelve a escribir, no se duplica: se suma a su historial y se completan los datos que faltaban.
+
+**Filtrar y exportar.** Usa **Origen** y **Etapa** para ver solo una parte. **Exportar CSV** descarga los leads con los filtros que elegiste, listos para abrir en una hoja de cálculo (hasta 5 000 por archivo). Cada exportación queda registrada.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -979,6 +997,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.67 | 2026-11-16 | Leads y CRM (8.35): el bloque «Formulario de contacto» con su casilla de aceptación, la lista de leads con origen, entrada, campaña, etapa editable y fecha, los filtros por origen y etapa, y «Exportar CSV». |
 | 0.66 | 2026-11-13 | SEO para IA (8.34): preguntas objetivo con la marca de cada asistente, permitir o bloquear rastreadores de IA, llms.txt con «Armar con las páginas publicadas» y las sugerencias de la IA con «Crear borrador» y «Descartar». |
 | 0.65 | 2026-11-13 | SEO (8.33): la pestaña SEO del editor con meta título y descripción con contador, URL canónica, datos estructurados, «Indexar en buscadores» y la vista previa en Google; Sitio web › SEO con los problemas, las redirecciones 301 y robots.txt; la ruta de una página publicada ya se puede cambiar. |
 | 0.64 | 2026-11-13 | Blog (8.32): conectar WordPress, «Sincronizar ahora» y su error, ordenar y ocultar categorías, ocultar artículos y «Editar en WordPress», y en el sitio el filtro por categoría, «Últimos artículos» del pie y la categoría inicial de cada landing. |
