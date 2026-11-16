@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.68 · actualizado con la sexta entrega del Sprint 12 (16 de noviembre de 2026)**
+**Versión 0.69 · actualizado con la séptima entrega del Sprint 12 (16 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -482,6 +482,32 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Auditoría:** CRM_CONEXION_EDITADA, CRM_SECRETO_REGENERADO (sin la clave), CRM_PRUEBA_ENVIADA y LEAD_SINCRONIZACION_REINTENTADA.
 - **Sin verificar:** los clientes de HubSpot, Pipedrive y Zoho están probados solo con respuestas simuladas (SUP-243). Enviar leads a terceros es tratamiento por un encargado (Ley 29733, SUP-245).
 
+### 3.27 Popups (HU-1603)
+
+- **Datos (REQ-076):** la tabla `SitioPopup` guarda cada popup, con la migración `20261116230000_popups`:
+  - Tipo (modal, deslizable o barra) e idioma.
+  - Disparador y su valor; páginas, como rutas exactas, `/blog/*` o `*`.
+  - Título, texto y botón; la acción (pedir el correo o abrir un enlace interno) y el enlace.
+  - Frecuencia en días (de 7 a 365), activo, orden y ficticio.
+  - Impresiones y conversiones.
+- **En vivo (CP-132, SUP-246):** los popups no van en la versión del sitio.
+  - Toda versión trae el script `/s/_popups.js` y todas sus páginas lo cargan.
+  - El script pide `/s/_popups.json`, que trae solo los popups activos (en producción, sin los ficticios) y la CDN guarda 30 s.
+  - Activar o apagar un popup vale en menos de un minuto sin republicar.
+  - La API registra el módulo de captación antes que el del sitio, para que esa ruta no caiga en el comodín `GET /s/*`.
+- **Reglas en el navegador (RN-17-3, CP-131, SUP-247 a SUP-249):**
+  - `localStorage` (`aptio.popups`) guarda cuándo vio cada popup y si dejó su correo, sin cookies; sin `localStorage` no se muestra ningún popup automático.
+  - Un popup no vuelve antes de su frecuencia y nunca vuelve tras dejar el correo.
+  - Nunca en `/pago*`, y como máximo uno automático por página.
+  - La intención de salida no se dispara en pantallas táctiles.
+  - Con `#popup-<id>` en la dirección o en un enlace del contenido, se abre ese popup.
+  - El modal es un diálogo con el foco atrapado y Escape. El deslizable y la barra son fijos, así que no mueven la página: en Lighthouse, ningún desplazamiento viene del popup.
+- **Resultados (SUP-250):**
+  - `POST /s/_popup` suma impresiones, y conversiones de los popups con enlace, sin guardar la IP ni datos personales. Límite: 30 eventos por minuto por IP.
+  - El popup de correo envía el lead a `POST /api/v1/publico/leads` con `via: popup` y `popupId`, que suma su conversión.
+- **Panel (PNT-31):** `GET` y `POST /captacion/popups`, `PATCH` y `DELETE /captacion/popups/{id}`, `PUT /captacion/popups/orden` y `POST /captacion/popups/{id}/reiniciar`, solo del superadmin.
+- **Auditoría:** POPUP_CREADO, POPUP_EDITADO, POPUP_BORRADO, POPUPS_ORDENADOS y POPUP_RESULTADOS_REINICIADOS.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -578,6 +604,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-205 a SUP-211:** de la landing sale ahora solo el meta título; la categoría del blog espera a la HU-1511; las preguntas de una landing son las de su ruta, del inicio y generales; la ruta no cambia con el sector; los testimonios se asignan por nombre del sector; la landing nace en borrador con la plantilla oculta; las landings de ejemplo están solo en el sitio de ejemplo y la simulación.
 - **SUP-224 a SUP-229:** Google Search Console y el puntaje de auditoría quedan para después; las redirecciones y robots llegan con «Publicar cambios» y la CDN debe aplicarlas; las redirecciones son internas, hasta 500, y el cambio de ruta crea la 301; robots solo con Allow, Disallow y comentarios; 60 y 160 caracteres; Product sin precios y Organization solo en el inicio.
 - **SUP-200 a SUP-204:** la analítica se guarda pero se activa con el banner de cookies; el superadmin se reconoce por la cookie de sesión durante el mantenimiento (dominio de cookie compartido y CDN sin caché de respuestas privadas); el certificado lo emite la CDN; logo y favicon de hasta 200 KB.
+- **SUP-246 a SUP-250:** popups leídos en vivo (una versión anterior a la HU-1603 hay que republicarla una vez); frecuencia en `localStorage`; `/pago*` reservada para el S13; sin intención de salida en pantallas táctiles; contadores sin datos personales, con el límite de eventos en memoria; la CDN debe reenviar `POST /_popup` y `/api/v1/publico/leads` (HU-1405).
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -621,6 +648,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.69 | 2026-11-16 | Popups (3.27): `SitioPopup`, los popups en vivo con `_popups.js` y `_popups.json` (CDN 30 s), las reglas de frecuencia, páginas y pago en el navegador con `localStorage`, los contadores de `POST /s/_popup` sin datos personales, el panel y su auditoría; SUP-246 a SUP-250 en los supuestos. |
 | 0.68 | 2026-11-16 | Integración con CRM (3.26): `CrmConexion` y `LeadEnvio`, la cola `crm` con 3 reintentos de espera creciente, el webhook firmado con HMAC-SHA256 y su comprobación SSRF, las claves en el entorno y la auditoría; SUP-241 a SUP-245 en los supuestos. |
 | 0.67 | 2026-11-16 | Leads con origen y UTM (3.25): el modelo `Lead` con la atribución del primer contacto, el formulario sin JavaScript y el script propio con `sessionStorage`, la CSP con `script-src 'self'`, la API pública con límite y campo trampa, el panel con CSV y su auditoría; SUP-237 a SUP-239 en los supuestos. |
 | 0.66 | 2026-11-13 | SEO para IA (3.24): llms.txt y los rastreadores de IA en la versión, las preguntas objetivo con menciones marcadas a mano, IA-19 dentro de la API con el consumo y el límite de la plataforma, y las propuestas que solo crean borradores. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.68 · actualizado con la sexta entrega del Sprint 12 (16 de noviembre de 2026)**
+**Versión 0.69 · actualizado con la séptima entrega del Sprint 12 (16 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -914,6 +914,52 @@ Cada correo es un solo lead: el origen, la entrada y la campaña son los de su p
 
 La columna **CRM** de cada lead dice **Sincronizado**, **Pendiente**, **Error** con el motivo, o **Sin enviar** si no había conexiones activas. Si un CRM no recibe el lead, se reintenta solo 3 veces (a los 30 segundos, 2 minutos y 8 minutos); si sigue sin entrar, queda en Error. Corrige la causa (por ejemplo, la clave o el mapeo) y pulsa **Reintentar** en la fila.
 
+### 8.36 Popups (solo superadmin)
+
+Un **popup** es un aviso que aparece sobre el sitio para invitar al visitante a dejar su correo o a ir a otra página, por ejemplo para descargar una guía o agendar una demo. Se administran en **Captación › Popups**.
+
+**Tipos.** Hay tres:
+
+- **Modal:** una ventana en el centro que oscurece el resto de la página.
+- **Deslizable:** una tarjeta en la esquina inferior que no interrumpe la lectura.
+- **Barra:** una franja abajo de la pantalla, por ejemplo para un anuncio.
+
+**Crear un popup.** Pulsa **Nuevo popup** y completa:
+
+- **Nombre interno:** solo lo ves tú en el panel.
+- **Tipo** e **Idioma:** un popup en español solo sale en las páginas en español, y uno en inglés, en las de inglés.
+- **Disparador:** cuándo aparece.
+  - **Al cargar:** apenas se abre la página.
+  - **Tiempo:** después de unos segundos.
+  - **Desplazamiento:** cuando el visitante bajó un porcentaje de la página.
+  - **Intención de salida:** cuando el puntero se va hacia arriba para cerrar la pestaña. En celulares y tabletas no se usa, porque no se puede saber.
+  - **Clic en elemento:** cuando el visitante pulsa un enlace del contenido que apunta a `#popup-` seguido del código del popup.
+  - La barra siempre aparece al cargar.
+- **Frecuencia (días):** cada cuántos días puede volver a verlo la misma persona. Lo mínimo son 7 días.
+- **Páginas:** una por línea. Por ejemplo, `/` para el inicio, `/precios` para esa página, `/blog/*` para el blog y todo lo que cuelga de él, o `*` para todo el sitio. Los popups nunca aparecen en las páginas de pago.
+- **Título**, **Texto** y **Botón:** lo que lee el visitante.
+- **Al pulsar el botón:** hay dos opciones.
+  - **Pedir el correo:** muestra un campo de correo y la casilla de aceptación del tratamiento de datos (Ley 29733). El correo entra a **Leads y CRM** con origen «Popup» y la campaña con la que llegó la persona.
+  - **Abrir un enlace del sitio:** lleva a una página tuya, por ejemplo `/agendar-demo`.
+- **Dato ficticio:** márcalo si el popup es de ejemplo. Un popup ficticio nunca aparece en el sitio real.
+
+Debajo del formulario, **Reglas** resume en una frase dónde, cuándo y cada cuánto se mostrará. Pulsa **Guardar popup**. El popup se crea **apagado**.
+
+**La tabla.** Cada fila es un popup, con su tipo, disparador, páginas, **impresiones** (las veces que se mostró) y **conversión** (el porcentaje que dejó su correo o pulsó el enlace). En cada fila:
+
+- **Interruptor:** lo activa o lo apaga. El cambio se ve en el sitio en menos de un minuto, sin publicar nada.
+- **↑ ↓:** cambian el orden. Si dos popups pueden salir en la misma página, se muestra uno solo: el primero cuyo disparador se cumpla.
+- **Editar:** cambia cualquier dato.
+- **Probar en el sitio:** abre la página en otra pestaña con el popup a la vista. Solo aparece si el popup está activo.
+- **Reiniciar:** pone en cero las impresiones y las conversiones, por ejemplo al empezar una campaña nueva.
+- **Borrar:** pide confirmación. Para que no se vea, basta con apagarlo.
+
+**Lo que ve el visitante.**
+
+- Cada persona ve un mismo popup como máximo una vez cada 7 días (o cada lo que diga su frecuencia), y nunca más si ya dejó su correo en él.
+- En cada página aparece un solo popup.
+- Se cierra con la ✕, con **No, gracias** o con la tecla Escape.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1005,6 +1051,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.69 | 2026-11-16 | Popups (8.36): crear modales, deslizables y barras con disparador, páginas, frecuencia y botón (pedir el correo o abrir un enlace), activarlos sin publicar, ordenarlos, probarlos en el sitio, ver impresiones y conversión, reiniciar y borrar. |
 | 0.68 | 2026-11-16 | Leads y CRM (8.35): enviar los leads a HubSpot, Pipedrive, Zoho o un webhook, con las tarjetas Conexiones, Mapeo de campos y Webhook (copiar y regenerar la clave, enviar prueba), la columna CRM y «Reintentar». |
 | 0.67 | 2026-11-16 | Leads y CRM (8.35): el bloque «Formulario de contacto» con su casilla de aceptación, la lista de leads con origen, entrada, campaña, etapa editable y fecha, los filtros por origen y etapa, y «Exportar CSV». |
 | 0.66 | 2026-11-13 | SEO para IA (8.34): preguntas objetivo con la marca de cada asistente, permitir o bloquear rastreadores de IA, llms.txt con «Armar con las páginas publicadas» y las sugerencias de la IA con «Crear borrador» y «Descartar». |
