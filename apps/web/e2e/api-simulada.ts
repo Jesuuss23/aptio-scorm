@@ -11,6 +11,7 @@ import {
 } from '@aptio/schema/sitio-seo-ia';
 import { CAMPOS_LEAD_CRM, DESCRIPCION_CRM, ETIQUETA_CAMPO_CRM, MAPEO_POR_DEFECTO, mapeoDe, NOMBRE_CRM, resumenCrm, tieneMapeo, TIPOS_CRM, type TipoCrm, validarMapeo, validarUrlWebhook, VARIABLES_CRM } from '@aptio/schema/crm';
 import { ETAPAS_LEAD, fusionarLead, leadNuevo, leadsACsv, leerHistorial, ORIGENES_LEAD, validarEnvioLead } from '@aptio/schema/leads';
+import { aPopupPublico, type DatosPopup, POPUP_NUEVO, tasaConversion, validarPopup } from '@aptio/schema/popups';
 import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, renderizar404, renderizarErrorFormulario, renderizarMantenimiento, renderizarSitio, resolverPedido, RUTA_GRACIAS } from '@aptio/sitio';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -184,6 +185,8 @@ export interface OpcionesSimulacion {
    * (por id). `pruebaFalla`: el webhook responde 500 a «Enviar prueba».
    */
   crmSitio?: { conexiones?: Partial<Record<TipoCrm, { activa?: boolean; mapeo?: Record<string, string>; url?: string | null; secreto?: string | null }>>; claves?: TipoCrm[]; envios?: Record<string, EnvioSim[]>; pruebaFalla?: boolean };
+  /** HU-1603 · Popups guardados en Captación › Popups. */
+  popupsSitio?: PopupSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -417,6 +420,18 @@ export interface PaginaSitioSim {
 }
 /** HU-1512 · Redirección 301 en la simulación. */
 /** HU-1601 · Un lead del simulador, con la forma de la API (fechas en ISO). */
+/** HU-1603 · Un popup guardado. */
+export interface PopupSim extends DatosPopup {
+  id: string;
+  orden: number;
+  impresiones: number;
+  conversiones: number;
+  actualizadoEn: string;
+}
+
+/** HU-1603 · Lo que el sitio mandó a `POST /s/_popup` (las pruebas lo leen). */
+export const eventosPopupSim: { popupId: string; evento: string }[] = [];
+
 export interface LeadSim {
   id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null; origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
   utmSource: string | null; utmMedium: string | null; utmCampaign: string | null; utmTerm: string | null; utmContent: string | null; referente: string | null; idioma: string;
@@ -441,7 +456,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {} }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [] }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -455,7 +470,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-1513 · SEO para IA: llms.txt y los rastreadores bloqueados viajan en la versión; las preguntas y las propuestas, no.
   let llmsSim = seoIaSitio.llmsTxt ?? '';
   // HU-1601 · Los leads, con las mismas reglas que la API (un lead por correo, atribución del primer contacto).
+  eventosPopupSim.length = 0;
   const leadsSim: LeadSim[] = leadsSitio.map((l) => ({ ...l }));
+  // HU-1603 · Popups: el panel los edita y el sitio los lee en vivo (`/s/_popups.json`).
+  let popupsSim: PopupSim[] = popupsSitio.map((x, orden) => ({ ...x, orden }));
+  let popupsCreados = 0;
+  const popupDto = (x: PopupSim) => ({ ...x, tasaConversion: tasaConversion(x.impresiones, x.conversiones) });
   let leadsSecuencia = 0;
   // HU-1602 · Conexiones de CRM y envíos, con las mismas reglas que la API (la cola no corre: los envíos quedan pendientes).
   const conexionesCrmSim = new Map(TIPOS_CRM.map((t) => [t, { activa: false, mapeo: {} as Record<string, string>, url: null as string | null, secreto: null as string | null, ...crmSitio.conexiones?.[t] }]));
@@ -649,6 +669,19 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   await page.route(/^https?:\/\/[^/]+\/s(?:[/?#]|$)/, (route) => {
     const ruta = new URL(route.request().url()).pathname.slice(2) || '/';
     // HU-1601 · El formulario de contacto sin JavaScript: 303 a la página de gracias, o la página con los errores (422).
+    // HU-1603 · Los popups activos, en vivo (sin los ficticios en producción), y sus impresiones y clics.
+    if (route.request().method() === 'GET' && ruta === '/_popups.json') {
+      const lista = popupsSim.filter((x) => x.visible && !(entornoSitio === 'produccion' && x.ficticio)).map((x) => aPopupPublico(x as unknown as Parameters<typeof aPopupPublico>[0]));
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }, body: JSON.stringify({ popups: lista }) });
+    }
+    if (route.request().method() === 'POST' && ruta === '/_popup') {
+      const { popupId, evento } = route.request().postDataJSON() as { popupId: string; evento: string };
+      const x = popupsSim.find((y) => y.id === popupId && y.visible);
+      if (x && evento === 'impresion') x.impresiones += 1;
+      if (x && evento === 'conversion' && x.accion === 'enlace_interno') x.conversiones += 1;
+      eventosPopupSim.push({ popupId, evento });
+      return route.fulfill({ status: 204, body: '' });
+    }
     if (route.request().method() === 'POST' && ruta === '/_lead') {
       const cuerpo = Object.fromEntries(new URLSearchParams(route.request().postData() ?? ''));
       const r = capturarLeadSim(cuerpo);
@@ -1194,8 +1227,47 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     // HU-1601 · La entrada pública de leads (popup, chatbot, agendador y suscripción) y Captación › Leads y CRM (PNT-34).
     if (ruta === '/publico/leads' && req.method() === 'POST') {
-      const r = capturarLeadSim(req.postDataJSON());
+      const cuerpo = req.postDataJSON() as Record<string, unknown>;
+      const r = capturarLeadSim(cuerpo);
+      const pp = r.ok && r.lead && cuerpo.via === 'popup' ? popupsSim.find((x) => x.id === cuerpo.popupId && x.accion === 'pedir_correo') : undefined;
+      if (pp) pp.conversiones += 1;
       return r.ok ? responder(201, { recibido: true }) : responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+    }
+    if (ruta === '/captacion/popups' || ruta.startsWith('/captacion/popups/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const noValido = (errores: { campo: string; mensaje: string }[]) => responder(422, { codigo: 'NO_VALIDO', mensaje: errores.map((e) => e.mensaje).join('. '), detalles: errores });
+      const ahora = new Date().toISOString();
+      if (ruta === '/captacion/popups' && req.method() === 'GET') return responder(200, { popups: popupsSim.map(popupDto) });
+      if (ruta === '/captacion/popups' && req.method() === 'POST') {
+        const v = validarPopup({ ...POPUP_NUEVO, ...(req.postDataJSON() as object) });
+        if (!v.ok) return noValido(v.errores);
+        popupsCreados += 1;
+        const x: PopupSim = { ...v.datos, id: `00000000-0000-4000-9900-${String(popupsCreados + 100).padStart(12, '0')}`, orden: popupsSim.length, impresiones: 0, conversiones: 0, actualizadoEn: ahora };
+        popupsSim.push(x);
+        return responder(201, popupDto(x));
+      }
+      if (ruta === '/captacion/popups/orden' && req.method() === 'PUT') {
+        const { ids } = req.postDataJSON() as { ids: string[] };
+        popupsSim = ids.map((id, orden) => ({ ...popupsSim.find((x) => x.id === id)!, orden }));
+        return responder(200, { popups: popupsSim.map(popupDto) });
+      }
+      const m = ruta.match(/^\/captacion\/popups\/([0-9a-f-]{36})(\/reiniciar)?$/);
+      const x = m ? popupsSim.find((y) => y.id === m[1]) : undefined;
+      if (!x) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'El popup no existe' });
+      if (m![2] && req.method() === 'POST') {
+        Object.assign(x, { impresiones: 0, conversiones: 0, actualizadoEn: ahora });
+        return responder(200, popupDto(x));
+      }
+      if (req.method() === 'PATCH') {
+        const v = validarPopup({ ...x, ...(req.postDataJSON() as object) });
+        if (!v.ok) return noValido(v.errores);
+        Object.assign(x, v.datos, { actualizadoEn: ahora });
+        return responder(200, popupDto(x));
+      }
+      if (req.method() === 'DELETE') {
+        popupsSim = popupsSim.filter((y) => y.id !== x.id).map((y, orden) => ({ ...y, orden }));
+        return responder(204);
+      }
     }
     if (ruta === '/captacion/leads' || ruta.startsWith('/captacion/leads/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });

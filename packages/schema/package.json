@@ -58,6 +58,7 @@
     "./leads": "./src/leads.ts",
     "./crm": "./src/crm.ts",
     "./crm-envio": "./src/crm-envio.ts",
+    "./popups": "./src/popups.ts",
     "./sitio-versiones": "./src/sitio-versiones.ts"
   }
 }

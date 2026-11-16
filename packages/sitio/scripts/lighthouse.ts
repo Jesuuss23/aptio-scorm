@@ -1,6 +1,8 @@
 /**
  * HU-1508 · CP-120: mide el Inicio publicado con Lighthouse en celular (4G simulado y CPU 4x, la configuración móvil
- * por defecto) y falla si LCP ≥ 2,5 s, SEO < 90 o accesibilidad < 90 (REQ-109).
+ * por defecto) y falla si LCP ≥ 2,5 s, SEO < 90 o accesibilidad < 90 (REQ-109). HU-1603 · El sitio local sirve un popup
+ * activo (la barra de anuncio, al cargar) en `_popups.json`; la medición también falla si el CLS no está en verde
+ * (< 0,1) o si algún desplazamiento de la página viene de un popup (los popups son fijos: no deben mover nada).
  *
  * Sin `SITIO_LIGHTHOUSE_URL`, sirve en un puerto local el sitio de ejemplo de producción pre-renderizado con
  * `@aptio/sitio` y las mismas cabeceras que `GET /s/*`. Con `SITIO_LIGHTHOUSE_URL=http://localhost:3000/s/` mide el
@@ -12,9 +14,9 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import * as chromeLauncher from 'chrome-launcher';
 import lighthouse from 'lighthouse';
-import { cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, renderizar404, renderizarSitio, resolverPedido } from '../src/index.js';
+import { ARCHIVO_POPUPS_JSON, cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, popupsDeEjemplo, renderizar404, renderizarSitio, resolverPedido, RUTA_EVENTO_POPUP } from '../src/index.js';
 
-export const UMBRALES = { lcpMs: 2500, seo: 0.9, accesibilidad: 0.9 };
+export const UMBRALES = { lcpMs: 2500, seo: 0.9, accesibilidad: 0.9, cls: 0.1 };
 
 function rutaChrome(): string | undefined {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
@@ -35,6 +37,9 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
   const archivos = new Map(renderizarSitio(inst, op).map((a) => [a.archivo, a.contenido]));
   servidor.on('request', (req, res) => {
     const url = req.url ?? '/';
+    // HU-1603 · Los popups en vivo (aquí, uno de ejemplo activo) y sus eventos, como los atiende la API.
+    if (url === `/s/${ARCHIVO_POPUPS_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }).end(JSON.stringify({ popups: popupsDeEjemplo() }));
+    if (url === `/s/${RUTA_EVENTO_POPUP}` && req.method === 'POST') return void res.writeHead(204).end();
     // robots.txt va en la raíz del dominio, como lo sirve la API.
     const pedido = url === '/robots.txt' ? resolverPedido(url) : url === '/s' || url.startsWith('/s/') ? resolverPedido(url.slice(2) || '/') : null;
     const cuerpo = pedido ? (pedido.tipo === 'fuente' ? leerFuente(pedido.archivo) : archivos.get(pedido.archivo) ?? null) : null;
@@ -62,6 +67,9 @@ try {
   const seo = lhr.categories.seo?.score ?? 0;
   const a11y = lhr.categories.accessibility?.score ?? 0;
   const rendimiento = lhr.categories.performance?.score ?? 0;
+  const cls = lhr.audits['cumulative-layout-shift']?.numericValue ?? Number.POSITIVE_INFINITY;
+  const desplazamientos = ((lhr.audits['layout-shifts']?.details as { items?: { node?: { selector?: string } }[] } | undefined)?.items ?? []).map((x) => x.node?.selector ?? '');
+  const dePopups = desplazamientos.filter((x) => /\bpp-|data-popup/.test(x));
   mkdirSync('lighthouse', { recursive: true });
   const [json, html] = r.report as string[];
   writeFileSync('lighthouse/inicio.json', json!);
@@ -70,10 +78,13 @@ try {
     ['LCP', `${(lcp / 1000).toFixed(2)} s`, `< ${UMBRALES.lcpMs / 1000} s`, lcp < UMBRALES.lcpMs],
     ['SEO', String(Math.round(seo * 100)), `≥ ${UMBRALES.seo * 100}`, seo >= UMBRALES.seo],
     ['Accesibilidad', String(Math.round(a11y * 100)), `≥ ${UMBRALES.accesibilidad * 100}`, a11y >= UMBRALES.accesibilidad],
+    ['CLS', cls.toFixed(5), `< ${UMBRALES.cls}`, cls < UMBRALES.cls],
+    ...(local ? [['Desplazamientos causados por el popup activo', String(dePopups.length), '= 0', dePopups.length === 0] as const] : []),
   ] as const;
   console.log(`CP-120 · Lighthouse ${lhr.lighthouseVersion} en celular sobre ${url}`);
   for (const [n, v, u, ok] of filas) console.log(`  ${ok ? '✓' : '✗'} ${n}: ${v} (umbral ${u})`);
   console.log(`  · Rendimiento (informativo): ${Math.round(rendimiento * 100)}. Informe en packages/sitio/lighthouse/inicio.html`);
+  if (desplazamientos.length) console.log(`  · Elementos que se desplazaron: ${desplazamientos.join(', ')}`);
   for (const a of Object.values(lhr.audits)) {
     if (a.score !== null && a.score < 1 && ['seo', 'accessibility'].some((c) => lhr.categories[c]?.auditRefs.some((x) => x.id === a.id && x.weight > 0))) console.log(`  - ${a.id}: ${a.title}`);
   }

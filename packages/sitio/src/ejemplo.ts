@@ -6,6 +6,7 @@
  * testimonio va marcado como ficticio para probar que en producción no sale. HU-1512: el inicio va como FAQPage y Personaje
  * con su propio meta título, como Product.
  */
+import type { PopupPublico } from '@aptio/schema/popups';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { blogPublico, type BlogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, type FilaArticuloBlog, type FilaCategoriaBlog } from '@aptio/schema/sitio-blog';
@@ -98,4 +99,15 @@ export function blogDeEjemplo(): { conexion: ConexionBlog; categorias: FilaCateg
     art(356, 'aniversario-del-equipo', 'Celebramos 10 años del equipo de producción', 'Noticias internas', 'Un repaso de los proyectos que nos trajeron hasta aquí.', 'Equipo Aptio', '2026-09-02'),
   ];
   return { conexion, categorias, articulos, publico: blogPublico(conexion, categorias, articulos) };
+}
+
+/**
+ * HU-1603 · Un popup activo de ejemplo para medir el inicio con Lighthouse: la barra de anuncio, al cargar y en todo el
+ * sitio (la que más podría mover la página si no fuera fija).
+ */
+export function popupsDeEjemplo(): PopupPublico[] {
+  return [{
+    id: '00000000-0000-4000-9900-000000000001', tipo: 'barra', idioma: 'es', disparador: 'al_cargar', valorDisparador: null, paginas: ['*'],
+    titulo: 'Nuevo: versión en inglés dentro del mismo paquete SCORM.', texto: '', boton: 'Ver cómo funciona', accion: 'enlace_interno', enlaceDestino: '/funcionalidades/personaje', frecuenciaDias: 7,
+  }];
 }

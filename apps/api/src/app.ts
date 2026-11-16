@@ -13,7 +13,10 @@ export function configurarApp(app: INestApplication): INestApplication {
   // HU-1508 · El sitio público pre-renderizado queda fuera del prefijo de la API.
   app.setGlobalPrefix(PREFIJO, {
     // HU-1601 · También el envío del formulario de contacto (`POST /s/_lead`), que funciona sin JavaScript.
-    exclude: [{ path: 's', method: RequestMethod.GET }, { path: 's/{*ruta}', method: RequestMethod.GET }, { path: 's/_lead', method: RequestMethod.POST }],
+    // HU-1603 · Y los eventos de los popups (`POST /s/_popup`).
+    exclude: [
+      { path: 's', method: RequestMethod.GET }, { path: 's/{*ruta}', method: RequestMethod.GET }, { path: 's/_lead', method: RequestMethod.POST }, { path: 's/_popup', method: RequestMethod.POST },
+    ],
   });
   app.use(cookieParser());
   // HU-1509 · El logo y el favicon llegan como el archivo mismo (SVG o PNG), hasta 200 KB; más, 413 DEMASIADO_GRANDE.

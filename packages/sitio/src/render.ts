@@ -20,6 +20,7 @@ import { CARPETA_FUENTES, fuentes } from './fuentes.js';
 import { type Idioma, INTERFAZ, TEXTOS } from './textos.js';
 import { CAMPO_TRAMPA, LIMITES_LEAD, PARAMETROS_UTM } from '@aptio/schema/leads';
 import { ARCHIVO_CAPTACION, RUTA_GRACIAS, RUTA_LEAD, SCRIPT_CAPTACION, TIPO_FORMULARIO } from './captacion.js';
+import { ARCHIVO_POPUPS, SCRIPT_POPUPS } from './popups.js';
 
 export interface OpcionesRender {
   entorno: EntornoSitio;
@@ -397,11 +398,19 @@ export function jsonLdSeguro(datos: unknown): string {
 /** HU-1512 · El HTML sin sus bloques JSON-LD (para comprobar que no queda ningún otro `<script>`). */
 export const sinJsonLd = (html: string): string => html.replace(/<script type="application\/ld\+json">[^<]*<\/script>/g, '');
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, children }: {
+/**
+ * HU-1603 · El HTML sin JSON-LD ni el script diferido de popups, que solo agrega los popups y no hace falta para leer ni
+ * enviar nada (para comprobar que la página no necesita JavaScript).
+ */
+export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_popups\.js" defer="" data-base="[^"]*"><\/script>/g, '');
+
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, children }: {
   titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
   og?: OpenGraph; jsonLd?: unknown;
   /** HU-1601 · Carga el script propio de captación (primera visita y UTM); la CSP solo permite scripts del mismo origen. */
-  captacion?: boolean; children?: ReactNode;
+  captacion?: boolean;
+  /** HU-1603 · Carga el script de popups, que los lee en vivo (`_popups.json`). Solo en las páginas del sitio. */
+  popups?: boolean; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -425,7 +434,8 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       favicon ? h('link', { rel: 'icon', href: `${base}/${CARPETA_MARCA}/${favicon.archivo}`, type: favicon.mime }) : null,
       lista.filter((f) => f.precargar).map((f) => h('link', { key: f.archivo, rel: 'preload', href: `${base}/${CARPETA_FUENTES}/${f.archivo}`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })),
       h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO + cssExtra } }),
-      captacion ? h('script', { src: `${base}/${ARCHIVO_CAPTACION}`, defer: true, 'data-base': base }) : null),
+      captacion ? h('script', { src: `${base}/${ARCHIVO_CAPTACION}`, defer: true, 'data-base': base }) : null,
+      popups ? h('script', { src: `${base}/${ARCHIVO_POPUPS}`, defer: true, 'data-base': base }) : null),
     h('body', null, children));
 }
 
@@ -487,6 +497,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     ...(indexar || op.entorno !== 'produccion' ? {} : { robots: 'noindex' }),
     cssExtra: (p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '') + (p.bloques.some((b) => b.tipo === TIPO_FORMULARIO) ? CSS_FORMULARIO : ''),
     captacion: tieneFormulario(inst),
+    popups: true,
     og: { titulo, descripcion, url: canonical, sitio: marca.nombre, idioma: i },
     jsonLd: datosEstructurados(p, { titulo, descripcion, url: canonical, idioma: i, marca, sitioUrl: op.sitioUrl }),
   }, h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: p.ruta, marca, landings, selector: selectorDe(inst, p.ruta, i) }, cuerpo)));
@@ -636,6 +647,8 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
       { archivo: `${RUTA_GRACIAS}.html`, contenido: renderizarGracias(inst, op, 'es'), mime: html },
       ...(inst.paginas.some((p) => p.idioma === 'en') ? [{ archivo: `en/${RUTA_GRACIAS}.html`, contenido: renderizarGracias(inst, op, 'en'), mime: html }] : []),
     ] : []),
+    // HU-1603 · El script de popups va en toda versión: los popups se leen en vivo, sin republicar.
+    { archivo: ARCHIVO_POPUPS, contenido: SCRIPT_POPUPS, mime: 'text/javascript; charset=utf-8' },
     ...(inst.llmsTxt?.trim() ? [{ archivo: ARCHIVO_LLMS, contenido: `${inst.llmsTxt.trim()}\n`, mime: 'text/plain; charset=utf-8' }] : []),
     ...(inst.redirecciones?.length ? [{ archivo: ARCHIVO_REDIRECCIONES, contenido: JSON.stringify(inst.redirecciones), mime: 'application/json' }] : []),
   ];

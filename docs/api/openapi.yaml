@@ -1672,7 +1672,7 @@ paths:
     get:
       tags:
       - Sitio público
-      summary: Página, fuente, sitemap o robots del sitio pre-renderizado (HU-1508)
+      summary: Página, fuente, sitemap, robots o popups del sitio pre-renderizado (HU-1508)
       operationId: get_sitio_archivo
       security: []
       servers:
@@ -1717,6 +1717,16 @@ paths:
         éxito, o con el campo trampa lleno, responde 303 a `/s/_gracias` (o `/s/en/_gracias`); con datos no válidos (422)
         o demasiados envíos (429, con Retry-After), la página del sitio con los errores y «Volver al formulario», con
         `Cache-Control: private, no-store`.
+
+        HU-1603 · Toda versión trae `_popups.js` y todas sus páginas lo cargan (diferido, del mismo origen): lee los
+        popups activos en vivo (`GET /s/_popups.json`), aplica la frecuencia (una vez por visitante cada 7 días como
+        mínimo, RN-17-3), las páginas, la exclusión de `/pago*` y la supresión tras dejar el correo, y guarda cuándo vio
+        cada popup en `localStorage`, sin cookies. Una página abierta con `#popup-{id}` abre ese popup. El modal es un
+        diálogo accesible; el deslizable y la barra son fijos. La página no necesita el script para nada más.
+
+        HU-1603 · `_popups.json` (en vivo, no sale de la versión) devuelve `{ popups: PopupPublico[] }`: solo los popups
+        activos y, en producción, nunca los ficticios, sin su nombre interno ni sus resultados. Lleva `Cache-Control:
+        public, max-age=0, s-maxage=30`: apagar un popup vale en menos de un minuto sin republicar (CP-132).
       parameters:
       - name: ruta
         in: path
@@ -1748,6 +1758,16 @@ paths:
             text/plain:
               schema:
                 type: string
+            application/json:
+              schema:
+                description: HU-1603 · `_popups.json`
+                type: object
+                required: [popups]
+                properties:
+                  popups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PopupPublico'
         '301':
           description: HU-1512 · Redirección activa de la versión vigente (CP-124)
           headers:
@@ -1762,6 +1782,42 @@ paths:
           $ref: '#/components/responses/PaginaSitioNoEncontrada'
         '503':
           $ref: '#/components/responses/SitioEnMantenimiento'
+  /s/_popup:
+    post:
+      tags:
+      - Sitio público
+      summary: Contar una impresión o el clic de un popup con enlace (HU-1603)
+      operationId: post_sitio_popup
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión y fuera del prefijo de la API. El script del sitio avisa cada vez que muestra un popup (`impresion`) y
+        cuando se pulsa el enlace de un popup con `enlace_interno` (`conversion`); la conversión de un popup de correo se
+        cuenta al llegar el lead por `POST /publico/leads` con `popupId`. No guarda datos personales: solo suma contadores.
+        Un popup apagado o que no existe se ignora con el mismo 204. 429 DEMASIADAS_SOLICITUDES con más de 30 eventos por
+        minuto desde la misma IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventoPopup'
+      responses:
+        '204':
+          description: Contado (o ignorado)
+        '400':
+          description: NO_VALIDO · `popupId` no es un UUID o `evento` no es `impresion` ni `conversion`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
   /publico/leads:
     post:
       tags:
@@ -1784,6 +1840,9 @@ paths:
 
         HU-1602 · El lead (o el contacto nuevo del mismo correo) se encola a cada conexión activa de CRM y al webhook
         (`lead.creado` o `lead.actualizado`), sin bloquear la respuesta.
+
+        HU-1603 · Con `via: popup` y el `popupId` de un popup que pide el correo, el lead guardado suma una conversión a ese
+        popup.
       requestBody:
         required: true
         content:
@@ -2048,6 +2107,169 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /captacion/popups:
+    get:
+      tags:
+      - Captación
+      summary: Popups del sitio con sus resultados (HU-1603, PNT-31)
+      operationId: get_captacion_popups
+      description: |-
+        Solo SUPERADMIN, con `Cache-Control: no-store`. En su orden, con impresiones, conversiones y la tasa de conversión.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPopups'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Captación
+      summary: Crear un popup (HU-1603, REQ-076)
+      operationId: post_captacion_popups
+      description: |-
+        Solo SUPERADMIN. Los campos que faltan toman los de un popup nuevo; se crea apagado salvo `visible: true`, al final
+        del orden. Reglas (RN-17-3): `frecuenciaDias` de 7 a 365; la barra solo con `al_cargar`; `valorDisparador` en
+        segundos (1 a 600) para `tiempo` o en porcentaje (1 a 100) para `desplazamiento`; `paginas` con rutas exactas,
+        comodín final (`/blog/*`) o `*`, y nunca `/pago*`; `enlaceDestino` es una ruta del sitio que empieza con una sola
+        `/` (sin esquema, dominio ni consulta). Los textos son planos: el sitio nunca los interpreta como HTML. Auditoría
+        POPUP_CREADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PopupEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Popup'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/popups/orden:
+    put:
+      tags:
+      - Captación
+      summary: Ordenar los popups (HU-1603)
+      operationId: put_captacion_popups_orden
+      description: Solo SUPERADMIN. Lleva todos los popups una vez cada uno; si no, 422 ORDEN_INCOMPLETO. Auditoría POPUPS_ORDENADOS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenPopups'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPopups'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/popups/{id}:
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar un popup o activarlo (HU-1603, CP-132)
+      operationId: patch_captacion_popups_id
+      description: |-
+        Solo SUPERADMIN. Solo cambia los campos que llegan; el popup completo se vuelve a validar con las reglas del alta.
+        `visible` lo activa o lo apaga: el sitio lo lee en vivo (`GET /s/_popups.json`), así que vale sin republicar.
+        Auditoría POPUP_EDITADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PopupEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Popup'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Captación
+      summary: Borrar un popup y sus resultados (HU-1603)
+      operationId: delete_captacion_popups_id
+      description: Solo SUPERADMIN. El resto se reordena sin huecos. Auditoría POPUP_BORRADO con sus últimos resultados.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Borrado
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /captacion/popups/{id}/reiniciar:
+    post:
+      tags:
+      - Captación
+      summary: Reiniciar las impresiones y conversiones de un popup (HU-1603)
+      operationId: post_captacion_popups_id_reiniciar
+      description: Solo SUPERADMIN. Auditoría POPUP_RESULTADOS_REINICIADOS con los valores de antes.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Popup'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
   /operacion:
     get:
       tags:
@@ -6935,6 +7157,10 @@ components:
         idioma:
           type: string
           enum: [es, en]
+        popupId:
+          type: string
+          format: uuid
+          description: HU-1603 · Con vía popup, el popup donde se dejó el correo (suma su conversión)
         utm_source:
           type: string
           maxLength: 150
@@ -7235,6 +7461,220 @@ components:
           items:
             type: string
             enum: [hubspot, pipedrive, zoho, webhook]
+    Popup:
+      type: object
+      required: [id, nombre, tipo, idioma, disparador, valorDisparador, paginas, titulo, texto, boton, accion, enlaceDestino, frecuenciaDias, visible, orden, ficticio, impresiones, conversiones, tasaConversion, actualizadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          maxLength: 80
+          example: Guía de microaprendizaje
+        tipo:
+          type: string
+          enum: [modal, deslizable, barra]
+        idioma:
+          type: string
+          enum: [es, en]
+        disparador:
+          type: string
+          enum: [al_cargar, tiempo, desplazamiento, intencion_salida, clic_elemento]
+          description: La barra solo admite al_cargar; intencion_salida no se dispara en pantallas táctiles
+        valorDisparador:
+          type: integer
+          nullable: true
+          description: Segundos (tiempo, 1 a 600) o porcentaje (desplazamiento, 1 a 100); null en los demás
+        paginas:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 200
+          example: ['/', '/blog/*']
+          description: Rutas exactas, con comodín final o `*` para todo el sitio; nunca `/pago*`
+        titulo:
+          type: string
+          maxLength: 120
+        texto:
+          type: string
+          maxLength: 400
+        boton:
+          type: string
+          maxLength: 40
+        accion:
+          type: string
+          enum: [pedir_correo, enlace_interno]
+        enlaceDestino:
+          type: string
+          nullable: true
+          maxLength: 200
+          example: /agendar-demo
+          description: Solo en enlace_interno. Ruta del sitio que empieza con una sola `/`
+        frecuenciaDias:
+          type: integer
+          minimum: 7
+          maximum: 365
+          description: RN-17-3 · Una vez por visitante cada N días
+        visible:
+          type: boolean
+          description: Activo
+        orden:
+          type: integer
+        ficticio:
+          type: boolean
+          description: Dato inventado; nunca se muestra en producción
+        impresiones:
+          type: integer
+        conversiones:
+          type: integer
+        tasaConversion:
+          type: number
+          nullable: true
+          example: 6.8
+          description: Conversiones sobre impresiones, en %; null sin impresiones
+        actualizadoEn:
+          type: string
+          format: date-time
+    ListaPopups:
+      type: object
+      required: [popups]
+      properties:
+        popups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Popup'
+    PopupEntrada:
+      type: object
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          maxLength: 80
+        tipo:
+          type: string
+          enum: [modal, deslizable, barra]
+        idioma:
+          type: string
+          enum: [es, en]
+        disparador:
+          type: string
+          enum: [al_cargar, tiempo, desplazamiento, intencion_salida, clic_elemento]
+          description: La barra solo admite al_cargar; intencion_salida no se dispara en pantallas táctiles
+        valorDisparador:
+          type: integer
+          nullable: true
+          description: Segundos (tiempo, 1 a 600) o porcentaje (desplazamiento, 1 a 100); null en los demás
+        paginas:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 200
+          example: ['/', '/blog/*']
+          description: Rutas exactas, con comodín final o `*` para todo el sitio; nunca `/pago*`
+        titulo:
+          type: string
+          maxLength: 120
+        texto:
+          type: string
+          maxLength: 400
+        boton:
+          type: string
+          maxLength: 40
+        accion:
+          type: string
+          enum: [pedir_correo, enlace_interno]
+        enlaceDestino:
+          type: string
+          nullable: true
+          maxLength: 200
+          example: /agendar-demo
+          description: Solo en enlace_interno. Ruta del sitio que empieza con una sola `/`
+        frecuenciaDias:
+          type: integer
+          minimum: 7
+          maximum: 365
+          description: RN-17-3 · Una vez por visitante cada N días
+        visible:
+          type: boolean
+        ficticio:
+          type: boolean
+    OrdenPopups:
+      type: object
+      additionalProperties: false
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+    PopupPublico:
+      type: object
+      description: Lo que el sitio recibe de cada popup activo (sin nombre interno ni resultados)
+      required: [id, tipo, idioma, disparador, valorDisparador, paginas, titulo, texto, boton, accion, enlaceDestino, frecuenciaDias]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [modal, deslizable, barra]
+        idioma:
+          type: string
+          enum: [es, en]
+        disparador:
+          type: string
+          enum: [al_cargar, tiempo, desplazamiento, intencion_salida, clic_elemento]
+          description: La barra solo admite al_cargar; intencion_salida no se dispara en pantallas táctiles
+        valorDisparador:
+          type: integer
+          nullable: true
+          description: Segundos (tiempo, 1 a 600) o porcentaje (desplazamiento, 1 a 100); null en los demás
+        paginas:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 200
+          example: ['/', '/blog/*']
+          description: Rutas exactas, con comodín final o `*` para todo el sitio; nunca `/pago*`
+        titulo:
+          type: string
+          maxLength: 120
+        texto:
+          type: string
+          maxLength: 400
+        boton:
+          type: string
+          maxLength: 40
+        accion:
+          type: string
+          enum: [pedir_correo, enlace_interno]
+        enlaceDestino:
+          type: string
+          nullable: true
+          maxLength: 200
+          example: /agendar-demo
+          description: Solo en enlace_interno. Ruta del sitio que empieza con una sola `/`
+        frecuenciaDias:
+          type: integer
+          minimum: 7
+          maximum: 365
+          description: RN-17-3 · Una vez por visitante cada N días
+    EventoPopup:
+      type: object
+      additionalProperties: false
+      required: [popupId, evento]
+      properties:
+        popupId:
+          type: string
+          format: uuid
+        evento:
+          type: string
+          enum: [impresion, conversion]
     SeoIaCambio:
       type: object
       additionalProperties: false
