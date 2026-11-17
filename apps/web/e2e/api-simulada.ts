@@ -35,6 +35,7 @@ import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
 import { crearPlanesSim, type PlanesSitioSim } from './planes-simulados';
 import { crearSuscripcionesSim, ORIGEN_STRIPE_SIMULADO } from './suscripciones-simuladas';
+import { type CobranzaSitioSim, crearCobranzaSim } from './cobranza-simulada';
 import { crearCuotasSim, type CuotaSitioSim, ORIGEN_PAGO_CAPSULAS } from './cuotas-simuladas';
 import { crearPasarelasSim, type PasarelasSitioSim } from './pasarelas-simuladas';
 import { crearComprobantesSim, type FacturacionSitioSim } from './comprobantes-simulados';
@@ -211,6 +212,8 @@ export interface OpcionesSimulacion {
   facturacionSitio?: FacturacionSitioSim;
   /** HU-1705 · La cuota de cápsulas de la organización; sin ella, `/organizacion/cuota` responde 404 y no se muestra. */
   cuotaSitio?: CuotaSitioSim;
+  /** HU-1708 · El estado de cobro de la organización (aviso, solo lectura y «Pagar ahora») y Ventas › Suscripciones. */
+  cobranzaSitio?: CobranzaSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -485,11 +488,12 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio, cobranzaSitio }: OpcionesSimulacion) {
   const planesSim = crearPlanesSim(planesSitio);
   const pasarelasSim = crearPasarelasSim(pasarelasSitio, () => entornoSitio);
   const comprobantesSim = crearComprobantesSim(facturacionSitio, () => entornoSitio);
   const cuotasSim = crearCuotasSim(cuotaSitio, () => rol ?? USUARIO.rol);
+  const cobranzaSim = crearCobranzaSim(cobranzaSitio, cuotaSitio?.plan ?? 'productora', () => rol ?? USUARIO.rol);
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -1382,8 +1386,23 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const r = agendaSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
       return responder(r.status, r.body);
     }
+    // HU-1708 · Suspendida, la escritura responde 403 SUSCRIPCION_SUSPENDIDA (salvo la sesión, exportar y pagar).
+    const suspendida = cobranzaSim.bloqueo(ruta, req.method());
+    if (suspendida) return responder(suspendida.status, suspendida.body);
+    if (ruta === '/organizacion/cobranza' && req.method() === 'GET') return responder(200, cobranzaSim.aviso());
+    if (ruta.startsWith('/organizacion/suscripcion/renovacion/')) {
+      const leer = () => { const x = cuotasSim.panel('/organizacion/suscripcion', 'GET', {}, new URL(req.url()).origin); return x?.status === 200 ? x.body as Record<string, unknown> : null; };
+      const r = cobranzaSim.pagar(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, leer);
+      if (r) return responder(r.status, r.body);
+    }
+    if (ruta.startsWith('/ventas/suscripciones')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = cobranzaSim.ventas(ruta, req.method(), new URL(req.url()).searchParams);
+      if (r) return responder(r.status, r.body);
+    }
     if (ruta.startsWith('/organizacion/cuota') || ruta.startsWith('/organizacion/suscripcion')) {
       const r = cuotasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).origin);
+      if (r && ruta === '/organizacion/suscripcion' && req.method() === 'GET' && r.status === 200) return responder(200, cobranzaSim.decorar(r.body as Record<string, unknown>));
       if (r) return responder(r.status, r.body);
     }
     if (ruta.startsWith('/ventas/comprobantes') || ruta === '/ventas/datos-fiscales') {

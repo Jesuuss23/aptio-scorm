@@ -11,8 +11,8 @@ export const MENU: GrupoMenu[] = [
   { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }, { ruta: '/sitio/blog', nombre: 'Blog' }, { ruta: '/sitio/seo', nombre: 'SEO' }, { ruta: '/sitio/seo-ia', nombre: 'SEO para IA' }] },
   // HU-1601 · Captación: Leads y CRM. HU-1603: Popups. HU-1604: Chatbot. HU-1605: Agendamiento.
   { nombre: 'Captación', items: [{ ruta: '/captacion/popups', nombre: 'Popups' }, { ruta: '/captacion/chatbot', nombre: 'Chatbot' }, { ruta: '/captacion/agendamiento', nombre: 'Agendamiento' }, { ruta: '/captacion/leads', nombre: 'Leads y CRM' }] },
-  // HU-1702 · Ventas: Planes. HU-1704: Pasarelas. HU-1707: Facturación. Suscripciones llega con su historia.
-  { nombre: 'Ventas', items: [{ ruta: '/ventas/planes', nombre: 'Planes' }, { ruta: '/ventas/pasarelas', nombre: 'Pasarelas' }, { ruta: '/ventas/facturacion', nombre: 'Facturación' }] },
+  // HU-1702 · Ventas: Planes. HU-1704: Pasarelas. HU-1707: Facturación. HU-1708: Suscripciones.
+  { nombre: 'Ventas', items: [{ ruta: '/ventas/planes', nombre: 'Planes' }, { ruta: '/ventas/suscripciones', nombre: 'Suscripciones' }, { ruta: '/ventas/pasarelas', nombre: 'Pasarelas' }, { ruta: '/ventas/facturacion', nombre: 'Facturación' }] },
   // HU-1509 · Configuración del sitio, también solo del superadmin.
   { nombre: 'Configuración', items: [{ ruta: '/sitio/ajustes', nombre: 'Ajustes del sitio' }] },
 ];
@@ -57,6 +57,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (camino === '/captacion/leads') return { grupo: 'Captación', nombre: 'Leads y CRM', activo: '/captacion/leads' };
   if (camino === '/ventas/planes') return { grupo: 'Ventas', nombre: 'Planes', activo: '/ventas/planes' };
   if (camino === '/ventas/pasarelas') return { grupo: 'Ventas', nombre: 'Pasarelas', activo: '/ventas/pasarelas' };
+  if (camino === '/ventas/suscripciones') return { grupo: 'Ventas', nombre: 'Suscripciones', activo: '/ventas/suscripciones' };
   if (camino === '/ventas/facturacion') return { grupo: 'Ventas', nombre: 'Facturación', activo: '/ventas/facturacion' };
   if (camino === '/sitio/ajustes') return { grupo: 'Configuración', nombre: 'Ajustes del sitio', activo: '/sitio/ajustes' };
   const editorPagina = camino.match(/^\/sitio\/paginas\/([0-9a-f-]{36})$/i);

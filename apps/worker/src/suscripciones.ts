@@ -5,11 +5,17 @@
  * la clave del administrador. Si el SMTP falla, la cola reintenta con espera creciente; la suscripción no cambia.
  *
  * HU-1706 · La misma cola vence las suscripciones canceladas al fin del período (`suscripcion-vencer`, RN-18-7).
+ * HU-1708 · Y lleva la cobranza: `renovar-suscripciones` y `renovacion-intento` (ver `cobranza.ts`).
  */
 import type { PrismaClient } from '@aptio/db';
-import { COLA_SUSCRIPCIONES, type DatosBienvenida, type DatosVencerSuscripcion, ESPERAS_SUSCRIPCIONES_MS, TAREA_VENCER_SUSCRIPCION } from '@aptio/colas';
+import {
+  COLA_SUSCRIPCIONES, type DatosBienvenida, type DatosIntentoRenovacion, type DatosVencerSuscripcion, ESPERAS_SUSCRIPCIONES_MS, TAREA_INTENTO_RENOVACION, TAREA_RENOVAR_SUSCRIPCIONES,
+  TAREA_VENCER_SUSCRIPCION,
+} from '@aptio/colas';
+import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { type ConnectionOptions, Worker } from 'bullmq';
+import { intentoManual, type OpcionesCobranza, type PrecioDe, renovarSuscripciones, type ResumenCobranza } from './cobranza.js';
 import type { Correo, EnviarCorreo } from './correo.js';
 
 export interface ResultadoBienvenida { estado: 'enviado' | 'omitido'; motivo?: string }
@@ -56,10 +62,12 @@ export async function procesarVencimiento(bd: PrismaClient, datos: DatosVencerSu
     const s = await tx.suscripcion.findUnique({ where: { id: datos.suscripcionId } });
     if (!s) return { estado: 'omitido', motivo: 'la suscripción no existe' };
     const r = await tx.suscripcion.updateMany({
-      where: { id: s.id, estado: 'ACTIVA', cancelarAlFin: true, finPeriodo: { lte: ahora } },
+      // HU-1708 · También si pidió cancelar con el pago de la renovación pendiente o ya suspendida: no se renueva.
+      where: { id: s.id, estado: { in: ['ACTIVA', 'PAGO_PENDIENTE', 'SUSPENDIDA'] }, cancelarAlFin: true, finPeriodo: { lte: ahora } },
       data: { estado: 'CANCELADA', canceladaEn: s.finPeriodo, planProgramadoId: null },
     });
     if (r.count === 0) return { estado: 'omitido', motivo: s.estado === 'CANCELADA' ? 'ya estaba cancelada' : !s.cancelarAlFin ? 'se reanudó' : 'el período no terminó' };
+    await tx.renovacion.updateMany({ where: { suscripcionId: s.id, estado: 'PENDIENTE' }, data: { estado: 'VENCIDA', proximoIntento: null } });
     await tx.auditoria.create({
       data: { organizacionId: s.organizacionId, usuarioId: null, accion: 'SUSCRIPCION_CANCELADA', entidad: 'Suscripcion', entidadId: s.id, datos: { finPeriodo: s.finPeriodo.toISOString(), planId: s.planId } },
     });
@@ -69,12 +77,28 @@ export async function procesarVencimiento(bd: PrismaClient, datos: DatosVencerSu
 
 export const esperaSuscripciones = (n: number, esperas: readonly number[] = ESPERAS_SUSCRIPCIONES_MS) => esperas[Math.min(Math.max(n, 1), esperas.length) - 1]!;
 
-/** El trabajador de la cola `suscripciones`. Las pruebas acortan las esperas. */
-export function crearTrabajadorSuscripciones(bd: PrismaClient, enviar: EnviarCorreo, opciones: { connection: ConnectionOptions; prefix: string; esperas?: readonly number[] }): Worker<DatosBienvenida | DatosVencerSuscripcion, ResultadoBienvenida | ResultadoVencimiento> {
+type DatosSuscripciones = DatosBienvenida | DatosVencerSuscripcion | DatosIntentoRenovacion | Record<string, never>;
+type ResultadoSuscripciones = ResultadoBienvenida | ResultadoVencimiento | ResumenCobranza | { estado: string };
+
+/**
+ * El trabajador de la cola `suscripciones`: la bienvenida, el vencimiento y (HU-1708) la cobranza periódica y el
+ * «Reintentar ahora». Las pruebas acortan las esperas y fijan el reloj y el entorno.
+ */
+export function crearTrabajadorSuscripciones(bd: PrismaClient, enviar: EnviarCorreo, opciones: {
+  connection: ConnectionOptions; prefix: string; esperas?: readonly number[];
+  encolarComprobante?: (cobroId: string) => Promise<unknown>; entorno?: EntornoSitio; webUrl?: string; ahora?: () => Date; precio?: PrecioDe;
+}): Worker<DatosSuscripciones, ResultadoSuscripciones> {
   const esperas = opciones.esperas ?? ESPERAS_SUSCRIPCIONES_MS;
-  return new Worker<DatosBienvenida | DatosVencerSuscripcion, ResultadoBienvenida | ResultadoVencimiento>(COLA_SUSCRIPCIONES, (job) => (job.name === TAREA_VENCER_SUSCRIPCION
-    ? procesarVencimiento(bd, job.data as DatosVencerSuscripcion)
-    : procesarBienvenida(bd, job.data as DatosBienvenida, enviar)), {
+  const reloj = opciones.ahora ?? (() => new Date());
+  const cobranza = (): OpcionesCobranza => ({
+    enviar, encolarComprobante: opciones.encolarComprobante ?? (async () => undefined), entorno: opciones.entorno, webUrl: opciones.webUrl, precio: opciones.precio,
+  });
+  return new Worker<DatosSuscripciones, ResultadoSuscripciones>(COLA_SUSCRIPCIONES, async (job) => {
+    if (job.name === TAREA_VENCER_SUSCRIPCION) return procesarVencimiento(bd, job.data as DatosVencerSuscripcion, reloj());
+    if (job.name === TAREA_RENOVAR_SUSCRIPCIONES) return renovarSuscripciones(bd, cobranza(), reloj());
+    if (job.name === TAREA_INTENTO_RENOVACION) return { estado: await intentoManual(bd, cobranza(), (job.data as DatosIntentoRenovacion).renovacionId, reloj()) };
+    return procesarBienvenida(bd, job.data as DatosBienvenida, enviar);
+  }, {
     connection: opciones.connection, prefix: opciones.prefix, concurrency: 4, settings: { backoffStrategy: (hechos: number) => esperaSuscripciones(hechos, esperas) },
   });
 }

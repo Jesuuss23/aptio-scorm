@@ -4,6 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
 import { BaseDatosModule } from './base-datos/base-datos.module.js';
 import { GuardaRoles } from './comun/guarda-roles.js';
+import { GuardaSuspension } from './comun/guarda-suspension.js';
 import { ClientesModule } from './clientes/clientes.module.js';
 import { CorreoModule } from './correo/correo.module.js';
 import { ExportacionesModule } from './exportaciones/exportaciones.module.js';
@@ -57,6 +58,7 @@ import { VentasModule } from './ventas/ventas.module.js';
     VentasModule,
     SitioModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],
+  // HU-1708 · Después de los roles: la cuenta suspendida queda en solo lectura.
+  providers: [{ provide: APP_GUARD, useClass: GuardaRoles }, { provide: APP_GUARD, useClass: GuardaSuspension }],
 })
 export class AppModule {}

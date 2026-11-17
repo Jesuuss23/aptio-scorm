@@ -1,6 +1,6 @@
 import { Estructura } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION, VEN_SITIO } from './api';
+import { api, type Cobranza, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION, VEN_SITIO } from './api';
 import { GRUPOS_SUPERADMIN, MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
 import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
@@ -35,6 +35,9 @@ import { CaptacionPopups } from './vistas/CaptacionPopups';
 import { VentasFacturacion } from './vistas/VentasFacturacion';
 import { VentasPasarelas } from './vistas/VentasPasarelas';
 import { VentasPlanes } from './vistas/VentasPlanes';
+import { VentasSuscripciones } from './vistas/VentasSuscripciones';
+import { CobranzaContexto, EVENTO_COBRANZA } from './cobranza';
+import { AvisoCobranza } from './vistas/AvisoCobranza';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -62,6 +65,19 @@ export function App() {
       setUsuario(null);
     });
   }, []);
+
+  // HU-1708 · El estado de cobranza de la organización: el aviso global y la solo lectura (no para el superadmin).
+  const [cobranzaPedida, setCobranza] = useState<Cobranza | null>(null);
+  const conOrganizacion = Boolean(usuario && !VEN_SITIO.includes(usuario.rol));
+  useEffect(() => {
+    if (!conOrganizacion) return;
+    let vigente = true;
+    const pedir = () => api.cobranza().then((c) => { if (vigente) setCobranza(c); }, () => undefined);
+    void pedir();
+    window.addEventListener(EVENTO_COBRANZA, pedir);
+    return () => { vigente = false; window.removeEventListener(EVENTO_COBRANZA, pedir); };
+  }, [conOrganizacion, usuario?.id]);
+  const cobranza = conOrganizacion ? cobranzaPedida : null;
 
   useEffect(() => {
     if (!veConexiones) return;
@@ -98,7 +114,9 @@ export function App() {
         ? [vista.grupo, 'Proyectos', titulo || 'Proyecto', vista.nombre]
         : [vista.grupo, vista.activo === '/' ? 'Proyectos' : 'Clientes y kits', titulo || vista.nombre]
       : [vista.grupo, vista.nombre];
-  const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol);
+  const soloLectura = cobranza?.estado === 'SUSPENDIDA';
+  // HU-1708 · Suspendida: sin «Nuevo SCORM» (la API responde 403 igual).
+  const puedeCrear = CREAN_PROYECTOS.includes(usuario.rol) && !soloLectura;
   const venCostos = VEN_COSTOS.includes(usuario.rol);
   const veOperacion = VEN_OPERACION.includes(usuario.rol);
   const veSitio = VEN_SITIO.includes(usuario.rol);
@@ -108,6 +126,7 @@ export function App() {
   // HU-1501 · El superadmin ve solo «Sitio web»; el resto de los roles nunca lo ve (CP-109).
   const menu = MENU.filter((g) => GRUPOS_SUPERADMIN.includes(g.nombre) === veSitio).map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion) && (i.ruta !== '/plan' || vePlan)) })).filter((g) => g.items.length);
   return (
+    <CobranzaContexto.Provider value={cobranza}>
     <Estructura
       menu={menu}
       rutaActual={vista?.activo ?? camino}
@@ -117,6 +136,7 @@ export function App() {
       alSalir={salir}
       pie={veConexiones && conexiones ? <MedidorCostoIA resumen={conexiones} /> : null}
     >
+      <AvisoCobranza cobranza={cobranza} />
       {vista?.sub === 'editor-pagina' && veSitio ? (
         <EditorPaginaSitio key={vista.id + busqueda} paginaId={vista.id!} nueva={new URLSearchParams(busqueda).has('nueva')} pestanaInicial={new URLSearchParams(busqueda).has('seo') ? 'seo' : 'pagina'} />
       ) : vista?.sub === 'vista-previa' ? (
@@ -163,6 +183,8 @@ export function App() {
         <CaptacionLeads />
       ) : vista?.activo === '/ventas/planes' && veSitio ? (
         <VentasPlanes />
+      ) : vista?.activo === '/ventas/suscripciones' && veSitio ? (
+        <VentasSuscripciones />
       ) : vista?.activo === '/ventas/pasarelas' && veSitio ? (
         <VentasPasarelas />
       ) : vista?.activo === '/ventas/facturacion' && veSitio ? (
@@ -194,5 +216,6 @@ export function App() {
         </div>
       )}
     </Estructura>
+    </CobranzaContexto.Provider>
   );
 }

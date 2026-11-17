@@ -3,10 +3,13 @@
 // la suscripción (formulario simulado en pruebas, página alojada de Stripe que vuelve a /plan?cambio=, o Culqi Checkout)
 // y rige de inmediato; la bajada queda programada para la renovación. «Cancelar al fin del período» con confirmación y
 // «Seguir con mi plan». La tarjeta nunca pasa por Aptio SCORM.
+// HU-1708 · Con el pago de la renovación pendiente o la cuenta suspendida, «Pagar ahora» con el total y la fecha de la
+// suspensión; la página alojada vuelve a /plan?renovacion=.
 import { Cabecera } from '@aptio/ui';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { api, type CambioPlan, type CuotaCapsulas, ErrorApi, type PagoCompra, type PlanOpcion, type SuscripcionOrg } from '../api';
+import { api, type CambioPlan, type CuotaCapsulas, ErrorApi, type PagoCompra, type PagoRenovacion, type PlanOpcion, type SuscripcionOrg } from '../api';
+import { avisarCobranza } from '../cobranza';
 import { IndicadorCuota } from './CuotaCapsulas';
 import { cargarCulqi, mensajeDe } from './pagos';
 
@@ -53,20 +56,20 @@ function ResumenCambio({ cambio, ocupado, alConfirmar, alVolver }: { cambio: Cam
 }
 
 /** El pago de la diferencia con la pasarela de pruebas. */
-function PagoPrueba({ cambio, ocupado, error, alPagar, alVolver }: { cambio: CambioPlan; ocupado: boolean; error: string; alPagar: (tarjeta: string) => void; alVolver: () => void }) {
+function PagoPrueba({ total, etiqueta, ocupado, error, alPagar, alVolver }: { total: string; etiqueta: string; ocupado: boolean; error: string; alPagar: (tarjeta: string) => void; alVolver: () => void }) {
   const id = useId();
   const [tarjeta, setTarjeta] = useState('');
   const campo = useRef<HTMLInputElement>(null);
   useEffect(() => campo.current?.focus(), []);
   return (
-    <form className="tarjeta compra-pago" aria-label="Pago del cambio de plan" onSubmit={(e) => { e.preventDefault(); alPagar(tarjeta); }}>
+    <form className="tarjeta compra-pago" aria-label={etiqueta} onSubmit={(e) => { e.preventDefault(); alPagar(tarjeta); }}>
       <label className="campo" htmlFor={`${id}-tarjeta`}>
         Tarjeta de prueba
         <input ref={campo} id={`${id}-tarjeta`} inputMode="numeric" autoComplete="off" value={tarjeta} onChange={(e) => setTarjeta(e.target.value)} aria-describedby={`${id}-ayuda`} aria-invalid={error ? true : undefined} />
       </label>
       <p id={`${id}-ayuda`} className="sec">Pasarela de pruebas, no cobra: 4111 1111 1111 1111 aprueba y 4000 0000 0000 0002 rechaza.</p>
       <div className="acciones-form">
-        <button className="boton primario" type="submit" disabled={ocupado}>Pagar {monto2(cambio.total, cambio.moneda)}</button>
+        <button className="boton primario" type="submit" disabled={ocupado}>Pagar {total}</button>
         <button className="boton" type="button" disabled={ocupado} onClick={alVolver}>Volver</button>
       </div>
     </form>
@@ -77,7 +80,7 @@ export function PlanSuscripcion() {
   // La vuelta de la página alojada (`?cambio=` y, si se canceló, `&cancelado=1`) se lee una sola vez, al montar.
   const [vuelta] = useState(() => {
     const q = new URLSearchParams(window.location.search);
-    return { cambio: q.get('cambio'), cancelado: Boolean(q.get('cancelado')) };
+    return { cambio: q.get('cambio'), renovacion: q.get('renovacion'), cancelado: Boolean(q.get('cancelado')) };
   });
   const [s, setS] = useState<SuscripcionOrg | null>(null);
   const [cuota, setCuota] = useState<CuotaCapsulas | null>(null);
@@ -86,7 +89,11 @@ export function PlanSuscripcion() {
   const [pagando, setPagando] = useState<CambioPlan | null>(null);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   const [ocupado, setOcupado] = useState(false);
-  const [aviso, setAviso] = useState(() => !vuelta.cambio ? '' : vuelta.cancelado ? 'Cancelaste el pago: tu plan no cambió.' : 'Confirmando el pago del cambio de plan…');
+  const [aviso, setAviso] = useState(() => vuelta.renovacion && !vuelta.cambio
+    ? (vuelta.cancelado ? 'Cancelaste el pago: la renovación sigue pendiente.' : '')
+    : !vuelta.cambio ? '' : vuelta.cancelado ? 'Cancelaste el pago: tu plan no cambió.' : 'Confirmando el pago del cambio de plan…');
+  // HU-1708 · «Pagar ahora» la renovación con la pasarela de pruebas.
+  const [pagandoRenovacion, setPagandoRenovacion] = useState(false);
   const [error, setError] = useState('');
   const vivo = useRef(true);
 
@@ -117,16 +124,47 @@ export function PlanSuscripcion() {
     if (vivo.current) setAviso('El pago sigue en revisión: tu plan cambia solo cuando la pasarela lo confirme.');
   }, [terminar]);
 
+  /** HU-1708 · Terminó el pago de la renovación: aprobado, la cuenta vuelve a la normalidad; rechazado, el motivo. */
+  const terminarRenovacion = useCallback((r: PagoRenovacion) => {
+    setPagandoRenovacion(false);
+    setS(r.suscripcion);
+    if (r.renovacion.estado === 'APROBADA') {
+      setError('');
+      setAviso(`Listo: pagaste la renovación de ${monto2(r.renovacion.total, r.renovacion.moneda)}. Tu plan sigue activo hasta el ${fechaLarga(r.suscripcion.finPeriodo)}.`);
+      avisarCobranza();
+    } else if (r.renovacion.motivoRechazo) { setAviso(''); setError(r.renovacion.motivoRechazo); }
+  }, []);
+
+  /** Tras la página alojada o el formulario de Culqi: espera a que el webhook confirme la renovación. */
+  const esperarRenovacion = useCallback(async () => {
+    setAviso('Confirmando el pago de la renovación…');
+    for (let i = 0; i < CONSULTAS && vivo.current; i++) {
+      const sus = await api.suscripcion();
+      if (sus.estado === 'ACTIVA' || sus.estado === 'CANCELADA') {
+        setS(sus);
+        setAviso(`Listo: pagaste la renovación. Tu plan sigue activo hasta el ${fechaLarga(sus.finPeriodo)}.`);
+        avisarCobranza();
+        return;
+      }
+      await new Promise((r) => setTimeout(r, CONSULTA_MS));
+    }
+    if (vivo.current) setAviso('El pago sigue en revisión: la cuenta se reactiva sola cuando la pasarela lo confirme.');
+  }, []);
+
   useEffect(() => {
     vivo.current = true;
     void recargar();
+    if (vuelta.renovacion && !vuelta.cambio) {
+      window.history.replaceState(window.history.state, '', window.location.pathname);
+      if (!vuelta.cancelado) Promise.resolve().then(esperarRenovacion).catch(() => setAviso(''));
+    }
     if (vuelta.cambio) {
       window.history.replaceState(window.history.state, '', window.location.pathname);
       // La consulta empieza tras el montaje: los estados cambian solo cuando responde la API.
       if (!vuelta.cancelado) Promise.resolve(vuelta.cambio).then(esperar).catch(() => setAviso(''));
     }
     return () => { vivo.current = false; };
-  }, [recargar, esperar, vuelta]);
+  }, [recargar, esperar, esperarRenovacion, vuelta]);
 
   async function ver(p: PlanOpcion) {
     setOcupado(true);
@@ -194,6 +232,50 @@ export function PlanSuscripcion() {
     }
   }
 
+  async function pagarAhora() {
+    setOcupado(true);
+    setError('');
+    setAviso('');
+    try {
+      const r = await api.pagarRenovacion();
+      const pago = r.pago;
+      if (!pago || pago.tipo === 'simulado') setPagandoRenovacion(true);
+      else if (pago.tipo === 'redireccion') window.location.assign(pago.url);
+      else {
+        const C = await cargarCulqi();
+        if (!C) return setError('No se pudo abrir la ventana de pago: intenta de nuevo en unos minutos');
+        C.publicKey = pago.llavePublica;
+        C.settings({ title: 'Aptio SCORM', currency: pago.moneda, amount: pago.montoCentimos, description: pago.descripcion });
+        Object.assign(window, { culqi: () => {
+          if (C.token?.id) {
+            const token = C.token.id;
+            C.close?.();
+            setOcupado(true);
+            api.tokenRenovacion(token).then(() => esperarRenovacion(), (e: unknown) => setError(mensajeDe(e, 'La pasarela no pudo procesar el pago'))).finally(() => setOcupado(false));
+          } else if (C.error) setError(C.error.user_message ?? 'La pasarela no pudo procesar el pago');
+        } });
+        C.open();
+      }
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo iniciar el pago'));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function pagarPruebaRenovacion(tarjeta: string) {
+    if (!tarjeta.replace(/\D/g, '')) return setError('Escribe la tarjeta de prueba');
+    setOcupado(true);
+    setError('');
+    try {
+      terminarRenovacion(await api.pagarPruebaRenovacion(tarjeta));
+    } catch (e) {
+      setError(mensajeDe(e, 'No se pudo pagar'));
+    } finally {
+      setOcupado(false);
+    }
+  }
+
   async function accion(hacer: () => Promise<SuscripcionOrg>, mensaje: (x: SuscripcionOrg) => string) {
     setOcupado(true);
     setError('');
@@ -224,6 +306,7 @@ export function PlanSuscripcion() {
             <p>{cuotaDe(s.plan.capsulasMes)} · {monto2(s.precioPactadoSinIgv, s.moneda)} {porCiclo(s.ciclo)} sin IGV ({s.ciclo === 'ANUAL' ? 'pago anual' : 'pago mensual'})</p>
             <p className="sec">
               {cancelada ? `Tu suscripción terminó el ${fechaLarga(s.canceladaEn ?? s.finPeriodo)}.`
+                : s.renovacion ? `El período terminó el ${fechaLarga(s.finPeriodo)}: falta pagar la renovación.`
                 : s.cancelarAlFin ? `Tu suscripción termina el ${fechaLarga(s.finPeriodo)}.`
                   : `Se renueva el ${fechaLarga(s.finPeriodo)}.`}
             </p>
@@ -238,13 +321,37 @@ export function PlanSuscripcion() {
               </div>
             ) : null}
           </section>
+          {s.renovacion ? (
+            <section className="tarjeta renovacion-pago" aria-labelledby="renovacion-pago">
+              <h2 id="renovacion-pago">{s.estado === 'SUSPENDIDA' ? 'Reactiva tu cuenta' : 'Paga la renovación'}</h2>
+              <p>
+                {s.estado === 'SUSPENDIDA'
+                  ? `Tu cuenta está en solo lectura desde el ${fechaLarga(s.renovacion.suspensionEn)}. Al pagar, vuelve a la normalidad y el período nuevo empieza ese día.`
+                  : `Tu período terminó el ${fechaLarga(s.renovacion.periodoInicio)}. Si no pagas antes del ${fechaLarga(s.renovacion.suspensionEn)}, la cuenta queda en solo lectura.`}
+              </p>
+              <dl className="desglose">
+                <div><dt>Plan {s.renovacion.plan.nombre} ({s.ciclo === 'ANUAL' ? 'anual' : 'mensual'})</dt><dd>{monto2(s.renovacion.montoSinIgv, s.renovacion.moneda)}</dd></div>
+                <div><dt>IGV (18 %)</dt><dd>{monto2(s.renovacion.igv, s.renovacion.moneda)}</dd></div>
+                <div className="total"><dt>Total a pagar</dt><dd>{monto2(s.renovacion.total, s.renovacion.moneda)}</dd></div>
+              </dl>
+              {s.renovacion.motivoRechazo ? <p className="sec">Último intento rechazado: {s.renovacion.motivoRechazo}.</p> : null}
+              {pagandoRenovacion ? (
+                <PagoPrueba total={monto2(s.renovacion.total, s.renovacion.moneda)} etiqueta="Pago de la renovación" ocupado={ocupado} error={error} alPagar={(t) => void pagarPruebaRenovacion(t)} alVolver={() => setPagandoRenovacion(false)} />
+              ) : (
+                <div className="acciones-form">
+                  <button className="boton primario" type="button" disabled={ocupado || !s.pagoDisponible} onClick={() => void pagarAhora()}>Pagar ahora {monto2(s.renovacion.total, s.renovacion.moneda)}</button>
+                </div>
+              )}
+              {!s.pagoDisponible ? <p className="sec">El pago en línea no está disponible ahora: escríbenos para regularizar tu cuenta.</p> : null}
+            </section>
+          ) : null}
           {cuota ? <IndicadorCuota cuota={cuota} /> : null}
 
           {pagando ? (
-            <PagoPrueba cambio={pagando} ocupado={ocupado} error={error} alPagar={(t) => void pagarPrueba(t)} alVolver={() => setPagando(null)} />
+            <PagoPrueba total={monto2(pagando.total, pagando.moneda)} etiqueta="Pago del cambio de plan" ocupado={ocupado} error={error} alPagar={(t) => void pagarPrueba(t)} alVolver={() => setPagando(null)} />
           ) : resumen ? (
             <ResumenCambio cambio={resumen} ocupado={ocupado} alConfirmar={() => void confirmar()} alVolver={() => setResumen(null)} />
-          ) : !cancelada ? (
+          ) : !cancelada && !s.renovacion ? (
             <section className="tarjeta" aria-labelledby="cambiar-plan">
               <h2 id="cambiar-plan">Cambiar de plan</h2>
               <p className="sec">Subir de plan rige hoy y pagas solo la diferencia por los días que faltan. Bajar de plan rige al renovar, sin cobro ni devolución.</p>
@@ -265,7 +372,7 @@ export function PlanSuscripcion() {
             </section>
           ) : null}
 
-          {!cancelada && !s.cancelarAlFin && !pagando && !resumen ? (
+          {!cancelada && !s.cancelarAlFin && !pagando && !resumen && !pagandoRenovacion ? (
             <section className="tarjeta" aria-labelledby="cancelar-suscripcion">
               <h2 id="cancelar-suscripcion">Cancelar la suscripción</h2>
               {confirmarCancelar ? (

@@ -11,6 +11,7 @@
 import { BadGatewayException, ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, type OnModuleDestroy, UnprocessableEntityException } from '@nestjs/common';
 import { COLA_SUSCRIPCIONES, type DatosVencerSuscripcion, idTareaVencer, opcionesRedis, opcionesTareaVencer, prefijoColas, TAREA_VENCER_SUSCRIPCION } from '@aptio/colas';
 import { type Prisma, ultimaVersion } from '@aptio/db';
+import { precioCicloPublicado } from '@aptio/schema/cobranza';
 import { diasDelPeriodo, prorrateo, type TipoCambio, validarCambio } from '@aptio/schema/cambio-plan';
 import type { PlanPublico } from '@aptio/schema/planes';
 import { planesServidos } from '@aptio/schema/sitio-versiones';
@@ -21,6 +22,7 @@ import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
 import type { CambioPlanDto, PlanBreveDto, PlanOpcionDto, SuscripcionOrgDto } from './cambio-plan.dto.js';
+import { aRenovacionDto, renovacionAbierta } from './cobranza.comun.js';
 import { CuotasService, estaCancelada } from './cuotas.service.js';
 import type { PagoCreado } from './pasarelas/contrato.js';
 import { PasarelasService } from './pasarelas.service.js';
@@ -38,11 +40,7 @@ const breve = (p: FilaPlan): PlanBreveDto => ({ slug: p.slug, nombre: p.nombre, 
 const noValido = (campo: string, mensaje: string) => new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje, detalles: [{ campo, mensaje }] });
 
 /** El precio publicado de un plan por el ciclo y la moneda de la suscripción, sin IGV (null si no se cobra así). */
-function precioCiclo(p: PlanPublico, ciclo: string, mon: Moneda): number | null {
-  if (p.aMedida) return null;
-  if (ciclo === 'ANUAL') return mon === 'USD' ? p.precioAnualUsd : p.precioAnual;
-  return mon === 'USD' ? p.precioMesUsd : p.precioMes;
-}
+const precioCiclo = precioCicloPublicado;
 
 /** Lo que devuelve el webhook al procesar el pago de un cambio: si era repetido y el cobro que dejó. */
 export interface ResultadoCambio { duplicado: boolean; cobroId: string | null }
@@ -87,8 +85,11 @@ export class CambioPlanService implements OnModuleDestroy {
       const actual = p.slug === s.plan.slug;
       return { slug: p.slug, nombre: p.nombre, capsulasMes: p.capsulasMes, precioCiclo: precio, actual, tipo: actual || precio === null ? null : precio > s.precioPactadoSinIgv ? 'SUBIDA' : 'BAJADA' };
     });
+    // HU-1708 · Con el pago de la renovación pendiente o ya suspendida, la renovación que falta pagar.
+    const renovacion = s.estado === 'PAGO_PENDIENTE' || s.estado === 'SUSPENDIDA' ? await renovacionAbierta(this.bd, s.id) : null;
     return {
-      plan: breve(s.plan), ciclo: s.ciclo, precioPactadoSinIgv: s.precioPactadoSinIgv, moneda: mon, estado: estaCancelada(s, ahora) ? 'CANCELADA' : 'ACTIVA',
+      plan: breve(s.plan), ciclo: s.ciclo, precioPactadoSinIgv: s.precioPactadoSinIgv, moneda: mon, estado: estaCancelada(s, ahora) ? 'CANCELADA' : s.estado,
+      renovacion: renovacion && !estaCancelada(s, ahora) ? aRenovacionDto(renovacion) : null,
       inicioPeriodo: s.inicioPeriodo.toISOString(), finPeriodo: s.finPeriodo.toISOString(), cancelarAlFin: s.cancelarAlFin, canceladaEn: s.canceladaEn?.toISOString() ?? null,
       planProgramado: s.planProgramado ? breve(s.planProgramado) : null, planes, pagoDisponible: Boolean(await this.cuotas.pasarelaPara(s)),
     };

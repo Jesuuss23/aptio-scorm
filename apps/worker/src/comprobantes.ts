@@ -111,21 +111,26 @@ const CON_COBRO = {
   solicitud: { include: { plan: true } },
   compraCapsulas: true,
   cambioPlan: { include: { planOrigen: true, planDestino: true } },
+  renovacion: { include: { plan: true, suscripcion: true } },
   suscripcion: { include: { solicitud: true } },
 } as const;
 type CobroCompleto = Prisma.CobroGetPayload<{ include: typeof CON_COBRO }>;
+
+const dia = (d: Date) => new Intl.DateTimeFormat('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Lima' }).format(d);
 
 /** Lo que se cobró, en una línea. */
 export function descripcionDe(c: CobroCompleto): string {
   if (c.solicitud) return `Suscripción ${c.solicitud.plan.nombre} de Aptio SCORM (${c.solicitud.ciclo === 'ANUAL' ? 'anual' : 'mensual'})`;
   if (c.compraCapsulas) return `${c.compraCapsulas.cantidad} ${c.compraCapsulas.cantidad === 1 ? 'cápsula adicional' : 'cápsulas adicionales'} de Aptio SCORM`;
   if (c.cambioPlan) return `Cambio de plan de ${c.cambioPlan.planOrigen.nombre} a ${c.cambioPlan.planDestino.nombre} (${c.cambioPlan.diasRestantes} de ${c.cambioPlan.diasPeriodo} días)`;
+  // HU-1708 · La renovación: el plan, el ciclo y el período que paga.
+  if (c.renovacion) return `Renovación ${c.renovacion.plan.nombre} de Aptio SCORM (${c.renovacion.suscripcion.ciclo === 'ANUAL' ? 'anual' : 'mensual'}, ${dia(c.renovacion.periodoInicio)} al ${dia(c.renovacion.periodoFin)})`;
   return 'Servicio de Aptio SCORM';
 }
 
 /** El receptor: la solicitud del cobro o la de la suscripción de su organización; sin solicitud, la organización. */
 async function receptorDe(bd: PrismaClient, c: CobroCompleto) {
-  const organizacionId = c.suscripcion?.organizacionId ?? c.compraCapsulas?.organizacionId ?? c.cambioPlan?.organizacionId ?? c.solicitud?.organizacionId ?? null;
+  const organizacionId = c.suscripcion?.organizacionId ?? c.compraCapsulas?.organizacionId ?? c.cambioPlan?.organizacionId ?? c.renovacion?.organizacionId ?? c.solicitud?.organizacionId ?? null;
   let sol = c.solicitud ?? c.suscripcion?.solicitud ?? null;
   if (!sol && organizacionId) sol = (await bd.suscripcion.findUnique({ where: { organizacionId }, include: { solicitud: true } }))?.solicitud ?? null;
   const org = organizacionId ? await bd.organizacion.findUnique({ where: { id: organizacionId } }) : null;

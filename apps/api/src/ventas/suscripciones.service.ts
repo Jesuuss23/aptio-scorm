@@ -5,7 +5,7 @@ import {
   COLA_COMPROBANTES, COLA_SUSCRIPCIONES, type DatosBienvenida, type DatosComprobante, opcionesRedis, opcionesTareaBienvenida, opcionesTareaComprobante, prefijoColas, TAREA_BIENVENIDA,
   TAREA_EMITIR_COMPROBANTE,
 } from '@aptio/colas';
-import { Prisma, ultimaVersion } from '@aptio/db';
+import { Prisma, resolverPagoRenovacion, ultimaVersion } from '@aptio/db';
 import { CATALOGO_PASARELAS, esCodigoPasarela } from '@aptio/schema/pasarelas';
 import { CAMPO_TRAMPA, type EnvioLead, validarEnvioLead } from '@aptio/schema/leads';
 import { planesServidos } from '@aptio/schema/sitio-versiones';
@@ -25,6 +25,8 @@ import { firmar, type PasarelaPruebas } from './pasarelas/pruebas.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import type { CambioPlanDto } from './cambio-plan.dto.js';
 import { CambioPlanService } from './cambio-plan.service.js';
+import type { PagoRenovacionDto } from './cobranza.dto.js';
+import { CobranzaService } from './cobranza.service.js';
 import type { CompraCapsulasDto } from './cuotas.dto.js';
 import { CuotasService } from './cuotas.service.js';
 import { PasarelasService } from './pasarelas.service.js';
@@ -64,7 +66,7 @@ export class SuscripcionesService implements OnModuleDestroy {
   /** El último encolado de la bienvenida y del comprobante (las pruebas lo esperan; la respuesta a la pasarela no). */
   ultimoEncolado: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService, private readonly cambios: CambioPlanService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService, private readonly cambios: CambioPlanService, private readonly cobranza: CobranzaService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -275,6 +277,35 @@ export class SuscripcionesService implements OnModuleDestroy {
     return this.cambios.cambio(u, id);
   }
 
+  /** HU-1708 · «Pagar ahora» la renovación con la pasarela de pruebas (solo en `pruebas`). */
+  async pagarPruebaRenovacion(u: UsuarioSesion, tarjeta: unknown): Promise<PagoRenovacionDto> {
+    const numero = await this.tarjetaPrueba(tarjeta);
+    const { renovacion: r } = await this.cobranza.buscarRenovacion(u);
+    if (r.pasarela !== PASARELA_PRUEBA) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La renovación no se paga con la pasarela de pruebas' });
+    await this.simularPago(r.id, numero, Number(r.total), r.moneda);
+    return this.cobranza.pagoDto(u, r.id);
+  }
+
+  /** HU-1708 · El token de Culqi Checkout para la renovación: la pasarela crea el cargo; se aplica con el webhook. */
+  async enviarTokenRenovacion(u: UsuarioSesion, token: unknown): Promise<PagoRenovacionDto> {
+    const { suscripcion: s, renovacion: r } = await this.cobranza.buscarRenovacion(u);
+    if (!esCodigoPasarela(r.pasarela) || CATALOGO_PASARELAS[r.pasarela].flujo !== 'formulario') throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La renovación no se paga con un formulario' });
+    if (typeof token !== 'string' || !token.trim()) throw noValido([{ campo: 'token', mensaje: 'Falta el token de la pasarela' }]);
+    const config = await this.pasarelas.config(r.pasarela);
+    if (!config || !this.pasarelas.activa(config)) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La pasarela no está disponible' });
+    const usuario = await this.bd.usuario.findUniqueOrThrow({ where: { id: u.id }, select: { email: true } });
+    try {
+      await this.pasarelas.adaptador(config.codigo).crearPago(config.modo, {
+        solicitudId: r.id, monto: Number(r.total), moneda: r.moneda === 'USD' ? 'USD' : 'PEN', descripcion: `Aptio SCORM · Renovación ${r.plan.nombre} (${s.ciclo === 'ANUAL' ? 'anual' : 'mensual'})`,
+        correo: usuario.email, urlExito: '', urlCancelado: '', token: token.trim(),
+      });
+    } catch (err) {
+      const motivo = err instanceof ErrorPasarela ? err.motivo : null;
+      throw new HttpException({ codigo: 'PAGO_RECHAZADO', mensaje: motivo ?? 'La pasarela no pudo procesar el pago: revisa la tarjeta o intenta de nuevo' }, HttpStatus.PAYMENT_REQUIRED);
+    }
+    return this.cobranza.pagoDto(u, r.id);
+  }
+
   /**
    * HU-1704 · El token de un solo uso del formulario incrustado de la pasarela (Culqi Checkout): con él, la pasarela crea
    * el cargo. La solicitud sigue pendiente hasta que llegue el webhook firmado (RN-18-3). 404 si el pago no existe o su
@@ -338,11 +369,20 @@ export class SuscripcionesService implements OnModuleDestroy {
         if (await tx.cobro.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
         if (await tx.compraCapsulas.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
         if (await tx.cambioPlan.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
+        if (await tx.renovacion.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
         const s = await tx.solicitudSuscripcion.findUnique({ where: { id: ev.solicitudId } });
         if (!s) {
           // HU-1705 · El mismo webhook acredita las compras de cápsulas adicionales (su id va donde iría el de la solicitud).
           const compra = await tx.compraCapsulas.findUnique({ where: { id: ev.solicitudId } });
           if (!compra) {
+            // HU-1708 · …las renovaciones (reactiva la cuenta y extiende el período)…
+            const renovacion = await tx.renovacion.findUnique({ where: { id: ev.solicitudId } });
+            if (renovacion) {
+              if (renovacion.pasarela !== pasarela) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });
+              const r = await resolverPagoRenovacion(tx, renovacion.id, { pasarela, ...ev }, ahora);
+              cobroId = r.cobroId;
+              return r.duplicado;
+            }
             // HU-1706 · …y aplica las subidas de plan con su diferencia prorrateada.
             const cambio = await tx.cambioPlan.findUnique({ where: { id: ev.solicitudId } });
             if (!cambio || cambio.pasarela !== pasarela) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });

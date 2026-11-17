@@ -2,6 +2,7 @@
 import { Cabecera } from '@aptio/ui';
 import { ESTADOS_PROYECTO, NOMBRE_ESTADO } from '@aptio/schema/proyecto';
 import { useEffect, useState } from 'react';
+import { useSoloLectura } from '../cobranza';
 import { api, type Cliente, CREAN_PROYECTOS, ErrorApi, type Proyecto, type Rol } from '../api';
 import { usd } from '../formato';
 import { navegar } from '../ruta';
@@ -16,7 +17,9 @@ export function Proyectos({ rol }: { rol: Rol }) {
   const [estado, setEstado] = useState('');
   const [buscar, setBuscar] = useState('');
   const [error, setError] = useState('');
-  const puedeCrear = CREAN_PROYECTOS.includes(rol);
+  // HU-1708 · Con la cuenta suspendida no se crean proyectos.
+  const soloLectura = useSoloLectura();
+  const puedeCrear = CREAN_PROYECTOS.includes(rol) && !soloLectura;
   const filtrando = Boolean(clienteId || estado || buscar);
 
   useEffect(() => {

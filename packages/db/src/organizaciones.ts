@@ -37,6 +37,8 @@ export const TABLAS_ORGANIZACION = [
   { tabla: 'CambioPlan', opcional: false },
   // HU-1707 · Comprobantes SUNAT (sin organización si el cobro no dio de alta una cuenta).
   { tabla: 'Comprobante', opcional: true },
+  // HU-1708 · Renovaciones de cada período.
+  { tabla: 'Renovacion', opcional: false },
 ] as const;
 export type TablaOrganizacion = (typeof TABLAS_ORGANIZACION)[number]['tabla'];
 
@@ -64,6 +66,7 @@ const REGLAS: { regla: string; sql: string }[] = [
   { regla: 'ConsumoCapsula: suscripción de otra organización', sql: `SELECT count(*) FROM "ConsumoCapsula" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
   { regla: 'CompraCapsulas: suscripción de otra organización', sql: `SELECT count(*) FROM "CompraCapsulas" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
   { regla: 'CambioPlan: suscripción de otra organización', sql: `SELECT count(*) FROM "CambioPlan" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
+  { regla: 'Renovacion: suscripción de otra organización', sql: `SELECT count(*) FROM "Renovacion" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
   { regla: 'Comprobante: cobro de otra organización', sql: `SELECT count(*) FROM "Comprobante" x JOIN "Cobro" c ON c."id" = x."cobroId" JOIN "Suscripcion" s ON s."id" = c."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
 ];
 

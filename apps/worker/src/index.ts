@@ -5,6 +5,7 @@ config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
   COLA_AGENDA, COLA_COMPROBANTES, COLA_CRM, COLA_SUSCRIPCIONES, COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
   type DatosPrerender, idPrerender, idRehacerPrerender, TAREA_PRERENDER, CADA_BLOG_MS, type DatosBlog, TAREA_BLOG,
+  CADA_RENOVAR_MS, type DatosComprobante, opcionesTareaComprobante, TAREA_EMITIR_COMPROBANTE, TAREA_RENOVAR_SUSCRIPCIONES,
 } from '@aptio/colas';
 import { sincronizarBlog } from './blog.js';
 import { crearTrabajadorCrm } from './crm.js';
@@ -184,9 +185,15 @@ crm.on('failed', (job, err) => console.error(`[${COLA_CRM}] el envío ${job?.dat
 const agenda = crearTrabajadorAgenda(prisma, correoDesdeEntorno(process.env), { sitioUrl: opcionesRenderDesdeEnv().sitioUrl, connection: opcionesRedis(), prefix: prefijoColas() });
 agenda.on('failed', (job, err) => console.error(`[${COLA_AGENDA}] el aviso ${job?.data.aviso} de la cita ${job?.data.citaId} no salió (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 // HU-1703 · El correo de bienvenida de una suscripción pagada, con reintentos si falla el SMTP (CP-143).
-const suscripciones = crearTrabajadorSuscripciones(prisma, correoDesdeEntorno(process.env), { connection: opcionesRedis(), prefix: prefijoColas() });
+// HU-1708 · …y la cobranza: la tarea periódica `renovar-suscripciones` y el comprobante de cada renovación cobrada.
+const colaComprobantes = new Queue<DatosComprobante>(COLA_COMPROBANTES, { connection: opcionesRedis(), prefix: prefijoColas() });
+const suscripciones = crearTrabajadorSuscripciones(prisma, correoDesdeEntorno(process.env), {
+  connection: opcionesRedis(), prefix: prefijoColas(), encolarComprobante: (cobroId) => colaComprobantes.add(TAREA_EMITIR_COMPROBANTE, { cobroId }, opcionesTareaComprobante(cobroId)),
+});
+const colaSuscripciones = new Queue(COLA_SUSCRIPCIONES, { connection: opcionesRedis(), prefix: prefijoColas() });
+await colaSuscripciones.upsertJobScheduler(TAREA_RENOVAR_SUSCRIPCIONES, { every: CADA_RENOVAR_MS }, { name: TAREA_RENOVAR_SUSCRIPCIONES, data: {} });
 // HU-1706 · En la misma cola, el vencimiento de las suscripciones canceladas al fin del período.
-suscripciones.on('failed', (job, err) => console.error(`[${COLA_SUSCRIPCIONES}] ${job && 'suscripcionId' in job.data ? `el vencimiento de la suscripción ${job.data.suscripcionId}` : `la bienvenida de la solicitud ${job && 'solicitudId' in job.data ? job.data.solicitudId : '?'}`} falló (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
+suscripciones.on('failed', (job, err) => console.error(`[${COLA_SUSCRIPCIONES}] ${job?.name === TAREA_RENOVAR_SUSCRIPCIONES ? 'la cobranza periódica' : job && 'renovacionId' in job.data ? `el intento de la renovación ${job.data.renovacionId}` : job && 'suscripcionId' in job.data ? `el vencimiento de la suscripción ${job.data.suscripcionId}` : `la bienvenida de la solicitud ${job && 'solicitudId' in job.data ? job.data.solicitudId : '?'}`} falló (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 // HU-1707 · El comprobante SUNAT de cada cobro (y la nota de crédito de su reembolso) con el OSE elegido (DA-09).
 const comprobantes = crearTrabajadorComprobantes(prisma, {
   proveedores: proveedoresOseDesdeEntorno(process.env), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime), enviar: correoDesdeEntorno(process.env),
@@ -211,7 +218,7 @@ for (const t of trabajadores) {
 console.log(`Worker escuchando las colas ${[...COLAS, COLA_MANTENIMIENTO, COLA_CRM, COLA_AGENDA, COLA_SUSCRIPCIONES].join(', ')} en ${opcionesRedis().host}:${opcionesRedis().port}`);
 
 async function cerrar() {
-  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close(), crm.close(), agenda.close(), suscripciones.close(), comprobantes.close()]);
+  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close(), crm.close(), agenda.close(), suscripciones.close(), comprobantes.close(), colaComprobantes.close(), colaSuscripciones.close()]);
   await cerrarOcr();
   redis.disconnect();
   await prisma.$disconnect();

@@ -17,20 +17,40 @@ export class PlanBreveDto {
   @ApiProperty({ type: Number, nullable: true, example: 8 }) capsulasMes: number | null;
 }
 
+/** HU-1708 · La renovación de un período (REQ-088, RN-18-8): el monto, los intentos y cuándo se suspende. */
+export class RenovacionDto {
+  @ApiProperty({ format: 'uuid' }) id: string;
+  @ApiProperty({ enum: ['PENDIENTE', 'APROBADA', 'VENCIDA'], description: 'VENCIDA: llegó el día 10 sin pago y la suscripción quedó suspendida (se puede pagar igual)' }) estado: 'PENDIENTE' | 'APROBADA' | 'VENCIDA';
+  @ApiProperty({ type: PlanBreveDto, description: 'El plan que se renueva (con la bajada programada ya aplicada)' }) plan: PlanBreveDto;
+  @ApiProperty({ format: 'date-time' }) periodoInicio: string;
+  @ApiProperty({ format: 'date-time' }) periodoFin: string;
+  @ApiProperty({ example: 1290 }) montoSinIgv: number;
+  @ApiProperty({ example: 232.2 }) igv: number;
+  @ApiProperty({ example: 1522.2 }) total: number;
+  @ApiProperty({ enum: ['PEN', 'USD'] }) moneda: 'PEN' | 'USD';
+  @ApiProperty({ example: 'pruebas' }) pasarela: string;
+  @ApiProperty({ example: 1, description: 'Intentos hechos (0 a 4: días 0, 1, 3 y 7)' }) intentos: number;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'El siguiente intento o, hechos los 4, la suspensión' }) proximoIntento: string | null;
+  @ApiProperty({ format: 'date-time', description: 'El día 10: la cuenta queda en solo lectura si no paga antes' }) suspensionEn: string;
+  @ApiProperty({ type: String, nullable: true }) motivoRechazo: string | null;
+}
+
 /** HU-1706 · La suscripción de la organización (REQ-086). */
 export class SuscripcionOrgDto {
   @ApiProperty({ type: PlanBreveDto }) plan: PlanBreveDto;
   @ApiProperty({ enum: ['MENSUAL', 'ANUAL'] }) ciclo: 'MENSUAL' | 'ANUAL';
   @ApiProperty({ example: 490, description: 'Sin IGV, por el ciclo' }) precioPactadoSinIgv: number;
   @ApiProperty({ enum: ['PEN', 'USD'] }) moneda: 'PEN' | 'USD';
-  @ApiProperty({ enum: ['ACTIVA', 'CANCELADA'], description: 'CANCELADA también si pidió cancelar y el fin del período ya llegó' }) estado: 'ACTIVA' | 'CANCELADA';
+  @ApiProperty({ enum: ['ACTIVA', 'PAGO_PENDIENTE', 'SUSPENDIDA', 'CANCELADA'], description: 'CANCELADA también si pidió cancelar y el fin del período ya llegó. HU-1708: PAGO_PENDIENTE desde el fin del período hasta el pago; SUSPENDIDA (solo lectura) desde el día 10 sin pago' })
+  estado: 'ACTIVA' | 'PAGO_PENDIENTE' | 'SUSPENDIDA' | 'CANCELADA';
   @ApiProperty({ format: 'date-time' }) inicioPeriodo: string;
   @ApiProperty({ format: 'date-time', description: 'Fin del período pagado: la renovación, o el fin si se canceló' }) finPeriodo: string;
   @ApiProperty({ description: 'Se cancelará al fin del período' }) cancelarAlFin: boolean;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) canceladaEn: string | null;
   @ApiProperty({ type: PlanBreveDto, nullable: true, description: 'Bajada programada para la renovación' }) planProgramado: PlanBreveDto | null;
   @ApiProperty({ type: [PlanOpcionDto], description: 'Los planes publicados' }) planes: PlanOpcionDto[];
-  @ApiProperty({ description: 'Hay una pasarela que cobra la moneda de la suscripción (para subir de plan)' }) pagoDisponible: boolean;
+  @ApiProperty({ description: 'Hay una pasarela que cobra la moneda de la suscripción (para subir de plan o pagar la renovación)' }) pagoDisponible: boolean;
+  @ApiProperty({ type: RenovacionDto, nullable: true, description: 'HU-1708 · La renovación que falta pagar (con PAGO_PENDIENTE o SUSPENDIDA)' }) renovacion: RenovacionDto | null;
 }
 
 /** Datos no confiables: los valida `@aptio/schema/cambio-plan`. */
