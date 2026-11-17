@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.83 · actualizado con la cuarta entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.84 · actualizado con la quinta entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1212,6 +1212,17 @@ Arriba de **Ventas › Planes**, la tarjeta **Ingresos de** (el mes) resume cóm
 
 Pulsa **Mes anterior** o **Mes siguiente** para ver otro mes (no se puede pasar del mes en curso). Los meses van con la hora de Lima. Para los meses pasados se usa el plan, el precio y el estado que cada suscripción tiene hoy. Las cápsulas adicionales no entran, porque no son un pago recurrente. Todo se usa con el teclado y el lector de pantalla anuncia los montos al cambiar de mes.
 
+### 8.50 Facturación de tu organización (administrador)
+
+En el menú **Empresa**, **Facturación** reúne todo lo que tu organización paga. Solo la ve el administrador; también entra con la cuenta en solo lectura, para descargar sus comprobantes y corregir sus datos.
+
+- **Plan y consumo:** tu plan, su precio sin IGV, el estado y la fecha de la próxima renovación, con las cápsulas usadas en el mes. El enlace **Plan y suscripción** te lleva a cambiar de plan o cancelar.
+- **Comprobantes:** tus facturas, boletas y notas de crédito con su número, fecha, monto y estado ante SUNAT. Pulsa **PDF** o **XML** para descargarlos; si el comprobante aún se está generando, los botones quedan desactivados con el aviso «Archivos en preparación».
+- **Medio de pago:** la pasarela y la tarjeta (solo sus 4 últimos dígitos). En el entorno de pruebas puedes cambiarla con una tarjeta de prueba: 4111 1111 1111 1111 aprueba los cobros y 4000 0000 0000 0002 los rechaza. Nunca se pide el código de seguridad. Si pagas con Stripe o Culqi, la tarjeta no se guarda en Aptio SCORM: cada renovación te llega por correo con el enlace para pagar.
+- **Datos de facturación:** elige **Factura (con RUC)** o **Boleta** y escribe la razón social o el nombre, el RUC, la dirección (opcional) y el correo donde llegan el PDF y el XML. La factura exige un RUC de 11 dígitos válido; con boleta puedes dejarlo vacío. Mientras no los edites, se muestran los datos de tu alta. Al pulsar **Guardar los datos**, los cambios rigen para los próximos comprobantes; los ya emitidos no cambian.
+
+Todo se usa con el teclado: si falta un dato, el aviso dice cuántos campos revisar y el cursor va al primero.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1303,6 +1314,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.84 | 2026-11-17 | Facturación de la organización (8.50): plan y consumo, descarga del PDF y el XML de tus comprobantes, cambio de la tarjeta de prueba y edición de los datos de facturación (factura o boleta). |
 | 0.83 | 2026-11-17 | Ingresos del mes en Ventas › Planes (8.49): ingreso mensual recurrente con los dólares aparte y el ingreso en riesgo, suscripciones activas, cancelación mensual con la variación y el ingreso promedio por cliente, con «Mes anterior» y «Mes siguiente». |
 | 0.82 | 2026-11-17 | Cupones y convenios: el «Código de cupón» con «Aplicar» y «Quitar el cupón» en el pago, con el descuento en el resumen y el motivo si no vale (8.47); la pestaña Cupones de Ventas › Facturación para crear, editar, ocultar y activar, con los usos y el estado (8.48). |
 | 0.81 | 2026-11-17 | Pago de la renovación (8.45): el aviso «Falta el pago de la renovación» con la fecha límite, la cuenta en solo lectura a los 10 días (ver y descargar, sin generar ni editar), «Cómo regularizar» y «Pagar ahora» en Plan y suscripción; Ventas › Suscripciones con el filtro y «Reintentar ahora» (8.46). |

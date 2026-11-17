@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.83 · actualizado con la cuarta entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.84 · actualizado con la quinta entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -637,6 +637,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Consola:** `GET /ventas/ingresos?mes=AAAA-MM` solo para SUPERADMIN (vista de plataforma sobre todas las organizaciones; 422 si el mes no es AAAA-MM). La tarjeta «Ingresos de <mes>» va arriba de Ventas › Planes (PNT-35).
 - **Fuera de alcance:** cápsulas adicionales, gráficos históricos y exportar a CSV.
 
+### 3.42 Portal de facturación de la organización (HU-1711)
+
+- **Acceso (REQ-091, CP-153):** solo el ADMINISTRADOR y siempre con la organización de su sesión, también con la cuenta suspendida. Un comprobante de otra organización da 404, igual que uno cuyo archivo aún no se generó (ARCHIVO_PENDIENTE). Cada descarga se audita (COMPROBANTE_DESCARGADO desde el portal).
+- **Datos de facturación (SUP-332):** `DatosFacturacionOrg`, una fila por organización. La factura exige un RUC con su dígito verificador; la boleta lo admite vacío. Rigen para los comprobantes nuevos: el worker los lee antes que la solicitud del alta (SUP-318) y los emitidos no cambian. Auditoría DATOS_FACTURACION_ACTUALIZADOS con el antes y el después.
+- **Medio de pago (SUP-331):** con la pasarela de pruebas se cambia la tarjeta de prueba y se guardan solo los 4 últimos dígitos, sin CVV (auditoría MEDIO_PAGO_ACTUALIZADO). Con Stripe o Culqi, 409 MEDIO_NO_EDITABLE: la renovación sigue por el enlace del correo (SUP-319).
+- **Consola:** `GET /organizacion/facturacion`, `PUT /organizacion/facturacion/datos`, `POST /organizacion/facturacion/medio-pago` y `GET /organizacion/comprobantes/{id}/pdf|xml`; la vista «Facturación» (PNT-40) en el menú Empresa del administrador.
+- **Fuera de alcance:** reenviar el correo desde el portal, filtros por fecha, exportación masiva y medios de pago reales guardados en Stripe o Culqi.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -743,6 +751,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-319 a SUP-323:** solo la pasarela de pruebas cobra sola la renovación (Stripe y Culqi envían el enlace por correo hasta la HU-1711); WhatsApp pendiente; aviso de 30 días por cambio de precio diferido; calendario en pasos de 24 h desde el fin del período; solo lectura con las excepciones de sesión, exportar y pagar.
 - **SUP-324 a SUP-328:** solo descuentos en porcentaje (sin monto fijo, prueba gratis, cápsulas adicionales ni cambios de plan); descuento al céntimo sobre la lista con IGV sobre la base y los ciclos contando el alta; usos al aprobarse con los dos pagos respetados en el último cupo; un cupón del 100 % no se paga en línea; «ya usado» por correo o RUC, vigencia por días de Lima y límite de la vista previa en memoria.
 - **SUP-329 y SUP-330:** soles y dólares por separado sin tipo de cambio; MRR neto sin IGV de las vigentes (activas y con pago pendiente), anual entre 12, con el cupón vigente y el ingreso en riesgo aparte; cancelación sobre las vigentes al empezar el mes; los meses pasados con el estado de hoy.
+- **SUP-331 y SUP-332:** el cambio de tarjeta del portal solo con la pasarela de pruebas, guardando los 4 últimos dígitos y nunca el CVV; los datos de facturación editados rigen solo para los comprobantes nuevos.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -786,6 +795,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.84 | 2026-11-17 | Portal de facturación de la organización (3.42): datos de facturación por organización para los comprobantes nuevos, descarga aislada del PDF y el XML, cambio de la tarjeta de prueba y la vista «Facturación» del administrador. |
 | 0.83 | 2026-11-17 | Panel de ingresos (3.41): MRR neto por moneda con el ingreso en riesgo, activas, cancelación mensual con su variación y ARPU por mes de Lima, en `GET /ventas/ingresos` y arriba de Ventas › Planes. |
 | 0.82 | 2026-11-17 | Cupones y convenios (3.40): el cupón de campaña o convenio, `aplicarCupon` en la vista previa y el checkout con el total intacto al rechazar, el uso al aprobarse con `FOR UPDATE` y la auditoría sobre el límite, el descuento en las renovaciones y la pestaña Cupones del superadmin. |
 | 0.81 | 2026-11-17 | Cobranza y suspensión (3.39): la tarea `renovar-suscripciones` con la renovación idempotente, los intentos de los días 0, 1, 3 y 7, la suspensión al día 10, el pago por el webhook único que reactiva y extiende el período, la guarda de solo lectura, el aviso global y Ventas › Suscripciones con «Reintentar ahora». |
