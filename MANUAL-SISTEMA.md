@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.82 · actualizado con la tercera entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.83 · actualizado con la cuarta entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -629,6 +629,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Consola:** `GET`, `POST` y `PATCH /ventas/cupones` solo para SUPERADMIN, auditados (CUPON_CREADO, CUPON_ACTUALIZADO con los cambios y su valor anterior). La pestaña Cupones de Ventas › Facturación (PNT-37) muestra el beneficio, los usos, la vigencia y el estado.
 - **Fuera de alcance:** descuentos de monto fijo, pruebas gratis, cupones en cápsulas adicionales y en cambios de plan.
 
+### 3.41 Panel de ingresos (HU-1710)
+
+- **Indicadores (REQ-090, CP-152, SUP-330):** por mes calendario de Lima y frente al anterior. El MRR neto sin IGV suma las suscripciones vigentes en el corte (ACTIVA y PAGO_PENDIENTE; nunca CANCELADA ni SUSPENDIDA), con el anual entre 12 al céntimo y menos el cupón con renovaciones pendientes o permanente; el ingreso en riesgo es el de las que tienen `cancelarAlFin`. Las activas son las vigentes; la cancelación mensual, las que pasaron a CANCELADA en el mes entre las vigentes al empezarlo (0 % sin base), con la variación en puntos; el ARPU, el MRR entre las organizaciones vigentes de esa moneda (0 sin ninguna).
+- **Monedas (SUP-329):** soles y dólares por separado, sin tipo de cambio.
+- **Corte:** el fin del mes o, en el mes en curso, el momento de la consulta. Sin historial: los meses pasados usan el estado, el precio y el descuento actuales.
+- **Consola:** `GET /ventas/ingresos?mes=AAAA-MM` solo para SUPERADMIN (vista de plataforma sobre todas las organizaciones; 422 si el mes no es AAAA-MM). La tarjeta «Ingresos de <mes>» va arriba de Ventas › Planes (PNT-35).
+- **Fuera de alcance:** cápsulas adicionales, gráficos históricos y exportar a CSV.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -734,6 +742,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-314 a SUP-318:** OSE simulado bajo DA-09 y XML sin firma; correlativo bajo bloqueo y número no reutilizado; boleta sin DNI desde S/ 700 por validar; detracción desactivada por validar con el contador; factura o boleta según la solicitud y el RUC.
 - **SUP-319 a SUP-323:** solo la pasarela de pruebas cobra sola la renovación (Stripe y Culqi envían el enlace por correo hasta la HU-1711); WhatsApp pendiente; aviso de 30 días por cambio de precio diferido; calendario en pasos de 24 h desde el fin del período; solo lectura con las excepciones de sesión, exportar y pagar.
 - **SUP-324 a SUP-328:** solo descuentos en porcentaje (sin monto fijo, prueba gratis, cápsulas adicionales ni cambios de plan); descuento al céntimo sobre la lista con IGV sobre la base y los ciclos contando el alta; usos al aprobarse con los dos pagos respetados en el último cupo; un cupón del 100 % no se paga en línea; «ya usado» por correo o RUC, vigencia por días de Lima y límite de la vista previa en memoria.
+- **SUP-329 y SUP-330:** soles y dólares por separado sin tipo de cambio; MRR neto sin IGV de las vigentes (activas y con pago pendiente), anual entre 12, con el cupón vigente y el ingreso en riesgo aparte; cancelación sobre las vigentes al empezar el mes; los meses pasados con el estado de hoy.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -777,6 +786,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.83 | 2026-11-17 | Panel de ingresos (3.41): MRR neto por moneda con el ingreso en riesgo, activas, cancelación mensual con su variación y ARPU por mes de Lima, en `GET /ventas/ingresos` y arriba de Ventas › Planes. |
 | 0.82 | 2026-11-17 | Cupones y convenios (3.40): el cupón de campaña o convenio, `aplicarCupon` en la vista previa y el checkout con el total intacto al rechazar, el uso al aprobarse con `FOR UPDATE` y la auditoría sobre el límite, el descuento en las renovaciones y la pestaña Cupones del superadmin. |
 | 0.81 | 2026-11-17 | Cobranza y suspensión (3.39): la tarea `renovar-suscripciones` con la renovación idempotente, los intentos de los días 0, 1, 3 y 7, la suspensión al día 10, el pago por el webhook único que reactiva y extiende el período, la guarda de solo lectura, el aviso global y Ventas › Suscripciones con «Reintentar ahora». |
 | 0.80 | 2026-11-17 | Comprobantes electrónicos SUNAT (3.38): la emisión idempotente con el correlativo bajo bloqueo, el XML UBL 2.1 y el PDF en S3, el OSE simulado (DA-09), el correo con los adjuntos, la consola de Facturación, el webhook firmado del OSE y la nota de crédito al reembolsar. |

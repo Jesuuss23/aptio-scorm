@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.82 · actualizado con la tercera entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.83 · actualizado con la cuarta entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1201,6 +1201,17 @@ En **Ventas › Facturación**, la pestaña **Cupones** lista los cupones de cam
 
 Los descuentos son siempre en porcentaje: por ahora no hay descuentos por un monto fijo, ni pruebas gratis, ni cupones para cápsulas adicionales o cambios de plan. Un cupón del 100 % no se puede pagar en línea. Todo queda registrado y se usa con el teclado.
 
+### 8.49 Ingresos del mes (superadmin)
+
+Arriba de **Ventas › Planes**, la tarjeta **Ingresos de** (el mes) resume cómo va el negocio. Todos los montos van sin IGV y en soles; si hay clientes que pagan en dólares, el monto en dólares aparece debajo, por separado (no se convierte a soles).
+
+- **Ingreso mensual recurrente:** lo que suman al mes las suscripciones vigentes, incluidas las que tienen el pago pendiente. No cuenta las canceladas ni las cuentas en solo lectura. Un plan anual cuenta su precio dividido entre 12, y un cupón se descuenta mientras siga vigente. **En riesgo** es la parte de las organizaciones que pidieron cancelar al fin de su período.
+- **Suscripciones activas:** cuántas están vigentes, también las de pago pendiente.
+- **Cancelación mensual:** qué porcentaje de las suscripciones vigentes al empezar el mes se canceló dentro del mes, y cuántos puntos más o menos que el mes anterior.
+- **Ingreso promedio por cliente:** el ingreso mensual recurrente dividido entre las organizaciones que lo pagan.
+
+Pulsa **Mes anterior** o **Mes siguiente** para ver otro mes (no se puede pasar del mes en curso). Los meses van con la hora de Lima. Para los meses pasados se usa el plan, el precio y el estado que cada suscripción tiene hoy. Las cápsulas adicionales no entran, porque no son un pago recurrente. Todo se usa con el teclado y el lector de pantalla anuncia los montos al cambiar de mes.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1292,6 +1303,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.83 | 2026-11-17 | Ingresos del mes en Ventas › Planes (8.49): ingreso mensual recurrente con los dólares aparte y el ingreso en riesgo, suscripciones activas, cancelación mensual con la variación y el ingreso promedio por cliente, con «Mes anterior» y «Mes siguiente». |
 | 0.82 | 2026-11-17 | Cupones y convenios: el «Código de cupón» con «Aplicar» y «Quitar el cupón» en el pago, con el descuento en el resumen y el motivo si no vale (8.47); la pestaña Cupones de Ventas › Facturación para crear, editar, ocultar y activar, con los usos y el estado (8.48). |
 | 0.81 | 2026-11-17 | Pago de la renovación (8.45): el aviso «Falta el pago de la renovación» con la fecha límite, la cuenta en solo lectura a los 10 días (ver y descargar, sin generar ni editar), «Cómo regularizar» y «Pagar ahora» en Plan y suscripción; Ventas › Suscripciones con el filtro y «Reintentar ahora» (8.46). |
 | 0.80 | 2026-11-17 | Facturación (8.44): los comprobantes de cada pago con su estado SUNAT, la descarga del PDF y el XML, «Corregir y reenviar» un observado y los datos fiscales con la detracción por validar con el contador. El pago ya envía el comprobante por correo (8.40). |
