@@ -4706,6 +4706,10 @@ paths:
         exactamente una (CP-146). Volver a generar un proyecto que ya consumió (por ejemplo, una cápsula en revisión) no
         consume otra. Sin cápsulas disponibles: 402 CUOTA_AGOTADA, con la cuota (`Cuota`, que trae la oferta de la
         adicional con IGV y el enlace a los planes) en `detalles[0]`. Sin suscripción o con un plan a medida, sin límite.
+
+        HU-1706 · Con la suscripción CANCELADA (o con la cancelación pedida y el fin del período ya cumplido), la cuota es
+        0 y lanzar una cápsula nueva responde 402 SUSCRIPCION_CANCELADA; volver a generar un proyecto que ya consumió sigue
+        permitido (las cápsulas en revisión siguen editables) y los paquetes exportados se siguen descargando.
       parameters:
       - name: proyectoId
         in: path
@@ -4729,7 +4733,7 @@ paths:
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '402':
-          description: CUOTA_AGOTADA · no quedan cápsulas este mes; `detalles[0]` es la `Cuota` (HU-1705)
+          description: CUOTA_AGOTADA · no quedan cápsulas este mes; `detalles[0]` es la `Cuota` (HU-1705). SUSCRIPCION_CANCELADA · la suscripción terminó (HU-1706)
           content:
             application/json:
               schema:
@@ -7175,7 +7179,8 @@ paths:
         PENDIENTE (auditoría CAPSULAS_COMPRA_INICIADA) y devuelve cómo sigue el pago, igual que el checkout: formulario de
         pruebas, página alojada de Stripe (vuelve a `/?compra=<id>`, o con `&cancelado=1`) o Culqi Checkout. Las
         adicionales se suman al aprobarse el pago por `POST /webhooks/pago/{pasarela}` y valen hasta el fin de la ventana
-        en que se aprueban; no se acumulan. 422 NO_VALIDO (cantidad), SIN_SUSCRIPCION, CUOTA_ILIMITADA o SIN_ADICIONALES.
+        en que se aprueban; no se acumulan. 422 NO_VALIDO (cantidad), SIN_SUSCRIPCION, CUOTA_ILIMITADA o SIN_ADICIONALES;
+        HU-1706 · 422 SUSCRIPCION_CANCELADA si la suscripción terminó.
       requestBody:
         required: false
         content:
@@ -7326,6 +7331,269 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /organizacion/suscripcion:
+    get:
+      tags:
+      - Ventas
+      summary: La suscripción de la organización y los planes a los que puede cambiar (HU-1706, REQ-086)
+      operationId: get_organizacion_suscripcion
+      description: |-
+        Solo ADMINISTRADOR. El plan, el ciclo, el precio pactado sin IGV, la moneda, el período (`finPeriodo` es la
+        renovación, o el fin si pidió cancelar), la cancelación (`cancelarAlFin`, `canceladaEn`), la bajada programada
+        para la renovación y los planes publicados con su precio por el ciclo y la moneda de la suscripción y si serían
+        subida o bajada. `estado` es CANCELADA también si pidió cancelar y el fin del período ya llegó, aunque la tarea
+        de vencimiento aún no haya corrido. Sin suscripción (organización interna), 404 SIN_SUSCRIPCION.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuscripcionOrg'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /organizacion/suscripcion/cambio:
+    post:
+      tags:
+      - Ventas
+      summary: Vista previa o confirmación de un cambio de plan con prorrateo (HU-1706, CP-147, RN-18-7)
+      operationId: post_organizacion_suscripcion_cambio
+      description: |-
+        Solo ADMINISTRADOR. El plan destino debe estar publicado y visible, no ser a medida, ser distinto del actual y
+        tener precio en el ciclo y la moneda de la suscripción (422 NO_VALIDO); con la suscripción terminada, 422
+        SUSCRIPCION_CANCELADA. Es subida si su precio por el ciclo es mayor que el pactado; si no, bajada.
+
+        Prorrateo por día UTC: `diasPeriodo` = días entre el inicio y el fin del período, `diasRestantes` = días que
+        faltan (el día en curso cuenta). La diferencia sin IGV es (precio nuevo − pactado) × restantes ÷ período,
+        redondeada al céntimo, más 18 % de IGV (CP-147: S/ 490 → S/ 1.290 con 15 de 30 días = S/ 400 + S/ 72 = S/ 472).
+        Con el período ya vencido, 409 PERIODO_VENCIDO.
+
+        Con `confirmar: false` (por defecto) solo devuelve la vista previa (VISTA_PREVIA, sin guardar nada). Al confirmar
+        una bajada, la programa para la renovación sin cobro ni devolución (PROGRAMADO, auditoría
+        PLAN_CAMBIO_PROGRAMADO). Al confirmar una subida, crea el cambio PENDIENTE (PLAN_CAMBIO_INICIADO) y devuelve cómo
+        sigue el pago con la pasarela de la suscripción, igual que la compra de cápsulas: formulario de pruebas, página
+        alojada de Stripe (vuelve a `/plan?cambio=<id>`, o con `&cancelado=1`) o Culqi Checkout. El plan cambia al
+        aprobarse el pago por `POST /webhooks/pago/{pasarela}`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambioPlanEntrada'
+      responses:
+        '200':
+          description: La vista previa, la bajada programada o la subida pendiente con el pago
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioPlan'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: PERIODO_VENCIDO · el período ya terminó y aún no se renovó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '502':
+          description: PASARELA_NO_RESPONDE · la pasarela no creó el pago; el cambio queda RECHAZADO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: PAGO_NO_DISPONIBLE · ninguna pasarela visible y activa cobra la moneda de la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /organizacion/suscripcion/cambios/{id}:
+    get:
+      tags:
+      - Ventas
+      summary: El estado de un cambio de plan, para consultar hasta que la pasarela confirme (HU-1706)
+      operationId: get_organizacion_suscripcion_cambios_id
+      description: Solo ADMINISTRADOR y solo cambios de su organización (otra organización, 404).
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioPlan'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /organizacion/suscripcion/cambios/{id}/pago-prueba:
+    post:
+      tags:
+      - Ventas
+      summary: Pagar un cambio de plan con la pasarela de pruebas (HU-1706)
+      operationId: post_organizacion_suscripcion_cambios_id_pago_prueba
+      description: |-
+        Solo ADMINISTRADOR y solo cambios de la pasarela de pruebas. Con 4111 1111 1111 1111 aprueba y con 4000 0000 0000
+        0002 rechaza, por el mismo camino que `POST /webhooks/pago/pruebas`. Otra tarjeta, 422.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagoPrueba'
+      responses:
+        '200':
+          description: El cambio tras el pago, con la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioPlan'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /organizacion/suscripcion/cambios/{id}/token:
+    post:
+      tags:
+      - Ventas
+      summary: Enviar el token de Culqi Checkout de un cambio de plan (HU-1706)
+      operationId: post_organizacion_suscripcion_cambios_id_token
+      description: |-
+        Solo ADMINISTRADOR. Con el token de un solo uso la API crea el cargo en Culqi; el cambio sigue PENDIENTE hasta el
+        webhook firmado. 404 si el cambio no es de Culqi; 409 PAGO_RESUELTO si ya no está pendiente; 402 PAGO_RECHAZADO
+        si Culqi rechaza la tarjeta.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPago'
+      responses:
+        '202':
+          description: Cargo enviado; el cambio sigue pendiente hasta el webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CambioPlan'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '402':
+          description: PAGO_RECHAZADO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: PAGO_RESUELTO · el cambio ya no está pendiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: PASARELA_NO_RESPONDE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /organizacion/suscripcion/cancelar:
+    post:
+      tags:
+      - Ventas
+      summary: Cancelar la suscripción al fin del período pagado (HU-1706, REQ-086)
+      operationId: post_organizacion_suscripcion_cancelar
+      description: |-
+        Solo ADMINISTRADOR. Marca `cancelarAlFin` sin devolución y programa en la cola `suscripciones` la tarea
+        «suscripcion-vencer» (jobId `vencer-<suscripcionId>`) para `finPeriodo`: entonces la suscripción pasa a CANCELADA
+        y la cuota a 0. Hasta ese día todo sigue igual. Pedirlo de nuevo no cambia nada. Auditoría
+        SUSCRIPCION_CANCELACION_PEDIDA. Ya terminada, 409 SUSCRIPCION_CANCELADA; sin suscripción, 404 SIN_SUSCRIPCION.
+      responses:
+        '200':
+          description: La suscripción con la cancelación pedida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuscripcionOrg'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: SUSCRIPCION_CANCELADA · la suscripción ya terminó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /organizacion/suscripcion/reanudar:
+    post:
+      tags:
+      - Ventas
+      summary: '«Seguir con mi plan»: quitar la cancelación y la bajada programada (HU-1706)'
+      operationId: post_organizacion_suscripcion_reanudar
+      description: |-
+        Solo ADMINISTRADOR y antes del fin del período. Quita `cancelarAlFin` y la bajada programada y retira la tarea de
+        vencimiento de la cola. Auditoría SUSCRIPCION_REANUDADA. Ya terminada, 409 SUSCRIPCION_CANCELADA; sin
+        suscripción, 404 SIN_SUSCRIPCION.
+      responses:
+        '200':
+          description: La suscripción sin cancelación ni bajada programada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuscripcionOrg'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: SUSCRIPCION_CANCELADA · la suscripción ya terminó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /webhooks/pago/{pasarela}:
     post:
       tags:
@@ -7362,6 +7630,13 @@ paths:
         Cobro con `compraCapsulasId` y encola «emitir-comprobante» con jobId = id del cobro (auditoría CAPSULAS_COMPRADAS);
         rechazada, la compra pasa a RECHAZADA (CAPSULAS_PAGO_RECHAZADO). Si el monto o la moneda no coinciden, o la compra
         ya no estaba pendiente (PAGO_SIN_COMPRA_PENDIENTE), el cobro queda sin acreditar y reembolsable.
+
+        HU-1706 · Si es un cambio de plan (subida), aprobado: con la suscripción bloqueada cambia de inmediato el plan y el
+        precio pactado (la cuota nueva rige en la ventana vigente), quita la bajada programada, guarda el Cobro con
+        `cambioPlanId` y encola «emitir-comprobante» con jobId = id del cobro (auditoría PLAN_CAMBIADO); rechazado, el
+        cambio pasa a RECHAZADO (PLAN_CAMBIO_RECHAZADO). Si el monto o la moneda no coinciden (PAGO_MONTO_NO_COINCIDE), el
+        cambio ya no estaba pendiente (PAGO_SIN_CAMBIO_PENDIENTE) o el plan de la suscripción ya cambió (PLAN_YA_CAMBIO),
+        el cobro queda sin acreditar y reembolsable.
       parameters:
       - name: pasarela
         in: path
@@ -15292,7 +15567,7 @@ components:
     Cuota:
       type: object
       description: HU-1705 · La cuota de cápsulas de la ventana mensual vigente (REQ-085, RN-18-6).
-      required: [ilimitada, ventanaInicio, ventanaFin, incluidas, adicionales, usadas, disponibles, oferta, puedeComprar, planes]
+      required: [ilimitada, ventanaInicio, ventanaFin, incluidas, adicionales, usadas, disponibles, oferta, puedeComprar, planes, cancelada]
       properties:
         ilimitada: { type: boolean, description: 'Sin suscripción (organización interna) o plan a medida' }
         ventanaInicio: { type: string, format: date-time }
@@ -15303,7 +15578,8 @@ components:
         disponibles: { type: integer, nullable: true, example: 3, description: 'null si es ilimitada' }
         oferta: { type: object, allOf: [{ $ref: '#/components/schemas/OfertaAdicional' }], nullable: true, description: 'null si el plan no vende adicionales o no hay suscripción' }
         puedeComprar: { type: boolean, description: 'El usuario es ADMINISTRADOR y hay oferta' }
-        planes: { type: string, example: '/s/precios', description: 'Subir de plan (el cambio con prorrateo llega con la HU-1706)' }
+        planes: { type: string, example: '/plan', description: 'Dónde subir de plan: HU-1706 · `/plan` (consola) para el ADMINISTRADOR con suscripción; si no, `/s/precios`' }
+        cancelada: { type: boolean, description: 'HU-1706 · La suscripción terminó: la cuota es 0 y no hay oferta' }
     CompraAdicionalesEntrada:
       type: object
       properties:
@@ -15324,6 +15600,70 @@ components:
         motivoRechazo: { type: string, nullable: true }
         pago: { $ref: '#/components/schemas/PagoCheckout' }
         cuota: { $ref: '#/components/schemas/Cuota' }
+    PlanBreve:
+      type: object
+      required: [slug, nombre, capsulasMes]
+      properties:
+        slug: { type: string, example: inicial }
+        nombre: { type: string, example: Inicial }
+        capsulasMes: { type: integer, nullable: true, example: 8, description: 'null = sin límite' }
+    PlanOpcion:
+      type: object
+      description: HU-1706 · Un plan publicado como lo ve el administrador al cambiar.
+      required: [slug, nombre, capsulasMes, precioCiclo, actual, tipo]
+      properties:
+        slug: { type: string, example: productora }
+        nombre: { type: string, example: Productora }
+        capsulasMes: { type: integer, nullable: true, example: 20 }
+        precioCiclo: { type: number, nullable: true, example: 1290, description: 'Sin IGV, por el ciclo y en la moneda de la suscripción; null si no se cobra así' }
+        actual: { type: boolean, description: Es el plan actual }
+        tipo: { type: string, enum: [SUBIDA, BAJADA], nullable: true, description: 'null si no se puede elegir (el actual, a medida o sin precio en ese ciclo y moneda)' }
+    SuscripcionOrg:
+      type: object
+      description: HU-1706 · La suscripción de la organización (REQ-086).
+      required: [plan, ciclo, precioPactadoSinIgv, moneda, estado, inicioPeriodo, finPeriodo, cancelarAlFin, canceladaEn, planProgramado, planes, pagoDisponible]
+      properties:
+        plan: { $ref: '#/components/schemas/PlanBreve' }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL] }
+        precioPactadoSinIgv: { type: number, example: 490, description: 'Sin IGV, por el ciclo' }
+        moneda: { type: string, enum: [PEN, USD] }
+        estado: { type: string, enum: [ACTIVA, CANCELADA], description: 'CANCELADA también si pidió cancelar y el fin del período ya llegó' }
+        inicioPeriodo: { type: string, format: date-time }
+        finPeriodo: { type: string, format: date-time, description: 'Fin del período pagado: la renovación, o el fin si se canceló' }
+        cancelarAlFin: { type: boolean, description: Se cancelará al fin del período }
+        canceladaEn: { type: string, format: date-time, nullable: true }
+        planProgramado: { type: object, allOf: [{ $ref: '#/components/schemas/PlanBreve' }], nullable: true, description: 'Bajada programada para la renovación' }
+        planes: { type: array, items: { $ref: '#/components/schemas/PlanOpcion' }, description: Los planes publicados }
+        pagoDisponible: { type: boolean, description: 'Hay una pasarela visible y activa que cobra la moneda de la suscripción (para subir de plan)' }
+    CambioPlanEntrada:
+      type: object
+      required: [plan]
+      properties:
+        plan: { type: string, example: productora, description: El slug del plan destino }
+        confirmar: { type: boolean, default: false, description: 'false = solo la vista previa con el prorrateo' }
+    CambioPlan:
+      type: object
+      description: HU-1706 · Un cambio de plan con su prorrateo (CP-147).
+      required: [id, tipo, estado, planOrigen, planDestino, ciclo, precioNuevoSinIgv, diasRestantes, diasPeriodo, diferenciaSinIgv, igv, total, moneda, rigeDesde, pasarela, motivoRechazo, suscripcion]
+      properties:
+        id: { type: string, format: uuid, nullable: true, description: 'null en la vista previa y en la bajada (no se cobra)' }
+        tipo: { type: string, enum: [SUBIDA, BAJADA] }
+        estado: { type: string, enum: [VISTA_PREVIA, PROGRAMADO, PENDIENTE, APROBADO, RECHAZADO] }
+        planOrigen: { $ref: '#/components/schemas/PlanBreve' }
+        planDestino: { $ref: '#/components/schemas/PlanBreve' }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL] }
+        precioNuevoSinIgv: { type: number, example: 1290, description: 'El precio nuevo por el ciclo, sin IGV' }
+        diasRestantes: { type: integer, example: 15 }
+        diasPeriodo: { type: integer, example: 30 }
+        diferenciaSinIgv: { type: number, example: 400, description: 'Prorrateo por día, sin IGV; 0 en una bajada' }
+        igv: { type: number, example: 72 }
+        total: { type: number, example: 472 }
+        moneda: { type: string, enum: [PEN, USD] }
+        rigeDesde: { type: string, format: date-time, description: 'Desde cuándo rige: ahora (subida, al aprobarse el pago) o la renovación (bajada)' }
+        pasarela: { type: string, nullable: true, example: pruebas }
+        motivoRechazo: { type: string, nullable: true }
+        pago: { $ref: '#/components/schemas/PagoCheckout' }
+        suscripcion: { $ref: '#/components/schemas/SuscripcionOrg' }
     Pasarela:
       type: object
       description: HU-1704 · Una pasarela como la ve el superadmin. Nunca lleva llaves ni secretos, solo los nombres de las variables que faltan.
@@ -15358,17 +15698,18 @@ components:
         codigos: { type: array, maxItems: 10, items: { type: string, enum: [pruebas, culqi, stripe] }, description: 'Todas las pasarelas, en el orden nuevo' }
     Cobro:
       type: object
-      description: HU-1704 · Un cobro aprobado. Sin datos de tarjeta, solo la referencia y los 4 últimos dígitos (REQ-110). HU-1705 · También de una compra de cápsulas adicionales.
-      required: [id, solicitudId, compraCapsulasId, concepto, suscripcionId, razonSocial, correoAdmin, nombrePlan, monto, moneda, pasarela, ultimos4Digitos, estado, motivoSinAlta, reembolsable, reembolsoId, reembolsadoEn, creadoEn]
+      description: HU-1704 · Un cobro aprobado. Sin datos de tarjeta, solo la referencia y los 4 últimos dígitos (REQ-110). HU-1705 · También de una compra de cápsulas adicionales. HU-1706 · O de un cambio de plan.
+      required: [id, solicitudId, compraCapsulasId, cambioPlanId, concepto, suscripcionId, razonSocial, correoAdmin, nombrePlan, monto, moneda, pasarela, ultimos4Digitos, estado, motivoSinAlta, reembolsable, reembolsoId, reembolsadoEn, creadoEn]
       properties:
         id: { type: string, format: uuid }
         solicitudId: { type: string, format: uuid, nullable: true, description: 'La solicitud de suscripción; null si es una compra de cápsulas' }
-        compraCapsulasId: { type: string, format: uuid, nullable: true, description: 'HU-1705 · La compra de cápsulas adicionales; null si es una suscripción' }
-        concepto: { type: string, enum: [SUSCRIPCION, CAPSULAS] }
+        compraCapsulasId: { type: string, format: uuid, nullable: true, description: 'HU-1705 · La compra de cápsulas adicionales; null si es otro concepto' }
+        cambioPlanId: { type: string, format: uuid, nullable: true, description: 'HU-1706 · El cambio de plan (subida); null si es otro concepto' }
+        concepto: { type: string, enum: [SUSCRIPCION, CAPSULAS, CAMBIO_PLAN] }
         suscripcionId: { type: string, format: uuid, nullable: true, description: 'null = pago aprobado sin alta o sin acreditar (SUP-291); reembolsable' }
         razonSocial: { type: string, example: Minera Andina SAC }
         correoAdmin: { type: string, format: email }
-        nombrePlan: { type: string, example: Productora }
+        nombrePlan: { type: string, example: Productora, description: 'En un cambio de plan, «Cambio de Inicial a Productora»' }
         monto: { type: number, example: 1522.2, description: Con IGV }
         moneda: { type: string, enum: [PEN, USD] }
         pasarela: { type: string, example: stripe }
