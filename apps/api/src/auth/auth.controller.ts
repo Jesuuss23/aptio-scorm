@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res } fr
 import { ApiAcceptedResponse, ApiCookieAuth, ApiExcludeEndpoint, ApiFoundResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
-import { Publico, type UsuarioSesion } from '../comun/roles.js';
+import { PermitidoSuspendida, Publico, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { aUsuarioDto, UsuarioDto } from '../usuarios/usuario.dto.js';
 import { IngresoDto, NuevaClaveDto, SesionDto, SolicitudClaveDto } from './auth.dto.js';
@@ -17,6 +17,8 @@ const RUTA_GOOGLE = '/api/v1/auth/google';
 
 @ApiTags('Acceso')
 @Controller()
+// HU-1708 · Sigue disponible con la cuenta suspendida (solo lectura).
+@PermitidoSuspendida()
 export class AuthController {
   constructor(
     private readonly auth: AuthService,

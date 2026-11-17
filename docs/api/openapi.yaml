@@ -6940,6 +6940,81 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /ventas/suscripciones:
+    get:
+      tags:
+      - Ventas
+      summary: Ventas › Suscripciones (HU-1708, REQ-088)
+      operationId: get_ventas_suscripciones
+      description: |-
+        Solo SUPERADMIN. Las 200 que vencen antes primero, con el filtro por estado y la renovación abierta (los intentos,
+        el siguiente y la suspensión). El calendario lo lleva el worker: la tarea periódica `renovar-suscripciones` de la
+        cola `suscripciones` (cada 15 min, idempotente) crea la renovación al llegar `finPeriodo` (aplicando la bajada
+        programada), intenta los días 0, 1, 3 y 7 (con la pasarela de pruebas cobra solo y la tarjeta terminada en 0002
+        rechaza; con Stripe o Culqi manda el enlace a «Pagar ahora» hasta la HU-1711) y suspende el día 10. Las que
+        pidieron cancelar al fin pasan a CANCELADA sin renovarse.
+      parameters:
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [ACTIVA, PAGO_PENDIENTE, SUSPENDIDA, CANCELADA]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaSuscripcionesVenta'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/suscripciones/{id}/reintentar:
+    post:
+      tags:
+      - Ventas
+      summary: '«Reintentar ahora» el cobro de una renovación (HU-1708)'
+      operationId: post_ventas_suscripciones_id_reintentar
+      description: |-
+        Solo SUPERADMIN. Pone en la cola `suscripciones` la tarea `renovacion-intento`: un intento fuera del calendario,
+        que no lo adelanta (con la pasarela de pruebas cobra con la tarjeta guardada; con Stripe o Culqi manda otra vez el
+        enlace). Auditoría RENOVACION_REINTENTO_PEDIDO. Sin renovación por cobrar, 409 SIN_PAGO_PENDIENTE.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Encolado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReintentoRenovacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: SIN_PAGO_PENDIENTE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: COLA_NO_DISPONIBLE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /ventas/comprobantes:
     get:
       tags:
@@ -7558,7 +7633,8 @@ paths:
         renovación, o el fin si pidió cancelar), la cancelación (`cancelarAlFin`, `canceladaEn`), la bajada programada
         para la renovación y los planes publicados con su precio por el ciclo y la moneda de la suscripción y si serían
         subida o bajada. `estado` es CANCELADA también si pidió cancelar y el fin del período ya llegó, aunque la tarea
-        de vencimiento aún no haya corrido. Sin suscripción (organización interna), 404 SIN_SUSCRIPCION.
+        de vencimiento aún no haya corrido. Sin suscripción (organización interna), 404 SIN_SUSCRIPCION. HU-1708: con
+        PAGO_PENDIENTE o SUSPENDIDA trae la `renovacion` que falta pagar.
       responses:
         '200':
           description: OK
@@ -7810,6 +7886,151 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /organizacion/suscripcion/renovacion/pago:
+    post:
+      tags:
+      - Ventas
+      summary: '«Pagar ahora» la renovación (HU-1708, REQ-088, PNT-36)'
+      operationId: post_organizacion_suscripcion_renovacion_pago
+      description: |-
+        Solo ADMINISTRADOR, también con la cuenta suspendida. Prepara el cobro del total de la renovación pendiente (o
+        vencida) en la pasarela de la suscripción o, si ya no cobra su moneda, en la primera que la cobre: el formulario
+        simulado (pruebas), la página alojada de Stripe que vuelve a `/plan?renovacion=` o Culqi Checkout. Se aplica con
+        el webhook firmado (`POST /webhooks/pago/{pasarela}`, RN-18-3): la suscripción vuelve a ACTIVA con el período
+        renovado (anclado al fin del anterior; si ya estaba suspendida, desde el día del pago), con su `Cobro` y su
+        comprobante en cola. Auditoría RENOVACION_PAGO_INICIADO. Sin renovación por pagar, 409 SIN_PAGO_PENDIENTE.
+      responses:
+        '200':
+          description: Cómo sigue el pago, con la renovación y la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagoRenovacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: SIN_PAGO_PENDIENTE · no hay una renovación por pagar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: PASARELA_NO_RESPONDE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: PAGO_NO_DISPONIBLE · ninguna pasarela cobra la moneda de la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /organizacion/suscripcion/renovacion/pago-prueba:
+    post:
+      tags:
+      - Ventas
+      summary: Pagar la renovación con la pasarela de pruebas (HU-1708)
+      operationId: post_organizacion_suscripcion_renovacion_pago_prueba
+      description: |-
+        Solo ADMINISTRADOR y solo con SITIO_ENTORNO=pruebas. Con 4111 1111 1111 1111 aprueba (reactiva la cuenta) y con
+        4000 0000 0000 0002 rechaza (la renovación sigue pendiente, con el motivo), por el mismo camino que
+        `POST /webhooks/pago/pruebas`. Otra tarjeta, 422.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagoPrueba'
+      responses:
+        '200':
+          description: La renovación tras el pago, con la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagoRenovacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: SIN_PAGO_PENDIENTE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /organizacion/suscripcion/renovacion/token:
+    post:
+      tags:
+      - Ventas
+      summary: El token de Culqi Checkout para pagar la renovación (HU-1708)
+      operationId: post_organizacion_suscripcion_renovacion_token
+      description: |-
+        Solo ADMINISTRADOR. Con el token de un solo uso, la pasarela crea el cargo; la renovación sigue pendiente hasta su
+        webhook firmado. La tarjeta nunca pasa por Aptio SCORM.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPago'
+      responses:
+        '202':
+          description: Cargo creado; falta el webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagoRenovacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '402':
+          description: PAGO_RECHAZADO · la pasarela rechazó el cargo al crearlo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: SIN_PAGO_PENDIENTE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /organizacion/cobranza:
+    get:
+      tags:
+      - Ventas
+      summary: El aviso global de cobranza (HU-1708, PNT-36, RN-18-8)
+      operationId: get_organizacion_cobranza
+      description: |-
+        Cualquier usuario con sesión. AL_DIA (sin aviso), PAGO_PENDIENTE (desde el fin del período: los intentos de los
+        días 0, 1, 3 y 7) o SUSPENDIDA (desde el día 10 sin pago: solo lectura), con el total, la fecha de la suspensión
+        y dónde regularizar. El superadmin, o una organización sin suscripción, siempre AL_DIA. Con SUSPENDIDA, toda
+        escritura de la organización responde 403 SUSCRIPCION_SUSPENDIDA (con `regularizar`, `renovacionId`, `total`,
+        `moneda` y `puedePagar` en `detalles`), salvo la sesión (`/auth/*`), validar y exportar (`/cursos/{id}/validar`,
+        `/cursos/{id}/exportaciones`) y `/organizacion/suscripcion/*`; la lectura y la descarga siguen igual.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cobranza'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
   /webhooks/pago/{pasarela}:
     post:
       tags:
@@ -7840,6 +8061,12 @@ paths:
         la emite el worker, HU-1707). Si el monto o la moneda no coinciden con la solicitud (PAGO_MONTO_NO_COINCIDE), el correo ya
         tiene cuenta (SUSCRIPCION_SIN_ALTA) o la solicitud ya no estaba pendiente (PAGO_SIN_SOLICITUD_PENDIENTE), el
         cobro queda sin alta para que el superadmin lo reembolse.
+
+        HU-1708 · `solicitudId` puede ser también el id de una renovación: aprobada con su monto, la suscripción vuelve a
+        ACTIVA con el período renovado (anclado al fin del anterior; si estaba SUSPENDIDA, desde el día del pago) y el
+        Cobro queda ligado a la renovación, con su comprobante en cola. Auditoría SUSCRIPCION_RENOVADA o
+        SUSCRIPCION_REACTIVADA; rechazada, RENOVACION_PAGO_RECHAZADO; con otro monto o ya pagada, PAGO_MONTO_NO_COINCIDE o
+        PAGO_SIN_RENOVACION_PENDIENTE (cobro sin suscripción, para reembolsarlo).
 
         HU-1705 · Si `solicitudId` (o la referencia de la pasarela) no es una solicitud de suscripción sino una compra de
         cápsulas adicionales, el mismo webhook la resuelve: aprobada, suma las cápsulas a la ventana vigente, guarda el
@@ -15904,20 +16131,91 @@ components:
     SuscripcionOrg:
       type: object
       description: HU-1706 · La suscripción de la organización (REQ-086).
-      required: [plan, ciclo, precioPactadoSinIgv, moneda, estado, inicioPeriodo, finPeriodo, cancelarAlFin, canceladaEn, planProgramado, planes, pagoDisponible]
+      required: [plan, ciclo, precioPactadoSinIgv, moneda, estado, inicioPeriodo, finPeriodo, cancelarAlFin, canceladaEn, planProgramado, planes, pagoDisponible, renovacion]
       properties:
         plan: { $ref: '#/components/schemas/PlanBreve' }
         ciclo: { type: string, enum: [MENSUAL, ANUAL] }
         precioPactadoSinIgv: { type: number, example: 490, description: 'Sin IGV, por el ciclo' }
         moneda: { type: string, enum: [PEN, USD] }
-        estado: { type: string, enum: [ACTIVA, CANCELADA], description: 'CANCELADA también si pidió cancelar y el fin del período ya llegó' }
+        estado: { type: string, enum: [ACTIVA, PAGO_PENDIENTE, SUSPENDIDA, CANCELADA], description: 'CANCELADA también si pidió cancelar y el fin del período ya llegó. HU-1708: PAGO_PENDIENTE desde el fin del período hasta el pago; SUSPENDIDA (solo lectura) desde el día 10 sin pago' }
         inicioPeriodo: { type: string, format: date-time }
         finPeriodo: { type: string, format: date-time, description: 'Fin del período pagado: la renovación, o el fin si se canceló' }
         cancelarAlFin: { type: boolean, description: Se cancelará al fin del período }
         canceladaEn: { type: string, format: date-time, nullable: true }
         planProgramado: { type: object, allOf: [{ $ref: '#/components/schemas/PlanBreve' }], nullable: true, description: 'Bajada programada para la renovación' }
         planes: { type: array, items: { $ref: '#/components/schemas/PlanOpcion' }, description: Los planes publicados }
-        pagoDisponible: { type: boolean, description: 'Hay una pasarela visible y activa que cobra la moneda de la suscripción (para subir de plan)' }
+        pagoDisponible: { type: boolean, description: 'Hay una pasarela visible y activa que cobra la moneda de la suscripción (para subir de plan o pagar la renovación)' }
+        renovacion: { type: object, allOf: [{ $ref: '#/components/schemas/Renovacion' }], nullable: true, description: 'HU-1708 · La renovación que falta pagar (con PAGO_PENDIENTE o SUSPENDIDA)' }
+    Renovacion:
+      type: object
+      description: HU-1708 · La renovación de un período (REQ-088, RN-18-8). El monto es el precio pactado o, con una bajada programada, el precio publicado vigente del plan nuevo, más 18 % de IGV.
+      required: [id, estado, plan, periodoInicio, periodoFin, montoSinIgv, igv, total, moneda, pasarela, intentos, proximoIntento, suspensionEn, motivoRechazo]
+      properties:
+        id: { type: string, format: uuid }
+        estado: { type: string, enum: [PENDIENTE, APROBADA, VENCIDA], description: 'VENCIDA: llegó el día 10 sin pago y la suscripción quedó suspendida (se puede pagar igual)' }
+        plan: { $ref: '#/components/schemas/PlanBreve' }
+        periodoInicio: { type: string, format: date-time, description: 'El fin del período anterior; si se pagó ya suspendida, el día del pago' }
+        periodoFin: { type: string, format: date-time }
+        montoSinIgv: { type: number, example: 1290 }
+        igv: { type: number, example: 232.2 }
+        total: { type: number, example: 1522.2 }
+        moneda: { type: string, enum: [PEN, USD] }
+        pasarela: { type: string, example: pruebas }
+        intentos: { type: integer, minimum: 0, maximum: 4, description: 'Intentos hechos: días 0, 1, 3 y 7' }
+        proximoIntento: { type: string, format: date-time, nullable: true, description: 'El siguiente intento o, hechos los 4, la suspensión' }
+        suspensionEn: { type: string, format: date-time, description: 'El día 10: la cuenta queda en solo lectura si no paga antes' }
+        motivoRechazo: { type: string, nullable: true }
+    PagoRenovacion:
+      type: object
+      description: HU-1708 · «Pagar ahora» la renovación.
+      required: [renovacion, suscripcion]
+      properties:
+        renovacion: { $ref: '#/components/schemas/Renovacion' }
+        pago: { $ref: '#/components/schemas/PagoCheckout' }
+        suscripcion: { $ref: '#/components/schemas/SuscripcionOrg' }
+    Cobranza:
+      type: object
+      description: HU-1708 · El aviso global de cobranza (PNT-36), para cualquier usuario de la organización.
+      required: [estado, total, moneda, finPeriodo, suspensionEn, puedePagar, regularizar]
+      properties:
+        estado: { type: string, enum: [AL_DIA, PAGO_PENDIENTE, SUSPENDIDA] }
+        total: { type: number, nullable: true, example: 1522.2 }
+        moneda: { type: string, enum: [PEN, USD], nullable: true }
+        finPeriodo: { type: string, format: date-time, nullable: true, description: El fin del período que se renueva }
+        suspensionEn: { type: string, format: date-time, nullable: true, description: 'El día 10: la suspensión, o cuándo se suspendió' }
+        puedePagar: { type: boolean, description: El usuario es administrador y puede pagar en /plan }
+        regularizar: { type: string, example: /plan }
+    SuscripcionVenta:
+      type: object
+      description: HU-1708 · Una suscripción como la ve el superadmin (Ventas › Suscripciones).
+      required: [id, organizacion, plan, ciclo, estado, finPeriodo, pasarela, ultimos4Digitos, renovacion, reintentable]
+      properties:
+        id: { type: string, format: uuid }
+        organizacion:
+          type: object
+          required: [id, nombre]
+          properties:
+            id: { type: string, format: uuid }
+            nombre: { type: string, example: Minera Andina SAC }
+        plan: { $ref: '#/components/schemas/PlanBreve' }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL] }
+        estado: { type: string, enum: [ACTIVA, PAGO_PENDIENTE, SUSPENDIDA, CANCELADA] }
+        finPeriodo: { type: string, format: date-time }
+        pasarela: { type: string, example: pruebas }
+        ultimos4Digitos: { type: string, nullable: true, example: '1111', description: 'Los 4 últimos de la tarjeta, nunca más' }
+        renovacion: { type: object, allOf: [{ $ref: '#/components/schemas/Renovacion' }], nullable: true, description: La renovación pendiente o vencida }
+        reintentable: { type: boolean, description: 'Con pago pendiente o suspendida: se puede reintentar' }
+    ListaSuscripcionesVenta:
+      type: object
+      required: [suscripciones]
+      properties:
+        suscripciones: { type: array, items: { $ref: '#/components/schemas/SuscripcionVenta' } }
+    ReintentoRenovacion:
+      type: object
+      required: [suscripcion, encolado]
+      properties:
+        suscripcion: { $ref: '#/components/schemas/SuscripcionVenta' }
+        encolado: { type: boolean, description: 'El intento quedó en la cola: con pruebas cobra; con Stripe o Culqi manda el enlace' }
     CambioPlanEntrada:
       type: object
       required: [plan]

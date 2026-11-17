@@ -1,5 +1,6 @@
 // HU-0302 · Detalle del proyecto: resumen, datos técnicos que se completan después y perfil de entrega propuesto (CP-031).
 // HU-0304 · Material del cliente con el texto por página. HU-0401 · Generación del SCORM con sus 11 etapas.
+import { useSoloLectura } from '../cobranza';
 import { Cabecera } from '@aptio/ui';
 import { FORMATOS, LMS_DESTINO, NOMBRE_ESTADO, NOMBRE_PERFIL, perfilPropuesto } from '@aptio/schema/proyecto';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
@@ -19,7 +20,9 @@ export function ProyectoDetalle({ id, rol, alCargar }: { id: string; rol: Rol; a
   const [aviso, setAviso] = useState('');
   const [lms, setLms] = useState('');
   const [materiales, setMateriales] = useState<Material[]>([]);
-  const puedeEditar = CREAN_PROYECTOS.includes(rol);
+  // HU-1708 · Con la cuenta suspendida, solo lectura: sin editar ni generar.
+  const soloLectura = useSoloLectura();
+  const puedeEditar = CREAN_PROYECTOS.includes(rol) && !soloLectura;
   // Tras lanzar, cancelar o terminar una generación cambian el estado y el costo del proyecto.
   const recargar = useCallback(() => {
     api.proyecto(id).then(setProyecto, () => undefined);

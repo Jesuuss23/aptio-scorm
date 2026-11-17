@@ -116,6 +116,21 @@ export const opcionesTareaVencer = (suscripcionId: string, esperaMs: number) => 
 });
 
 /**
+ * HU-1708 · Cobranza (REQ-088, CP-150, RN-18-8). En la misma cola `suscripciones`, la tarea periódica
+ * `renovar-suscripciones` (cada 15 min): vence las canceladas, crea la renovación de cada período vencido (idempotente
+ * por suscripción y período), hace los intentos de los días 0, 1, 3 y 7 y suspende el día 10. `renovacion-intento` es
+ * el «Reintentar ahora» del superadmin: un intento fuera del calendario, que no lo adelanta.
+ */
+export const TAREA_RENOVAR_SUSCRIPCIONES = 'renovar-suscripciones';
+export const CADA_RENOVAR_MS = 15 * 60_000;
+export const TAREA_INTENTO_RENOVACION = 'renovacion-intento';
+export interface DatosIntentoRenovacion { renovacionId: string; pedidoPorId?: string | null }
+export const opcionesTareaIntento = (renovacionId: string, ahora = Date.now()) => ({
+  jobId: `intento-${renovacionId}-${ahora}`, attempts: 3, backoff: { type: 'exponential', delay: 30_000 },
+  removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
+});
+
+/**
  * HU-1704 · «Emitir comprobante» de cada cobro aprobado (RN-18-4, CP-144). Un trabajo por cobro (`jobId` = id del cobro):
  * un evento repetido no crea otro cobro ni otro trabajo. HU-1707: el worker emite el comprobante ante el OSE. Los completados se guardan 90 días para que el id siga
  * deduplicando.

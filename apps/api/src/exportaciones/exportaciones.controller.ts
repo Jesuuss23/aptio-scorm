@@ -2,7 +2,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiAcceptedResponse, ApiCookieAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { EQUIPO } from '../comun/organizacion.js';
-import { Roles, type UsuarioSesion } from '../comun/roles.js';
+import { PermitidoSuspendida, Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { ExportacionDto, ExportacionEntradaDto, ValidacionDto } from './exportacion.dto.js';
 import { ExportacionesService } from './exportaciones.service.js';
@@ -13,6 +13,8 @@ const EXPORTAN = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL', 'PRODUCTOR'] as co
 @ApiTags('Entrega')
 @ApiCookieAuth('sesion')
 @Controller()
+// HU-1708 · Sigue disponible con la cuenta suspendida (solo lectura).
+@PermitidoSuspendida()
 @Roles(...EQUIPO)
 export class ExportacionesController {
   constructor(private readonly exportaciones: ExportacionesService) {}

@@ -791,9 +791,23 @@ export interface CompraCapsulas {
 /** HU-1706 · La suscripción de la organización: cambio de plan con prorrateo y cancelación (REQ-086, CP-147). */
 export interface PlanBreve { slug: string; nombre: string; capsulasMes: number | null }
 export interface PlanOpcion extends PlanBreve { precioCiclo: number | null; actual: boolean; tipo: 'SUBIDA' | 'BAJADA' | null }
+export type EstadoSuscripcion = 'ACTIVA' | 'PAGO_PENDIENTE' | 'SUSPENDIDA' | 'CANCELADA';
 export interface SuscripcionOrg {
-  plan: PlanBreve; ciclo: 'MENSUAL' | 'ANUAL'; precioPactadoSinIgv: number; moneda: 'PEN' | 'USD'; estado: 'ACTIVA' | 'CANCELADA'; inicioPeriodo: string; finPeriodo: string;
-  cancelarAlFin: boolean; canceladaEn: string | null; planProgramado: PlanBreve | null; planes: PlanOpcion[]; pagoDisponible: boolean;
+  plan: PlanBreve; ciclo: 'MENSUAL' | 'ANUAL'; precioPactadoSinIgv: number; moneda: 'PEN' | 'USD'; estado: EstadoSuscripcion; inicioPeriodo: string; finPeriodo: string;
+  cancelarAlFin: boolean; canceladaEn: string | null; planProgramado: PlanBreve | null; planes: PlanOpcion[]; pagoDisponible: boolean; renovacion: Renovacion | null;
+}
+/** HU-1708 · Cobranza y suspensión (REQ-088, CP-150, RN-18-8, PNT-36). */
+export interface Renovacion {
+  id: string; estado: 'PENDIENTE' | 'APROBADA' | 'VENCIDA'; plan: PlanBreve; periodoInicio: string; periodoFin: string; montoSinIgv: number; igv: number; total: number;
+  moneda: 'PEN' | 'USD'; pasarela: string; intentos: number; proximoIntento: string | null; suspensionEn: string; motivoRechazo: string | null;
+}
+export interface PagoRenovacion { renovacion: Renovacion; pago?: PagoCompra; suscripcion: SuscripcionOrg }
+export interface Cobranza {
+  estado: 'AL_DIA' | 'PAGO_PENDIENTE' | 'SUSPENDIDA'; total: number | null; moneda: 'PEN' | 'USD' | null; finPeriodo: string | null; suspensionEn: string | null; puedePagar: boolean; regularizar: string;
+}
+export interface SuscripcionVenta {
+  id: string; organizacion: { id: string; nombre: string }; plan: PlanBreve; ciclo: 'MENSUAL' | 'ANUAL'; estado: EstadoSuscripcion; finPeriodo: string; pasarela: string;
+  ultimos4Digitos: string | null; renovacion: Renovacion | null; reintentable: boolean;
 }
 export interface CambioPlan {
   id: string | null; tipo: 'SUBIDA' | 'BAJADA'; estado: 'VISTA_PREVIA' | 'PROGRAMADO' | 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'; planOrigen: PlanBreve; planDestino: PlanBreve;
@@ -1054,6 +1068,13 @@ export const api = {
   tokenCambio: (id: string, token: string) => pedir<CambioPlan>(`/organizacion/suscripcion/cambios/${id}/token`, json({ token })),
   cancelarSuscripcion: () => pedir<SuscripcionOrg>('/organizacion/suscripcion/cancelar', { method: 'POST' }),
   reanudarSuscripcion: () => pedir<SuscripcionOrg>('/organizacion/suscripcion/reanudar', { method: 'POST' }),
+  // HU-1708 · Cobranza y suspensión
+  cobranza: () => pedir<Cobranza>('/organizacion/cobranza'),
+  pagarRenovacion: () => pedir<PagoRenovacion>('/organizacion/suscripcion/renovacion/pago', { method: 'POST' }),
+  pagarPruebaRenovacion: (tarjeta: string) => pedir<PagoRenovacion>('/organizacion/suscripcion/renovacion/pago-prueba', json({ tarjeta })),
+  tokenRenovacion: (token: string) => pedir<PagoRenovacion>('/organizacion/suscripcion/renovacion/token', json({ token })),
+  suscripcionesVentas: (estado?: EstadoSuscripcion) => pedir<{ suscripciones: SuscripcionVenta[] }>(`/ventas/suscripciones${estado ? `?estado=${estado}` : ''}`),
+  reintentarRenovacion: (id: string) => pedir<{ suscripcion: SuscripcionVenta; encolado: boolean }>(`/ventas/suscripciones/${id}/reintentar`, { method: 'POST' }),
   // HU-1605 · Captación › Agendamiento (PNT-33).
   agenda: () => pedir<Agenda>('/captacion/agenda'),
   cambiarAjustesAgenda: (c: Partial<AjustesAgenda>) => pedir<AjustesAgenda>('/captacion/agenda', json(c, 'PATCH')),

@@ -24,6 +24,7 @@
 // HU-0609 · Pestaña «Imágenes» (piezas del kit, subir y la biblioteca del proyecto) y soltar un archivo de imagen sobre
 // el lienzo: se sube, queda centrado donde se soltó (en %, dentro de la pantalla), elegido y en modo Libre, y la API lo
 // suma a los recursos del curso en el mismo cambio (CP-070). Su texto alternativo empieza con el nombre del archivo.
+import { useSoloLectura } from '../cobranza';
 import { type AjusteElemento, type CursoReproductor, type Disparador, duracionDe, leerVtt, montar, PALETA_BASE, type Pantalla, type Reproductor, type RolColor, tiemposDe } from '@aptio/player';
 import { elementoRevisarTiempo, marcasPalabra, ORIGEN_REVISAR_TIEMPO, sincronizarConVoz, type TiempoSincronizado } from '@aptio/schema/tiempos';
 import { type PiezaKit, posicionSoltada } from '@aptio/schema/biblioteca';
@@ -124,7 +125,9 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   const lienzo = useRef<HTMLDivElement>(null);
   /** Texto que recupera el foco cuando el lienzo se redibuja tras guardar con Enter (teclado). */
   const reenfocar = useRef<string | null>(null);
-  const editan = EDITAN_PANTALLAS.includes(rol);
+  // HU-1708 · Con la cuenta suspendida, el editor queda en solo lectura.
+  const soloLectura = useSoloLectura();
+  const editan = EDITAN_PANTALLAS.includes(rol) && !soloLectura;
 
   /** El último curso leído, para guardar con su versión aunque el estado de React aún no se haya actualizado. */
   const cursoRef = useRef<Curso | null>(null);

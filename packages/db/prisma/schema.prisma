@@ -52,6 +52,7 @@ model Organizacion {
   comprasCapsulas   CompraCapsulas[]
   cambiosPlan       CambioPlan[]
   comprobantes      Comprobante[]
+  renovaciones      Renovacion[]
 }
 
 // ---------- Personas y acceso ----------
@@ -1312,6 +1313,7 @@ model Plan {
   programadas    Suscripcion[]          @relation("PlanProgramado")
   cambiosOrigen  CambioPlan[]           @relation("CambioPlanOrigen")
   cambiosDestino CambioPlan[]           @relation("CambioPlanDestino")
+  renovaciones   Renovacion[]           @relation("PlanRenovacion")
 
   @@index([orden])
 }
@@ -1337,6 +1339,53 @@ enum EstadoSuscripcion {
   ACTIVA
   /// HU-1706 · Cancelada al fin del período pagado (RN-18-7): sin cuota para cápsulas nuevas.
   CANCELADA
+  /// HU-1708 · Venció el período y la renovación aún no se cobra (RN-18-8): trabaja normal, con aviso, hasta el día 10.
+  PAGO_PENDIENTE
+  /// HU-1708 · Día 10 sin pago: la organización queda en solo lectura (CP-150).
+  SUSPENDIDA
+}
+
+enum EstadoRenovacion {
+  PENDIENTE
+  APROBADA
+  /// Llegó el día 10 sin pago: la suscripción quedó suspendida; aún se puede pagar para reactivarla.
+  VENCIDA
+}
+
+/// HU-1708 · La renovación de un período (REQ-088, RN-18-8): una por suscripción y período, con los intentos de cobro
+/// de los días 0, 1, 3 y 7 y la suspensión del día 10.
+model Renovacion {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizacionId String           @db.Uuid
+  organizacion   Organizacion     @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  suscripcionId  String           @db.Uuid
+  suscripcion    Suscripcion      @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  planId         String           @db.Uuid
+  plan           Plan             @relation("PlanRenovacion", fields: [planId], references: [id], onDelete: Restrict)
+  /// El período que se paga: empieza en el fin del anterior (o en el pago, si ya estaba suspendida).
+  periodoInicio  DateTime
+  periodoFin     DateTime
+  /// En la moneda de la suscripción, con dos decimales.
+  montoSinIgv    Decimal          @db.Decimal(10, 2)
+  igv            Decimal          @db.Decimal(10, 2)
+  total          Decimal          @db.Decimal(10, 2)
+  moneda         String
+  pasarela       String
+  /// Intentos de cobro ya hechos (0 a 4: días 0, 1, 3 y 7).
+  intentos       Int              @default(0)
+  /// Cuándo toca el siguiente intento o, hechos los 4, la suspensión del día 10. null si ya se resolvió.
+  proximoIntento DateTime?
+  estado         EstadoRenovacion @default(PENDIENTE)
+  motivoRechazo  String?
+  /// El evento de la pasarela que la aprobó (idempotencia, RN-18-3).
+  eventoPagoId   String?          @unique
+  suspendidaEn   DateTime?
+  creadoEn       DateTime         @default(now())
+  actualizadoEn  DateTime         @updatedAt
+  cobros         Cobro[]
+
+  @@unique([suscripcionId, periodoInicio])
+  @@index([estado, proximoIntento])
 }
 
 enum TipoComprobante {
@@ -1380,6 +1429,7 @@ model Suscripcion {
   planProgramadoId    String?               @db.Uuid
   planProgramado      Plan?                 @relation("PlanProgramado", fields: [planProgramadoId], references: [id], onDelete: Restrict)
   cambiosPlan         CambioPlan[]
+  renovaciones        Renovacion[]
   creadoEn            DateTime              @default(now())
   actualizadoEn       DateTime              @updatedAt
 }
@@ -1444,6 +1494,9 @@ model Cobro {
   /// HU-1706 · La subida de plan que pagó este cobro (la diferencia prorrateada).
   cambioPlanId           String?               @db.Uuid
   cambioPlan             CambioPlan?           @relation(fields: [cambioPlanId], references: [id], onDelete: Restrict)
+  /// HU-1708 · La renovación del período que pagó este cobro.
+  renovacionId           String?               @db.Uuid
+  renovacion             Renovacion?           @relation(fields: [renovacionId], references: [id], onDelete: Restrict)
   /// HU-1707 · El comprobante del cobro y, si se reembolsó, su nota de crédito.
   comprobantes           Comprobante[]
   suscripcionId          String?               @db.Uuid
@@ -1467,6 +1520,7 @@ model Cobro {
   @@index([suscripcionId])
   @@index([compraCapsulasId])
   @@index([cambioPlanId])
+  @@index([renovacionId])
 }
 
 enum OrigenConsumo {
