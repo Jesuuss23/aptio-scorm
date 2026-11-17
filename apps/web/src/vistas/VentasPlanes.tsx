@@ -2,7 +2,7 @@
 // como Más elegido», sus campos, el orden y sus características (agregar, ocultar, quitar); y la tarjeta «Página de
 // precios» con la opción anual, el descuento y el IGV. Los planes no se borran: se ocultan. Lo que ve el visitante
 // en /precios sale de la versión publicada: los cambios se ven al publicar. Solo el superadmin (ADR-011).
-// Los indicadores de ingresos llegan con las suscripciones (HU-1710). HU-1704: precios opcionales en dólares (para
+// HU-1710: arriba, los indicadores de ingresos del mes (`VentasIngresos.tsx`). HU-1704: precios opcionales en dólares (para
 // cobrar con Stripe a clientes del exterior, RN-18-9).
 import { type AjustesPlanes, type Caracteristica, conIgv, dolares, LIMITES_PLAN, SLUG_PLAN, soles, validarAjustesPlanes, validarPlan, validarPlanCompleto, type DatosPlan } from '@aptio/schema/planes';
 import { Cabecera } from '@aptio/ui';
@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ErrorApi, type EntradaPlan, type PlanVenta } from '../api';
 import { usePublicacionSitio } from './publicacion-sitio';
 import { AccionPublicar, AvisosPublicacion } from './SitioVersiones';
+import { IndicadoresIngresos } from './VentasIngresos';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
@@ -70,6 +71,7 @@ export function VentasPlanes() {
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {aviso ? <div className={`nota ${aviso.tipo === 'ok' ? 'validado' : 'error'}`} role={aviso.tipo === 'ok' ? 'status' : 'alert'}>{aviso.texto}</div> : null}
       <AvisosPublicacion estado={publicacion} />
+      <IndicadoresIngresos />
       {!planes || !ajustes ? (!error ? <p className="sec" role="status">Cargando los planes…</p> : null) : (
         <>
           <ul className="planes-panel" aria-label="Planes">

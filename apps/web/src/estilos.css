@@ -3901,3 +3901,8 @@ ul.fila-chips {
   .tabla-comprobantes th[scope='row'], .tabla-comprobantes td { display: block; text-align: left; padding: 4px 0; border: 0; }
   .tabla-comprobantes td::before { content: attr(data-etiqueta); display: block; font-size: var(--texto-xs); color: var(--color-texto-sec); }
 }
+
+/* HU-1710 · Panel de ingresos de Ventas › Planes (PNT-35). */
+.tarjeta.ingresos { margin-bottom: 16px; }
+.ingresos-mes { display: flex; flex-wrap: wrap; gap: 8px; }
+.ingresos .res-indicadores dd.num { font-size: var(--texto-sm); }
