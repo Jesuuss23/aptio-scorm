@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.70 · actualizado con la octava entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.71 · actualizado con la novena entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1003,6 +1003,42 @@ El visitante recibe la **invitación** por correo con la videollamada, el archiv
 
 Cada reserva entra también a **Leads y CRM** con vía «Agendador» y pasa a la etapa **Demo** (si estaba en Nuevo o Contactado). **Ver página de agenda** abre la página del sitio en otra pestaña.
 
+### 8.38 Chatbot del sitio (solo superadmin)
+
+El **chatbot** es un asistente que responde las preguntas de los visitantes del sitio con la información que el sitio ya publica, y les ofrece agendar una demo o hablar con una persona. Se administra en **Captación › Chatbot**.
+
+**Mostrar u ocultar.** El interruptor **Mostrar chatbot en el sitio**, arriba a la derecha, lo enciende o lo apaga. El cambio vale de inmediato, sin publicar. Viene apagado.
+
+**Identidad y objetivo.**
+
+- **Nombre:** el nombre del asistente (por defecto, Ana).
+- **Saludo (español)** y **Saludo (inglés):** el primer mensaje que ve el visitante.
+- **Tono:** cercano y profesional, formal o directo.
+- **Objetivo principal:** agendar demo, captar lead o derivar a WhatsApp. El asistente lo tiene en cuenta al responder.
+- **Horario de traspaso a una persona (hora de Lima):** desde qué hora y hasta qué hora hay alguien del equipo, y qué días. Debajo dice el horario actual.
+- Pulsa **Guardar**.
+
+**Respuestas rápidas.** Son los botones que el visitante ve debajo del saludo, por ejemplo «¿Funciona con Moodle?».
+
+- Pulsa **Nueva respuesta**, escribe el **texto en español** (y en inglés, si quieres) y elige qué pasa **al pulsarla**: **Pregunta a la IA** (el asistente responde esa pregunta), **Agendar demo** o **Hablar con una persona**.
+- **Subir** y **Bajar** cambian el orden. **Editar** cambia el texto y **Borrar** la quita después de confirmar.
+- El interruptor **Mostrar [respuesta]** la muestra u oculta en el chat. Una marcada como **Ficticio** nunca aparece en producción.
+- El chat muestra hasta 8.
+
+**Base de conocimiento.** El asistente solo responde con lo que está aquí, y siempre dice de dónde sacó la respuesta:
+
+- Las **páginas publicadas** y las **preguntas frecuentes** del sitio, en el idioma del visitante. La tarjeta dice cuántas toma.
+- Las **fuentes** que agregues tú con **Agregar fuente**: un título, el contenido en texto simple (sin etiquetas HTML, hasta 4 000 caracteres) y el idioma. Sirven para datos que no están en el sitio, como los plazos de entrega.
+- El interruptor **Usar [fuente]** la deja fuera sin borrarla.
+
+Si la respuesta no está en la base, el asistente dice que no lo sabe y ofrece **Agendar demo** y **Hablar con una persona**. Nunca inventa.
+
+**Conversaciones.** La lista muestra las conversaciones de los últimos 90 días, de la más reciente a la más antigua; después se borran solas. Cada una dice su **resultado**: Respondida, Pidió una persona, Lead, Demo agendada o Sin conversión. Con **Resultado** filtras la lista. Pulsa una para leer los mensajes, las fuentes que citó y los botones que ofreció.
+
+**Probar.** **Abrir el chat en el sitio** abre el sitio en otra pestaña con el chat abierto.
+
+**Lo que ve el visitante.** Un botón abajo a la derecha (encima del de WhatsApp) abre el chat, en todas las páginas menos las de pago. Puede escribir su pregunta o pulsar una respuesta rápida. Con **Agendar demo** elige un horario y deja sus datos sin salir del chat; la cita aparece en **Agendamiento** y el lead entra a **Leads y CRM** con vía «Chatbot» y en la etapa **Demo**. Con **Hablar con una persona**, dentro del horario ve el botón de WhatsApp y siempre puede dejar su correo y su pregunta; fuera del horario se le avisa que le responderán el siguiente día hábil. La conversación sigue si cambia de página, y se cierra con **Escape** o con el botón de cerrar. Todo funciona con el teclado.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1094,6 +1130,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.71 | 2026-11-17 | Chatbot del sitio (8.38): mostrarlo u ocultarlo sin publicar, nombre, saludos, tono, objetivo y horario de atención, respuestas rápidas con orden, la base de conocimiento con fuentes propias, las conversaciones de 90 días con su resultado y lo que ve el visitante (preguntar, agendar una demo y hablar con una persona). |
 | 0.70 | 2026-11-17 | Agendamiento de demos (8.37): asesores con su enlace de videollamada, tipos de reunión con «Ofrecer», duración y orden, horarios de lunes a viernes, días bloqueados y feriados, recordatorios por correo, la reserva del visitante con su invitación y cancelación, y la lista de citas con «Cancelar», «Realizada» y «No asistió». |
 | 0.69 | 2026-11-16 | Popups (8.36): crear modales, deslizables y barras con disparador, páginas, frecuencia y botón (pedir el correo o abrir un enlace), activarlos sin publicar, ordenarlos, probarlos en el sitio, ver impresiones y conversión, reiniciar y borrar. |
 | 0.68 | 2026-11-16 | Leads y CRM (8.35): enviar los leads a HubSpot, Pipedrive, Zoho o un webhook, con las tarjetas Conexiones, Mapeo de campos y Webhook (copiar y regenerar la clave, enviar prueba), la columna CRM y «Reintentar». |

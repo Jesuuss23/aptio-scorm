@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.70 · actualizado con la octava entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.71 · actualizado con la novena entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -525,6 +525,20 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Panel (PNT-33):** `GET` y `PATCH /captacion/agenda`, los tipos (`POST`, `PATCH`, `DELETE`, `PUT orden`), los asesores (`POST`, `PATCH`, `DELETE`), `GET /captacion/agenda/citas` y `PATCH /captacion/agenda/citas/{id}`, solo del superadmin.
 - **Auditoría:** AGENDA_AJUSTES_EDITADOS, AGENDA_TIPO_CREADO, AGENDA_TIPO_EDITADO, AGENDA_TIPO_BORRADO, AGENDA_TIPOS_ORDENADOS, AGENDA_ASESOR_CREADO, AGENDA_ASESOR_EDITADO, AGENDA_ASESOR_BORRADO, AGENDA_CITA_CANCELADA y AGENDA_CITA_MARCADA.
 
+### 3.29 Chatbot del sitio (HU-1604)
+
+- **Datos (REQ-077):** migración `20261117010000_chatbot`.
+  - `SitioChatbot`: una fila con el nombre, los saludos, el tono, el objetivo, el horario y los días de atención y si se muestra.
+  - `SitioChatRapida`: texto en español e inglés, acción (pregunta a la IA, agendar demo, hablar con una persona), visible, orden y ficticio.
+  - `SitioChatFuente`: título, contenido en texto plano, idioma y visible.
+  - `SitioConversacion`: idioma, mensajes, resultado y fecha de borrado (90 días). No guarda IP ni cookies.
+- **Sitio (SUP-261):** toda versión trae `_chat.js`, que cargan todas las páginas salvo `/pago*` (diferido, sin cookies, conversación en `sessionStorage`). Lee `GET /s/_chatbot.json` en vivo (la CDN 30 s): mostrar u ocultar el chatbot no necesita publicar. El botón y el diálogo son fijos, así que no mueven la página (Lighthouse: CLS 0 con el chat activo).
+- **Conversación (RN-17-4, SUP-258):** `POST /api/v1/publico/chat`, con 500 caracteres por mensaje, 20 mensajes del visitante por conversación y 10 por minuto por IP (en memoria). Responde 404 CHATBOT_OCULTO con el chatbot oculto.
+- **IA-20 (SUP-256, SUP-257):** responde dentro de la solicitud con las páginas y preguntas frecuentes publicadas del idioma (sin ficticios en producción) y las fuentes manuales visibles: hasta 6 fuentes y 12 000 caracteres. El mensaje y el historial van neutralizados como datos. La salida valida contra un esquema estricto y debe citar una fuente del contexto. Sin fuentes, sin cita válida, con la salida no válida, a los 20 s o con el tope de gasto de la plataforma alcanzado, responde «no lo sé» con «Agendar demo» y «Hablar con una persona» (CP-133). El consumo queda como trabajo de IA de la plataforma.
+- **Agendar y traspaso (CP-134, SUP-259, SUP-260):** las respuestas rápidas «Agendar demo» y «Hablar con una persona» no llaman a la IA. La reserva va a `POST /publico/citas` con `via: chatbot`: el lead entra con vía «Chatbot» y pasa a Demo. El traspaso ofrece WhatsApp dentro del horario de atención (hora de Lima) y, siempre, el correo y la pregunta (`POST /publico/leads` con `via: chatbot`). El resultado de la conversación sube a Lead o Demo agendada.
+- **Panel (PNT-32):** `GET` y `PATCH /captacion/chatbot`, las respuestas rápidas (`POST`, `PATCH`, `DELETE`, `PUT orden`), las fuentes (`POST`, `PATCH`, `DELETE`) y `GET /captacion/chatbot/conversaciones`, solo del superadmin.
+- **Auditoría:** CHATBOT_AJUSTES_CAMBIADOS, CHATBOT_MOSTRADO, CHATBOT_OCULTADO, CHATBOT_RAPIDA_CREADA, CHATBOT_RAPIDA_CAMBIADA, CHATBOT_RAPIDA_BORRADA, CHATBOT_RAPIDAS_ORDENADAS, CHATBOT_FUENTE_CREADA, CHATBOT_FUENTE_CAMBIADA, CHATBOT_FUENTE_BORRADA y LIMITE_GASTO_ALCANZADO (una vez al día).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -666,6 +680,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.71 | 2026-11-17 | Chatbot del sitio (3.29): los modelos del chatbot y sus conversaciones de 90 días, `_chat.js` y `_chatbot.json` en vivo, los límites de `POST /publico/chat`, IA-20 con fuentes del sitio y «no lo sé» ante la espera o el tope de gasto, la reserva y el traspaso con vía «Chatbot», el panel y la auditoría. |
 | 0.70 | 2026-11-17 | Agendamiento de demos (3.28): los modelos del agendador con su índice único parcial, las franjas en hora de Lima sin feriados, la reserva con candado por asesor y 409, el lead en Demo, la cola `agenda` con invitación, recordatorios y cancelación, el token guardado como SHA-256, el bloque del sitio con CLS 0, el panel y su auditoría; SUP-251 a SUP-255 en los supuestos. |
 | 0.69 | 2026-11-16 | Popups (3.27): `SitioPopup`, los popups en vivo con `_popups.js` y `_popups.json` (CDN 30 s), las reglas de frecuencia, páginas y pago en el navegador con `localStorage`, los contadores de `POST /s/_popup` sin datos personales, el panel y su auditoría; SUP-246 a SUP-250 en los supuestos. |
 | 0.68 | 2026-11-16 | Integración con CRM (3.26): `CrmConexion` y `LeadEnvio`, la cola `crm` con 3 reintentos de espera creciente, el webhook firmado con HMAC-SHA256 y su comprobación SSRF, las claves en el entorno y la auditoría; SUP-241 a SUP-245 en los supuestos. |
