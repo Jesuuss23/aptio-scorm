@@ -12,6 +12,8 @@ import { ARCHIVO_CAPTACION, RUTA_GRACIAS } from './captacion.js';
 import { ARCHIVO_POPUPS } from './popups.js';
 import { ARCHIVO_AGENDA } from './agenda.js';
 import { ARCHIVO_CHAT } from './chat.js';
+import { ARCHIVO_COOKIES } from './cookies.js';
+import { type CookiesPublicadas, dominiosCsp } from '@aptio/schema/cookies';
 import { ARCHIVO_LLMS, archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
 
 export type Pedido =
@@ -37,6 +39,8 @@ export function resolverPedido(ruta: string): Pedido | null {
   if (limpia === `/${ARCHIVO_POPUPS}`) return { tipo: 'script', archivo: ARCHIVO_POPUPS };
   // HU-1604 · El chat (en toda versión desde esta historia).
   if (limpia === `/${ARCHIVO_CHAT}`) return { tipo: 'script', archivo: ARCHIVO_CHAT };
+  // HU-1606 · El consentimiento de cookies: solo existe si la versión tiene etiquetas.
+  if (limpia === `/${ARCHIVO_COOKIES}`) return { tipo: 'script', archivo: ARCHIVO_COOKIES };
   // HU-1605 · El agendador: solo existe si alguna página lo tiene.
   if (limpia === `/${ARCHIVO_AGENDA}`) return { tipo: 'script', archivo: ARCHIVO_AGENDA };
   if (limpia === `/${RUTA_GRACIAS}` || limpia === `/en/${RUTA_GRACIAS}`) return { tipo: 'pagina', archivo: `${limpia.slice(1)}.html`, ruta: limpia };
@@ -65,6 +69,17 @@ export const TIPOS_MIME = {
  */
 export const POLITICA_CONTENIDO = "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
+/**
+ * HU-1606 · La CSP de las páginas de una versión: con etiquetas publicadas (GA4, Tag Manager, Meta Pixel), suma solo los
+ * orígenes que cada una necesita en `script-src`, `connect-src` e `img-src`; sin ellas, `POLITICA_CONTENIDO` tal cual.
+ */
+export function politicaContenido(cookies: CookiesPublicadas | null | undefined): string {
+  const d = dominiosCsp(cookies ?? null);
+  if (!d.script.length) return POLITICA_CONTENIDO;
+  const mas = (lista: string[]) => (lista.length ? ` ${lista.join(' ')}` : '');
+  return `default-src 'none'; script-src 'self'${mas(d.script)}; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${mas(d.img)}; connect-src 'self'${mas(d.connect)}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
+}
+
 /** Tipo de un archivo de marca por su extensión. */
 export const mimeMarca = (archivo: string) => (archivo.endsWith('.png') ? 'image/png' : 'image/svg+xml');
 /** HU-1511 · Tipo de una imagen copiada del blog por su extensión. */
@@ -74,7 +89,7 @@ export const mimeBlog = (archivo: string) => (archivo.endsWith('.png') ? 'image/
  * Cabeceras de cada respuesta. HU-1509: la marca (con su hash en el nombre) se guarda un año, como las fuentes; el
  * aviso de mantenimiento (503) no se guarda en ninguna caché; `privada` es para lo que ve el superadmin en mantenimiento.
  */
-export function cabecerasSitio(tipo: Pedido['tipo'] | '404' | '503', cuerpo: Uint8Array | string, opciones: { archivo?: string | undefined; privada?: boolean } = {}): Record<string, string> {
+export function cabecerasSitio(tipo: Pedido['tipo'] | '404' | '503', cuerpo: Uint8Array | string, opciones: { archivo?: string | undefined; privada?: boolean; cookies?: CookiesPublicadas | null } = {}): Record<string, string> {
   const etag = `"${createHash('sha1').update(cuerpo).digest('base64url')}"`;
   const tipoContenido = tipo === '404' || tipo === '503' ? TIPOS_MIME.pagina : tipo === 'marca' ? mimeMarca(opciones.archivo ?? '') : tipo === 'blog' ? mimeBlog(opciones.archivo ?? '') : TIPOS_MIME[tipo];
   const base = { 'Content-Type': tipoContenido, ETag: etag, 'X-Content-Type-Options': 'nosniff' };
@@ -85,7 +100,7 @@ export function cabecerasSitio(tipo: Pedido['tipo'] | '404' | '503', cuerpo: Uin
   return {
     ...base,
     'Cache-Control': cache,
-    ...(tipo === 'pagina' || tipo === '404' || tipo === '503' ? { 'Content-Security-Policy': POLITICA_CONTENIDO, 'Referrer-Policy': 'strict-origin-when-cross-origin' } : {}),
+    ...(tipo === 'pagina' || tipo === '404' || tipo === '503' ? { 'Content-Security-Policy': tipo === 'pagina' ? politicaContenido(opciones.cookies) : POLITICA_CONTENIDO, 'Referrer-Policy': 'strict-origin-when-cross-origin' } : {}),
     ...(tipo === '503' ? { 'Retry-After': String(REINTENTO_MANTENIMIENTO_S) } : {}),
   };
 }

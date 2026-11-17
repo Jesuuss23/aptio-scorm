@@ -3,6 +3,8 @@
 // que la API (`@aptio/schema/sitio-ajustes`). Nombre, dominio, marca y WhatsApp llegan al sitio con «Publicar cambios»;
 // el mantenimiento y el correo de leads valen al instante (CP-121).
 // HU-1510 · Tarjeta «Idiomas»: el interruptor «Mostrar selector ES/EN» (activo por defecto) llega al sitio al publicar.
+// HU-1606 · Tarjeta «Privacidad»: «Mostrar banner de cookies» y la versión de la política; los IDs de Analítica y la
+// privacidad llegan al sitio al publicar y las etiquetas solo se cargan con el consentimiento del visitante (RN-17-6).
 import { AJUSTES_POR_DEFECTO, type AjustesSitio as Reglas, aplicarCambiosAjustes, type CambiosAjustes, LIMITES_AJUSTES } from '@aptio/schema/sitio-ajustes';
 import { Cabecera } from '@aptio/ui';
 import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
@@ -31,13 +33,14 @@ export function SitioAjustes() {
 
   return (
     <>
-      <Cabecera titulo="Ajustes del sitio" subtitulo="Dominio, marca, analítica, contacto, idiomas y mantenimiento del sitio comercial." />
+      <Cabecera titulo="Ajustes del sitio" subtitulo="Dominio, marca, analítica, privacidad, contacto, idiomas y mantenimiento del sitio comercial." />
       {error ? <div className="nota error" role="alert">{error}</div> : null}
       {!ajustes ? (!error ? <p className="sec" role="status">Cargando…</p> : null) : (
         <div className="columnas ajustes-sitio">
           <TarjetaIdentidad ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaContacto ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaAnalitica ajustes={ajustes} alGuardar={setAjustes} />
+          <TarjetaPrivacidad ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaIdiomas ajustes={ajustes} alGuardar={setAjustes} />
           <TarjetaMantenimiento ajustes={ajustes} alGuardar={setAjustes} />
         </div>
@@ -241,9 +244,44 @@ function TarjetaAnalitica({ ajustes, alGuardar }: PropsTarjeta) {
         <label className="campo" htmlFor="ajuste-ga4">Google Analytics 4<input id="ajuste-ga4" value={ga4} onChange={(e) => setGa4(e.target.value)} placeholder="G-AB12CD34EF" spellCheck={false} /></label>
         <label className="campo" htmlFor="ajuste-gtm">Tag Manager<input id="ajuste-gtm" value={gtm} onChange={(e) => setGtm(e.target.value)} placeholder="GTM-AB12CD3" spellCheck={false} /></label>
         <label className="campo" htmlFor="ajuste-pixel">Meta Pixel<input id="ajuste-pixel" value={pixel} onChange={(e) => setPixel(e.target.value)} placeholder="123456789012345" inputMode="numeric" /></label>
-        <p className="nota aviso">Se guardan ahora y se activarán en el sitio con el banner de cookies (Ley 29733): las etiquetas solo se cargan después de que el visitante acepte las cookies de analítica.</p>
+        <p className="nota aviso">Los identificadores llegan al sitio con «Publicar cambios» y cada etiqueta solo se carga después de que el visitante acepte su categoría en el aviso de cookies (Ley 29733): Google Analytics 4 y Tag Manager son analítica; Meta Pixel es publicidad.</p>
         <div className="acciones-fila ajustes-acciones"><button type="submit" className="boton primario" disabled={g.ocupado}>Guardar</button></div>
       </form>
+      <Nota aviso={g.aviso} />
+    </Tarjeta>
+  );
+}
+
+function TarjetaPrivacidad({ ajustes, alGuardar }: PropsTarjeta) {
+  const g = useGuardar(ajustes, alGuardar);
+  const [confirmando, setConfirmando] = useState(false);
+  const { visible, version } = ajustes.cookies;
+  const hayEtiquetas = Boolean(ajustes.analitica.ga4 || ajustes.analitica.gtm || ajustes.analitica.metaPixel);
+  async function subir() {
+    if (await g.guardar({ cookies: { subirVersion: true } }, `La política quedó en la versión ${version + 1}. Al publicar, el sitio vuelve a pedir el consentimiento a todos los visitantes.`)) setConfirmando(false);
+  }
+  return (
+    <Tarjeta id="ajustes-privacidad" titulo="Privacidad">
+      <div className="formulario-ajustes">
+        <div className="fila-interruptor">
+          <span id="ajuste-cookies-etiqueta">Mostrar banner de cookies</span>
+          <button type="button" role="switch" className="interruptor" aria-checked={visible} aria-labelledby="ajuste-cookies-etiqueta" aria-describedby="ajuste-cookies-ayuda" disabled={g.ocupado}
+            onClick={() => void g.guardar({ cookies: { visible: !visible } }, `${visible ? 'El aviso de cookies quedará oculto y el sitio no cargará ninguna etiqueta.' : 'El aviso de cookies se mostrará.'} ${PUBLICAR}`)}><span aria-hidden="true" /></button>
+          <span className="sec">{visible ? 'Visible' : 'Oculto'}</span>
+        </div>
+        <p className="sec" id="ajuste-cookies-ayuda">Categorías: necesarias (siempre), analítica y publicidad (solo si el visitante las acepta). El aviso aparece solo si hay al menos un identificador en Analítica; apagado, el sitio no carga ninguna etiqueta. El visitante cambia su elección con «Configurar cookies», al pie de cada página.</p>
+        {!hayEtiquetas ? <p className="nota">Sin identificadores en Analítica, el sitio no muestra el aviso de cookies.</p> : null}
+        <p>Versión de la política: <b>{version}</b></p>
+        {!confirmando ? (
+          <div className="acciones-fila"><button type="button" className="boton" disabled={g.ocupado} onClick={() => setConfirmando(true)}>Pedir de nuevo el consentimiento</button></div>
+        ) : (
+          <div className="nota aviso confirmar-fila" role="group" aria-label="Confirmar la nueva versión de la política">
+            <span>¿Subir la política a la versión {version + 1}? Al publicar, todos los visitantes vuelven a ver el aviso. Hazlo cuando cambie la política de privacidad o lo que miden las etiquetas.</span>
+            <button type="button" className="boton primario" disabled={g.ocupado} onClick={() => void subir()}>Sí, subir la versión</button>
+            <button type="button" className="boton" onClick={() => setConfirmando(false)}>Cancelar</button>
+          </div>
+        )}
+      </div>
       <Nota aviso={g.aviso} />
     </Tarjeta>
   );

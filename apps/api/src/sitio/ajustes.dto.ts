@@ -15,6 +15,11 @@ class AnaliticaDto {
   @ApiProperty({ type: String, nullable: true, example: '123456789012345' }) metaPixel: string | null;
 }
 
+class CookiesDto {
+  @ApiProperty({ default: true, description: 'HU-1606 · Muestra el aviso de cookies en el sitio (solo si hay al menos un ID de analítica); apagado, no se carga ninguna etiqueta' }) visible: boolean;
+  @ApiProperty({ default: 1, minimum: 1, description: 'HU-1606 · Versión de la política: al subirla y publicar, el sitio vuelve a pedir el consentimiento' }) version: number;
+}
+
 class WhatsappDto {
   @ApiProperty() visible: boolean;
   @ApiProperty({ type: String, nullable: true, example: '+51987654321' }) numero: string | null;
@@ -33,7 +38,8 @@ export class AjustesSitioDto {
   @ApiProperty({ example: 'Aptio SCORM' }) nombre: string;
   @ApiProperty({ type: ArchivoMarcaDto, nullable: true }) logo: ArchivoMarcaDto | null;
   @ApiProperty({ type: ArchivoMarcaDto, nullable: true }) favicon: ArchivoMarcaDto | null;
-  @ApiProperty({ type: AnaliticaDto, description: 'Se guardan; se activan con el banner de cookies (SUP-200)' }) analitica: AnaliticaDto;
+  @ApiProperty({ type: AnaliticaDto, description: 'HU-1606 · Salen al sitio con «Publicar cambios» y solo se cargan con el consentimiento del visitante' }) analitica: AnaliticaDto;
+  @ApiProperty({ type: CookiesDto }) cookies: CookiesDto;
   @ApiProperty({ type: WhatsappDto }) whatsapp: WhatsappDto;
   @ApiProperty({ type: String, nullable: true }) correoLeads: string | null;
   @ApiProperty({ type: MantenimientoDto, description: 'Vale al instante, sin publicar (CP-121)' }) mantenimiento: MantenimientoDto;
@@ -45,6 +51,11 @@ class AnaliticaCambioDto {
   @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @ValidateIf(opcional) @IsString() ga4?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @ValidateIf(opcional) @IsString() gtm?: string | null;
   @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @ValidateIf(opcional) @IsString() metaPixel?: string | null;
+}
+
+class CookiesCambioDto {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() visible?: boolean;
+  @ApiPropertyOptional({ description: 'true suma 1 a la versión de la política' }) @IsOptional() @IsBoolean() subirVersion?: boolean;
 }
 
 class WhatsappCambioDto {
@@ -62,6 +73,7 @@ export class AjustesSitioCambioDto {
   @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @ValidateIf(opcional) @IsString() dominio?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsString() nombre?: string;
   @ApiPropertyOptional({ type: AnaliticaCambioDto }) @IsOptional() @ValidateNested() @Type(() => AnaliticaCambioDto) analitica?: AnaliticaCambioDto;
+  @ApiPropertyOptional({ type: CookiesCambioDto, description: 'HU-1606 · El aviso de cookies y la versión de la política; salen al sitio al publicar' }) @IsOptional() @ValidateNested() @Type(() => CookiesCambioDto) cookies?: CookiesCambioDto;
   @ApiPropertyOptional({ type: WhatsappCambioDto }) @IsOptional() @ValidateNested() @Type(() => WhatsappCambioDto) whatsapp?: WhatsappCambioDto;
   @ApiPropertyOptional({ type: String, nullable: true }) @IsOptional() @ValidateIf(opcional) @IsString() correoLeads?: string | null;
   @ApiPropertyOptional({ type: MantenimientoCambioDto }) @IsOptional() @ValidateNested() @Type(() => MantenimientoCambioDto) mantenimiento?: MantenimientoCambioDto;

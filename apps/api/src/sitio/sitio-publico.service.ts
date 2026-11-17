@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ARCHIVO_REDIRECCIONES, CLAVE_ACTUAL, claveBlog, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
+import { ARCHIVO_COOKIES_JSON, ARCHIVO_REDIRECCIONES, CLAVE_ACTUAL, claveBlog, claveMarca, claveVersion, leerFuente, opcionesRenderDesdeEnv, type Pedido, type PunteroSitio, renderizar404, renderizarMantenimiento } from '@aptio/sitio';
+import type { CookiesPublicadas } from '@aptio/schema/cookies';
 import { ajustesPublicados, type AjustesSitio } from '@aptio/schema/sitio-ajustes';
 import { redireccionDe } from '@aptio/schema/sitio-seo';
 import { AlmacenService } from '../recursos/almacen.service.js';
@@ -11,7 +12,11 @@ const MAX_OBJETOS = 300;
 const noExiste = (e: unknown) =>
   ['NoSuchKey', 'NotFound'].includes((e as { name?: string }).name ?? '') || (e as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode === 404;
 
-export interface Respuesta { estado: 200 | 404 | 503; tipo: Pedido['tipo'] | '404' | '503'; cuerpo: Uint8Array; archivo?: string }
+export interface Respuesta {
+  estado: 200 | 404 | 503; tipo: Pedido['tipo'] | '404' | '503'; cuerpo: Uint8Array; archivo?: string;
+  /** HU-1606 · Las etiquetas publicadas en la versión de la página, para su CSP. */
+  cookies?: CookiesPublicadas | null;
+}
 /** HU-1512 · CP-124 · Una ruta con redirección activa en la versión vigente: 301 a su destino (ruta interna). */
 export interface Redireccion301 { estado: 301; hacia: string }
 
@@ -66,7 +71,7 @@ export class SitioPublicoService {
     if (version === null) return this.noEncontrada(null);
     if (pedido) {
       const cuerpo = await this.leer(claveVersion(version, pedido.archivo), true);
-      if (cuerpo) return { estado: 200, tipo: pedido.tipo, cuerpo };
+      if (cuerpo) return { estado: 200, tipo: pedido.tipo, cuerpo, ...(pedido.tipo === 'pagina' ? { cookies: await this.cookies(version) } : {}) };
       // HU-1512 · CP-124 · Antes del 404, las redirecciones activas de la versión vigente (la página publicada manda).
       if (pedido.tipo === 'pagina') {
         const hacia = redireccionDe(await this.redirecciones(version), pedido.ruta);
@@ -74,6 +79,18 @@ export class SitioPublicoService {
       }
     }
     return this.noEncontrada(version);
+  }
+
+  /** HU-1606 · Las etiquetas publicadas con la versión (sin archivo: ninguna, y la CSP queda cerrada). */
+  private async cookies(version: number): Promise<CookiesPublicadas | null> {
+    const bruto = await this.leer(claveVersion(version, ARCHIVO_COOKIES_JSON), true);
+    if (!bruto) return null;
+    try {
+      const c = JSON.parse(new TextDecoder().decode(bruto)) as Partial<CookiesPublicadas>;
+      return c && typeof c.version === 'number' && c.etiquetas && typeof c.etiquetas === 'object' ? { version: c.version, etiquetas: c.etiquetas } : null;
+    } catch {
+      return null;
+    }
   }
 
   /** Las redirecciones guardadas con la versión (sin archivo: ninguna). */

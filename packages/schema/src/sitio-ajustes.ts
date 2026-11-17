@@ -1,9 +1,10 @@
 /**
  * HU-1509 · Ajustes del sitio comercial (REQ-073, PNT-38): dominio, marca, analítica, WhatsApp, correo de leads y modo
- * mantenimiento. Una sola fila por plataforma. Nombre, dominio, logo, favicon y WhatsApp entran en la versión al
+ * mantenimiento. HU-1606: el banner de cookies y la versión de la política; los IDs de analítica entran en la versión. Una sola fila por plataforma. Nombre, dominio, logo, favicon y WhatsApp entran en la versión al
  * publicar (`ajustesPublicados`); el mantenimiento y el correo de leads valen al instante. Lo usan la API, `@aptio/db`,
  * el pre-render y la consola web.
  */
+import { cookiesPublicadas, type CookiesPublicadas } from './cookies.js';
 import { esTextoPlano, type ErrorCampo } from './sitio-contenido.js';
 
 export type MimeMarca = 'image/svg+xml' | 'image/png';
@@ -18,8 +19,10 @@ export interface AjustesSitio {
   nombre: string;
   logo: ArchivoMarca | null;
   favicon: ArchivoMarca | null;
-  /** IDs guardados; se activan en el sitio con el banner de cookies (SUP-200). */
+  /** IDs guardados; salen al sitio al publicar y solo se cargan con el consentimiento de su categoría (HU-1606). */
   analitica: { ga4: string | null; gtm: string | null; metaPixel: string | null };
+  /** HU-1606 · Banner de cookies y versión de la política: subirla vuelve a pedir el consentimiento al publicar. */
+  cookies: { visible: boolean; version: number };
   whatsapp: { visible: boolean; numero: string | null; mensaje: string | null };
   correoLeads: string | null;
   mantenimiento: { activo: boolean; mensaje: string | null; desde: string | null };
@@ -32,6 +35,7 @@ export const NOMBRE_POR_DEFECTO = 'Aptio SCORM';
 export const AJUSTES_POR_DEFECTO: AjustesSitio = {
   dominio: null, nombre: NOMBRE_POR_DEFECTO, logo: null, favicon: null,
   analitica: { ga4: null, gtm: null, metaPixel: null },
+  cookies: { visible: true, version: 1 },
   whatsapp: { visible: false, numero: null, mensaje: null },
   correoLeads: null,
   mantenimiento: { activo: false, mensaje: null, desde: null },
@@ -63,6 +67,10 @@ export function leerAjustes(v: unknown): AjustesSitio {
     nombre: typeof o.nombre === 'string' && o.nombre ? o.nombre : d.nombre,
     logo: archivo(o.logo), favicon: archivo(o.favicon),
     analitica: { ...d.analitica, ...(o.analitica ?? {}) },
+    cookies: {
+      visible: typeof o.cookies?.visible === 'boolean' ? o.cookies.visible : d.cookies.visible,
+      version: Number.isInteger(o.cookies?.version) && o.cookies!.version >= 1 ? o.cookies!.version : d.cookies.version,
+    },
     whatsapp: { ...d.whatsapp, ...(o.whatsapp ?? {}) },
     correoLeads: typeof o.correoLeads === 'string' ? o.correoLeads : null,
     mantenimiento: { ...d.mantenimiento, ...(o.mantenimiento ?? {}) },
@@ -75,6 +83,8 @@ export interface CambiosAjustes {
   dominio?: string | null;
   nombre?: string;
   analitica?: Partial<AjustesSitio['analitica']>;
+  /** HU-1606 · `subirVersion` suma 1 a la versión de la política. */
+  cookies?: { visible?: boolean; subirVersion?: boolean };
   whatsapp?: Partial<AjustesSitio['whatsapp']>;
   correoLeads?: string | null;
   mantenimiento?: { activo?: boolean; mensaje?: string | null };
@@ -114,6 +124,10 @@ export function aplicarCambiosAjustes(actual: AjustesSitio, c: CambiosAjustes, a
       if (v !== null && !re.test(v)) errores.push({ campo: `analitica.${clave}`, mensaje });
       a.analitica[clave] = v;
     }
+  }
+  if (c.cookies) {
+    if (c.cookies.visible !== undefined) a.cookies.visible = c.cookies.visible;
+    if (c.cookies.subirVersion === true) a.cookies.version += 1;
   }
   if (c.whatsapp) {
     if (c.whatsapp.numero !== undefined) {
@@ -162,13 +176,17 @@ export interface SitioPublicado {
   whatsapp: { numero: string; mensaje: string | null } | null;
   /** HU-1510 · Solo cuando el selector está apagado; sin el campo, se muestra (así las versiones de antes no cambian). */
   mostrarSelectorIdioma?: false;
+  /** HU-1606 · Solo con el banner encendido y al menos un ID: la versión de la política y las etiquetas (sin el campo, ni banner ni etiquetas). */
+  cookies?: CookiesPublicadas;
 }
 
 export function ajustesPublicados(a: AjustesSitio): SitioPublicado {
+  const cookies = cookiesPublicadas(a.cookies, a.analitica);
   return {
     nombre: a.nombre, dominio: a.dominio, logo: a.logo, favicon: a.favicon,
     whatsapp: a.whatsapp.visible && a.whatsapp.numero ? { numero: a.whatsapp.numero, mensaje: a.whatsapp.mensaje } : null,
     ...(a.mostrarSelectorIdioma ? {} : { mostrarSelectorIdioma: false as const }),
+    ...(cookies ? { cookies } : {}),
   };
 }
 

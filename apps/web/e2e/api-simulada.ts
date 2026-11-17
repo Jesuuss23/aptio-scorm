@@ -2,6 +2,7 @@ import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/
 import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
 import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
+import type { CookiesPublicadas } from '@aptio/schema/cookies';
 import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
 import { aplicarCambiosBlog, blogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, enlaceEditarWp, type FilaArticuloBlog, type FilaCategoriaBlog, leerArticuloWp } from '@aptio/schema/sitio-blog';
 import { analizarSeo, aplicarCambiosSeo, type CambiosSeo, leerSeo, redireccionDe, rutaServida, validarRedireccion, validarRobotsExtra } from '@aptio/schema/sitio-seo';
@@ -720,9 +721,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     // HU-1509 · CP-121 · En mantenimiento el visitante recibe el aviso (503); el superadmin con sesión ve el sitio con un aviso arriba.
     const mantenimiento = Boolean(ajustesSim?.mantenimiento.activo) && pedido?.tipo !== 'fuente' && pedido?.tipo !== 'marca';
     const superadmin = sesion && usuario.rol === 'SUPERADMIN';
-    const enviar = (status: number, tipo: Parameters<typeof cabecerasSitio>[0], cuerpo: string | Buffer, archivo?: string) => {
+    const enviar = (status: number, tipo: Parameters<typeof cabecerasSitio>[0], cuerpo: string | Buffer, archivo?: string, cookies: CookiesPublicadas | null = null) => {
       const html = mantenimiento && superadmin && typeof cuerpo === 'string' ? cuerpo.replace('<body>', `<body><p class="aviso-pruebas" role="status">${AVISO_MANTENIMIENTO}</p>`) : cuerpo;
-      return route.fulfill({ status, headers: cabecerasSitio(tipo, html, { archivo, privada: mantenimiento }), body: html });
+      // HU-1606 · Como la API: la CSP de la página se abre solo a las etiquetas publicadas en su versión.
+      return route.fulfill({ status, headers: cabecerasSitio(tipo, html, { archivo, privada: mantenimiento, cookies }), body: html });
     };
     if (mantenimiento && !superadmin) return enviar(503, '503', renderizarMantenimiento({ sitio: ajustesPublicados(ajustesSim!) }, op, ajustesSim!.mantenimiento.mensaje));
     if (pedido?.tipo === 'fuente') {
@@ -740,7 +742,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     // HU-1512 · CP-124 · Antes del 404, las redirecciones activas de la versión vigente.
     const hacia = !a && pedido?.tipo === 'pagina' ? redireccionDe(ultima.instantanea.redirecciones, pedido.ruta) : null;
     if (hacia) return route.fulfill({ status: 301, headers: { Location: `/s${hacia === '/' ? '' : hacia}`, 'Cache-Control': 'public, max-age=0, s-maxage=60' }, body: '' });
-    return a ? enviar(200, pedido!.tipo, a.contenido) : enviar(404, '404', archivos.find((x) => x.archivo === '404.html')!.contenido);
+    return a ? enviar(200, pedido!.tipo, a.contenido, undefined, ultima.instantanea.sitio?.cookies ?? null) : enviar(404, '404', archivos.find((x) => x.archivo === '404.html')!.contenido);
   });
 
   await page.route('**/s3-simulado/**', (route) => {

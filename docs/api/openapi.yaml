@@ -1740,6 +1740,16 @@ paths:
         nunca las ficticias); `whatsapp` es el enlace de los ajustes del sitio (null si está oculto). Una página abierta
         con `#chat` abre el chat. El botón y el diálogo son fijos (CLS 0) y el diálogo es modal y accesible; conversa con
         `POST /publico/chat`.
+
+        HU-1606 · Si la versión publicó al menos un ID de analítica con el aviso de cookies visible, trae `_cookies.js` y
+        sus páginas lo cargan (no la 404; diferido, del mismo origen, sin cookies propias). Sus atributos `data-version`,
+        `data-ga4`, `data-gtm`, `data-pixel` y `data-privacidad` llevan la política publicada. Muestra un aviso fijo
+        (CLS 0) con «Rechazar», «Configurar» y «Aceptar» mientras no haya una decisión vigente en `localStorage`
+        (`aptio.cookies`, 12 meses; se vuelve a preguntar si sube la versión de la política o aparece otra categoría).
+        GA4 y Tag Manager son «Analítica» y Meta Pixel «Publicidad»; ninguna etiqueta se pide antes de aceptar su
+        categoría. El pie trae «Configurar cookies» (`#cookies` abre el diálogo modal). Solo entonces la
+        `Content-Security-Policy` de las páginas suma a `script-src`, `connect-src` e `img-src` los orígenes de Google o
+        de Meta de las etiquetas publicadas; sin etiquetas sigue `script-src 'self'`.
       parameters:
       - name: ruta
         in: path
@@ -7421,6 +7431,7 @@ components:
       - logo
       - favicon
       - analitica
+      - cookies
       - whatsapp
       - correoLeads
       - mantenimiento
@@ -7442,6 +7453,7 @@ components:
           $ref: '#/components/schemas/ArchivoMarcaSitio'
         analitica:
           type: object
+          description: HU-1606 · Salen al sitio con «Publicar cambios» y solo se cargan con el consentimiento del visitante
           required:
           - ga4
           - gtm
@@ -7459,6 +7471,22 @@ components:
               type: string
               nullable: true
               example: '123456789012345'
+        cookies:
+          type: object
+          description: HU-1606 · Aviso de cookies del sitio (REQ-079, RN-17-6); sale al sitio con «Publicar cambios»
+          required:
+          - visible
+          - version
+          properties:
+            visible:
+              type: boolean
+              default: true
+              description: Muestra el aviso (solo si hay al menos un ID de analítica); oculto, el sitio no carga ninguna etiqueta
+            version:
+              type: integer
+              minimum: 1
+              default: 1
+              description: Versión de la política; al subirla y publicar, el sitio vuelve a pedir el consentimiento
         whatsapp:
           type: object
           required:
@@ -7527,6 +7555,15 @@ components:
             metaPixel:
               type: string
               nullable: true
+        cookies:
+          type: object
+          description: HU-1606 · El aviso de cookies y la versión de la política
+          properties:
+            visible:
+              type: boolean
+            subirVersion:
+              type: boolean
+              description: true suma 1 a la versión de la política
         whatsapp:
           type: object
           properties:
