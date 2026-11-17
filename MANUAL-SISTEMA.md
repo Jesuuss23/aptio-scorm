@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.77 · actualizado con la cuarta entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.78 · actualizado con la quinta entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -582,6 +582,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Reembolso:** `POST /ventas/cobros/{id}/reembolsar` (SUPERADMIN) pasa el cobro sin alta a REEMBOLSADO de forma condicional y pide la devolución a la pasarela (Idempotency-Key `reembolso-<cobro>`); si falla, vuelve a APROBADO, responde 502 y audita COBRO_REEMBOLSO_FALLIDO.
 - **Fuera de alcance:** emisión SUNAT y notas de crédito (HU-1707), cuotas (HU-1705), cancelación con devolución (HU-1706). Culqi está sin probar en su sandbox (SUP-294).
 
+### 3.36 Cuotas de cápsulas (HU-1705)
+
+- **Cuota (REQ-085, RN-18-6):** `GET /organizacion/cuota` da la ventana mensual vigente, anclada a `inicioPeriodo` de la suscripción (también en el ciclo anual; sin suscripción, el mes calendario en UTC), con las incluidas del plan, las adicionales aprobadas en la ventana, las usadas y las disponibles. Sin suscripción o con un plan a medida, ilimitada (SUP-302).
+- **Consumo (CP-146):** la primera generación de un proyecto crea un `ConsumoCapsula` (`proyectoId` único, origen CUOTA o ADICIONAL) en la misma transacción que la generación, con la fila de `Suscripcion` bloqueada (`FOR UPDATE`): dos lanzamientos a la vez con una disponible consumen una y el otro recibe 402 CUOTA_AGOTADA, con la cuota en `detalles[0]`. Regenerar el mismo proyecto no consume (SUP-301).
+- **Adicionales:** `POST /organizacion/cuota/adicionales` (solo ADMINISTRADOR, de 1 a 10) crea una `CompraCapsulas` PENDIENTE al precio `capsulaAdicional` del plan con IGV de 18 % en la moneda de la suscripción (en dólares, proporcional, SUP-300) y cobra con la pasarela de la suscripción o la primera que cobre esa moneda (503 si ninguna). Stripe vuelve a `/?compra=<id>`. `pago-prueba`, `token` y `GET …/{id}` siguen el mismo camino que el checkout (SUP-303).
+- **Webhook:** el mismo `POST /webhooks/pago/{pasarela}` resuelve la compra si el evento no es de una solicitud: aprobada, suma las adicionales a la ventana vigente, crea el `Cobro` con `compraCapsulasId` y encola «emitir-comprobante» con jobId = cobro. Monto distinto o compra cerrada deja el cobro sin acreditar y reembolsable (SUP-304). Auditorías CAPSULAS_COMPRA_INICIADA, CAPSULAS_COMPRADAS y CAPSULAS_PAGO_RECHAZADO.
+- **Fuera de alcance:** cambio de plan con prorrateo (HU-1706), qué pasa con la cuota de una suscripción vencida o suspendida (HU-1708, SUP-305) y la emisión del comprobante (HU-1707).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -727,6 +735,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.78 | 2026-11-17 | Cuotas de cápsulas (3.36): la ventana mensual, el consumo transaccional con 402 CUOTA_AGOTADA, la compra de adicionales con la pasarela de la suscripción y su paso por el webhook único. |
 | 0.77 | 2026-11-17 | Pasarelas de pago y webhooks (3.35): Culqi, Stripe y la de pruebas con el mismo contrato, el checkout en dólares, el webhook único con firma por pasarela, el `Cobro` con su tarea de comprobante y el reembolso auditado; proveedores de pago en la sección 6. |
 | 0.76 | 2026-11-17 | Alta de suscripción (3.34): la página `/pago`, `POST /publico/checkout`, el webhook firmado e idempotente, la transacción del alta, la cola `suscripciones`, la pasarela de pruebas y las tablas `Suscripcion` y `SolicitudSuscripcion`. |
 | 0.75 | 2026-11-17 | Planes administrables (3.33): planes en la versión publicada, `GET /publico/planes/{slug}`, bloqueo por planes ficticios en producción y las tablas `Plan` y `PlanesAjustes`. |
