@@ -33,6 +33,8 @@ export const TABLAS_ORGANIZACION = [
   // HU-1705 · Consumos de cápsulas (uno por proyecto) y compras de adicionales.
   { tabla: 'ConsumoCapsula', opcional: false },
   { tabla: 'CompraCapsulas', opcional: false },
+  // HU-1706 · Subidas de plan prorrateadas.
+  { tabla: 'CambioPlan', opcional: false },
 ] as const;
 export type TablaOrganizacion = (typeof TABLAS_ORGANIZACION)[number]['tabla'];
 
@@ -59,6 +61,7 @@ const REGLAS: { regla: string; sql: string }[] = [
   { regla: 'ConsumoCapsula: proyecto de otra organización', sql: `SELECT count(*) FROM "ConsumoCapsula" x JOIN "Proyecto" p ON p."id" = x."proyectoId" WHERE x."organizacionId" <> p."organizacionId"` },
   { regla: 'ConsumoCapsula: suscripción de otra organización', sql: `SELECT count(*) FROM "ConsumoCapsula" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
   { regla: 'CompraCapsulas: suscripción de otra organización', sql: `SELECT count(*) FROM "CompraCapsulas" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
+  { regla: 'CambioPlan: suscripción de otra organización', sql: `SELECT count(*) FROM "CambioPlan" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
 ];
 
 export interface ConteoOrganizacion { organizacionId: string | null; slug: string | null; tabla: TablaOrganizacion; filas: number }

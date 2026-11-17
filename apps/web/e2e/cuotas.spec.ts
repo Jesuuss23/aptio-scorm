@@ -31,7 +31,7 @@ async function conTema(page: Page) {
 for (const ancho of [1280, 390]) {
   test(`CP-146 · con 20 de 20, el administrador compra una adicional con el teclado y genera (${ancho} px)`, async ({ page }) => {
     await page.setViewportSize({ width: ancho, height: 900 });
-    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'ADMINISTRADOR', entornoSitio: 'pruebas', cuotaSitio: { incluidas: 20, usadas: 20 } });
+    await simularApi(page, { conSesion: true, conProyectos: true, rol: 'ADMINISTRADOR', entornoSitio: 'pruebas', cuotaSitio: { incluidas: 20, usadas: 20, plan: 'productora' } });
     await page.goto('/');
     const cuota = page.getByRole('region', { name: 'Cuota de cápsulas' });
     await expect(cuota).toContainText('Cápsulas del mes: 20 de 20');
@@ -45,7 +45,8 @@ for (const ancho of [1280, 390]) {
     await gen.getByRole('button', { name: 'Generar SCORM' }).click();
     const aviso = gen.getByRole('alert').filter({ hasText: 'Se agotaron las cápsulas de este mes' });
     await expect(aviso).toContainText('(20 de 20). Compra una cápsula adicional o sube de plan para generar esta. Las cápsulas en revisión siguen editables.');
-    await expect(aviso.getByRole('link', { name: 'Ver planes' })).toHaveAttribute('href', '/s/precios');
+    // HU-1706 · El administrador cambia de plan en la consola.
+    await expect(aviso.getByRole('link', { name: 'Ver planes' })).toHaveAttribute('href', '/plan');
     await expect(gen.getByRole('list', { name: 'Etapas de la generación' })).toHaveCount(0);
     await sinViolaciones(page);
     await sinDesbordeHorizontal(page);

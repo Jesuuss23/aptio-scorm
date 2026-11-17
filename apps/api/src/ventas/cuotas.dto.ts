@@ -21,7 +21,8 @@ export class CuotaDto {
   @ApiProperty({ type: Number, nullable: true, example: 3, description: 'null si es ilimitada' }) disponibles: number | null;
   @ApiProperty({ type: OfertaAdicionalDto, nullable: true, description: 'null si el plan no vende adicionales o no hay suscripción' }) oferta: OfertaAdicionalDto | null;
   @ApiProperty({ description: 'El usuario es ADMINISTRADOR y hay una oferta disponible' }) puedeComprar: boolean;
-  @ApiProperty({ example: '/s/precios', description: 'Subir de plan (el cambio con prorrateo llega con la HU-1706)' }) planes: string;
+  @ApiProperty({ example: '/plan', description: 'Subir de plan: `/plan` en la consola para el administrador de una organización suscrita (HU-1706); si no, `/s/precios`' }) planes: string;
+  @ApiProperty({ description: 'HU-1706 · La suscripción terminó (cancelada al fin del período): cuota 0 y sin adicionales' }) cancelada: boolean;
 }
 
 /** Datos no confiables: los valida `@aptio/schema/cuotas`. */

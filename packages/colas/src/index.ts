@@ -103,6 +103,19 @@ export const opcionesTareaBienvenida = (solicitudId: string) => ({
 });
 
 /**
+ * HU-1706 · En la misma cola `suscripciones`, la tarea retrasada que pasa a CANCELADA una suscripción con
+ * `cancelarAlFin` al llegar su `finPeriodo` (RN-18-7). Una por suscripción (`jobId` fijo): reanudar la quita y volver a
+ * cancelar la crea de nuevo. El trabajador vuelve a leer la suscripción y no hace nada si ya no debe cancelarse.
+ */
+export const TAREA_VENCER_SUSCRIPCION = 'suscripcion-vencer';
+export interface DatosVencerSuscripcion { suscripcionId: string }
+export const idTareaVencer = (suscripcionId: string) => `vencer-${suscripcionId}`;
+export const opcionesTareaVencer = (suscripcionId: string, esperaMs: number) => ({
+  jobId: idTareaVencer(suscripcionId), delay: Math.max(0, esperaMs), attempts: 5, backoff: { type: 'exponential', delay: 60_000 },
+  removeOnComplete: true, removeOnFail: { age: 30 * 24 * 3600 },
+});
+
+/**
  * HU-1704 · «Emitir comprobante» de cada cobro aprobado (RN-18-4, CP-144). Un trabajo por cobro (`jobId` = id del cobro):
  * un evento repetido no crea otro cobro ni otro trabajo. La emisión ante el OSE/PSE y su trabajador llegan con la
  * HU-1707; hasta entonces los trabajos esperan en la cola. Los completados se guardan 90 días para que el id siga

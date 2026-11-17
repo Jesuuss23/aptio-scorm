@@ -1378,7 +1378,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const r = agendaSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
       return responder(r.status, r.body);
     }
-    if (ruta.startsWith('/organizacion/cuota')) {
+    if (ruta.startsWith('/organizacion/cuota') || ruta.startsWith('/organizacion/suscripcion')) {
       const r = cuotasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).origin);
       if (r) return responder(r.status, r.body);
     }

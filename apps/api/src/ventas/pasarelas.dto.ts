@@ -35,7 +35,8 @@ export class CobroDto {
   @ApiProperty({ format: 'uuid' }) id: string;
   @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'El alta que pagó; null si es una compra de cápsulas (HU-1705)' }) solicitudId: string | null;
   @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'HU-1705 · La compra de cápsulas adicionales que pagó' }) compraCapsulasId: string | null;
-  @ApiProperty({ enum: ['SUSCRIPCION', 'CAPSULAS'], description: 'HU-1705 · Qué pagó: el alta o cápsulas adicionales' }) concepto: 'SUSCRIPCION' | 'CAPSULAS';
+  @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'HU-1706 · La subida de plan que pagó' }) cambioPlanId: string | null;
+  @ApiProperty({ enum: ['SUSCRIPCION', 'CAPSULAS', 'CAMBIO_PLAN'], description: 'Qué pagó: el alta, cápsulas adicionales (HU-1705) o una subida de plan (HU-1706)' }) concepto: 'SUSCRIPCION' | 'CAPSULAS' | 'CAMBIO_PLAN';
   @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'null = pago aprobado sin alta (SUP-291)' }) suscripcionId: string | null;
   @ApiProperty({ example: 'Minera Andina SAC' }) razonSocial: string;
   @ApiProperty({ example: 'ana@minera.pe' }) correoAdmin: string;

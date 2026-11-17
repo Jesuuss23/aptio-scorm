@@ -3,9 +3,11 @@
  * vuelve a leer la solicitud: si no está aprobada o no tiene organización (por ejemplo, el correo ya era de otra cuenta),
  * no envía nada. El correo lleva el plan, el ciclo, el total pagado, el comprobante que se emitirá y el enlace para crear
  * la clave del administrador. Si el SMTP falla, la cola reintenta con espera creciente; la suscripción no cambia.
+ *
+ * HU-1706 · La misma cola vence las suscripciones canceladas al fin del período (`suscripcion-vencer`, RN-18-7).
  */
 import type { PrismaClient } from '@aptio/db';
-import { COLA_SUSCRIPCIONES, type DatosBienvenida, ESPERAS_SUSCRIPCIONES_MS } from '@aptio/colas';
+import { COLA_SUSCRIPCIONES, type DatosBienvenida, type DatosVencerSuscripcion, ESPERAS_SUSCRIPCIONES_MS, TAREA_VENCER_SUSCRIPCION } from '@aptio/colas';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { type ConnectionOptions, Worker } from 'bullmq';
 import type { Correo, EnviarCorreo } from './correo.js';
@@ -43,12 +45,36 @@ export async function procesarBienvenida(bd: PrismaClient, datos: DatosBienvenid
   return { estado: 'enviado' };
 }
 
+export interface ResultadoVencimiento { estado: 'cancelada' | 'omitido'; motivo?: string }
+
+/**
+ * HU-1706 · Pasa a CANCELADA la suscripción que pidió cancelar al fin del período, si ese fin ya llegó. Condicional en la
+ * base (estado ACTIVA, `cancelarAlFin` y `finPeriodo` vencido): una tarea vieja tras reanudar, o repetida, no cambia nada.
+ */
+export async function procesarVencimiento(bd: PrismaClient, datos: DatosVencerSuscripcion, ahora = new Date()): Promise<ResultadoVencimiento> {
+  return bd.$transaction(async (tx) => {
+    const s = await tx.suscripcion.findUnique({ where: { id: datos.suscripcionId } });
+    if (!s) return { estado: 'omitido', motivo: 'la suscripción no existe' };
+    const r = await tx.suscripcion.updateMany({
+      where: { id: s.id, estado: 'ACTIVA', cancelarAlFin: true, finPeriodo: { lte: ahora } },
+      data: { estado: 'CANCELADA', canceladaEn: s.finPeriodo, planProgramadoId: null },
+    });
+    if (r.count === 0) return { estado: 'omitido', motivo: s.estado === 'CANCELADA' ? 'ya estaba cancelada' : !s.cancelarAlFin ? 'se reanudó' : 'el período no terminó' };
+    await tx.auditoria.create({
+      data: { organizacionId: s.organizacionId, usuarioId: null, accion: 'SUSCRIPCION_CANCELADA', entidad: 'Suscripcion', entidadId: s.id, datos: { finPeriodo: s.finPeriodo.toISOString(), planId: s.planId } },
+    });
+    return { estado: 'cancelada' };
+  });
+}
+
 export const esperaSuscripciones = (n: number, esperas: readonly number[] = ESPERAS_SUSCRIPCIONES_MS) => esperas[Math.min(Math.max(n, 1), esperas.length) - 1]!;
 
 /** El trabajador de la cola `suscripciones`. Las pruebas acortan las esperas. */
-export function crearTrabajadorSuscripciones(bd: PrismaClient, enviar: EnviarCorreo, opciones: { connection: ConnectionOptions; prefix: string; esperas?: readonly number[] }): Worker<DatosBienvenida, ResultadoBienvenida> {
+export function crearTrabajadorSuscripciones(bd: PrismaClient, enviar: EnviarCorreo, opciones: { connection: ConnectionOptions; prefix: string; esperas?: readonly number[] }): Worker<DatosBienvenida | DatosVencerSuscripcion, ResultadoBienvenida | ResultadoVencimiento> {
   const esperas = opciones.esperas ?? ESPERAS_SUSCRIPCIONES_MS;
-  return new Worker<DatosBienvenida, ResultadoBienvenida>(COLA_SUSCRIPCIONES, (job) => procesarBienvenida(bd, job.data, enviar), {
+  return new Worker<DatosBienvenida | DatosVencerSuscripcion, ResultadoBienvenida | ResultadoVencimiento>(COLA_SUSCRIPCIONES, (job) => (job.name === TAREA_VENCER_SUSCRIPCION
+    ? procesarVencimiento(bd, job.data as DatosVencerSuscripcion)
+    : procesarBienvenida(bd, job.data as DatosBienvenida, enviar)), {
     connection: opciones.connection, prefix: opciones.prefix, concurrency: 4, settings: { backoffStrategy: (hechos: number) => esperaSuscripciones(hechos, esperas) },
   });
 }

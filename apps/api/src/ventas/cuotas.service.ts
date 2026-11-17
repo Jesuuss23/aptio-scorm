@@ -23,6 +23,8 @@ import { PasarelasService } from './pasarelas.service.js';
 
 type Tx = Prisma.TransactionClient;
 export const ENLACE_PLANES = '/s/precios';
+/** HU-1706 · El administrador de una organización suscrita cambia de plan en la consola. */
+export const ENLACE_PLAN_CONSOLA = '/plan';
 const TOLERANCIA_MONTO = 0.005;
 const CON_PLAN = { plan: true } as const;
 type SuscripcionConPlan = Prisma.SuscripcionGetPayload<{ include: typeof CON_PLAN }>;
@@ -32,8 +34,13 @@ const moneda = (m: string): Moneda => (m === 'USD' ? 'USD' : 'PEN');
 const noValido = (campo: string, mensaje: string) => new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje, detalles: [{ campo, mensaje }] });
 /** Sin suscripción no hay ancla: la ventana del consumo es el mes calendario (UTC). */
 const mesCalendario = (ahora: Date): Ventana => ventanaMensual(new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), 1)), ahora);
+/**
+ * HU-1706 · Cancelada: ya pasó a CANCELADA, o pidió cancelar al fin del período y ese fin llegó (por si la tarea retrasada
+ * que la vence todavía no corrió). Sin cuota para cápsulas nuevas (RN-18-7).
+ */
+export const estaCancelada = (s: { estado: string; cancelarAlFin: boolean; finPeriodo: Date }, ahora: Date) => s.estado === 'CANCELADA' || (s.cancelarAlFin && s.finPeriodo.getTime() <= ahora.getTime());
 
-interface Situacion { suscripcion: SuscripcionConPlan | null; ventana: Ventana; cuota: EstadoCuota }
+interface Situacion { suscripcion: SuscripcionConPlan | null; ventana: Ventana; cuota: EstadoCuota; cancelada: boolean }
 
 /** Lo que devuelve el webhook al procesar el pago de una compra: si era repetido y el cobro que dejó. */
 export interface ResultadoCompra { duplicado: boolean; cobroId: string | null }
@@ -53,27 +60,30 @@ export class CuotasService {
     const suscripcion = await tx.suscripcion.findUnique({ where: { organizacionId }, include: CON_PLAN });
     const ventana = suscripcion ? ventanaMensual(suscripcion.inicioPeriodo, ahora) : mesCalendario(ahora);
     const usadas = await tx.consumoCapsula.count({ where: { organizacionId, ventanaInicio: ventana.inicio } });
-    if (!suscripcion) return { suscripcion, ventana, cuota: calcularCuota({ capsulasMes: null, adicionales: 0, usadas }) };
+    if (!suscripcion) return { suscripcion, ventana, cuota: calcularCuota({ capsulasMes: null, adicionales: 0, usadas }), cancelada: false };
+    // HU-1706 · Cancelada: la cuota es 0 y no se ofrecen adicionales (las cápsulas en revisión siguen editables).
+    if (estaCancelada(suscripcion, ahora)) return { suscripcion, ventana, cuota: calcularCuota({ capsulasMes: 0, adicionales: 0, usadas }), cancelada: true };
     const compradas = await tx.compraCapsulas.aggregate({ where: { suscripcionId: suscripcion.id, estado: 'APROBADA', ventanaInicio: ventana.inicio }, _sum: { cantidad: true } });
-    return { suscripcion, ventana, cuota: calcularCuota({ capsulasMes: suscripcion.plan.capsulasMes, adicionales: compradas._sum.cantidad ?? 0, usadas }) };
+    return { suscripcion, ventana, cuota: calcularCuota({ capsulasMes: suscripcion.plan.capsulasMes, adicionales: compradas._sum.cantidad ?? 0, usadas }), cancelada: false };
   }
 
-  /** La pasarela de la compra: la de la suscripción si sigue activa y cobra esa moneda; si no, la primera que la cobre. */
-  private async pasarelaPara(s: SuscripcionConPlan): Promise<ConfigPasarela | null> {
+  /** La pasarela de la compra (o del cambio de plan): la de la suscripción si sigue activa y cobra esa moneda; si no, la primera que la cobre. */
+  async pasarelaPara(s: SuscripcionConPlan): Promise<ConfigPasarela | null> {
     const propia = esCodigoPasarela(s.pasarela) ? await this.pasarelas.config(s.pasarela) : null;
     if (propia && propia.visible && this.pasarelas.activa(propia) && (CATALOGO_PASARELAS[propia.codigo].monedas as readonly string[]).includes(s.moneda)) return propia;
     return this.pasarelas.elegir(moneda(s.moneda));
   }
 
-  private async aDto(rol: UsuarioSesion['rol'], { suscripcion, ventana, cuota }: Situacion): Promise<CuotaDto> {
-    const unitario = suscripcion && !cuota.ilimitada ? precioUnitarioAdicional(suscripcion.plan, moneda(suscripcion.moneda)) : null;
+  private async aDto(rol: UsuarioSesion['rol'], { suscripcion, ventana, cuota, cancelada }: Situacion): Promise<CuotaDto> {
+    const unitario = suscripcion && !cuota.ilimitada && !cancelada ? precioUnitarioAdicional(suscripcion.plan, moneda(suscripcion.moneda)) : null;
     const oferta = suscripcion && unitario !== null
       ? (() => { const p = precioAdicionales(unitario, 1, moneda(suscripcion.moneda)); return { unitario, igv: p.igv, total: p.total, moneda: p.moneda, disponible: false }; })()
       : null;
     if (oferta && suscripcion) oferta.disponible = Boolean(await this.pasarelaPara(suscripcion));
     return {
       ilimitada: cuota.ilimitada, ventanaInicio: ventana.inicio.toISOString(), ventanaFin: ventana.fin.toISOString(), incluidas: cuota.incluidas, adicionales: cuota.adicionales,
-      usadas: cuota.usadas, disponibles: cuota.disponibles, oferta, puedeComprar: rol === 'ADMINISTRADOR' && Boolean(oferta?.disponible), planes: ENLACE_PLANES,
+      usadas: cuota.usadas, disponibles: cuota.disponibles, oferta, puedeComprar: rol === 'ADMINISTRADOR' && Boolean(oferta?.disponible), planes: rol === 'ADMINISTRADOR' && suscripcion ? ENLACE_PLAN_CONSOLA : ENLACE_PLANES,
+      cancelada,
     };
   }
 
@@ -92,6 +102,13 @@ export class CuotasService {
     // Cerrojo de la suscripción: dos proyectos lanzados a la vez esperan su turno y ven el conteo del otro.
     await tx.$queryRaw`SELECT "id" FROM "Suscripcion" WHERE "organizacionId" = ${organizacionId}::uuid FOR UPDATE`;
     const s = await this.situacion(tx, organizacionId, ahora);
+    if (s.cancelada) {
+      throw new HttpException({
+        codigo: 'SUSCRIPCION_CANCELADA',
+        mensaje: 'Tu suscripción terminó: suscríbete de nuevo para generar cápsulas nuevas. Las cápsulas en revisión siguen editables y lo exportado se puede descargar.',
+        detalles: [{ ...(await this.aDto(u.rol, s)) }],
+      }, HttpStatus.PAYMENT_REQUIRED);
+    }
     if (!s.cuota.ilimitada && s.cuota.disponibles === 0) {
       throw new HttpException({
         codigo: 'CUOTA_AGOTADA',
@@ -129,6 +146,7 @@ export class CuotasService {
     if (errores.length) throw noValido('cantidad', errores[0]!.mensaje);
     const s = await this.situacion(this.bd, organizacionId, ahora);
     if (!s.suscripcion) throw new UnprocessableEntityException({ codigo: 'SIN_SUSCRIPCION', mensaje: 'Tu organización no tiene un plan con cuota de cápsulas' });
+    if (s.cancelada) throw new UnprocessableEntityException({ codigo: 'SUSCRIPCION_CANCELADA', mensaje: 'Tu suscripción terminó: suscríbete de nuevo para comprar cápsulas' });
     if (s.cuota.ilimitada) throw new UnprocessableEntityException({ codigo: 'CUOTA_ILIMITADA', mensaje: 'Tu plan no tiene límite de cápsulas' });
     const mon = moneda(s.suscripcion.moneda);
     const unitario = precioUnitarioAdicional(s.suscripcion.plan, mon);
