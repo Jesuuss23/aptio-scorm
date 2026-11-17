@@ -13,6 +13,7 @@ import { Queue } from 'bullmq';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
+import { ChatbotService } from './chatbot.service.js';
 import { LeadsService } from './leads.service.js';
 import type {
   AgendaDto, AjustesAgendaCambioDto, AjustesAgendaDto, AsesorDto, AsesorEntradaDto, CitaDto, CitasDto, ConsultaCitasDto, ReservaRecibidaDto, TipoReunionDto, TipoReunionEntradaDto,
@@ -63,7 +64,7 @@ export class AgendaService implements OnModuleDestroy {
   /** El último encolado en curso (las pruebas lo esperan; la respuesta al visitante no). */
   ultimoEncolado: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly chatbot: ChatbotService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -337,6 +338,8 @@ export class AgendaService implements OnModuleDestroy {
     } catch (e) {
       this.log.warn(`La cita ${cita.id} quedó sin lead: ${e instanceof Error ? e.message : String(e)}`);
     }
+    // HU-1604 · CP-134 · Agendada desde el chat: la conversación pasa a «demo».
+    if (reserva.envio.via === 'chatbot') await this.chatbot.marcar((entrada as { conversacionId?: unknown } | null)?.conversacionId, 'demo');
     this.ultimoEncolado = this.trasReservar(cita, token, ahora);
     const marca = (await leerAjustesSitio(this.bd).catch(() => null))?.nombre || NOMBRE_POR_DEFECTO;
     return { recibido: true, cita: this.confirmacion(cita, marca) };

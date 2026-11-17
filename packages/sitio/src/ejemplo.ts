@@ -8,6 +8,7 @@
  */
 import { type AgendaPublica, AJUSTES_AGENDA_POR_DEFECTO, deLima, fechaLima, franjasLibres, sumarDias } from '@aptio/schema/agenda';
 import type { PopupPublico } from '@aptio/schema/popups';
+import { AJUSTES_CHATBOT_POR_DEFECTO, chatbotPublico, type ChatbotPublico } from '@aptio/schema/chatbot';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { blogPublico, type BlogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, type FilaArticuloBlog, type FilaCategoriaBlog } from '@aptio/schema/sitio-blog';
@@ -124,4 +125,17 @@ export function agendaDeEjemplo(ahora = new Date()): AgendaPublica {
   const tipo = { id: '00000000-0000-4000-9900-0000000000a1', nombre: 'Demo del generador', minutos: 30 };
   const franjas = franjasLibres(AJUSTES_AGENDA_POR_DEFECTO, { minutos: 30, asesorIds: ['asesor'] }, [{ asesorId: 'asesor', inicio: deLima(sumarDias(hoy, 1), '10:00'), fin: deLima(sumarDias(hoy, 1), '10:30') }], ahora);
   return { zona: 'America/Lima', tipos: [tipo], tipoId: tipo.id, franjas, hoy, horizonte: sumarDias(hoy, AJUSTES_AGENDA_POR_DEFECTO.horizonteDias) };
+}
+
+/**
+ * HU-1604 · El chatbot en vivo de ejemplo (lo que respondería `GET /s/_chatbot.json`): visible, con su saludo y tres
+ * respuestas rápidas, para medir el inicio con Lighthouse con el chat activo.
+ */
+export function chatbotDeEjemplo(idioma: 'es' | 'en' = 'es', ahora = new Date()): { visible: true } & ChatbotPublico {
+  const rapidas = [
+    { id: '00000000-0000-4000-9900-0000000000c1', textoEs: '¿Funciona en Moodle?', textoEn: 'Does it work in Moodle?', accion: 'consulta_ia', visible: true, orden: 0, ficticio: false },
+    { id: '00000000-0000-4000-9900-0000000000c2', textoEs: 'Agendar demo', textoEn: 'Book a demo', accion: 'agendar_demo', visible: true, orden: 1, ficticio: false },
+    { id: '00000000-0000-4000-9900-0000000000c3', textoEs: 'Hablar con una persona', textoEn: 'Talk to a person', accion: 'hablar_persona', visible: true, orden: 2, ficticio: false },
+  ];
+  return { visible: true, ...chatbotPublico({ ...AJUSTES_CHATBOT_POR_DEFECTO, visible: true }, rapidas, { idioma, entorno: 'produccion', ahora, whatsapp: 'https://wa.me/51999888777' }) };
 }

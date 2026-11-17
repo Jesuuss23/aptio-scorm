@@ -5,6 +5,8 @@
  * (< 0,1) o si algún desplazamiento de la página viene de un popup (los popups son fijos: no deben mover nada).
  * HU-1605 · También mide `/agendar-demo` con el agendador (las franjas de ejemplo en `_agenda.json`): mismos umbrales, y
  * falla si algún desplazamiento viene del bloque (el contenedor reserva su alto: el calendario no debe mover nada).
+ * HU-1604 · Las dos páginas se miden con el chatbot activo (`_chatbot.json` de ejemplo): el botón del chat es fijo y
+ * también falla la medición si algún desplazamiento viene de él.
  *
  * Sin `SITIO_LIGHTHOUSE_URL`, sirve en un puerto local el sitio de ejemplo de producción pre-renderizado con
  * `@aptio/sitio` y las mismas cabeceras que `GET /s/*`. Con `SITIO_LIGHTHOUSE_URL=http://localhost:3000/s/` mide el
@@ -16,7 +18,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import * as chromeLauncher from 'chrome-launcher';
 import lighthouse from 'lighthouse';
-import { agendaDeEjemplo, ARCHIVO_AGENDA_JSON, ARCHIVO_POPUPS_JSON, cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, popupsDeEjemplo, renderizar404, renderizarSitio, resolverPedido, RUTA_EVENTO_POPUP } from '../src/index.js';
+import { agendaDeEjemplo, ARCHIVO_AGENDA_JSON, ARCHIVO_CHATBOT_JSON, ARCHIVO_POPUPS_JSON, chatbotDeEjemplo, cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, popupsDeEjemplo, renderizar404, renderizarSitio, resolverPedido, RUTA_EVENTO_POPUP } from '../src/index.js';
 
 export const UMBRALES = { lcpMs: 2500, seo: 0.9, accesibilidad: 0.9, cls: 0.1 };
 
@@ -43,6 +45,8 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
     if (url === `/s/${ARCHIVO_POPUPS_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }).end(JSON.stringify({ popups: popupsDeEjemplo() }));
     if (url === `/s/${RUTA_EVENTO_POPUP}` && req.method === 'POST') return void res.writeHead(204).end();
     // HU-1605 · Las franjas libres en vivo, como las sirve la API.
+    // HU-1604 · El chatbot activo: el botón flotante del chat está en todas las páginas medidas.
+    if (url.split('?')[0] === `/s/${ARCHIVO_CHATBOT_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }).end(JSON.stringify(chatbotDeEjemplo(url.includes('idioma=en') ? 'en' : 'es', new Date())));
     if (url.split('?')[0] === `/s/${ARCHIVO_AGENDA_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=15' }).end(JSON.stringify(agendaDeEjemplo(new Date())));
     // robots.txt va en la raíz del dominio, como lo sirve la API.
     const pedido = url === '/robots.txt' ? resolverPedido(url) : url === '/s' || url.startsWith('/s/') ? resolverPedido(url.slice(2) || '/') : null;
@@ -62,8 +66,8 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
 const local = process.env.SITIO_LIGHTHOUSE_URL ? null : await servirEjemplo();
 const base = process.env.SITIO_LIGHTHOUSE_URL ?? local!.url;
 const PAGINAS = [
-  { nombre: 'inicio', ruta: '', bloque: 'el popup activo', propio: /\bpp-|data-popup/ },
-  { nombre: 'agendar-demo', ruta: 'agendar-demo', bloque: 'el agendador', propio: /booker|\bag-|data-agenda|#agendar/ },
+  { nombre: 'inicio', ruta: '', bloque: 'el popup activo o el chat', propio: /\bpp-|data-popup|\bch-/ },
+  { nombre: 'agendar-demo', ruta: 'agendar-demo', bloque: 'el agendador o el chat', propio: /booker|\bag-|data-agenda|#agendar|\bch-/ },
 ] as const;
 const ruta = rutaChrome();
 const chrome = await chromeLauncher.launch({ ...(ruta ? { chromePath: ruta } : {}), chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu'] });

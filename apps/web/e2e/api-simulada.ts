@@ -31,6 +31,7 @@ import { rangoPeriodo } from '../src/vistas/costos-periodo.ts';
 import { CLAVES_ETAPA, normalizarParametros, PARAMETROS_EJEMPLO } from '@aptio/schema/rentabilidad';
 import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from '@aptio/schema/conexiones';
 import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
+import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 /** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
@@ -190,6 +191,8 @@ export interface OpcionesSimulacion {
   popupsSitio?: PopupSim[];
   /** HU-1605 · Tipos de reunión, asesores, ajustes y citas de Captación › Agendamiento. */
   agendaSitio?: AgendaSitioSim;
+  /** HU-1604 · Ajustes, respuestas rápidas, fuentes y conversaciones de Captación › Chatbot. */
+  chatbotSitio?: ChatbotSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -459,7 +462,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {} }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -582,6 +585,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   });
   const versionDto = ({ instantanea, ...v }: VersionSim) => ({ ...v, paginas: instantanea.paginas.length, prerender: prerenderDto({ instantanea, ...v }) });
   if (versionSitio) nuevaVersionSim('publicacion');
+  // HU-1604 · El chatbot: el panel lo edita y el sitio lo lee en vivo (`/s/_chatbot.json`); sin `chatbotSitio`, oculto.
+  const chatbotSim = crearChatbotSim(chatbotSitio ?? {}, entornoSitio, () => versionesSim.at(-1)?.instantanea, () => {
+    const w = ajustesSim ? ajustesPublicados(ajustesSim).whatsapp : null;
+    return w ? `https://wa.me/${w.numero.slice(1)}` : null;
+  });
   // HU-1511 · El blog: la conexión y la copia de WordPress, fuera de las versiones; «Sincronizar ahora» lee `wordpress`.
   const ejemploBlog = blogSitio ? blogDeEjemplo() : null;
   let conexionBlog: ConexionBlog = ejemploBlog ? { ...ejemploBlog.conexion } : { ...CONEXION_BLOG_POR_DEFECTO };
@@ -682,6 +690,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (route.request().method() === 'GET' && ruta === '/_popups.json') {
       const lista = popupsSim.filter((x) => x.visible && !(entornoSitio === 'produccion' && x.ficticio)).map((x) => aPopupPublico(x as unknown as Parameters<typeof aPopupPublico>[0]));
       return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }, body: JSON.stringify({ popups: lista }) });
+    }
+    if (route.request().method() === 'GET' && ruta === '/_chatbot.json') {
+      const datos = chatbotSim.publico(new URL(route.request().url()).searchParams);
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }, body: JSON.stringify(datos) });
     }
     if (route.request().method() === 'GET' && ruta === '/_agenda.json') {
       const datos = agendaSim.publica(new URL(route.request().url()).searchParams);
@@ -1244,11 +1256,24 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const r = capturarLeadSim(cuerpo);
       const pp = r.ok && r.lead && cuerpo.via === 'popup' ? popupsSim.find((x) => x.id === cuerpo.popupId && x.accion === 'pedir_correo') : undefined;
       if (pp) pp.conversiones += 1;
+      if (r.ok && cuerpo.via === 'chatbot') chatbotSim.marcar(cuerpo.conversacionId, 'lead');
       return r.ok ? responder(201, { recibido: true }) : responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
     }
     // HU-1605 · La reserva pública y Captación › Agendamiento (PNT-33).
     if (ruta === '/publico/citas' && req.method() === 'POST') {
-      const r = agendaSim.reservar(req.postDataJSON() as Record<string, unknown>);
+      const cuerpo = req.postDataJSON() as Record<string, unknown>;
+      const r = agendaSim.reservar(cuerpo);
+      if (r.status === 201 && cuerpo.via === 'chatbot') chatbotSim.marcar(cuerpo.conversacionId, 'demo');
+      return responder(r.status, r.body);
+    }
+    // HU-1604 · El chat público y Captación › Chatbot (PNT-32).
+    if (ruta === '/publico/chat' && req.method() === 'POST') {
+      const r = chatbotSim.conversar(req.postDataJSON() as Record<string, unknown>);
+      return responder(r.status, r.body);
+    }
+    if (ruta === '/captacion/chatbot' || ruta.startsWith('/captacion/chatbot/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = chatbotSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
       return responder(r.status, r.body);
     }
     if (ruta === '/captacion/agenda' || ruta.startsWith('/captacion/agenda/')) {

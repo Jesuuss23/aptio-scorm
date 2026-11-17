@@ -163,6 +163,15 @@ describe('reserva del visitante', () => {
   it('el campo trampa lleno se descarta en silencio', () => {
     expect(validarReserva({ ...OK, website: 'spam' })).toEqual({ ok: true, trampa: true });
   });
+
+  it('CP-134 · desde el chatbot la reserva lleva vía «chatbot» y también pide el nombre; otra vía no vale', () => {
+    const r = validarReserva({ ...OK, via: 'chatbot' }, '/s');
+    expect(r.ok && !r.trampa && r.reserva.envio.via).toBe('chatbot');
+    const sinNombre = validarReserva({ ...OK, via: 'chatbot', nombre: '' });
+    expect(sinNombre.ok ? [] : sinNombre.errores.map((e) => e.campo)).toContain('nombre');
+    const otra = validarReserva({ ...OK, via: 'popup' });
+    expect(otra.ok ? [] : otra.errores.map((e) => e.campo)).toEqual(['via']);
+  });
 });
 
 describe('invitación iCalendar y Google Calendar (CP-136)', () => {

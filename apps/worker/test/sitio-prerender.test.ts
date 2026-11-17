@@ -39,9 +39,10 @@ describe.skipIf((!hayS3 || !hayBase) && !process.env.CI)('pre-render del sitio (
     expect(v.prerenderEstado).toBe('en_curso');
     expect(await versionPendienteDePrerender(prisma)).toBe(v.numero);
     const r = await prerenderizarVersion(prisma, almacen, v.numero, env);
-    // HU-1603 · Además del sitemap, robots y la 404, toda versión trae el script de popups.
-    expect(r).toEqual({ numero: v.numero, estado: 'listo', archivos: 11, puntero: true });
+    // HU-1603 y HU-1604 · Además del sitemap, robots y la 404, toda versión trae los scripts de popups y de chat.
+    expect(r).toEqual({ numero: v.numero, estado: 'listo', archivos: 12, puntero: true });
     expect(await texto(claveVersion(v.numero, '_popups.js'))).toContain('_popups.json');
+    expect(await texto(claveVersion(v.numero, '_chat.js'))).toContain('_chatbot.json');
     // HU-1514 · Las 4 landings publicadas del ejemplo suben; la de borrador (Sector público) no.
     expect(await texto(claveVersion(v.numero, 'sectores/mineria-y-energia/index.html'))).toContain('Minería y energía');
     expect(await almacen.info(claveVersion(v.numero, 'sectores/sector-publico/index.html'))).toBeNull();
@@ -65,7 +66,7 @@ describe.skipIf((!hayS3 || !hayBase) && !process.env.CI)('pre-render del sitio (
     expect(fila).toMatchObject({ prerenderEstado: 'listo', prerenderError: null });
     expect(fila.prerenderEn).toBeInstanceOf(Date);
     const aud = await prisma.auditoria.findFirst({ where: { entidad: 'SitioVersion', entidadId: v.id, accion: 'SITIO_PRERENDER_LISTO' } });
-    expect(aud?.datos).toMatchObject({ numero: v.numero, archivos: 11, puntero: true, entorno: 'produccion' });
+    expect(aud?.datos).toMatchObject({ numero: v.numero, archivos: 12, puntero: true, entorno: 'produccion' });
     expect(await versionPendienteDePrerender(prisma)).toBeNull();
   });
 

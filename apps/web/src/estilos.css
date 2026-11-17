@@ -3623,3 +3623,83 @@ ul.fila-chips {
   min-width: 88px;
   font-weight: 600;
 }
+
+/* HU-1604 · Captación › Chatbot (PNT-32): dos columnas, listas de respuestas rápidas, fuentes y conversaciones. */
+.chat-columnas > * {
+  flex: 1 1 360px;
+  min-width: 0;
+}
+.chat-columna {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+.chat-columna > .tarjeta {
+  margin: 0;
+}
+.chat-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.chat-lista > li {
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.chat-lista > li.oculto b {
+  color: var(--color-texto-sec);
+}
+.chat-fila {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.chat-orden {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.chat-texto {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chat-filtro {
+  margin: 0;
+  min-width: 180px;
+}
+.chat-dias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  width: 100%;
+}
+.chat-conv summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  min-height: 44px;
+}
+.chat-mensajes {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.chat-mensajes li {
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: var(--color-suave);
+  overflow-wrap: anywhere;
+}
+.chat-mensajes li.bot {
+  border-left: 3px solid var(--color-cobalto);
+}

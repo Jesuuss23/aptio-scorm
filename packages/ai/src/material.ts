@@ -50,3 +50,12 @@ export function materialParaPrompt(documento: { nombre: string }, paginas: Pagin
   const { rango, texto } = paginasParaPrompt(paginas);
   return `<material_cliente archivo="${textoSeguro(documento.nombre)}" paginas="${rango}">\n${texto}\n</material_cliente>`;
 }
+
+/**
+ * HU-1604 · IA-20: las fuentes del chatbot listas para ir dentro de `<datos_sitio tipo="fuentes">`, cada una como
+ * `[fuente id="…"] título` y su texto en las líneas siguientes, neutralizadas. Sin fuentes, lo dice.
+ */
+export function fuentesChatParaPrompt(fuentes: readonly { id: string; titulo: string; texto: string }[]): string {
+  if (!fuentes.length) return '(no hay fuentes)';
+  return fuentes.map((f) => `[fuente id="${f.id.replace(/["\s]/g, '')}"] ${neutralizar(f.titulo.replace(/\s+/g, ' '))}\n${neutralizar(f.texto.trim())}`).join('\n\n');
+}

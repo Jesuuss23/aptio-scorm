@@ -21,6 +21,7 @@ import { type Idioma, INTERFAZ, TEXTOS } from './textos.js';
 import { CAMPO_TRAMPA, LIMITES_LEAD, PARAMETROS_UTM } from '@aptio/schema/leads';
 import { ARCHIVO_CAPTACION, RUTA_GRACIAS, RUTA_LEAD, SCRIPT_CAPTACION, TIPO_FORMULARIO } from './captacion.js';
 import { ARCHIVO_POPUPS, SCRIPT_POPUPS } from './popups.js';
+import { ARCHIVO_CHAT, SCRIPT_CHAT } from './chat.js';
 import { ARCHIVO_AGENDA, CSS_AGENDA, RUTA_CITA, SCRIPT_AGENDA, TEXTOS_AGENDA } from './agenda.js';
 
 export interface OpcionesRender {
@@ -431,18 +432,20 @@ export function jsonLdSeguro(datos: unknown): string {
 export const sinJsonLd = (html: string): string => html.replace(/<script type="application\/ld\+json">[^<]*<\/script>/g, '');
 
 /**
- * HU-1603 · El HTML sin JSON-LD ni el script diferido de popups, que solo agrega los popups y no hace falta para leer ni
- * enviar nada (para comprobar que la página no necesita JavaScript).
+ * HU-1603 · El HTML sin JSON-LD ni los scripts diferidos de popups y del chat (HU-1604), que solo agregan lo suyo y no
+ * hacen falta para leer ni enviar nada (para comprobar que la página no necesita JavaScript).
  */
-export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_popups\.js" defer="" data-base="[^"]*"><\/script>/g, '');
+export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_(?:popups|chat)\.js" defer="" data-base="[^"]*"><\/script>/g, '');
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, agenda = false, children }: {
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, chat = false, agenda = false, children }: {
   titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
   og?: OpenGraph; jsonLd?: unknown;
   /** HU-1601 · Carga el script propio de captación (primera visita y UTM); la CSP solo permite scripts del mismo origen. */
   captacion?: boolean;
   /** HU-1603 · Carga el script de popups, que los lee en vivo (`_popups.json`). Solo en las páginas del sitio. */
   popups?: boolean;
+  /** HU-1604 · Carga el chat, que lee el chatbot en vivo (`_chatbot.json`) y no hace nada si está oculto. */
+  chat?: boolean;
   /** HU-1605 · Carga el agendador (`_agenda.js`): solo en las páginas con el bloque. */
   agenda?: boolean; children?: ReactNode;
 }) {
@@ -470,6 +473,7 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO + cssExtra } }),
       captacion ? h('script', { src: `${base}/${ARCHIVO_CAPTACION}`, defer: true, 'data-base': base }) : null,
       popups ? h('script', { src: `${base}/${ARCHIVO_POPUPS}`, defer: true, 'data-base': base }) : null,
+      chat ? h('script', { src: `${base}/${ARCHIVO_CHAT}`, defer: true, 'data-base': base }) : null,
       agenda ? h('script', { src: `${base}/${ARCHIVO_AGENDA}`, defer: true }) : null),
     h('body', null, children));
 }
@@ -534,6 +538,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
       + (p.bloques.some((b) => b.tipo === 'agendador') ? CSS_AGENDA : ''),
     captacion: tieneFormulario(inst) || tieneAgendador(inst),
     popups: true,
+    chat: true,
     agenda: p.bloques.some((b) => b.tipo === 'agendador'),
     og: { titulo, descripcion, url: canonical, sitio: marca.nombre, idioma: i },
     jsonLd: datosEstructurados(p, { titulo, descripcion, url: canonical, idioma: i, marca, sitioUrl: op.sitioUrl }),
@@ -743,6 +748,8 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     ] : []),
     // HU-1603 · El script de popups va en toda versión: los popups se leen en vivo, sin republicar.
     { archivo: ARCHIVO_POPUPS, contenido: SCRIPT_POPUPS, mime: 'text/javascript; charset=utf-8' },
+    // HU-1604 · El chat también va en toda versión: se enciende y se apaga en vivo.
+    { archivo: ARCHIVO_CHAT, contenido: SCRIPT_CHAT, mime: 'text/javascript; charset=utf-8' },
     // HU-1605 · El agendador, solo si alguna página lo tiene.
     ...(tieneAgendador(inst) ? [{ archivo: ARCHIVO_AGENDA, contenido: SCRIPT_AGENDA, mime: 'text/javascript; charset=utf-8' }] : []),
     ...(inst.llmsTxt?.trim() ? [{ archivo: ARCHIVO_LLMS, contenido: `${inst.llmsTxt.trim()}\n`, mime: 'text/plain; charset=utf-8' }] : []),
