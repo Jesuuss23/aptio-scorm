@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.78 · actualizado con la quinta entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.79 · actualizado con la sexta entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1130,6 +1130,20 @@ Cada plan incluye una cantidad de cápsulas al mes. En **Proyectos** ves cuánta
 
 Todo se usa con el teclado: **Cantidad** cambia con las flechas y los botones con Enter.
 
+### 8.43 Plan y suscripción: cambiar de plan o cancelar
+
+Si eres el administrador de tu organización, en el menú **Empresa** está **Plan y suscripción**. Ahí ves tu plan, cuántas cápsulas al mes incluye, cuánto pagas sin IGV, el día en que se renueva y las cápsulas que usaste este mes. Los demás roles no ven esta opción.
+
+**Subir de plan.** En **Cambiar de plan** están los planes publicados. Pulsa **Cambiar a** y el nombre del plan. Antes de pagar ves el resumen: los días que faltan del período, la diferencia que pagas solo por esos días, el IGV y el total. Por ejemplo, de Inicial (S/ 490 al mes) a Productora (S/ 1.290 al mes) con 15 de 30 días por delante pagas S/ 400 más S/ 72 de IGV: S/ 472. Pulsa **Confirmar y pagar** y paga con la misma pasarela de tu suscripción: en el sitio de pruebas, escribe la tarjeta de prueba (4111 1111 1111 1111 aprueba, 4000 0000 0000 0002 rechaza) y pulsa **Pagar**; con Stripe vas a su página de pago y vuelves a **Plan y suscripción**. Cuando se aprueba, el plan nuevo y su cuota rigen desde ese momento, y desde la renovación pagas el precio nuevo completo. Si el pago se rechaza, tu plan no cambia.
+
+**Bajar de plan.** Con un plan más barato, el resumen dice desde qué día pasas al plan nuevo: el de la renovación. Pulsa **Confirmar el cambio**. No se cobra nada ahora ni se devuelve la diferencia, y hasta la renovación sigues con tu plan actual.
+
+**Cancelar.** En **Cancelar la suscripción**, pulsa **Cancelar al fin del período** y confirma con **Sí, cancelar al fin del período** (o **No, seguir** si te arrepientes). Sigues con tu plan hasta el fin del período pagado y no se devuelve lo pagado. Después no puedes generar cápsulas nuevas, pero las cápsulas en revisión siguen editables y lo exportado se puede descargar siempre.
+
+**Seguir con mi plan.** Mientras no llegue el fin del período, si pediste cancelar o bajar de plan, pulsa **Seguir con mi plan** para dejarlo todo como estaba.
+
+Desde el aviso **Se agotaron las cápsulas de este mes**, el enlace **Ver planes** lleva al administrador a esta pantalla. Todo se usa con el teclado: los botones con Enter y el resumen recibe el foco al abrirse.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1221,6 +1235,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.79 | 2026-11-17 | Plan y suscripción (8.43): subir de plan pagando solo la diferencia por los días que faltan, bajar de plan desde la renovación, cancelar al fin del período sin devolución y «Seguir con mi plan». |
 | 0.78 | 2026-11-17 | Cápsulas del mes y cápsulas adicionales (8.42): el indicador en Proyectos, qué cuenta como cápsula, cuándo se renueva, el aviso al agotarse y la compra de 1 a 10 adicionales por el administrador. |
 | 0.77 | 2026-11-17 | Pagar en soles o en dólares (8.40): el selector de moneda y el pago con Stripe o Culqi. Pasarelas de pago (8.41): mostrar, nombrar, cambiar de modo y ordenar las pasarelas, reembolsar pagos aprobados sin cuenta y los precios en dólares de los planes. |
 | 0.76 | 2026-11-17 | Suscribirse a un plan (8.40): los tres pasos de la página de pago (empresa con RUC y factura o boleta, resumen mensual o anual con IGV y pago), la confirmación y el correo de bienvenida, y el aviso de agendar una demo mientras no haya pago en línea. |
