@@ -3,7 +3,7 @@ import { armarInstantaneaActual, crearVersion, Prisma, type SitioVersion, ultima
 import { nombreElemento } from '@aptio/schema/sitio-contenido';
 import { bloqueaPublicacion, ficticiosVisibles } from '@aptio/schema/sitio-ficticios';
 import { navegacionPublica, type NavegacionPublica } from '@aptio/schema/sitio-navegacion';
-import { armarPagina, coleccionesDeBloques, ficticiosDeInstantanea, hayPendientes, leerInstantanea, type Instantanea, type OrigenVersion } from '@aptio/schema/sitio-versiones';
+import { armarPagina, BLOQUES_DE_PLANES, coleccionesDeBloques, ficticiosDeInstantanea, hayPendientes, leerInstantanea, type Instantanea, type OrigenVersion } from '@aptio/schema/sitio-versiones';
 import { entornoActual } from './entorno-sitio.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { PrerenderService } from './prerender.service.js';
@@ -50,10 +50,15 @@ export class VersionesService {
    */
   async revisarFicticios(): Promise<number> {
     const filas = ficticiosVisibles(await this.bd.sitioElemento.findMany({ where: { ficticio: true, visible: true } }));
-    if (bloqueaPublicacion(entornoActual(), filas.length)) {
-      throw bloqueo(filas.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: nombreElemento(e.coleccion, e.datos) })), 'publica');
+    const detalles: DetalleFicticio[] = filas.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: nombreElemento(e.coleccion, e.datos) }));
+    // HU-1702 · Y los planes ficticios visibles, si alguna página publicada muestra los planes (si no, no se publican).
+    const conPlanes = await this.bd.sitioBloque.count({ where: { visible: true, tipo: { in: [...BLOQUES_DE_PLANES] }, pagina: { estado: 'PUBLICADA' } } });
+    if (conPlanes) {
+      const planes = await this.bd.plan.findMany({ where: { ficticio: true, visible: true }, orderBy: [{ orden: 'asc' }, { nombre: 'asc' }], select: { slug: true, nombre: true } });
+      detalles.push(...planes.map((p) => ({ id: p.slug, coleccion: 'planes', nombre: p.nombre })));
     }
-    return filas.length;
+    if (bloqueaPublicacion(entornoActual(), detalles.length)) throw bloqueo(detalles, 'publica');
+    return detalles.length;
   }
 
   /** Crea la versión siguiente con la instantánea actual (o la dada) y la deja en la auditoría. */

@@ -63,6 +63,7 @@
     "./crm-envio": "./src/crm-envio.ts",
     "./popups": "./src/popups.ts",
     "./agenda": "./src/agenda.ts",
-    "./sitio-versiones": "./src/sitio-versiones.ts"
+    "./sitio-versiones": "./src/sitio-versiones.ts",
+    "./planes": "./src/planes.ts"
   }
 }

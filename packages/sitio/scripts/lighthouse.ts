@@ -40,7 +40,7 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
   const origen = `http://127.0.0.1:${(servidor.address() as AddressInfo).port}`;
   // El sitio vive bajo /s: el canonical y el sitemap apuntan ahí, como detrás de la CDN apuntarían a la raíz.
   const op = { entorno: 'produccion' as const, sitioUrl: `${origen}/s`, base: '/s' };
-  const inst = instantaneaDeEjemplo('produccion', { agenda: true, cookies: true });
+  const inst = instantaneaDeEjemplo('produccion', { agenda: true, cookies: true, planes: true });
   const archivos = new Map(renderizarSitio(inst, op).map((a) => [a.archivo, a.contenido]));
   servidor.on('request', (req, res) => {
     const url = req.url ?? '/';
@@ -73,6 +73,8 @@ const base = process.env.SITIO_LIGHTHOUSE_URL ?? local!.url;
 const PAGINAS = [
   { nombre: 'inicio', ruta: '', bloque: 'el popup activo, el chat o el aviso de cookies', propio: /\bpp-|data-popup|\bch-|\bck-/ },
   { nombre: 'agendar-demo', ruta: 'agendar-demo', bloque: 'el agendador, el chat o el aviso de cookies', propio: /booker|\bag-|data-agenda|#agendar|\bch-|\bck-/ },
+  // HU-1702 · /precios con los planes de la versión publicada, en HTML estático (CLS 0).
+  { nombre: 'precios', ruta: 'precios', bloque: 'los planes, el chat o el aviso de cookies', propio: /\bplan|price|badge5|\bch-|\bck-/ },
 ] as const;
 const ruta = rutaChrome();
 const chrome = await chromeLauncher.launch({ ...(ruta ? { chromePath: ruta } : {}), chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu'] });
@@ -100,7 +102,7 @@ try {
       ['CLS', cls.toFixed(5), `< ${UMBRALES.cls}`, cls < UMBRALES.cls],
       ...(local ? [[`Desplazamientos causados por ${p.bloque}`, String(delBloque.length), '= 0', delBloque.length === 0] as const] : []),
     ] as const;
-    console.log(`${p.nombre === 'inicio' ? 'CP-120' : 'HU-1605'} · Lighthouse ${lhr.lighthouseVersion} en celular sobre ${url}`);
+    console.log(`${p.nombre === 'inicio' ? 'CP-120' : p.nombre === 'precios' ? 'HU-1702' : 'HU-1605'} · Lighthouse ${lhr.lighthouseVersion} en celular sobre ${url}`);
     for (const [n, v, u, ok] of filas) console.log(`  ${ok ? '✓' : '✗'} ${n}: ${v} (umbral ${u})`);
     console.log(`  · Rendimiento (informativo): ${Math.round(rendimiento * 100)}. Informe en packages/sitio/lighthouse/${p.nombre}.html`);
     if (desplazamientos.length) console.log(`  · Elementos que se desplazaron: ${desplazamientos.join(', ')}`);

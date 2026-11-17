@@ -1,6 +1,6 @@
 import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
 import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
-import { armarInstantanea, armarPagina, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
+import { armarInstantanea, armarPagina, BLOQUES_DE_PLANES, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import type { CookiesPublicadas } from '@aptio/schema/cookies';
 import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
@@ -33,6 +33,7 @@ import { CLAVES_ETAPA, normalizarParametros, PARAMETROS_EJEMPLO } from '@aptio/s
 import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from '@aptio/schema/conexiones';
 import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
+import { crearPlanesSim, type PlanesSitioSim } from './planes-simulados';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
 
@@ -198,6 +199,8 @@ export interface OpcionesSimulacion {
   chatbotSitio?: ChatbotSitioSim;
   /** HU-1607 · Visitas ya contadas, por día de Lima, ruta e idioma (Sitio web › Resumen). */
   visitasSitio?: VisitaDiaSim[];
+  /** HU-1702 · Los planes de Ventas › Planes y los ajustes de la página de precios. */
+  planesSitio?: PlanesSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -472,7 +475,8 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio }: OpcionesSimulacion) {
+  const planesSim = crearPlanesSim(planesSitio);
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -581,7 +585,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const ajustesDto = () => ({ ...(ajustesSim ?? structuredClone(AJUSTES_POR_DEFECTO)), actualizadoEn: ajustesEn });
   const guardarAjustesSim = (a: AjustesSitio) => { ajustesSim = a; ajustesEn = new Date().toISOString(); return ajustesDto(); };
   const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
-  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim, llmsTxt: llmsSim, rastreadoresBloqueados: bloqueadosSim }, entornoSitio);
+  const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim, llmsTxt: llmsSim, rastreadoresBloqueados: bloqueadosSim, planes: planesSim.filas(), ajustesPlanes: planesSim.ajustes() }, entornoSitio);
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
       numero: versionesSim.length + 1, creadoEn: new Date(Date.UTC(2026, 10, 13, 15, versionesSim.length)).toISOString(), entorno: entornoSitio, origen,
@@ -1171,8 +1175,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         codigo: 'FICTICIOS_VISIBLES', mensaje: `No se ${que} en producción con datos ficticios: hay ${detalles.length}. Ocúltalos o reemplázalos primero.`, detalles,
       });
       if (ruta === '/sitio/publicar') {
-        const ficticios = ficticiosVisiblesSim();
-        if (ficticios.length && entornoSitio === 'produccion') return bloqueo(ficticios.map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: String(Object.values(e.datos)[0] ?? e.coleccion) })), 'publica');
+        const ficticios = ficticiosVisiblesSim().map((e) => ({ id: e.id, coleccion: e.coleccion, nombre: String(Object.values(e.datos)[0] ?? e.coleccion) }));
+        // HU-1702 · Y los planes ficticios visibles, si alguna página publicada muestra los planes.
+        const conPlanes = bloquesSim.some((b) => b.visible && (BLOQUES_DE_PLANES as readonly string[]).includes(b.tipo) && paginasSim.some((p) => p.id === b.paginaId && p.estado === 'PUBLICADA'));
+        if (conPlanes) ficticios.push(...planesSim.filas().filter((p) => p.ficticio && p.visible).map((p) => ({ id: p.slug, coleccion: 'planes', nombre: p.nombre })));
+        if (ficticios.length && entornoSitio === 'produccion') return bloqueo(ficticios, 'publica');
         const v = nuevaVersionSim('publicacion');
         return responder(201, { ...versionDto(v), ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}) });
       }
@@ -1339,6 +1346,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (ruta === '/captacion/agenda' || ruta.startsWith('/captacion/agenda/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const r = agendaSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
+      return responder(r.status, r.body);
+    }
+    if (ruta === '/ventas/planes' || ruta.startsWith('/ventas/planes/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = planesSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>);
       return responder(r.status, r.body);
     }
     if (ruta === '/captacion/popups' || ruta.startsWith('/captacion/popups/')) {

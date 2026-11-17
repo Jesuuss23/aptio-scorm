@@ -12,6 +12,7 @@ import { AJUSTES_CHATBOT_POR_DEFECTO, chatbotPublico, type ChatbotPublico } from
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { AJUSTES_POR_DEFECTO } from '@aptio/schema/sitio-ajustes';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
+import { AJUSTES_PLANES_POR_DEFECTO, PLANES_DE_EJEMPLO } from '@aptio/schema/planes';
 import { blogPublico, type BlogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, type FilaArticuloBlog, type FilaCategoriaBlog } from '@aptio/schema/sitio-blog';
 
 const F = '2026-11-13T15:00:00.000Z';
@@ -34,10 +35,12 @@ const enlace = (id: string, zona: string, texto: string, ruta: string | null, or
 /** HU-1606 · IDs de ejemplo (no son de una cuenta real) para medir el sitio con el aviso de cookies. */
 export const ETIQUETAS_DE_EJEMPLO = { ga4: 'G-AB12CD34EF', gtm: 'GTM-AB12CD3', metaPixel: '123456789012345' } as const;
 
-export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra: { agenda?: boolean; cookies?: boolean } = {}): Instantanea {
+/** HU-1702 · `planes: true` suma la página «Precios» con los 3 planes del prototipo (sin marca de ficticio, para medirla en producción). */
+export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra: { agenda?: boolean; cookies?: boolean; planes?: boolean } = {}): Instantanea {
   n = 0;
   return armarInstantanea({
     paginas: [
+      ...(extra.planes ? [{ ...pagina('precios', '/precios', 'Precios', ['precios', 'faq', 'cta']), metaDescripcion: 'Planes de Aptio SCORM en soles, con factura electrónica en cada cobro.' }] : []),
       ...(extra.agenda ? [{ ...pagina('agendar', '/agendar-demo', 'Agendar demo', ['agendador']), metaDescripcion: 'Te mostramos el generador con un documento tuyo. Elige día y hora en horario de Lima.' }] : []),
       // HU-1512 · El inicio con sus preguntas en FAQPage; Personaje con meta título y descripción propios, como Product.
       { ...pagina('inicio', '/', 'Inicio', ['hero', 'metricas', 'confianza', 'logos', 'pasos', 'funcionalidades', 'lms', 'sectores', 'testimonios', 'faq', 'bloglista', 'cta']), datosEstructurados: 'FAQPage' },
@@ -84,6 +87,7 @@ export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra
     ],
     // HU-1606 · Con etiquetas configuradas: el aviso de cookies y `_cookies.js` en cada página.
     ...(extra.cookies ? { ajustes: { ...AJUSTES_POR_DEFECTO, analitica: { ...ETIQUETAS_DE_EJEMPLO } } } : {}),
+    ...(extra.planes ? { planes: PLANES_DE_EJEMPLO.map((p, i) => ({ ...p, id: `plan-${i}`, ficticio: false, caracteristicas: p.caracteristicas.map((c) => ({ ...c })) })), ajustesPlanes: AJUSTES_PLANES_POR_DEFECTO } : {}),
   }, entorno);
 }
 

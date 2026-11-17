@@ -9,6 +9,7 @@ import type { EstadoTraduccion } from '@aptio/schema/traduccion';
 import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/proyecto';
 import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
 import type { Operacion } from '@aptio/schema/operacion';
+import type { AjustesPlanes, DatosPlan } from '@aptio/schema/planes';
 import type { DatosPopup } from '@aptio/schema/popups';
 import type { AjustesAgenda, EstadoCita, Feriado } from '@aptio/schema/agenda';
 import type { AccionRapida, ObjetivoChatbot, ResultadoConversacion, TonoChatbot } from '@aptio/schema/chatbot';
@@ -728,6 +729,16 @@ export interface PopupSitio extends DatosPopup {
   actualizadoEn: string;
 }
 
+/** HU-1702 · Ventas › Planes (PNT-35): el plan con su precio anual efectivo (el propio o con el descuento). */
+export interface PlanVenta extends DatosPlan {
+  id: string;
+  orden: number;
+  ficticio: boolean;
+  precioAnualEfectivo: number | null;
+  actualizadoEn: string;
+}
+export type EntradaPlan = Partial<DatosPlan> & { ficticio?: boolean };
+
 /** HU-1605 · Captación › Agendamiento (PNT-33). */
 export interface TipoReunion { id: string; nombreEs: string; nombreEn: string; minutos: number; asesorIds: string[]; visible: boolean; orden: number; ficticio: boolean }
 export interface AsesorAgenda { id: string; nombre: string; correo: string; enlaceVideollamada: string; visible: boolean; ficticio: boolean; citasProximas: number }
@@ -936,6 +947,12 @@ export const api = {
   borrarPopup: (id: string) => pedir<void>(`/captacion/popups/${id}`, { method: 'DELETE' }),
   ordenarPopups: (ids: string[]) => pedir<{ popups: PopupSitio[] }>('/captacion/popups/orden', json({ ids }, 'PUT')),
   reiniciarPopup: (id: string) => pedir<PopupSitio>(`/captacion/popups/${id}/reiniciar`, { method: 'POST' }),
+  // HU-1702 · Ventas › Planes (PNT-35).
+  planes: () => pedir<{ planes: PlanVenta[]; ajustes: AjustesPlanes }>('/ventas/planes'),
+  crearPlan: (d: EntradaPlan) => pedir<PlanVenta>('/ventas/planes', json(d)),
+  cambiarPlan: (id: string, d: EntradaPlan) => pedir<PlanVenta>(`/ventas/planes/${id}`, json(d, 'PATCH')),
+  ordenarPlanes: (ids: string[]) => pedir<{ planes: PlanVenta[]; ajustes: AjustesPlanes }>('/ventas/planes/orden', json({ ids }, 'PUT')),
+  guardarAjustesPlanes: (a: AjustesPlanes) => pedir<AjustesPlanes>('/ventas/planes/ajustes', json(a, 'PUT')),
   // HU-1605 · Captación › Agendamiento (PNT-33).
   agenda: () => pedir<Agenda>('/captacion/agenda'),
   cambiarAjustesAgenda: (c: Partial<AjustesAgenda>) => pedir<AjustesAgenda>('/captacion/agenda', json(c, 'PATCH')),

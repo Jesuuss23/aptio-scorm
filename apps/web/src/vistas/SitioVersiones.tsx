@@ -6,6 +6,7 @@
 import { type Coleccion, COLECCIONES_CONTENIDO } from '@aptio/schema/sitio-contenido';
 import { useEffect, useRef, useState } from 'react';
 import type { VersionSitio } from '../api';
+import { navegar } from '../ruta';
 import type { PublicacionSitio } from './publicacion-sitio';
 import { fechaHoraLima } from './sitio-paginas';
 
@@ -49,8 +50,9 @@ export function AvisosPublicacion({ estado }: { estado: PublicacionSitio }) {
         <div className="nota error" role="alert" aria-labelledby="bloqueo-sitio-titulo">
           <p id="bloqueo-sitio-titulo"><b>{bloqueo.titulo}</b> {bloqueo.mensaje}</p>
           <ul aria-label="Datos ficticios">
-            {bloqueo.detalles.map((d) => <li key={d.id}>{d.nombre} <span>({COLECCIONES_CONTENIDO[d.coleccion as Coleccion]?.nombre ?? d.coleccion})</span></li>)}
+            {bloqueo.detalles.map((d) => <li key={`${d.coleccion}-${d.id}`}>{d.nombre} <span>({d.coleccion === 'planes' ? 'Planes' : (COLECCIONES_CONTENIDO[d.coleccion as Coleccion]?.nombre ?? d.coleccion)})</span></li>)}
           </ul>
+          {bloqueo.detalles.some((d) => d.coleccion === 'planes') ? <p>Los planes ficticios se ocultan o se reemplazan en <a href="/ventas/planes" onClick={(e) => { e.preventDefault(); navegar('/ventas/planes'); }}>Ventas › Planes</a>.</p> : null}
           <div className="acciones-fila">
             {bloqueo.ocultable ? <button type="button" className="boton primario" disabled={estado.ocupado} onClick={() => void estado.ocultarYPublicar()}>Ocultar todos los ficticios</button> : null}
             <button type="button" className="boton" onClick={estado.cerrarBloqueo}>Cerrar</button>

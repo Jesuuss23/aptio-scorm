@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PrismaClient, Rol } from '@prisma/client';
+import { PLANES_DE_EJEMPLO } from '@aptio/schema/planes';
 import { hashearClave } from '../src/clave.js';
 
 const prisma = new PrismaClient();
@@ -100,10 +101,18 @@ async function main() {
     },
   });
 
+  // 7. HU-1702 · Los 3 planes del prototipo, ficticios y con precios por validar (DA-12, SUP-277): se vuelven a poner
+  // como en el prototipo. Un ficticio visible bloquea publicar el sitio en producción, como el resto del contenido.
+  for (const plan of PLANES_DE_EJEMPLO) {
+    const datos = { ...plan, ficticio: true, caracteristicas: plan.caracteristicas.map((c) => ({ ...c })) };
+    await prisma.plan.upsert({ where: { slug: plan.slug }, create: datos, update: datos });
+  }
+
   console.log(`Organización: ${org.nombre}`);
   console.log(`Cliente: ${cliente.nombre} (con kit)`);
   console.log(`Usuarios: ${usuarios.length} de la organización + superadmin · clave de desarrollo: ${CLAVE}`);
   console.log(`Proyecto: ${proyecto.nombre}`);
+  console.log(`Planes: ${PLANES_DE_EJEMPLO.map((p) => p.nombre).join(', ')} (ficticios)`);
 }
 
 main()

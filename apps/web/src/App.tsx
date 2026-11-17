@@ -31,6 +31,7 @@ import { CaptacionAgendamiento } from './vistas/CaptacionAgendamiento';
 import { CaptacionChatbot } from './vistas/CaptacionChatbot';
 import { CaptacionLeads } from './vistas/CaptacionLeads';
 import { CaptacionPopups } from './vistas/CaptacionPopups';
+import { VentasPlanes } from './vistas/VentasPlanes';
 import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
@@ -68,10 +69,11 @@ export function App() {
 
   useEffect(() => {
     if (usuario === null && !PUBLICAS.includes(camino)) navegar('/ingresar');
-    // HU-1501 · El superadmin no tiene organización: su panel es «Sitio web» y, desde la HU-1601, «Captación» (SUP-166).
+    // HU-1501 · El superadmin no tiene organización: su panel es «Sitio web» y, desde la HU-1601, «Captación» (SUP-166);
+    // desde la HU-1702, también «Ventas».
     const inicio = usuario && VEN_SITIO.includes(usuario.rol) ? '/sitio' : '/';
     if (usuario && camino === '/ingresar') navegar(inicio);
-    else if (usuario && inicio === '/sitio' && !camino.startsWith('/sitio') && !camino.startsWith('/captacion')) navegar('/sitio');
+    else if (usuario && inicio === '/sitio' && !camino.startsWith('/sitio') && !camino.startsWith('/captacion') && !camino.startsWith('/ventas')) navegar('/sitio');
   }, [usuario, camino]);
 
   if (camino === '/clave') return <NuevaClave token={new URLSearchParams(busqueda).get('token') ?? ''} />;
@@ -154,6 +156,8 @@ export function App() {
         <CaptacionAgendamiento />
       ) : vista?.activo === '/captacion/leads' && veSitio ? (
         <CaptacionLeads />
+      ) : vista?.activo === '/ventas/planes' && veSitio ? (
+        <VentasPlanes />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
         <SitioAjustes />
       ) : vista?.activo === '/operacion' && veOperacion ? (

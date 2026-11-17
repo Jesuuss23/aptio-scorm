@@ -25,6 +25,7 @@ import { OperacionModule } from './operacion/operacion.module.js';
 import { ComentariosModule } from './comentarios/comentarios.module.js';
 import { SitioModule } from './sitio/sitio.module.js';
 import { CaptacionModule } from './captacion/captacion.module.js';
+import { VentasModule } from './ventas/ventas.module.js';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { CaptacionModule } from './captacion/captacion.module.js';
     ComentariosModule,
     // HU-1603 · Antes que el sitio: `GET /s/_popups.json` no debe caer en la ruta comodín `GET /s/*`.
     CaptacionModule,
+    VentasModule,
     SitioModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: GuardaRoles }],

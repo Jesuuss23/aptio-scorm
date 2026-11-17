@@ -36,7 +36,11 @@ export function usePublicacionSitio() {
       setAviso(v.avisoFicticios ? { tipo: 'aviso', texto: ok(v) + avisoFicticios(v.avisoFicticios) } : { tipo: 'ok', texto: ok(v) });
       return v;
     } catch (e) {
-      if (e instanceof ErrorApi && e.codigo === 'FICTICIOS_VISIBLES') setBloqueo({ titulo, mensaje: e.message, detalles: e.detalles as Detalle[], ocultable });
+      if (e instanceof ErrorApi && e.codigo === 'FICTICIOS_VISIBLES') {
+        const detalles = e.detalles as Detalle[];
+        // HU-1702 · Los planes ficticios se ocultan o se desmarcan en Ventas › Planes, no con «Ocultar todos los ficticios».
+        setBloqueo({ titulo, mensaje: e.message, detalles, ocultable: ocultable && !detalles.some((d) => d.coleccion === 'planes') });
+      }
       else setAviso({ tipo: 'error', texto: mensajeDe(e, `${titulo} Inténtalo de nuevo.`) });
       return null;
     } finally {
