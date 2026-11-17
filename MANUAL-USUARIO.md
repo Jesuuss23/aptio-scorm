@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.72 · actualizado con la décima entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.73 · actualizado con la undécima entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -679,7 +679,19 @@ Dentro del ZIP encuentras:
 Los nombres de los menús de cada LMS cambian entre versiones: por eso la guía dice «Verificar con la versión del cliente». Revísala con quien administra el LMS antes de configurarlo.
 ### 8.28 Sitio web (solo superadmin)
 
-Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Sitio web › Resumen**, que dice cuántas páginas del sitio están publicadas, programadas o en borrador, con el enlace **Ir a Páginas**. Las demás opciones del grupo son Contenido, Blog y SEO.
+Quien tiene el usuario de **superadmin de la plataforma** entra directo a **Sitio web › Resumen**. Las demás opciones del grupo son Páginas, Contenido, Blog, SEO y SEO para IA.
+
+**Resumen.** Muestra cómo le va al sitio comercial, para decidir dónde invertir:
+
+1. Elige el período arriba a la derecha: **7 días**, **30 días** (viene marcado) o **Trimestre**. Los días van en hora de Lima y hoy cuenta.
+2. Los cuatro indicadores son **Visitas**, **Leads**, **Demos agendadas** y **Suscripciones nuevas**. Debajo de cada cifra ves cuánto subió o bajó frente al período anterior del mismo largo, o «Sin datos del período anterior». Suscripciones nuevas muestra «—» hasta que lleguen las suscripciones.
+3. **Visitas y conversiones** dibuja por día las visitas (escala de la izquierda) y los leads y demos (escala de la derecha), con una frase que resume el período. En **Ver los datos por día** está la misma información en una tabla.
+4. **Origen de los leads** reparte los leads del período por canal (Formulario, Popup, Chatbot, Agendador, Suscripción, Boletín o Asistente IA); los porcentajes siempre suman 100 %.
+5. **Páginas con más conversiones** lista hasta 5 páginas: cuántas visitas empezaron en ella, cuántos leads entraron por ella y la conversión. **Ver páginas** lleva a Páginas.
+6. **Próximas demos** muestra las 5 siguientes citas confirmadas; **Agendamiento** lleva a la agenda.
+7. Al final sigue la cuenta de páginas publicadas, programadas o en borrador, con **Ir a Páginas**.
+
+Los leads y las demos son los mismos de Captación. Las visitas se cuentan sin cookies ni datos personales: no cuentan los buscadores ni los robots, ni tus visitas cuando entras al sitio con tu sesión de superadmin. Empiezan a contarse cuando publicas el sitio después de esta actualización.
 
 En **Sitio web › Páginas** están todas las páginas del sitio comercial, con su ruta, idioma, estado y fecha:
 
@@ -1138,6 +1150,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.73 | 2026-11-17 | Resumen del sitio (8.28): período de 7 días, 30 días o trimestre, los cuatro indicadores con su variación, el gráfico de visitas y conversiones con su tabla, el origen de los leads, las páginas con más conversiones y las próximas demos. |
 | 0.72 | 2026-11-17 | Consentimiento de cookies (8.29): la tarjeta Privacidad con «Mostrar banner de cookies» y «Pedir de nuevo el consentimiento», la analítica que se activa solo con el permiso del visitante y lo que ve el visitante (aviso, preferencias y «Configurar cookies» en el pie). |
 | 0.71 | 2026-11-17 | Chatbot del sitio (8.38): mostrarlo u ocultarlo sin publicar, nombre, saludos, tono, objetivo y horario de atención, respuestas rápidas con orden, la base de conocimiento con fuentes propias, las conversaciones de 90 días con su resultado y lo que ve el visitante (preguntar, agendar una demo y hablar con una persona). |
 | 0.70 | 2026-11-17 | Agendamiento de demos (8.37): asesores con su enlace de videollamada, tipos de reunión con «Ofrecer», duración y orden, horarios de lunes a viernes, días bloqueados y feriados, recordatorios por correo, la reserva del visitante con su invitación y cancelación, y la lista de citas con «Cancelar», «Realizada» y «No asistió». |

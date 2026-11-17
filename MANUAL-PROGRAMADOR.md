@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.72 · actualizado con la décima entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.73 · actualizado con la undécima entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -113,6 +113,13 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
     - `LeadsService.capturar` suma la conversión con `popupId`.
   - **Web:** `vistas/CaptacionPopups.tsx` en `/captacion/popups`, y `popupsSitio` y `eventosPopupSim` en la API simulada.
   - **Pruebas:** `packages/schema/test/popups.test.ts`, `packages/sitio/test/popups.test.ts`, `apps/api/test/popups.casos.ts` y `apps/web/e2e/captacion-popups.spec.ts`.
+- **Resumen del sitio (HU-1607, REQ-080, PNT-24, CP-138):**
+  - **Modelo:** `SitioVisitaDia` (día DATE de Lima, ruta, idioma, `visitas`, `paginasVistas`, único por día, ruta e idioma), con la migración aditiva `20261117020000_visitas_sitio`.
+  - **Reglas:** `@aptio/schema/resumen-sitio` es puro. Expone `PERIODOS_RESUMEN`, `ventanaResumen` (tramos con `desde`/`hasta` de Lima y sus instantes `inicio`/`fin`), `diasDe`, `variacion`, `indicador`, `repartoOrigen` (mayor resto), `conversionPaginas`, `serieDiaria`, `contarPorDia`, `validarVisita` (normaliza la ruta con `normalizarPagina` de leads) y `esBot`.
+  - **Sitio (`@aptio/sitio`):** `src/visitas.ts` con `SCRIPT_VISITA`, `ARCHIVO_VISITA` (`_visita.js`), `RUTA_VISITA` y `CLAVE_VISITA`; `renderizarPagina` lo carga con `visita: true` y `renderizarSitio` lo sube en toda versión; `sinScriptsOpcionales` lo quita.
+  - **API:** `ResumenService` (`resumen()` con `Promise.all` sobre `SitioVisitaDia`, `Lead` y `AgendaCita`; `registrar()` con el límite por IP en memoria y un `INSERT … ON CONFLICT` con `$executeRaw`), `ResumenController` (`GET /sitio/resumen`, solo SUPERADMIN) y `VisitasPublicoController` (`POST /s/_visita`, excluido del prefijo en `app.ts`).
+  - **Web:** `vistas/SitioResumen.tsx` en `/sitio`, `api.resumenSitio(periodo)` y la simulación de `/sitio/resumen` y `POST /s/_visita` en `e2e/api-simulada.ts` (`visitasSitio`, `visitasRecibidasSim`).
+  - **Pruebas:** `packages/schema/test/resumen-sitio.test.ts`, `packages/sitio/test/visitas.test.ts`, `apps/api/test/sitio-resumen.casos.ts` y `apps/web/e2e/sitio-resumen.spec.ts`; `scripts/lighthouse.ts` responde 204 a la visita.
 - **Cookies (HU-1606, REQ-079, PNT-38, CP-137, RN-17-6):**
   - **Reglas:** `@aptio/schema/cookies` es puro y corre en la API, la web, el sitio y las pruebas. Expone `CATEGORIAS_COOKIES`, `CATEGORIA_ETIQUETA` (ga4 y gtm → analitica, metaPixel → publicidad), `CLAVE_COOKIES` (`aptio.cookies`), `VIGENCIA_MESES` (12), `cookiesPublicadas` (null sin IDs o con el aviso oculto), `leerDecision`, `venceEn`, `motivoParaPreguntar`, `etiquetasACargar`, `nuevaDecision`, `DOMINIOS_ETIQUETA` y `dominiosCsp`.
   - **Ajustes:** `AjustesSitio.cookies` (`visible`, `version`) en la columna Json de `SitioAjustes`, sin migración; `CambiosAjustes.cookies` acepta `visible` y `subirVersion`. `ajustesPublicados` suma `sitio.cookies` a la instantánea, y `CAMPOS_PUBLICADOS` del servicio incluye `analitica` y `cookies` para los pendientes.
@@ -490,6 +497,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.73 | 2026-11-17 | HU-1607: `SitioVisitaDia` con su migración, `@aptio/schema/resumen-sitio`, `_visita.js`, `POST /s/_visita`, `GET /sitio/resumen`, el Resumen nuevo y sus pruebas. |
 | 0.72 | 2026-11-17 | HU-1606: `@aptio/schema/cookies`, `cookies` en los ajustes y en la versión publicada, `_cookies.js` con el aviso y el diálogo, `politicaContenido` con la CSP por etiquetas, la tarjeta Privacidad y sus pruebas. |
 | 0.71 | 2026-11-17 | HU-1604: los modelos del chatbot con la migración `20261117010000_chatbot`, `@aptio/schema/chatbot`, IA-20 con su prompt, esquema y salida simulada, `ChatbotService` con la espera y el tope de gasto, `_chat.js` en toda versión, la reserva con `via: chatbot`, la vista Captación › Chatbot y sus pruebas. |
 | 0.70 | 2026-11-17 | HU-1605: los modelos del agendador con la migración `20261117000000_agenda` y su índice único parcial, `@aptio/schema/agenda`, la cola `agenda` y su worker, `AgendaService` con los controladores (candado por asesor y 409), `registrarAgendado`, el bloque y `_agenda.js`, la página `_cita`, Lighthouse de `/agendar-demo` y la vista Captación › Agendamiento. |
