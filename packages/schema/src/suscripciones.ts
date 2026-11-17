@@ -83,7 +83,7 @@ export type PlanResumible = Pick<PlanPublico, 'slug' | 'nombre' | 'aMedida' | 'p
 
 /**
  * Paso 2 · Resumen. El mensual cobra el precio al mes; el anual, el precio anual efectivo del plan publicado (propio o
- * con el descuento). En dólares (HU-1704), los precios en USD del plan, también con IGV de 18 % por defecto (SUP-296:
+ * con el descuento). En dólares (HU-1704), los precios en USD del plan, también con IGV de 18 % por defecto (SUP-295:
  * el tratamiento de la exportación de servicios se valida con el contador). Null si el plan es a medida, si pide el anual
  * y la página no lo ofrece, o si pide dólares y el plan no tiene precio en USD.
  */

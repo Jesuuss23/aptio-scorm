@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { api, type Cliente, CREAN_PROYECTOS, ErrorApi, type Proyecto, type Rol } from '../api';
 import { usd } from '../formato';
 import { navegar } from '../ruta';
+import { CuotaProyectos } from './CuotaCapsulas';
 
 const CHIP_ESTADO: Record<string, string> = { GENERANDO: 'ia', REVISION: 'aviso', ENTREGADO: 'validado' };
 
@@ -42,6 +43,7 @@ export function Proyectos({ rol }: { rol: Rol }) {
         subtitulo="Cada proyecto es un SCORM: se genera, se revisa, se ajusta y se entrega."
         accion={puedeCrear ? <a className="boton primario" href="/nuevo" onClick={ir('/nuevo')}>Nuevo SCORM</a> : undefined}
       />
+      {rol !== 'REVISOR_CLIENTE' && rol !== 'SUPERADMIN' ? <CuotaProyectos /> : null}
       <div className="filtros" role="search" aria-label="Filtrar proyectos">
         <label className="campo">
           Cliente

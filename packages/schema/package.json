@@ -66,6 +66,7 @@
     "./sitio-versiones": "./src/sitio-versiones.ts",
     "./planes": "./src/planes.ts",
     "./suscripciones": "./src/suscripciones.ts",
-    "./pasarelas": "./src/pasarelas.ts"
+    "./pasarelas": "./src/pasarelas.ts",
+    "./cuotas": "./src/cuotas.ts"
   }
 }

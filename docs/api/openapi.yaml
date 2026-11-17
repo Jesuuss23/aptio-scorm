@@ -4700,6 +4700,12 @@ paths:
         Crea las 11 etapas en cola y encola la generación (cola ia, tarea GENERAR). Lo que no se envía se toma del
         proyecto. Una generación activa por proyecto: 409 GENERACION_ACTIVA (CP-037). 422 PROYECTO_ARCHIVADO,
         SIN_MATERIAL o MATERIAL_EN_PROCESO. Solo administración, diseño instruccional y producción.
+
+        HU-1705 · La primera generación de un proyecto consume una cápsula de la cuota mensual (REQ-085, RN-18-6), en la
+        misma transacción y con la suscripción bloqueada, así que dos lanzamientos simultáneos con una disponible consumen
+        exactamente una (CP-146). Volver a generar un proyecto que ya consumió (por ejemplo, una cápsula en revisión) no
+        consume otra. Sin cápsulas disponibles: 402 CUOTA_AGOTADA, con la cuota (`Cuota`, que trae la oferta de la
+        adicional con IGV y el enlace a los planes) en `detalles[0]`. Sin suscripción o con un plan a medida, sin límite.
       parameters:
       - name: proyectoId
         in: path
@@ -4722,6 +4728,12 @@ paths:
                 $ref: '#/components/schemas/Generacion'
         '401':
           $ref: '#/components/responses/NoAutenticado'
+        '402':
+          description: CUOTA_AGOTADA · no quedan cápsulas este mes; `detalles[0]` es la `Cuota` (HU-1705)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           $ref: '#/components/responses/SinPermiso'
         '404':
@@ -7128,6 +7140,192 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /organizacion/cuota:
+    get:
+      tags:
+      - Ventas
+      summary: La cuota de cápsulas del mes (HU-1705, REQ-085, RN-18-6)
+      operationId: get_organizacion_cuota
+      description: |-
+        La ventana mensual vigente, anclada al inicio del período de la suscripción (también en el ciclo anual) y, sin
+        suscripción, el mes calendario en UTC: incluidas del plan, adicionales aprobadas en la ventana, usadas y
+        disponibles. Sin suscripción o con un plan a medida, `ilimitada`. Cualquier rol del equipo; el revisor del cliente
+        y el superadmin, 403.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cuota'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /organizacion/cuota/adicionales:
+    post:
+      tags:
+      - Ventas
+      summary: Comprar cápsulas adicionales (HU-1705, CP-146)
+      operationId: post_organizacion_cuota_adicionales
+      description: |-
+        Solo ADMINISTRADOR. De 1 a 10 cápsulas al precio de la adicional del plan, en la moneda de la suscripción, con IGV
+        de 18 % (en dólares, el precio es proporcional al del plan, supuesto SUP-300). Cobra con la pasarela de la
+        suscripción si sigue visible, activa y cobra esa moneda; si no, con la primera que la cobre. Crea la compra
+        PENDIENTE (auditoría CAPSULAS_COMPRA_INICIADA) y devuelve cómo sigue el pago, igual que el checkout: formulario de
+        pruebas, página alojada de Stripe (vuelve a `/?compra=<id>`, o con `&cancelado=1`) o Culqi Checkout. Las
+        adicionales se suman al aprobarse el pago por `POST /webhooks/pago/{pasarela}` y valen hasta el fin de la ventana
+        en que se aprueban; no se acumulan. 422 NO_VALIDO (cantidad), SIN_SUSCRIPCION, CUOTA_ILIMITADA o SIN_ADICIONALES.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompraAdicionalesEntrada'
+      responses:
+        '201':
+          description: Compra pendiente, con el pago
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompraCapsulas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '502':
+          description: PASARELA_NO_RESPONDE · la pasarela no creó el pago
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: PAGO_NO_DISPONIBLE · ninguna pasarela visible y activa cobra la moneda de la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /organizacion/cuota/adicionales/{id}:
+    get:
+      tags:
+      - Ventas
+      summary: El estado de una compra de cápsulas, para consultar hasta que la pasarela confirme (HU-1705)
+      operationId: get_organizacion_cuota_adicionales_id
+      description: Solo ADMINISTRADOR y solo compras de su organización (otra organización, 404).
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompraCapsulas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /organizacion/cuota/adicionales/{id}/pago-prueba:
+    post:
+      tags:
+      - Ventas
+      summary: Pagar una compra de cápsulas con la pasarela de pruebas (HU-1705)
+      operationId: post_organizacion_cuota_adicionales_id_pago_prueba
+      description: |-
+        Solo ADMINISTRADOR y solo compras de la pasarela de pruebas. Con 4111 1111 1111 1111 aprueba y con 4000 0000 0000
+        0002 rechaza: arma el evento firmado y lo procesa por el mismo camino que `POST /webhooks/pago/pruebas`. Otra
+        tarjeta, 422. Solo se guardan los 4 últimos dígitos.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagoPrueba'
+      responses:
+        '200':
+          description: La compra tras el pago, con la cuota
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompraCapsulas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /organizacion/cuota/adicionales/{id}/token:
+    post:
+      tags:
+      - Ventas
+      summary: Enviar el token de Culqi Checkout de una compra de cápsulas (HU-1705)
+      operationId: post_organizacion_cuota_adicionales_id_token
+      description: |-
+        Solo ADMINISTRADOR. Con el token de un solo uso la API crea el cargo en Culqi; la compra sigue PENDIENTE hasta el
+        webhook firmado. 404 si la compra no es de Culqi; 409 PAGO_RESUELTO si ya no está pendiente; 402 PAGO_RECHAZADO si
+        Culqi rechaza la tarjeta.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPago'
+      responses:
+        '202':
+          description: Cargo enviado; la compra sigue pendiente hasta el webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompraCapsulas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '402':
+          description: PAGO_RECHAZADO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: PAGO_RESUELTO · la compra ya no está pendiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: PASARELA_NO_RESPONDE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /webhooks/pago/{pasarela}:
     post:
       tags:
@@ -7158,6 +7356,12 @@ paths:
         la emite la HU-1707). Si el monto o la moneda no coinciden con la solicitud (PAGO_MONTO_NO_COINCIDE), el correo ya
         tiene cuenta (SUSCRIPCION_SIN_ALTA) o la solicitud ya no estaba pendiente (PAGO_SIN_SOLICITUD_PENDIENTE), el
         cobro queda sin alta para que el superadmin lo reembolse.
+
+        HU-1705 · Si `solicitudId` (o la referencia de la pasarela) no es una solicitud de suscripción sino una compra de
+        cápsulas adicionales, el mismo webhook la resuelve: aprobada, suma las cápsulas a la ventana vigente, guarda el
+        Cobro con `compraCapsulasId` y encola «emitir-comprobante» con jobId = id del cobro (auditoría CAPSULAS_COMPRADAS);
+        rechazada, la compra pasa a RECHAZADA (CAPSULAS_PAGO_RECHAZADO). Si el monto o la moneda no coinciden, o la compra
+        ya no estaba pendiente (PAGO_SIN_COMPRA_PENDIENTE), el cobro queda sin acreditar y reembolsable.
       parameters:
       - name: pasarela
         in: path
@@ -15075,6 +15279,51 @@ components:
       required: [token]
       properties:
         token: { type: string, example: tkn_test_…, description: 'El token de un solo uso del formulario incrustado (Culqi Checkout)' }
+    OfertaAdicional:
+      type: object
+      description: HU-1705 · El precio de una cápsula adicional en la moneda de la suscripción.
+      required: [unitario, igv, total, moneda, disponible]
+      properties:
+        unitario: { type: number, example: 69, description: 'Sin IGV, por cápsula' }
+        igv: { type: number, example: 12.42 }
+        total: { type: number, example: 81.42, description: 'Con IGV de 18 %, por cápsula' }
+        moneda: { type: string, enum: [PEN, USD] }
+        disponible: { type: boolean, description: 'Hay una pasarela visible y activa que cobra esa moneda' }
+    Cuota:
+      type: object
+      description: HU-1705 · La cuota de cápsulas de la ventana mensual vigente (REQ-085, RN-18-6).
+      required: [ilimitada, ventanaInicio, ventanaFin, incluidas, adicionales, usadas, disponibles, oferta, puedeComprar, planes]
+      properties:
+        ilimitada: { type: boolean, description: 'Sin suscripción (organización interna) o plan a medida' }
+        ventanaInicio: { type: string, format: date-time }
+        ventanaFin: { type: string, format: date-time, description: 'Cuándo se renueva; las no usadas y las adicionales vencen aquí' }
+        incluidas: { type: integer, nullable: true, example: 20, description: 'Cápsulas al mes del plan' }
+        adicionales: { type: integer, example: 0, description: 'Adicionales aprobadas en la ventana' }
+        usadas: { type: integer, example: 17 }
+        disponibles: { type: integer, nullable: true, example: 3, description: 'null si es ilimitada' }
+        oferta: { type: object, allOf: [{ $ref: '#/components/schemas/OfertaAdicional' }], nullable: true, description: 'null si el plan no vende adicionales o no hay suscripción' }
+        puedeComprar: { type: boolean, description: 'El usuario es ADMINISTRADOR y hay oferta' }
+        planes: { type: string, example: '/s/precios', description: 'Subir de plan (el cambio con prorrateo llega con la HU-1706)' }
+    CompraAdicionalesEntrada:
+      type: object
+      properties:
+        cantidad: { type: integer, minimum: 1, maximum: 10, default: 1 }
+    CompraCapsulas:
+      type: object
+      description: HU-1705 · Una compra de cápsulas adicionales.
+      required: [id, estado, cantidad, subtotal, igv, total, moneda, pasarela, motivoRechazo, cuota]
+      properties:
+        id: { type: string, format: uuid }
+        estado: { type: string, enum: [PENDIENTE, APROBADA, RECHAZADA] }
+        cantidad: { type: integer, minimum: 1, maximum: 10 }
+        subtotal: { type: number, example: 69 }
+        igv: { type: number, example: 12.42 }
+        total: { type: number, example: 81.42 }
+        moneda: { type: string, enum: [PEN, USD] }
+        pasarela: { type: string, enum: [pruebas, culqi, stripe] }
+        motivoRechazo: { type: string, nullable: true }
+        pago: { $ref: '#/components/schemas/PagoCheckout' }
+        cuota: { $ref: '#/components/schemas/Cuota' }
     Pasarela:
       type: object
       description: HU-1704 · Una pasarela como la ve el superadmin. Nunca lleva llaves ni secretos, solo los nombres de las variables que faltan.
@@ -15109,12 +15358,14 @@ components:
         codigos: { type: array, maxItems: 10, items: { type: string, enum: [pruebas, culqi, stripe] }, description: 'Todas las pasarelas, en el orden nuevo' }
     Cobro:
       type: object
-      description: HU-1704 · Un cobro aprobado. Sin datos de tarjeta, solo la referencia y los 4 últimos dígitos (REQ-110).
-      required: [id, solicitudId, suscripcionId, razonSocial, correoAdmin, nombrePlan, monto, moneda, pasarela, ultimos4Digitos, estado, motivoSinAlta, reembolsable, reembolsoId, reembolsadoEn, creadoEn]
+      description: HU-1704 · Un cobro aprobado. Sin datos de tarjeta, solo la referencia y los 4 últimos dígitos (REQ-110). HU-1705 · También de una compra de cápsulas adicionales.
+      required: [id, solicitudId, compraCapsulasId, concepto, suscripcionId, razonSocial, correoAdmin, nombrePlan, monto, moneda, pasarela, ultimos4Digitos, estado, motivoSinAlta, reembolsable, reembolsoId, reembolsadoEn, creadoEn]
       properties:
         id: { type: string, format: uuid }
-        solicitudId: { type: string, format: uuid }
-        suscripcionId: { type: string, format: uuid, nullable: true, description: 'null = pago aprobado sin alta (SUP-291)' }
+        solicitudId: { type: string, format: uuid, nullable: true, description: 'La solicitud de suscripción; null si es una compra de cápsulas' }
+        compraCapsulasId: { type: string, format: uuid, nullable: true, description: 'HU-1705 · La compra de cápsulas adicionales; null si es una suscripción' }
+        concepto: { type: string, enum: [SUSCRIPCION, CAPSULAS] }
+        suscripcionId: { type: string, format: uuid, nullable: true, description: 'null = pago aprobado sin alta o sin acreditar (SUP-291); reembolsable' }
         razonSocial: { type: string, example: Minera Andina SAC }
         correoAdmin: { type: string, format: email }
         nombrePlan: { type: string, example: Productora }

@@ -4,7 +4,8 @@
 import { esLimiteGasto } from '@aptio/schema/conexiones';
 import { DETALLE_PROXIMAMENTE, NOMBRE_ETAPA } from '@aptio/schema/generacion';
 import { type ReactNode, useCallback, useEffect, useState } from 'react';
-import { api, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
+import { api, type CuotaCapsulas, ErrorApi, type EtapaGeneracion, type Generacion } from '../api';
+import { AvisoCuotaAgotada } from './CuotaCapsulas';
 import { usd } from '../formato';
 import { EstructuraVista } from './EstructuraVista';
 import { GuionVista } from './GuionVista';
@@ -61,6 +62,8 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, puedeRegenerar = fal
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  /** HU-1705 · 402 CUOTA_AGOTADA al lanzar la primera generación: la cuota con la oferta de adicionales. */
+  const [agotada, setAgotada] = useState<CuotaCapsulas | null>(null);
   const [abierta, setAbierta] = useState<EtapaGeneracion['etapa'] | null>(null);
   const activa = Boolean(g && ACTIVAS.has(g.estado));
 
@@ -101,11 +104,14 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, puedeRegenerar = fal
     setOcupado(true);
     setError('');
     setAviso('');
+    setAgotada(null);
     try {
       setG(await hacer());
       alCambiar();
     } catch (e) {
-      if (e instanceof ErrorApi && e.codigo === 'GENERACION_ACTIVA') {
+      if (e instanceof ErrorApi && e.codigo === 'CUOTA_AGOTADA' && e.detalles[0]) {
+        setAgotada(e.detalles[0] as unknown as CuotaCapsulas);
+      } else if (e instanceof ErrorApi && e.codigo === 'GENERACION_ACTIVA') {
         // CP-037: otra persona ya la lanzó; se muestra la que está en curso.
         setAviso(e.message);
         api.generaciones(proyectoId).then((l) => setG(l[0] ?? null), () => undefined);
@@ -142,6 +148,7 @@ export function GeneracionScorm({ proyectoId, puedeGenerar, puedeRegenerar = fal
         ) : null}
       </div>
       {error ? <div className="nota error" role="alert">{error}</div> : null}
+      {agotada ? <AvisoCuotaAgotada cuota={agotada} alAcreditar={(_c, m) => { setAgotada(null); setAviso(m); }} /> : null}
       {aviso ? <div className="nota aviso" role="status">{aviso}</div> : null}
       {porLimite ? (
         <div className="nota aviso limite-gasto" role="alert">

@@ -7,7 +7,7 @@ import { ErrorPasarela } from './pasarelas/contrato.js';
 import { PasarelasService } from './pasarelas.service.js';
 import type { CobroDto, CobrosDto } from './pasarelas.dto.js';
 
-const CON_SOLICITUD = { solicitud: { include: { plan: true } } } as const;
+const CON_SOLICITUD = { solicitud: { include: { plan: true } }, compraCapsulas: { include: { organizacion: true, suscripcion: { include: { plan: true } } } } } as const;
 type FilaCobro = Prisma.CobroGetPayload<{ include: typeof CON_SOLICITUD }>;
 
 /**
@@ -30,11 +30,13 @@ export class CobrosService {
       where: { ...(filtro.estado ? { estado: filtro.estado } : {}), ...(filtro.sinAlta === undefined ? {} : filtro.sinAlta ? { suscripcionId: null } : { suscripcionId: { not: null } }) },
       include: CON_SOLICITUD, orderBy: { creadoEn: 'desc' }, take: 200,
     });
-    return { cobros: filas.map((c) => this.aDto(c)) };
+    const correos = await this.correosDe(filas);
+    return { cobros: filas.map((c) => this.aDto(c, correos)) };
   }
 
   async obtener(id: string): Promise<CobroDto> {
-    return this.aDto(await this.buscar(id));
+    const c = await this.buscar(id);
+    return this.aDto(c, await this.correosDe([c]));
   }
 
   /**
@@ -44,7 +46,7 @@ export class CobrosService {
    */
   async reembolsar(u: UsuarioSesion, id: string, ahora = new Date()): Promise<CobroDto> {
     const c = await this.buscar(id);
-    if (c.suscripcionId) throw new ConflictException({ codigo: 'COBRO_CON_SUSCRIPCION', mensaje: 'Este cobro creó una suscripción: se devuelve al cancelarla, no desde aquí' });
+    if (c.suscripcionId) throw new ConflictException({ codigo: 'COBRO_CON_SUSCRIPCION', mensaje: 'Este cobro está acreditado a una suscripción: se devuelve al cancelarla, no desde aquí' });
     const tomado = await this.bd.cobro.updateMany({ where: { id, estado: 'APROBADO', suscripcionId: null }, data: { estado: 'REEMBOLSADO', reembolsadoEn: ahora } });
     if (tomado.count === 0) throw new ConflictException({ codigo: 'COBRO_YA_REEMBOLSADO', mensaje: 'Este cobro ya se reembolsó' });
     try {
@@ -55,9 +57,9 @@ export class CobrosService {
       const { reembolsoId } = await this.pasarelas.adaptador(config.codigo).reembolsar(config.modo, { referencia: c.tokenPago, monto: Number(c.monto), moneda: c.moneda === 'USD' ? 'USD' : 'PEN', idempotencia: c.id });
       const hecho = await this.bd.cobro.update({ where: { id }, data: { reembolsoId }, include: CON_SOLICITUD });
       await this.bd.auditoria.create({
-        data: { organizacionId: null, usuarioId: u.id, accion: 'COBRO_REEMBOLSADO', entidad: 'Cobro', entidadId: id, datos: { pasarela: c.pasarela, monto: Number(c.monto), moneda: c.moneda, reembolsoId, solicitudId: c.solicitudSuscripcionId } },
+        data: { organizacionId: null, usuarioId: u.id, accion: 'COBRO_REEMBOLSADO', entidad: 'Cobro', entidadId: id, datos: { pasarela: c.pasarela, monto: Number(c.monto), moneda: c.moneda, reembolsoId, solicitudId: c.solicitudSuscripcionId, compraCapsulasId: c.compraCapsulasId } },
       });
-      return this.aDto(hecho);
+      return this.aDto(hecho, await this.correosDe([hecho]));
     } catch (e) {
       await this.bd.cobro.update({ where: { id }, data: { estado: 'APROBADO', reembolsadoEn: null } });
       const mensaje = e instanceof Error ? e.message : String(e);
@@ -73,10 +75,24 @@ export class CobrosService {
     return c;
   }
 
-  private aDto(c: FilaCobro): CobroDto {
-    const motivo = c.suscripcionId ? null : (c.solicitud.motivoRechazo ?? 'El pago llegó cuando la solicitud ya estaba cerrada');
+  /** HU-1705 · El correo de quien pidió cada compra de cápsulas (la compra guarda solo su id). */
+  private async correosDe(filas: FilaCobro[]): Promise<Map<string, string>> {
+    const ids = [...new Set(filas.flatMap((c) => (c.compraCapsulas ? [c.compraCapsulas.pedidoPorId] : [])))];
+    if (!ids.length) return new Map();
+    const usuarios = await this.bd.usuario.findMany({ where: { id: { in: ids } }, select: { id: true, email: true } });
+    return new Map(usuarios.map((x) => [x.id, x.email]));
+  }
+
+  private aDto(c: FilaCobro, correos: Map<string, string>): CobroDto {
+    const compra = c.compraCapsulas;
+    const motivo = c.suscripcionId ? null
+      : compra ? (compra.motivoRechazo ?? 'El pago llegó cuando la compra ya estaba cerrada')
+        : (c.solicitud?.motivoRechazo ?? 'El pago llegó cuando la solicitud ya estaba cerrada');
+    const origen = compra
+      ? { razonSocial: compra.organizacion.nombre, correoAdmin: correos.get(compra.pedidoPorId) ?? '', nombrePlan: `${compra.suscripcion.plan.nombre} · ${compra.cantidad} ${compra.cantidad === 1 ? 'cápsula adicional' : 'cápsulas adicionales'}` }
+      : { razonSocial: c.solicitud?.razonSocial ?? '', correoAdmin: c.solicitud?.correoAdmin ?? '', nombrePlan: c.solicitud?.plan.nombre ?? '' };
     return {
-      id: c.id, solicitudId: c.solicitudSuscripcionId, suscripcionId: c.suscripcionId, razonSocial: c.solicitud.razonSocial, correoAdmin: c.solicitud.correoAdmin, nombrePlan: c.solicitud.plan.nombre,
+      id: c.id, solicitudId: c.solicitudSuscripcionId, compraCapsulasId: c.compraCapsulasId, concepto: compra ? 'CAPSULAS' : 'SUSCRIPCION', suscripcionId: c.suscripcionId, ...origen,
       monto: Number(c.monto), moneda: c.moneda === 'USD' ? 'USD' : 'PEN', pasarela: c.pasarela, ultimos4Digitos: c.ultimos4Digitos, estado: c.estado, motivoSinAlta: motivo,
       reembolsable: c.estado === 'APROBADO' && !c.suscripcionId, reembolsoId: c.reembolsoId, reembolsadoEn: c.reembolsadoEn?.toISOString() ?? null, creadoEn: c.creadoEn.toISOString(),
     };

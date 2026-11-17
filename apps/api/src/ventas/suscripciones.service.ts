@@ -22,6 +22,9 @@ import { BASE_SITIO } from '../sitio/sitio-publico.controller.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
 import { type Cabeceras, ErrorPasarela, type PagoCreado } from './pasarelas/contrato.js';
 import { firmar, type PasarelaPruebas } from './pasarelas/pruebas.js';
+import type { UsuarioSesion } from '../comun/roles.js';
+import type { CompraCapsulasDto } from './cuotas.dto.js';
+import { CuotasService } from './cuotas.service.js';
 import { PasarelasService } from './pasarelas.service.js';
 import type { CheckoutCreadoDto, EstadoCheckoutDto, WebhookRecibidoDto } from './suscripciones.dto.js';
 
@@ -59,7 +62,7 @@ export class SuscripcionesService implements OnModuleDestroy {
   /** El último encolado de la bienvenida y del comprobante (las pruebas lo esperan; la respuesta a la pasarela no). */
   ultimoEncolado: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -181,24 +184,63 @@ export class SuscripcionesService implements OnModuleDestroy {
    * procesa por el mismo camino que el webhook. Otra tarjeta, 422. Nunca se guarda el número, solo los 4 últimos.
    */
   async pagarPrueba(id: string, tarjeta: unknown): Promise<EstadoCheckoutDto> {
+    const numero = await this.tarjetaPrueba(tarjeta);
+    const s = await this.bd.solicitudSuscripcion.findUnique({ where: { id } });
+    if (!s || s.pasarela !== PASARELA_PRUEBA) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });
+    if (s.estado === 'PENDIENTE') await this.simularPago(s.id, numero, Number(s.total), s.moneda);
+    return this.estado(id);
+  }
+
+  /** La tarjeta de prueba sin espacios ni guiones; 404 si la pasarela de pruebas no está, 422 si no es de prueba. */
+  private async tarjetaPrueba(tarjeta: unknown): Promise<string> {
     const config = await this.pasarelas.config(PASARELA_PRUEBA);
     if (!config || !this.pasarelas.activa(config)) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La pasarela de pruebas no está disponible' });
-    const secreto = (this.pasarelas.adaptador(PASARELA_PRUEBA) as PasarelaPruebas).secreto();
     const numero = (typeof tarjeta === 'string' ? tarjeta : '').replace(/[\s-]/g, '');
     if (numero !== TARJETAS_PRUEBA.aprobada && numero !== TARJETAS_PRUEBA.rechazada) {
       throw noValido([{ campo: 'tarjeta', mensaje: 'Usa una tarjeta de prueba: 4111 1111 1111 1111 aprueba y 4000 0000 0000 0002 rechaza' }]);
     }
-    const s = await this.bd.solicitudSuscripcion.findUnique({ where: { id } });
-    if (!s || s.pasarela !== PASARELA_PRUEBA) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });
-    if (s.estado === 'PENDIENTE') {
-      const aprobado = numero === TARJETAS_PRUEBA.aprobada;
-      const cuerpo = Buffer.from(JSON.stringify({
-        id: `prueba_${s.id}`, tipo: aprobado ? 'pago.aprobado' : 'pago.rechazado', solicitudId: s.id, ultimos4: numero.slice(-4), monto: Number(s.total), moneda: s.moneda,
-        ...(aprobado ? {} : { motivo: 'La tarjeta de prueba fue rechazada' }),
-      }));
-      await this.recibirWebhook(PASARELA_PRUEBA, cuerpo, { 'x-aptio-firma': firmar(secreto, cuerpo) });
+    return numero;
+  }
+
+  /** Arma el evento de la pasarela de pruebas, lo firma y lo procesa por el mismo camino que el webhook. */
+  private async simularPago(id: string, numero: string, monto: number, moneda: string): Promise<void> {
+    const secreto = (this.pasarelas.adaptador(PASARELA_PRUEBA) as PasarelaPruebas).secreto();
+    const aprobado = numero === TARJETAS_PRUEBA.aprobada;
+    const cuerpo = Buffer.from(JSON.stringify({
+      id: `prueba_${id}`, tipo: aprobado ? 'pago.aprobado' : 'pago.rechazado', solicitudId: id, ultimos4: numero.slice(-4), monto, moneda,
+      ...(aprobado ? {} : { motivo: 'La tarjeta de prueba fue rechazada' }),
+    }));
+    await this.recibirWebhook(PASARELA_PRUEBA, cuerpo, { 'x-aptio-firma': firmar(secreto, cuerpo) });
+  }
+
+  /** HU-1705 · Pagar una compra de cápsulas adicionales con la pasarela de pruebas (solo en `pruebas`). */
+  async pagarPruebaCompra(u: UsuarioSesion, id: string, tarjeta: unknown): Promise<CompraCapsulasDto> {
+    const numero = await this.tarjetaPrueba(tarjeta);
+    const c = await this.cuotas.buscarCompra(u, id);
+    if (c.pasarela !== PASARELA_PRUEBA) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La compra no existe' });
+    if (c.estado === 'PENDIENTE') await this.simularPago(c.id, numero, Number(c.montoTotalConIgv), c.moneda);
+    return this.cuotas.compra(u, id);
+  }
+
+  /** HU-1705 · El token de Culqi Checkout para una compra de cápsulas: la pasarela crea el cargo; se acredita con el webhook. */
+  async enviarTokenCompra(u: UsuarioSesion, id: string, token: unknown): Promise<CompraCapsulasDto> {
+    const c = await this.cuotas.buscarCompra(u, id);
+    if (!esCodigoPasarela(c.pasarela) || CATALOGO_PASARELAS[c.pasarela].flujo !== 'formulario') throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La compra no existe' });
+    if (c.estado !== 'PENDIENTE') throw new ConflictException({ codigo: 'PAGO_RESUELTO', mensaje: 'Este pago ya se resolvió' });
+    if (typeof token !== 'string' || !token.trim()) throw noValido([{ campo: 'token', mensaje: 'Falta el token de la pasarela' }]);
+    const config = await this.pasarelas.config(c.pasarela);
+    if (!config || !this.pasarelas.activa(config)) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'La pasarela no está disponible' });
+    const usuario = await this.bd.usuario.findUniqueOrThrow({ where: { id: u.id }, select: { email: true } });
+    try {
+      await this.pasarelas.adaptador(config.codigo).crearPago(config.modo, {
+        solicitudId: c.id, monto: Number(c.montoTotalConIgv), moneda: c.moneda === 'USD' ? 'USD' : 'PEN', descripcion: `Aptio SCORM · ${c.cantidad} ${c.cantidad === 1 ? 'cápsula adicional' : 'cápsulas adicionales'}`,
+        correo: usuario.email, urlExito: '', urlCancelado: '', token: token.trim(),
+      });
+    } catch (err) {
+      const motivo = err instanceof ErrorPasarela ? err.motivo : null;
+      throw new HttpException({ codigo: 'PAGO_RECHAZADO', mensaje: motivo ?? 'La pasarela no pudo procesar el pago: revisa la tarjeta o intenta de nuevo' }, HttpStatus.PAYMENT_REQUIRED);
     }
-    return this.estado(id);
+    return this.cuotas.compra(u, id);
   }
 
   /**
@@ -262,8 +304,17 @@ export class SuscripcionesService implements OnModuleDestroy {
       duplicado = await this.bd.$transaction(async (tx) => {
         if (await tx.solicitudSuscripcion.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
         if (await tx.cobro.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
+        if (await tx.compraCapsulas.findUnique({ where: { eventoPagoId: ev.eventoId } })) return true;
         const s = await tx.solicitudSuscripcion.findUnique({ where: { id: ev.solicitudId } });
-        if (!s || s.pasarela !== pasarela) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });
+        if (!s) {
+          // HU-1705 · El mismo webhook acredita las compras de cápsulas adicionales (su id va donde iría el de la solicitud).
+          const compra = await tx.compraCapsulas.findUnique({ where: { id: ev.solicitudId } });
+          if (!compra || compra.pasarela !== pasarela) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });
+          const r = await this.cuotas.procesarCompra(tx, compra, pasarela, ev, ahora);
+          cobroId = r.cobroId;
+          return r.duplicado;
+        }
+        if (s.pasarela !== pasarela) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El pago no existe' });
         const aprobado = ev.resultado === 'aprobado';
         /** El cobro de un pago aprobado, con o sin alta. Sin datos de tarjeta: la referencia y los 4 últimos (REQ-110). */
         const cobrar = async (suscripcionId: string | null) => {
