@@ -71,6 +71,7 @@
     "./cambio-plan": "./src/cambio-plan.ts",
     "./cobranza": "./src/cobranza.ts",
     "./cupones": "./src/cupones.ts",
+    "./ingresos": "./src/ingresos.ts",
     "./comprobantes": "./src/comprobantes.ts"
   }
 }

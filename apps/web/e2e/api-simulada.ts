@@ -17,6 +17,7 @@ import { blogDeEjemplo, cabecerasSitio, conDominio, robotsTxt, leerFuente, rende
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import type { Page } from '@playwright/test';
+import { type IngresosSitioSim, panelIngresosSim } from './ingresos-simulados';
 import { aVtt, subtitulosDeNarracion } from '../../../packages/ai/src/subtitulos.js';
 import { traducirLoto } from '../../../packages/exporters/test/loto.ts';
 import { DETALLE_PROXIMAMENTE, ETAPAS } from '@aptio/schema/generacion';
@@ -215,6 +216,8 @@ export interface OpcionesSimulacion {
   cuotaSitio?: CuotaSitioSim;
   /** HU-1708 · El estado de cobro de la organización (aviso, solo lectura y «Pagar ahora») y Ventas › Suscripciones. */
   cobranzaSitio?: CobranzaSitioSim;
+  /** HU-1710 · Las suscripciones del panel de ingresos de Ventas › Planes (sin ellas, todo en 0). */
+  ingresosSitio?: IngresosSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -489,7 +492,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio, cobranzaSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio, cobranzaSitio, ingresosSitio }: OpcionesSimulacion) {
   const planesSim = crearPlanesSim(planesSitio);
   const pasarelasSim = crearPasarelasSim(pasarelasSitio, () => entornoSitio);
   const comprobantesSim = crearComprobantesSim(facturacionSitio, () => entornoSitio);
@@ -1407,6 +1410,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const r = cuotasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).origin);
       if (r && ruta === '/organizacion/suscripcion' && req.method() === 'GET' && r.status === 200) return responder(200, cobranzaSim.decorar(r.body as Record<string, unknown>));
       if (r) return responder(r.status, r.body);
+    }
+    if (ruta === '/ventas/ingresos' && req.method() === 'GET') {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = panelIngresosSim(ingresosSitio, new URL(req.url()).searchParams);
+      return responder(r.status, r.body);
     }
     if (ruta.startsWith('/ventas/cupones')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });

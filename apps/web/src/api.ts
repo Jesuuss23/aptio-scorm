@@ -812,6 +812,10 @@ export interface CuponEntrada {
   limiteUsos: number | null; planesPermitidos: string[]; dominiosCorreo: string[]; visible: boolean; orden: number;
 }
 export interface CuponVenta extends CuponEntrada { id: string; usos: number; beneficio: string; estado: EstadoCupon }
+/** HU-1710 · El panel de ingresos de Ventas › Planes (REQ-090, PNT-35). Montos sin IGV; soles y dólares por separado. */
+export interface IngresoMoneda { moneda: 'PEN' | 'USD'; mrr: number; enRiesgo: number; activas: number; arpu: number }
+export interface ResumenIngresosMes { mes: string; inicio: string; corte: string; monedas: IngresoMoneda[]; activas: number; vigentesAlInicio: number; canceladas: number; tasaCancelacion: number }
+export interface PanelIngresos { actual: ResumenIngresosMes; anterior: ResumenIngresosMes; variacionCancelacion: number }
 export interface PagoRenovacion { renovacion: Renovacion; pago?: PagoCompra; suscripcion: SuscripcionOrg }
 export interface Cobranza {
   estado: 'AL_DIA' | 'PAGO_PENDIENTE' | 'SUSPENDIDA'; total: number | null; moneda: 'PEN' | 'USD' | null; finPeriodo: string | null; suspensionEn: string | null; puedePagar: boolean; regularizar: string;
@@ -1067,6 +1071,7 @@ export const api = {
   datosFiscales: () => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales'),
   guardarDatosFiscales: (d: DatosFiscalesVenta) => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales', json(d, 'PUT')),
   cupones: () => pedir<{ cupones: CuponVenta[] }>('/ventas/cupones'),
+  ingresos: (mes: string) => pedir<PanelIngresos>(`/ventas/ingresos?mes=${encodeURIComponent(mes)}`),
   crearCupon: (d: CuponEntrada) => pedir<CuponVenta>('/ventas/cupones', json(d)),
   editarCupon: (id: string, d: Partial<CuponEntrada>) => pedir<CuponVenta>(`/ventas/cupones/${id}`, json(d, 'PATCH')),
   cuota: () => pedir<CuotaCapsulas>('/organizacion/cuota'),

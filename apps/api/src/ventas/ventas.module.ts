@@ -12,6 +12,8 @@ import { CuotaController } from './cuotas.controller.js';
 import { CuponesController } from './cupones.controller.js';
 import { CuponesService } from './cupones.service.js';
 import { CuotasService } from './cuotas.service.js';
+import { IngresosController } from './ingresos.controller.js';
+import { IngresosService } from './ingresos.service.js';
 import { CobrosController, PasarelasController } from './pasarelas.controller.js';
 import { PasarelasService } from './pasarelas.service.js';
 import { PlanesController, PlanesPublicoController } from './planes.controller.js';
@@ -24,13 +26,13 @@ import { SuscripcionesService } from './suscripciones.service.js';
  * /precios. HU-1704: pasarelas intercambiables, cobros y reembolsos. HU-1705: cuotas de cápsulas y adicionales (exporta
  * `CuotasService` para descontar al lanzar una generación). HU-1706: cambio de plan con prorrateo y cancelación. HU-1707: comprobantes electrónicos SUNAT, datos fiscales y el
  * webhook del OSE. HU-1708: cobranza, suspensión a solo lectura y Ventas › Suscripciones (exporta `CobranzaService` para la guarda).
- * HU-1709: cupones y convenios en el pago y la pestaña Cupones.
+ * HU-1709: cupones y convenios en el pago y la pestaña Cupones. HU-1710: panel de ingresos de Ventas › Planes.
  */
 @Module({
   imports: [AuthModule, CaptacionModule],
   controllers: [PlanesController, PlanesPublicoController, CheckoutPublicoController, WebhooksPagoController, PasarelasController, CobrosController, CuotaController, SuscripcionOrgController,
-    ComprobantesController, DatosFiscalesController, WebhooksOseController, CobranzaOrgController, SuscripcionesVentasController, CuponesController],
-  providers: [PlanesService, SuscripcionesService, PasarelasService, CobrosService, CuotasService, CambioPlanService, ComprobantesService, AlmacenService, CobranzaService, CuponesService],
+    ComprobantesController, DatosFiscalesController, WebhooksOseController, CobranzaOrgController, SuscripcionesVentasController, CuponesController, IngresosController],
+  providers: [PlanesService, SuscripcionesService, PasarelasService, CobrosService, CuotasService, CambioPlanService, ComprobantesService, AlmacenService, CobranzaService, CuponesService, IngresosService],
   exports: [CuotasService, CobranzaService],
 })
 export class VentasModule {}

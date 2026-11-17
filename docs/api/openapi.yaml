@@ -6755,6 +6755,47 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /ventas/ingresos:
+    get:
+      tags:
+      - Ventas
+      summary: Panel de ingresos de Ventas › Planes (HU-1710, REQ-090, CP-152, PNT-35)
+      operationId: get_ventas_ingresos
+      description: |-
+        Solo SUPERADMIN. Vista de plataforma: lee las suscripciones de todas las organizaciones y calcula, para el mes de
+        Lima pedido y el anterior, con `@aptio/schema/ingresos`:
+
+        - el ingreso mensual recurrente (MRR) neto sin IGV de las suscripciones vigentes en el corte (ACTIVA y
+          PAGO_PENDIENTE; nunca CANCELADA ni SUSPENDIDA), con el anual entre 12 al céntimo y menos el cupón mientras le
+          queden renovaciones con descuento o si es permanente; aparte, el «ingreso en riesgo» de las que pidieron cancelar
+          al fin del período;
+        - las suscripciones activas;
+        - la cancelación mensual: las que pasaron a CANCELADA en el mes entre las vigentes al empezarlo (0 sin base), con
+          la variación en puntos frente al mes anterior;
+        - el ingreso promedio por cliente: el MRR entre las organizaciones vigentes de esa moneda (0 sin ninguna).
+
+        Soles y dólares van por separado, sin tipo de cambio (SUP-329). El corte es el fin del mes o, en el mes en curso,
+        el momento de la consulta; el estado, el precio y el descuento son los actuales (SUP-330). 422 NO_VALIDO en `mes`
+        si no es AAAA-MM.
+      parameters:
+      - name: mes
+        in: query
+        required: false
+        description: AAAA-MM; por defecto el mes en curso de Lima
+        schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$', example: '2026-11' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PanelIngresos'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /ventas/pasarelas:
     get:
       tags:
@@ -16157,6 +16198,36 @@ components:
         descuento: { type: number, example: 258, description: 'HU-1709 · El descuento del cupón sin IGV, al céntimo sobre `subtotal` (el precio de lista)' }
         base: { type: number, example: 1032, description: 'HU-1709 · Lo que se cobra sin IGV: subtotal − descuento; IGV y total van sobre la base' }
         cupon: { $ref: '#/components/schemas/CuponAplicado' }
+    IngresoMoneda:
+      type: object
+      description: HU-1710 · El ingreso de una moneda, sin IGV.
+      required: [moneda, mrr, enRiesgo, activas, arpu]
+      properties:
+        moneda: { type: string, enum: [PEN, USD] }
+        mrr: { type: number, example: 13834, description: 'MRR neto: el anual entre 12 y menos el cupón vigente' }
+        enRiesgo: { type: number, example: 2990, description: 'La parte del MRR de las suscripciones que pidieron cancelar al fin del período' }
+        activas: { type: integer, example: 7, description: 'Vigentes (ACTIVA o PAGO_PENDIENTE) en el corte' }
+        arpu: { type: number, example: 1976.29, description: 'MRR entre las organizaciones vigentes de esa moneda (0 sin ninguna)' }
+    ResumenIngresosMes:
+      type: object
+      required: [mes, inicio, corte, monedas, activas, vigentesAlInicio, canceladas, tasaCancelacion]
+      properties:
+        mes: { type: string, example: '2026-11' }
+        inicio: { type: string, format: date-time, description: El primer instante del mes en Lima }
+        corte: { type: string, format: date-time, description: 'El fin del mes o, en el mes en curso, el momento de la consulta' }
+        monedas: { type: array, items: { $ref: '#/components/schemas/IngresoMoneda' } }
+        activas: { type: integer, example: 8 }
+        vigentesAlInicio: { type: integer, example: 9, description: 'La base de la cancelación' }
+        canceladas: { type: integer, example: 1, description: Pasaron a CANCELADA dentro del mes }
+        tasaCancelacion: { type: number, example: 11.1, description: 'Porcentaje con un decimal (0 sin base)' }
+    PanelIngresos:
+      type: object
+      description: HU-1710 · El panel de ingresos de Ventas › Planes (REQ-090, PNT-35).
+      required: [actual, anterior, variacionCancelacion]
+      properties:
+        actual: { $ref: '#/components/schemas/ResumenIngresosMes' }
+        anterior: { $ref: '#/components/schemas/ResumenIngresosMes' }
+        variacionCancelacion: { type: number, example: -7.1, description: 'La cancelación del mes menos la del anterior, en puntos' }
     CuponAplicado:
       type: object
       description: HU-1709 · El cupón aplicado al resumen.
