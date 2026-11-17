@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.71 · actualizado con la novena entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.72 · actualizado con la décima entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -746,7 +746,7 @@ Si otra persona escribe la dirección del sitio web en el navegador, ve «Págin
 
 ### 8.29 Ajustes del sitio (solo superadmin)
 
-En **Configuración › Ajustes del sitio** el superadmin define los datos generales del sitio comercial. La vista tiene cuatro tarjetas y cada una se guarda con su propio botón. Si algo no es válido, la tarjeta lo dice antes de guardar.
+En **Configuración › Ajustes del sitio** el superadmin define los datos generales del sitio comercial. Cada tarjeta se guarda con su propio botón. Si algo no es válido, la tarjeta lo dice antes de guardar.
 
 **Dominio e identidad.**
 
@@ -762,7 +762,15 @@ El dominio, el nombre, el logo y el favicon llegan al sitio con **Publicar cambi
 - **Botón de WhatsApp:** con el interruptor se muestra un botón verde flotante en todas las páginas del sitio. Para mostrarlo hay que escribir el número con el código de país (por ejemplo `+51 987 654 321`). El **mensaje inicial** es opcional y aparece escrito cuando el visitante abre el chat. El botón llega al sitio con **Publicar cambios**.
 - **Correo que recibe los leads:** vale desde que lo guardas. Con **Enviar correo de prueba** confirmas que llega.
 
-**Analítica.** Guarda los identificadores de Google Analytics 4 (empieza con `G-`), Tag Manager (empieza con `GTM-`) y Meta Pixel (de 10 a 20 dígitos). Todavía no se activan: lo harán con el aviso de cookies del sitio, y solo para los visitantes que acepten las cookies de analítica.
+**Analítica.** Guarda los identificadores de Google Analytics 4 (empieza con `G-`), Tag Manager (empieza con `GTM-`) y Meta Pixel (de 10 a 20 dígitos). Llegan al sitio con **Publicar cambios** y cada etiqueta se activa solo para los visitantes que acepten su categoría en el aviso de cookies: Google Analytics 4 y Tag Manager son **Analítica**, Meta Pixel es **Publicidad**. Lo que cargue tu contenedor de Tag Manager corre bajo «Analítica»: no pongas en él etiquetas de publicidad, y las de proveedores que no sean Google no cargan.
+
+**Privacidad.** Controla el aviso de cookies del sitio (Ley 29733).
+
+- **Mostrar banner de cookies:** viene encendido. El aviso aparece solo si hay al menos un identificador en Analítica; si no hay ninguno, la tarjeta te lo recuerda. Si lo apagas, el sitio no muestra el aviso y no carga ninguna etiqueta.
+- **Versión de la política:** el número de la política de cookies vigente. Si cambias la política de privacidad, pulsa **Pedir de nuevo el consentimiento** y confirma con **Sí, subir la versión**: al publicar, el sitio vuelve a preguntar a todos los visitantes.
+- Los cambios de esta tarjeta llegan al sitio con **Publicar cambios**.
+
+**Lo que ve el visitante.** Abajo de la página, un aviso con **Rechazar**, **Configurar** y **Aceptar**, que no mueve el contenido. **Configurar** abre las preferencias: **Necesarias** (siempre activas), **Analítica** y **Publicidad**, con **Guardar preferencias**. La decisión se recuerda 12 meses en ese navegador; después, o si subes la versión de la política, se vuelve a preguntar. El pie de cada página tiene **Configurar cookies** para cambiar la decisión cuando quiera; al retirar un permiso, la página se recarga y se borran las cookies de esas etiquetas. Si publicaste una página `/privacidad`, el aviso la enlaza. Todo funciona con el teclado y con lector de pantalla, en español y en inglés.
 
 **Mantenimiento.** Sirve para pausar el sitio mientras se hacen cambios grandes.
 
@@ -1130,6 +1138,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.72 | 2026-11-17 | Consentimiento de cookies (8.29): la tarjeta Privacidad con «Mostrar banner de cookies» y «Pedir de nuevo el consentimiento», la analítica que se activa solo con el permiso del visitante y lo que ve el visitante (aviso, preferencias y «Configurar cookies» en el pie). |
 | 0.71 | 2026-11-17 | Chatbot del sitio (8.38): mostrarlo u ocultarlo sin publicar, nombre, saludos, tono, objetivo y horario de atención, respuestas rápidas con orden, la base de conocimiento con fuentes propias, las conversaciones de 90 días con su resultado y lo que ve el visitante (preguntar, agendar una demo y hablar con una persona). |
 | 0.70 | 2026-11-17 | Agendamiento de demos (8.37): asesores con su enlace de videollamada, tipos de reunión con «Ofrecer», duración y orden, horarios de lunes a viernes, días bloqueados y feriados, recordatorios por correo, la reserva del visitante con su invitación y cancelación, y la lista de citas con «Cancelar», «Realizada» y «No asistió». |
 | 0.69 | 2026-11-16 | Popups (8.36): crear modales, deslizables y barras con disparador, páginas, frecuencia y botón (pedir el correo o abrir un enlace), activarlos sin publicar, ordenarlos, probarlos en el sitio, ver impresiones y conversión, reiniciar y borrar. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.71 · actualizado con la novena entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.72 · actualizado con la décima entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -539,6 +539,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Panel (PNT-32):** `GET` y `PATCH /captacion/chatbot`, las respuestas rápidas (`POST`, `PATCH`, `DELETE`, `PUT orden`), las fuentes (`POST`, `PATCH`, `DELETE`) y `GET /captacion/chatbot/conversaciones`, solo del superadmin.
 - **Auditoría:** CHATBOT_AJUSTES_CAMBIADOS, CHATBOT_MOSTRADO, CHATBOT_OCULTADO, CHATBOT_RAPIDA_CREADA, CHATBOT_RAPIDA_CAMBIADA, CHATBOT_RAPIDA_BORRADA, CHATBOT_RAPIDAS_ORDENADAS, CHATBOT_FUENTE_CREADA, CHATBOT_FUENTE_CAMBIADA, CHATBOT_FUENTE_BORRADA y LIMITE_GASTO_ALCANZADO (una vez al día).
 
+### 3.30 Consentimiento de cookies (HU-1606)
+
+- **Datos:** `cookies.visible` (por defecto true) y `cookies.version` (por defecto 1) en `SitioAjustes.datos` (Json), sin migración (SUP-268). Salen al sitio con «Publicar cambios» junto con los IDs de analítica.
+- **Sitio (REQ-079, RN-17-6):** con al menos un ID y el aviso visible, la versión trae `_cookies.js` (diferido, del mismo origen, sin cookies propias) y `_cookies.json` (interno, no se sirve). La decisión del visitante vive en `localStorage` (`aptio.cookies`) por 12 meses; se vuelve a pedir al subir la versión de la política o al sumar una categoría (SUP-262, SUP-263). GA4 y Tag Manager son analítica; Meta Pixel, publicidad; lo que carga el contenedor de Tag Manager lo define quien lo configura (SUP-264).
+- **CSP (SUP-266):** sin etiquetas, `script-src 'self'`. Con etiquetas, las páginas suman los orígenes de Google o de Meta en `script-src`, `connect-src` e `img-src`; la 404, los scripts y la marca siguen cerradas. La CDN debe conservar la cabecera de cada respuesta (HU-1405).
+- **Retiro (SUP-267):** retirar un permiso borra las cookies conocidas de las etiquetas y recarga la página.
+- **Panel (PNT-38):** tarjeta Privacidad; `PATCH /sitio/ajustes` con `cookies.visible` y `cookies.subirVersion`, con la auditoría SITIO_AJUSTES_ACTUALIZADOS.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -680,6 +688,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.72 | 2026-11-17 | Consentimiento de cookies (3.30): ajustes del aviso sin migración, `_cookies.js` con la decisión en `localStorage` por 12 meses, la CSP por etiquetas publicadas y el retiro del consentimiento. |
 | 0.71 | 2026-11-17 | Chatbot del sitio (3.29): los modelos del chatbot y sus conversaciones de 90 días, `_chat.js` y `_chatbot.json` en vivo, los límites de `POST /publico/chat`, IA-20 con fuentes del sitio y «no lo sé» ante la espera o el tope de gasto, la reserva y el traspaso con vía «Chatbot», el panel y la auditoría. |
 | 0.70 | 2026-11-17 | Agendamiento de demos (3.28): los modelos del agendador con su índice único parcial, las franjas en hora de Lima sin feriados, la reserva con candado por asesor y 409, el lead en Demo, la cola `agenda` con invitación, recordatorios y cancelación, el token guardado como SHA-256, el bloque del sitio con CLS 0, el panel y su auditoría; SUP-251 a SUP-255 en los supuestos. |
 | 0.69 | 2026-11-16 | Popups (3.27): `SitioPopup`, los popups en vivo con `_popups.js` y `_popups.json` (CDN 30 s), las reglas de frecuencia, páginas y pago en el navegador con `localStorage`, los contadores de `POST /s/_popup` sin datos personales, el panel y su auditoría; SUP-246 a SUP-250 en los supuestos. |
