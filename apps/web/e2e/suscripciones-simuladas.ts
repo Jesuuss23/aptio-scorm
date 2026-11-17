@@ -4,15 +4,19 @@
 // HU-1704: la moneda (dólares si el plan tiene precio en USD y una pasarela cobra en dólares) y la pasarela que cobra cada
 // moneda; con Stripe, la página alojada es `https://pago.simulado.test/stripe/{id}` (la sirve `rutaStripeSimulada`):
 // visitarla aprueba el pago como lo haría su webhook y su enlace vuelve a `/pago?plan=…&checkout={id}`.
+// HU-1709: el cupón con la vista previa (`/publico/checkout/cupon`) y en el checkout, con el motivo si no vale (CP-151).
 import type { PlanPublico } from '@aptio/schema/planes';
+import type { ResumenConDescuento } from '@aptio/schema/cupones';
 import type { CodigoPasarela } from '@aptio/schema/pasarelas';
 import { esCiclo, esMoneda, finPeriodo, type Moneda, monedasDelPlan, resumenCheckout, type ResumenCheckout, TARJETAS_PRUEBA, type TipoComprobante, validarEmpresa } from '@aptio/schema/suscripciones';
+
+import type { CuponesSim } from './cupones-simulados';
 
 export const ORIGEN_STRIPE_SIMULADO = 'https://pago.simulado.test';
 
 type Respuesta = { status: number; body?: unknown };
 export interface CheckoutSim {
-  id: string; estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'; resumen: ResumenCheckout; tipoComprobante: TipoComprobante; correoAdmin: string; razonSocial: string; ruc: string | null;
+  id: string; estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'; resumen: ResumenCheckout | ResumenConDescuento; tipoComprobante: TipoComprobante; correoAdmin: string; razonSocial: string; ruc: string | null;
   nombreAdmin: string; cuerpo: Record<string, unknown>; motivoRechazo: string | null; finPeriodo: string | null; pasarela: CodigoPasarela; vuelta: string;
 }
 /** Lo que llegó al checkout (las pruebas lo leen). */
@@ -21,6 +25,7 @@ export const checkoutsSim: CheckoutSim[] = [];
 export function crearSuscripcionesSim(d: {
   planes: () => { ajustes: { mostrarAnual: boolean }; planes: PlanPublico[] } | null; entorno: () => 'pruebas' | 'produccion'; correosEnUso: () => string[];
   pasarelas: { elegir: (m: Moneda) => CodigoPasarela | null; monedas: () => Moneda[] };
+  cupones?: CuponesSim;
 }) {
   let secuencia = 0;
   const estado = (c: CheckoutSim) => ({
@@ -38,6 +43,15 @@ export function crearSuscripcionesSim(d: {
       const usd = monedas.includes('USD');
       return { status: 200, body: { ...p, precioMesUsd: usd ? (p.precioMesUsd ?? null) : null, precioAnualUsd: usd ? (p.precioAnualUsd ?? null) : null, monedas, ajustes: s!.ajustes } };
     }
+    if (ruta === '/publico/checkout/cupon' && metodo === 'POST') {
+      const s = d.planes();
+      const p = s?.planes.find((x) => x.slug === cuerpo.plan);
+      if (!s || !p || p.aMedida) return { status: 404, body: { codigo: 'PLAN_NO_DISPONIBLE', mensaje: 'Este plan no se puede contratar en línea' } };
+      const resumen = resumenCheckout(p, (cuerpo.ciclo ?? 'MENSUAL') as 'MENSUAL', s.ajustes.mostrarAnual, (cuerpo.moneda ?? 'PEN') as Moneda);
+      if (!resumen || !d.cupones) return { status: 422, body: { codigo: 'NO_VALIDO', detalles: [{ campo: 'ciclo', mensaje: 'Este plan no se ofrece así' }] } };
+      const a = d.cupones.aplicar(cuerpo.cupon, p, resumen, typeof cuerpo.correoAdmin === 'string' ? cuerpo.correoAdmin : null);
+      return a.ok ? { status: 200, body: { resumen: a.resumen } } : { status: 422, body: { codigo: 'CUPON_NO_VALIDO', mensaje: a.mensaje, detalles: [{ campo: 'cupon', mensaje: a.mensaje, motivo: a.codigo, fecha: a.fecha, resumen: a.resumen }] } };
+    }
     if (ruta === '/publico/checkout' && metodo === 'POST') {
       const s = d.planes();
       const p = s?.planes.find((x) => x.slug === cuerpo.plan);
@@ -48,8 +62,14 @@ export function crearSuscripcionesSim(d: {
       const errores = [...(esCiclo(ciclo) ? [] : [{ campo: 'ciclo', mensaje: 'El ciclo es MENSUAL o ANUAL' }]), ...(esMoneda(moneda) ? [] : [{ campo: 'moneda', mensaje: 'La moneda es PEN o USD' }]), ...(empresa.ok ? [] : empresa.errores)];
       if (errores.length || !empresa.ok) return { status: 422, body: { codigo: 'NO_VALIDO', mensaje: errores.map((e) => e.mensaje).join('. '), detalles: errores } };
       if (moneda === 'USD' && (p.precioMesUsd ?? null) === null) return { status: 422, body: { codigo: 'NO_VALIDO', detalles: [{ campo: 'moneda', mensaje: 'Este plan no se cobra en dólares' }] } };
-      const resumen = resumenCheckout(p, ciclo as 'MENSUAL', s.ajustes.mostrarAnual, moneda);
-      if (!resumen) return { status: 422, body: { codigo: 'NO_VALIDO', detalles: [{ campo: 'ciclo', mensaje: 'Este plan no se ofrece con pago anual' }] } };
+      const lista = resumenCheckout(p, ciclo as 'MENSUAL', s.ajustes.mostrarAnual, moneda);
+      if (!lista) return { status: 422, body: { codigo: 'NO_VALIDO', detalles: [{ campo: 'ciclo', mensaje: 'Este plan no se ofrece con pago anual' }] } };
+      let resumen: ResumenCheckout | ResumenConDescuento = lista;
+      if (typeof cuerpo.cupon === 'string' && cuerpo.cupon && d.cupones) {
+        const a = d.cupones.aplicar(cuerpo.cupon, p, lista, empresa.datos.correoAdmin);
+        if (!a.ok) return { status: 422, body: { codigo: 'NO_VALIDO', mensaje: a.mensaje, detalles: [{ campo: 'cupon', mensaje: a.mensaje, motivo: a.codigo }] } };
+        resumen = a.resumen;
+      }
       if (d.correosEnUso().includes(empresa.datos.correoAdmin)) return { status: 409, body: { codigo: 'CORREO_EN_USO', mensaje: 'Ese correo ya tiene una cuenta' } };
       const pasarela = d.pasarelas.elegir(moneda);
       if (!pasarela) return { status: 503, body: { codigo: 'PAGO_NO_DISPONIBLE', mensaje: 'El pago en línea todavía no está disponible' } };
@@ -68,7 +88,11 @@ export function crearSuscripcionesSim(d: {
       const n = String(cuerpo.tarjeta ?? '').replace(/[\s-]/g, '');
       if (n !== TARJETAS_PRUEBA.aprobada && n !== TARJETAS_PRUEBA.rechazada) return { status: 422, body: { codigo: 'NO_VALIDO', detalles: [{ campo: 'tarjeta', mensaje: 'Usa una tarjeta de prueba: 4111 1111 1111 1111 aprueba y 4000 0000 0000 0002 rechaza' }] } };
       if (c.estado === 'PENDIENTE') {
-        if (n === TARJETAS_PRUEBA.aprobada) Object.assign(c, { estado: 'APROBADA', finPeriodo: finPeriodo(new Date(), c.resumen.ciclo).toISOString() });
+        if (n === TARJETAS_PRUEBA.aprobada) {
+          Object.assign(c, { estado: 'APROBADA', finPeriodo: finPeriodo(new Date(), c.resumen.ciclo).toISOString() });
+          const cupon = 'cupon' in c.resumen ? c.resumen.cupon : null;
+          if (cupon) d.cupones?.usar(cupon.codigo);
+        }
         else Object.assign(c, { estado: 'RECHAZADA', motivoRechazo: 'La tarjeta de prueba fue rechazada' });
       }
       return { status: 200, body: estado(c) };

@@ -25,6 +25,8 @@ export interface CuotaSitioSim {
    * sigue al plan. Período del 10 de noviembre al 10 de diciembre, hoy el 25: quedan 15 de 30 días (CP-147).
    */
   plan?: string;
+  /** HU-1709 · El cupón del alta con las renovaciones que le quedan con descuento. */
+  descuento?: { codigo: string; porcentaje: number; ciclosRestantes: number | null };
 }
 
 /** HU-1706 · Los planes publicados, mensuales en soles; «corporativo» es a medida. */
@@ -89,7 +91,7 @@ export function crearCuotasSim(inicial: CuotaSitioSim | undefined, rol: () => st
   function suscripcionDto() {
     return {
       plan: breve(sus!.plan), ciclo: 'MENSUAL', precioPactadoSinIgv: sus!.precio, moneda: estado!.moneda, estado: sus!.estado, inicioPeriodo: INICIO_SIM, finPeriodo: ventanaFin,
-      cancelarAlFin: sus!.cancelarAlFin, canceladaEn: sus!.canceladaEn, planProgramado: sus!.programado ? breve(sus!.programado) : null, pagoDisponible: true,
+      cancelarAlFin: sus!.cancelarAlFin, canceladaEn: sus!.canceladaEn, planProgramado: sus!.programado ? breve(sus!.programado) : null, pagoDisponible: true, descuento: inicial?.descuento ?? null,
       planes: PLANES_SIM.map((p) => ({
         slug: p.slug, nombre: p.nombre, capsulasMes: p.capsulasMes, precioCiclo: p.precioCiclo, actual: p.slug === sus!.plan,
         tipo: p.slug === sus!.plan || p.precioCiclo === null ? null : p.precioCiclo > sus!.precio ? 'SUBIDA' : 'BAJADA',

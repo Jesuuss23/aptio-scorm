@@ -3,15 +3,17 @@
 // un observado (o pendiente), que vuelve a enviar el mismo número al OSE; y «Datos fiscales», el emisor, las series, el
 // proveedor OSE, el ambiente y la detracción, con el aviso de que esta última está por validar con el contador. Los
 // secretos del OSE viven en variables de entorno, nunca aquí. Solo el superadmin (ADR-011).
+// HU-1709: la tercera pestaña, «Cupones» (`VentasCupones.tsx`).
 import { LIMITES_FISCALES, validarDatosFiscales, validarReceptor } from '@aptio/schema/comprobantes';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { Cabecera } from '@aptio/ui';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { Cupones } from './VentasCupones';
 import { api, type ComprobanteVenta, type DatosFiscalesConProveedores, type DatosFiscalesVenta, ErrorApi, type EstadoComprobante } from '../api';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
-const PESTANAS = [{ id: 'comprobantes', nombre: 'Comprobantes' }, { id: 'datos', nombre: 'Datos fiscales' }] as const;
+const PESTANAS = [{ id: 'comprobantes', nombre: 'Comprobantes' }, { id: 'datos', nombre: 'Datos fiscales' }, { id: 'cupones', nombre: 'Cupones' }] as const;
 type Pestana = (typeof PESTANAS)[number]['id'];
 const ESTADOS: Record<EstadoComprobante, { nombre: string; chip: string }> = {
   PENDIENTE: { nombre: 'Pendiente', chip: '' }, ACEPTADO: { nombre: 'Aceptado', chip: 'validado' }, OBSERVADO: { nombre: 'Observado', chip: 'aviso' }, RECHAZADO: { nombre: 'Rechazado', chip: 'error' },
@@ -35,7 +37,7 @@ export function VentasFacturacion() {
 
   return (
     <>
-      <Cabecera titulo="Facturación" subtitulo="Facturas, boletas y notas de crédito electrónicas de cada cobro, con su estado ante SUNAT, y los datos fiscales del emisor." />
+      <Cabecera titulo="Facturación" subtitulo="Facturas, boletas y notas de crédito electrónicas de cada cobro, con su estado ante SUNAT, los datos fiscales del emisor y los cupones." />
       <div className="opciones" role="tablist" aria-label="Facturación" ref={pestanas}>
         {PESTANAS.map((p) => (
           <button key={p.id} type="button" role="tab" id={`pestana-${p.id}`} className="opcion" aria-selected={pestana === p.id} aria-controls={`panel-${p.id}`}
@@ -43,7 +45,7 @@ export function VentasFacturacion() {
         ))}
       </div>
       <section className="tarjeta facturacion-panel" role="tabpanel" id={`panel-${pestana}`} aria-labelledby={`pestana-${pestana}`}>
-        {pestana === 'comprobantes' ? <Comprobantes /> : <DatosFiscales />}
+        {pestana === 'comprobantes' ? <Comprobantes /> : pestana === 'datos' ? <DatosFiscales /> : <Cupones />}
       </section>
     </>
   );

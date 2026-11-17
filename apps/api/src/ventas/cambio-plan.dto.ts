@@ -33,6 +33,15 @@ export class RenovacionDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true, description: 'El siguiente intento o, hechos los 4, la suspensión' }) proximoIntento: string | null;
   @ApiProperty({ format: 'date-time', description: 'El día 10: la cuenta queda en solo lectura si no paga antes' }) suspensionEn: string;
   @ApiProperty({ type: String, nullable: true }) motivoRechazo: string | null;
+  @ApiProperty({ type: Number, nullable: true, example: 20, description: 'HU-1709 · El porcentaje del cupón aplicado (null = sin descuento)' }) porcentajeDescuento: number | null;
+  @ApiProperty({ example: 258, description: 'HU-1709 · El descuento sin IGV (0 sin cupón): `montoSinIgv` ya lo resta' }) descuentoSinIgv: number;
+}
+
+/** HU-1709 · El descuento del cupón o convenio del alta, mientras siga en las renovaciones. */
+export class DescuentoSuscripcionDto {
+  @ApiProperty({ example: 'LANZAMIENTO26' }) codigo: string;
+  @ApiProperty({ example: 20 }) porcentaje: number;
+  @ApiProperty({ type: Number, nullable: true, example: 2, description: 'Renovaciones que quedan con descuento; null = permanente' }) ciclosRestantes: number | null;
 }
 
 /** HU-1706 · La suscripción de la organización (REQ-086). */
@@ -51,6 +60,7 @@ export class SuscripcionOrgDto {
   @ApiProperty({ type: [PlanOpcionDto], description: 'Los planes publicados' }) planes: PlanOpcionDto[];
   @ApiProperty({ description: 'Hay una pasarela que cobra la moneda de la suscripción (para subir de plan o pagar la renovación)' }) pagoDisponible: boolean;
   @ApiProperty({ type: RenovacionDto, nullable: true, description: 'HU-1708 · La renovación que falta pagar (con PAGO_PENDIENTE o SUSPENDIDA)' }) renovacion: RenovacionDto | null;
+  @ApiProperty({ type: DescuentoSuscripcionDto, nullable: true, description: 'HU-1709 · El cupón del alta, si le quedan renovaciones con descuento' }) descuento: DescuentoSuscripcionDto | null;
 }
 
 /** Datos no confiables: los valida `@aptio/schema/cambio-plan`. */

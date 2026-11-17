@@ -39,6 +39,7 @@ import { type CobranzaSitioSim, crearCobranzaSim } from './cobranza-simulada';
 import { crearCuotasSim, type CuotaSitioSim, ORIGEN_PAGO_CAPSULAS } from './cuotas-simuladas';
 import { crearPasarelasSim, type PasarelasSitioSim } from './pasarelas-simuladas';
 import { crearComprobantesSim, type FacturacionSitioSim } from './comprobantes-simulados';
+import { crearCuponesSim } from './cupones-simulados';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
 
@@ -604,9 +605,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
   const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim, llmsTxt: llmsSim, rastreadoresBloqueados: bloqueadosSim, planes: planesSim.filas(), ajustesPlanes: planesSim.ajustes() }, entornoSitio);
   // HU-1703 · El checkout de /pago: el plan sale de la última versión (como la API).
+  // HU-1709 · Los cupones: la pestaña Cupones y el cupón en /pago comparten la misma lista.
+  const cuponesSim = crearCuponesSim();
   const suscripcionesSim = crearSuscripcionesSim({
     planes: () => { const v = versionesSim.at(-1); return v ? planesServidos(v.instantanea, entornoSitio) : null; },
-    entorno: () => entornoSitio, correosEnUso: () => [USUARIO.email], pasarelas: pasarelasSim,
+    entorno: () => entornoSitio, correosEnUso: () => [USUARIO.email], pasarelas: pasarelasSim, cupones: cuponesSim,
   });
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
@@ -1403,6 +1406,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (ruta.startsWith('/organizacion/cuota') || ruta.startsWith('/organizacion/suscripcion')) {
       const r = cuotasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).origin);
       if (r && ruta === '/organizacion/suscripcion' && req.method() === 'GET' && r.status === 200) return responder(200, cobranzaSim.decorar(r.body as Record<string, unknown>));
+      if (r) return responder(r.status, r.body);
+    }
+    if (ruta.startsWith('/ventas/cupones')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = cuponesSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>);
       if (r) return responder(r.status, r.body);
     }
     if (ruta.startsWith('/ventas/comprobantes') || ruta === '/ventas/datos-fiscales') {

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Publico } from '../comun/roles.js';
+import { VistaCuponDto, VistaCuponEntradaDto } from './cupones.dto.js';
 import { CheckoutCreadoDto, CheckoutEntradaDto, EstadoCheckoutDto, PagoPruebaDto, TokenPagoDto, WebhookRecibidoDto } from './suscripciones.dto.js';
 import { SuscripcionesService } from './suscripciones.service.js';
 
@@ -30,6 +31,18 @@ export class CheckoutPublicoController {
   @ApiBadGatewayResponse({ description: 'PASARELA_NO_RESPONDE: la pasarela no inició el pago (la solicitud queda rechazada)' })
   crear(@Body() cuerpo: Record<string, unknown>, @Req() req: Request): Promise<CheckoutCreadoDto> {
     return this.suscripciones.crearCheckout(cuerpo, ipDe(req));
+  }
+
+  @Post('cupon')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  @ApiBody({ type: VistaCuponEntradaDto })
+  @ApiOkResponse({ type: VistaCuponDto, description: 'HU-1709 · El resumen con el descuento del cupón (sin crear nada)' })
+  @ApiNotFoundResponse({ description: 'PLAN_NO_DISPONIBLE' })
+  @ApiUnprocessableEntityResponse({ description: 'CUPON_NO_VALIDO con el `motivo` (CUPON_NO_EXISTE, CUPON_INACTIVO, CUPON_NO_VIGENTE, CUPON_VENCIDO, CUPON_AGOTADO, CUPON_NO_APLICA_PLAN, CUPON_CORREO_CONVENIO, CUPON_YA_USADO), el mensaje y el `resumen` sin cambios (CP-151); o NO_VALIDO' })
+  @ApiTooManyRequestsResponse({ description: 'DEMASIADAS_SOLICITUDES: más de 20 consultas de cupón en 10 minutos desde la misma IP' })
+  vistaCupon(@Body() cuerpo: Record<string, unknown>, @Req() req: Request): Promise<VistaCuponDto> {
+    return this.suscripciones.vistaCupon(cuerpo, ipDe(req));
   }
 
   @Get(':id')

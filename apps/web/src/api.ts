@@ -795,12 +795,23 @@ export type EstadoSuscripcion = 'ACTIVA' | 'PAGO_PENDIENTE' | 'SUSPENDIDA' | 'CA
 export interface SuscripcionOrg {
   plan: PlanBreve; ciclo: 'MENSUAL' | 'ANUAL'; precioPactadoSinIgv: number; moneda: 'PEN' | 'USD'; estado: EstadoSuscripcion; inicioPeriodo: string; finPeriodo: string;
   cancelarAlFin: boolean; canceladaEn: string | null; planProgramado: PlanBreve | null; planes: PlanOpcion[]; pagoDisponible: boolean; renovacion: Renovacion | null;
+  /** HU-1709 · El cupón del alta, mientras le queden renovaciones con descuento. */
+  descuento?: { codigo: string; porcentaje: number; ciclosRestantes: number | null } | null;
 }
 /** HU-1708 · Cobranza y suspensión (REQ-088, CP-150, RN-18-8, PNT-36). */
 export interface Renovacion {
   id: string; estado: 'PENDIENTE' | 'APROBADA' | 'VENCIDA'; plan: PlanBreve; periodoInicio: string; periodoFin: string; montoSinIgv: number; igv: number; total: number;
   moneda: 'PEN' | 'USD'; pasarela: string; intentos: number; proximoIntento: string | null; suspensionEn: string; motivoRechazo: string | null;
+  /** HU-1709 · El porcentaje del cupón aplicado (null = sin descuento) y el descuento sin IGV. */
+  porcentajeDescuento?: number | null; descuentoSinIgv?: number;
 }
+/** HU-1709 · Cupones y convenios (REQ-089, CP-151, PNT-37). */
+export type EstadoCupon = 'ACTIVO' | 'PROGRAMADO' | 'VENCIDO' | 'AGOTADO' | 'OCULTO';
+export interface CuponEntrada {
+  codigo: string; nombre: string; tipo: 'CAMPANA' | 'CONVENIO'; porcentaje: number; ciclosDescuento: number | null; vigenciaDesde: string | null; vigenciaHasta: string | null;
+  limiteUsos: number | null; planesPermitidos: string[]; dominiosCorreo: string[]; visible: boolean; orden: number;
+}
+export interface CuponVenta extends CuponEntrada { id: string; usos: number; beneficio: string; estado: EstadoCupon }
 export interface PagoRenovacion { renovacion: Renovacion; pago?: PagoCompra; suscripcion: SuscripcionOrg }
 export interface Cobranza {
   estado: 'AL_DIA' | 'PAGO_PENDIENTE' | 'SUSPENDIDA'; total: number | null; moneda: 'PEN' | 'USD' | null; finPeriodo: string | null; suspensionEn: string | null; puedePagar: boolean; regularizar: string;
@@ -1055,6 +1066,9 @@ export const api = {
   },
   datosFiscales: () => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales'),
   guardarDatosFiscales: (d: DatosFiscalesVenta) => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales', json(d, 'PUT')),
+  cupones: () => pedir<{ cupones: CuponVenta[] }>('/ventas/cupones'),
+  crearCupon: (d: CuponEntrada) => pedir<CuponVenta>('/ventas/cupones', json(d)),
+  editarCupon: (id: string, d: Partial<CuponEntrada>) => pedir<CuponVenta>(`/ventas/cupones/${id}`, json(d, 'PATCH')),
   cuota: () => pedir<CuotaCapsulas>('/organizacion/cuota'),
   comprarCapsulas: (cantidad: number) => pedir<CompraCapsulas>('/organizacion/cuota/adicionales', json({ cantidad })),
   compraCapsulas: (id: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}`),

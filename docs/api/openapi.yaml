@@ -7185,6 +7185,106 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /ventas/cupones:
+    get:
+      tags:
+      - Ventas
+      summary: Cupones y convenios (HU-1709, REQ-089, PNT-37)
+      operationId: get_ventas_cupones
+      description: |-
+        Solo SUPERADMIN. La pestaña Cupones de Ventas › Facturación: cada cupón de campaña o convenio con su beneficio, su
+        vigencia (días de Lima), los usos acumulados (altas aprobadas) y su estado (ACTIVO, PROGRAMADO, VENCIDO, AGOTADO u
+        OCULTO). Hasta 500, por `orden` y código.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaCupones'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Ventas
+      summary: Crear un cupón o convenio (HU-1709)
+      operationId: post_ventas_cupones
+      description: |-
+        Solo SUPERADMIN, con auditoría CUPON_CREADO. Valida con `@aptio/schema/cupones`: código de 3 a 30 letras, números o
+        guiones (se guarda en mayúsculas), porcentaje de 1 a 100, ciclos y límite de 1 en adelante (null = permanente o sin
+        límite), `vigenciaHasta` no antes de `vigenciaDesde`, planes por slug y dominios de correo obligatorios en un
+        convenio y solo en él. Solo descuentos en porcentaje (sin monto fijo ni prueba gratis). 409 CODIGO_EN_USO si el
+        código ya existe.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CuponEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupon'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          description: CODIGO_EN_USO · ya hay un cupón con ese código
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/cupones/{id}:
+    patch:
+      tags:
+      - Ventas
+      summary: Editar, ocultar o activar un cupón (HU-1709)
+      operationId: patch_ventas_cupones_id
+      description: |-
+        Solo SUPERADMIN, con auditoría CUPON_ACTUALIZADO (los campos que cambian y su valor anterior). Solo los campos que
+        llegan, validados sobre el cupón actual; los usos no se editan. Sin DELETE: `visible: false` lo retira del pago y
+        conserva sus usos. Los cambios rigen para los pagos nuevos; las suscripciones que ya lo usaron conservan su
+        descuento. 404 si no existe; 409 CODIGO_EN_USO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CuponEntradaParcial'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cupon'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: CODIGO_EN_USO · ya hay un cupón con ese código
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /ventas/datos-fiscales:
     get:
       tags:
@@ -7286,6 +7386,12 @@ paths:
         PAGO_NO_DISPONIBLE si ninguna pasarela visible y activa cobra esa moneda (el sitio ofrece agendar una demo); 502
         PASARELA_NO_RESPONDE si la pasarela no creó el pago (la solicitud queda RECHAZADA); 429 con más de 10 checkouts en
         10 minutos desde la misma IP.
+
+        HU-1709 · Con `cupon`, vuelve a aplicar el cupón en el servidor antes de guardar la solicitud (422 NO_VALIDO en
+        `cupon` con su `motivo` si ya no vale) y cobra la base descontada más IGV. Al aprobarse el alta, el webhook bloquea
+        el cupón (FOR UPDATE), suma un uso y guarda en la suscripción el porcentaje y las renovaciones que quedan con
+        descuento; si dos pagos concurren en el último cupo se respetan los dos y queda la auditoría
+        CUPON_USO_SOBRE_LIMITE (SUP-326).
       requestBody:
         required: true
         content:
@@ -7323,6 +7429,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /publico/checkout/cupon:
+    post:
+      tags:
+      - Sitio público
+      summary: Vista previa del cupón en el paso 2 de /pago (HU-1709, REQ-089, CP-151)
+      operationId: post_publico_checkout_cupon
+      security: []
+      description: |-
+        Sin sesión. Lo usa `_checkout.js` al pulsar «Aplicar». Calcula el resumen con el cupón: el descuento al céntimo
+        sobre el precio de lista sin IGV del ciclo y la moneda elegidos, y el IGV de 18 % sobre la base descontada. Con
+        `correoAdmin` revisa el dominio de un convenio (también un subdominio) y, con el correo o el RUC, si la empresa ya
+        usó el cupón en un alta aprobada.
+
+        422 CUPON_NO_VALIDO si no vale, con el total intacto: `detalles[0]` trae `campo: cupon`, `motivo`
+        (CUPON_NO_EXISTE, CUPON_INACTIVO, CUPON_NO_VIGENTE, CUPON_VENCIDO, CUPON_AGOTADO, CUPON_NO_APLICA_PLAN,
+        CUPON_CORREO_CONVENIO, CUPON_YA_USADO o CUPON_SIN_COBRO si el total quedaría en cero, SUP-327), `fecha` (el día de
+        inicio o de vencimiento) y `resumen` sin descuento. 404 PLAN_NO_DISPONIBLE como en el checkout; 429 con más de 20
+        consultas en 10 minutos desde la misma IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VistaCuponEntrada'
+      responses:
+        '200':
+          description: El resumen con `descuento`, `base` y `cupon`
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [resumen]
+                properties:
+                  resumen: { $ref: '#/components/schemas/ResumenCheckout' }
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
   /publico/checkout/{id}:
     get:
       tags:
@@ -15996,6 +16142,7 @@ components:
         utm_term: { type: string }
         utm_content: { type: string }
         idioma: { type: string, enum: [es, en] }
+        cupon: { type: string, maxLength: 30, example: LANZAMIENTO26, description: 'HU-1709 · Opcional. Se vuelve a validar en el servidor' }
     ResumenCheckout:
       type: object
       required: [plan, nombrePlan, ciclo, subtotal, igv, total, moneda]
@@ -16007,6 +16154,77 @@ components:
         igv: { type: number, example: 232.2, description: 'IGV de 18 %, también en dólares (supuesto SUP-295)' }
         total: { type: number, example: 1522.2 }
         moneda: { type: string, enum: [PEN, USD] }
+        descuento: { type: number, example: 258, description: 'HU-1709 · El descuento del cupón sin IGV, al céntimo sobre `subtotal` (el precio de lista)' }
+        base: { type: number, example: 1032, description: 'HU-1709 · Lo que se cobra sin IGV: subtotal − descuento; IGV y total van sobre la base' }
+        cupon: { $ref: '#/components/schemas/CuponAplicado' }
+    CuponAplicado:
+      type: object
+      description: HU-1709 · El cupón aplicado al resumen.
+      required: [codigo, nombre, tipo, porcentaje, ciclosDescuento]
+      properties:
+        codigo: { type: string, example: LANZAMIENTO26 }
+        nombre: { type: string, example: Lanzamiento 2026 }
+        tipo: { type: string, enum: [CAMPANA, CONVENIO] }
+        porcentaje: { type: integer, minimum: 1, maximum: 100, example: 20 }
+        ciclosDescuento: { type: integer, nullable: true, example: 3, description: 'Pagos con descuento contando el alta; null = permanente' }
+    VistaCuponEntrada:
+      type: object
+      description: HU-1709 · La vista previa del cupón en /pago. Datos no confiables del visitante.
+      required: [plan, cupon]
+      properties:
+        plan: { type: string, example: productora }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL], default: MENSUAL }
+        moneda: { type: string, enum: [PEN, USD], default: PEN }
+        cupon: { type: string, maxLength: 30, example: LANZAMIENTO26 }
+        correoAdmin: { type: string, example: ana@pucp.edu.pe, description: 'Para los convenios y para ver si la empresa ya lo usó' }
+        ruc: { type: string, example: '20131312955' }
+    CuponEntradaParcial:
+      type: object
+      description: HU-1709 · Lo que envía la consola al crear o editar un cupón. Al editar, solo los campos que cambian.
+      properties:
+        codigo: { type: string, minLength: 3, maxLength: 30, pattern: '^[A-Za-z0-9-]+$', example: LANZAMIENTO26, description: Se guarda en mayúsculas }
+        nombre: { type: string, maxLength: 80, example: Lanzamiento 2026 }
+        tipo: { type: string, enum: [CAMPANA, CONVENIO], default: CAMPANA }
+        porcentaje: { type: integer, minimum: 1, maximum: 100, example: 20 }
+        ciclosDescuento: { type: integer, minimum: 1, nullable: true, example: 3, description: 'Pagos con descuento contando el alta; null = permanente' }
+        vigenciaDesde: { type: string, format: date, nullable: true, example: '2026-11-01', description: Día de Lima (inclusivo) }
+        vigenciaHasta: { type: string, format: date, nullable: true, example: '2026-12-31', description: Día de Lima (vale todo ese día) }
+        limiteUsos: { type: integer, minimum: 1, nullable: true, example: 50, description: null = sin límite }
+        planesPermitidos: { type: array, items: { type: string }, example: [productora], description: 'Slugs; vacío = todos los planes con tarifa' }
+        dominiosCorreo: { type: array, items: { type: string }, example: [pucp.edu.pe], description: 'Obligatorio en un convenio y solo en él (también vale un subdominio)' }
+        visible: { type: boolean, default: true, description: 'Ocultar no borra: el cupón deja de aceptarse en el pago' }
+        orden: { type: integer, default: 0 }
+    CuponEntrada:
+      allOf:
+      - $ref: '#/components/schemas/CuponEntradaParcial'
+      - type: object
+        required: [codigo, nombre, porcentaje]
+    Cupon:
+      type: object
+      description: HU-1709 · Un cupón o convenio en la consola.
+      required: [id, codigo, nombre, tipo, porcentaje, ciclosDescuento, vigenciaDesde, vigenciaHasta, limiteUsos, usos, planesPermitidos, dominiosCorreo, visible, orden, beneficio, estado]
+      properties:
+        id: { type: string, format: uuid }
+        codigo: { type: string, example: LANZAMIENTO26 }
+        nombre: { type: string, example: Lanzamiento 2026 }
+        tipo: { type: string, enum: [CAMPANA, CONVENIO] }
+        porcentaje: { type: integer, example: 20 }
+        ciclosDescuento: { type: integer, nullable: true, example: 3 }
+        vigenciaDesde: { type: string, format: date, nullable: true, example: '2026-11-01' }
+        vigenciaHasta: { type: string, format: date, nullable: true, example: '2026-12-31' }
+        limiteUsos: { type: integer, nullable: true, example: 50 }
+        usos: { type: integer, minimum: 0, example: 18, description: Altas aprobadas con el cupón }
+        planesPermitidos: { type: array, items: { type: string } }
+        dominiosCorreo: { type: array, items: { type: string } }
+        visible: { type: boolean }
+        orden: { type: integer }
+        beneficio: { type: string, example: '−20 % en los primeros 3 pagos' }
+        estado: { type: string, enum: [ACTIVO, PROGRAMADO, VENCIDO, AGOTADO, OCULTO] }
+    ListaCupones:
+      type: object
+      required: [cupones]
+      properties:
+        cupones: { type: array, items: { $ref: '#/components/schemas/Cupon' } }
     PagoCheckout:
       type: object
       description: |-
@@ -16131,7 +16349,7 @@ components:
     SuscripcionOrg:
       type: object
       description: HU-1706 · La suscripción de la organización (REQ-086).
-      required: [plan, ciclo, precioPactadoSinIgv, moneda, estado, inicioPeriodo, finPeriodo, cancelarAlFin, canceladaEn, planProgramado, planes, pagoDisponible, renovacion]
+      required: [plan, ciclo, precioPactadoSinIgv, moneda, estado, inicioPeriodo, finPeriodo, cancelarAlFin, canceladaEn, planProgramado, planes, pagoDisponible, renovacion, descuento]
       properties:
         plan: { $ref: '#/components/schemas/PlanBreve' }
         ciclo: { type: string, enum: [MENSUAL, ANUAL] }
@@ -16146,17 +16364,28 @@ components:
         planes: { type: array, items: { $ref: '#/components/schemas/PlanOpcion' }, description: Los planes publicados }
         pagoDisponible: { type: boolean, description: 'Hay una pasarela visible y activa que cobra la moneda de la suscripción (para subir de plan o pagar la renovación)' }
         renovacion: { type: object, allOf: [{ $ref: '#/components/schemas/Renovacion' }], nullable: true, description: 'HU-1708 · La renovación que falta pagar (con PAGO_PENDIENTE o SUSPENDIDA)' }
+        descuento:
+          type: object
+          nullable: true
+          description: HU-1709 · El cupón del alta, si le quedan renovaciones con descuento
+          required: [codigo, porcentaje, ciclosRestantes]
+          properties:
+            codigo: { type: string, example: LANZAMIENTO26 }
+            porcentaje: { type: integer, example: 20 }
+            ciclosRestantes: { type: integer, nullable: true, example: 2, description: 'Renovaciones que quedan con descuento; null = permanente' }
     Renovacion:
       type: object
       description: HU-1708 · La renovación de un período (REQ-088, RN-18-8). El monto es el precio pactado o, con una bajada programada, el precio publicado vigente del plan nuevo, más 18 % de IGV.
-      required: [id, estado, plan, periodoInicio, periodoFin, montoSinIgv, igv, total, moneda, pasarela, intentos, proximoIntento, suspensionEn, motivoRechazo]
+      required: [id, estado, plan, periodoInicio, periodoFin, montoSinIgv, porcentajeDescuento, descuentoSinIgv, igv, total, moneda, pasarela, intentos, proximoIntento, suspensionEn, motivoRechazo]
       properties:
         id: { type: string, format: uuid }
         estado: { type: string, enum: [PENDIENTE, APROBADA, VENCIDA], description: 'VENCIDA: llegó el día 10 sin pago y la suscripción quedó suspendida (se puede pagar igual)' }
         plan: { $ref: '#/components/schemas/PlanBreve' }
         periodoInicio: { type: string, format: date-time, description: 'El fin del período anterior; si se pagó ya suspendida, el día del pago' }
         periodoFin: { type: string, format: date-time }
-        montoSinIgv: { type: number, example: 1290 }
+        montoSinIgv: { type: number, example: 1290, description: 'HU-1709 · Ya descontado si la suscripción tiene un cupón con renovaciones pendientes' }
+        porcentajeDescuento: { type: integer, nullable: true, example: 20, description: 'HU-1709 · El porcentaje del cupón aplicado (null = sin descuento); al aprobarse, resta una renovación con descuento' }
+        descuentoSinIgv: { type: number, example: 258, description: 'HU-1709 · El descuento sin IGV (0 sin cupón)' }
         igv: { type: number, example: 232.2 }
         total: { type: number, example: 1522.2 }
         moneda: { type: string, enum: [PEN, USD] }

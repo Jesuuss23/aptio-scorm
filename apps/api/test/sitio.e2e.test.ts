@@ -1078,3 +1078,4 @@ await import('./cuotas.casos.js');
 await import('./cambio-plan.casos.js');
 await import('./comprobantes.casos.js');
 await import('./cobranza.casos.js');
+await import('./cupones.casos.js');

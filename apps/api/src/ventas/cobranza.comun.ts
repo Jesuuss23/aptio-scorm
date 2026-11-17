@@ -16,5 +16,6 @@ export function aRenovacionDto(r: FilaRenovacion): RenovacionDto {
     periodoFin: r.periodoFin.toISOString(), montoSinIgv: Number(r.montoSinIgv), igv: Number(r.igv), total: Number(r.total), moneda: r.moneda === 'USD' ? 'USD' : 'PEN',
     pasarela: r.pasarela, intentos: r.intentos, proximoIntento: r.proximoIntento?.toISOString() ?? null,
     suspensionEn: (r.suspendidaEn ?? fechaDelPaso(r.periodoInicio, DIAS_INTENTOS.length)).toISOString(), motivoRechazo: r.motivoRechazo,
+    porcentajeDescuento: r.porcentajeDescuento, descuentoSinIgv: r.descuentoSinIgv === null ? 0 : Number(r.descuentoSinIgv),
   };
 }

@@ -16,6 +16,7 @@ export class CheckoutEntradaDto {
   @ApiPropertyOptional() utm_medium?: string;
   @ApiPropertyOptional() utm_campaign?: string;
   @ApiPropertyOptional({ enum: ['es', 'en'] }) idioma?: 'es' | 'en';
+  @ApiPropertyOptional({ example: 'LANZAMIENTO26', description: 'HU-1709 · El código de un cupón o convenio: se vuelve a validar aquí; si no vale, 422 con el campo `cupon`' }) cupon?: string;
 }
 
 export class ResumenCheckoutDto {
@@ -26,6 +27,18 @@ export class ResumenCheckoutDto {
   @ApiProperty({ example: 232.2, description: 'IGV de 18 %' }) igv: number;
   @ApiProperty({ example: 1522.2 }) total: number;
   @ApiProperty({ enum: ['PEN', 'USD'], example: 'PEN' }) moneda: 'PEN' | 'USD';
+  @ApiPropertyOptional({ example: 258, description: 'HU-1709 · El descuento del cupón sin IGV (0 sin cupón)' }) descuento?: number;
+  @ApiPropertyOptional({ example: 1032, description: 'HU-1709 · La base que se cobra sin IGV: subtotal − descuento' }) base?: number;
+  @ApiPropertyOptional({ type: () => CuponAplicadoDto, nullable: true }) cupon?: CuponAplicadoDto | null;
+}
+
+/** HU-1709 · El cupón aplicado al resumen. */
+export class CuponAplicadoDto {
+  @ApiProperty({ example: 'LANZAMIENTO26' }) codigo: string;
+  @ApiProperty({ example: 'Lanzamiento 2026' }) nombre: string;
+  @ApiProperty({ enum: ['CAMPANA', 'CONVENIO'] }) tipo: 'CAMPANA' | 'CONVENIO';
+  @ApiProperty({ example: 20 }) porcentaje: number;
+  @ApiProperty({ example: 3, nullable: true, type: Number, description: 'Pagos con descuento contando el alta; null = permanente' }) ciclosDescuento: number | null;
 }
 
 /**

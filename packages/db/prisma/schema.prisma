@@ -1355,34 +1355,37 @@ enum EstadoRenovacion {
 /// HU-1708 · La renovación de un período (REQ-088, RN-18-8): una por suscripción y período, con los intentos de cobro
 /// de los días 0, 1, 3 y 7 y la suspensión del día 10.
 model Renovacion {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizacionId String           @db.Uuid
-  organizacion   Organizacion     @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
-  suscripcionId  String           @db.Uuid
-  suscripcion    Suscripcion      @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
-  planId         String           @db.Uuid
-  plan           Plan             @relation("PlanRenovacion", fields: [planId], references: [id], onDelete: Restrict)
+  id                  String           @id @default(uuid()) @db.Uuid
+  organizacionId      String           @db.Uuid
+  organizacion        Organizacion     @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  suscripcionId       String           @db.Uuid
+  suscripcion         Suscripcion      @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  planId              String           @db.Uuid
+  plan                Plan             @relation("PlanRenovacion", fields: [planId], references: [id], onDelete: Restrict)
   /// El período que se paga: empieza en el fin del anterior (o en el pago, si ya estaba suspendida).
-  periodoInicio  DateTime
-  periodoFin     DateTime
+  periodoInicio       DateTime
+  periodoFin          DateTime
   /// En la moneda de la suscripción, con dos decimales.
-  montoSinIgv    Decimal          @db.Decimal(10, 2)
-  igv            Decimal          @db.Decimal(10, 2)
-  total          Decimal          @db.Decimal(10, 2)
-  moneda         String
-  pasarela       String
+  montoSinIgv         Decimal          @db.Decimal(10, 2)
+  igv                 Decimal          @db.Decimal(10, 2)
+  total               Decimal          @db.Decimal(10, 2)
+  moneda              String
+  pasarela            String
   /// Intentos de cobro ya hechos (0 a 4: días 0, 1, 3 y 7).
-  intentos       Int              @default(0)
+  intentos            Int              @default(0)
   /// Cuándo toca el siguiente intento o, hechos los 4, la suspensión del día 10. null si ya se resolvió.
-  proximoIntento DateTime?
-  estado         EstadoRenovacion @default(PENDIENTE)
-  motivoRechazo  String?
+  proximoIntento      DateTime?
+  estado              EstadoRenovacion @default(PENDIENTE)
+  motivoRechazo       String?
   /// El evento de la pasarela que la aprobó (idempotencia, RN-18-3).
-  eventoPagoId   String?          @unique
-  suspendidaEn   DateTime?
-  creadoEn       DateTime         @default(now())
-  actualizadoEn  DateTime         @updatedAt
-  cobros         Cobro[]
+  eventoPagoId        String?          @unique
+  suspendidaEn        DateTime?
+  /// HU-1709 · El porcentaje del cupón aplicado a esta renovación (null = sin descuento); al aprobarse, descuenta un ciclo.
+  porcentajeDescuento Int?
+  descuentoSinIgv     Decimal?         @db.Decimal(10, 2)
+  creadoEn            DateTime         @default(now())
+  actualizadoEn       DateTime         @updatedAt
+  cobros              Cobro[]
 
   @@unique([suscripcionId, periodoInicio])
   @@index([estado, proximoIntento])
@@ -1401,71 +1404,85 @@ enum EstadoSolicitudSuscripcion {
 
 /// La suscripción de una organización: una por organización. El precio pactado no cambia si cambia el plan (RN-18-2, SUP-285).
 model Suscripcion {
-  id                  String                @id @default(uuid()) @db.Uuid
-  organizacionId      String                @unique @db.Uuid
-  organizacion        Organizacion          @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
-  planId              String                @db.Uuid
-  plan                Plan                  @relation("PlanSuscripcion", fields: [planId], references: [id])
-  ciclo               CicloSuscripcion
+  id                       String                @id @default(uuid()) @db.Uuid
+  organizacionId           String                @unique @db.Uuid
+  organizacion             Organizacion          @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  planId                   String                @db.Uuid
+  plan                     Plan                  @relation("PlanSuscripcion", fields: [planId], references: [id])
+  ciclo                    CicloSuscripcion
   /// Soles enteros sin IGV por ciclo (el mes o el año).
-  precioPactadoSinIgv Int
-  moneda              String                @default("PEN")
-  estado              EstadoSuscripcion     @default(ACTIVA)
-  inicioPeriodo       DateTime
-  finPeriodo          DateTime
+  precioPactadoSinIgv      Int
+  moneda                   String                @default("PEN")
+  estado                   EstadoSuscripcion     @default(ACTIVA)
+  inicioPeriodo            DateTime
+  finPeriodo               DateTime
   /// prueba (HU-1703); las reales llegan con la HU-1704.
-  pasarela            String
-  ultimos4Digitos     String?
-  solicitudId         String?               @unique @db.Uuid
-  solicitud           SolicitudSuscripcion? @relation(fields: [solicitudId], references: [id])
-  cobros              Cobro[]
-  consumosCapsulas    ConsumoCapsula[]
-  comprasCapsulas     CompraCapsulas[]
+  pasarela                 String
+  ultimos4Digitos          String?
+  solicitudId              String?               @unique @db.Uuid
+  solicitud                SolicitudSuscripcion? @relation(fields: [solicitudId], references: [id])
+  cobros                   Cobro[]
+  consumosCapsulas         ConsumoCapsula[]
+  comprasCapsulas          CompraCapsulas[]
   /// HU-1706 · Cancelación al fin del período pagado (RN-18-7): marcada por el administrador, se puede reanudar antes.
-  cancelarAlFin       Boolean               @default(false)
+  cancelarAlFin            Boolean               @default(false)
   /// Cuándo pasó a CANCELADA (el fin del período).
-  canceladaEn         DateTime?
+  canceladaEn              DateTime?
   /// HU-1706 · Bajada de plan programada: rige al renovar, sin cobro ni devolución.
-  planProgramadoId    String?               @db.Uuid
-  planProgramado      Plan?                 @relation("PlanProgramado", fields: [planProgramadoId], references: [id], onDelete: Restrict)
-  cambiosPlan         CambioPlan[]
-  renovaciones        Renovacion[]
-  creadoEn            DateTime              @default(now())
-  actualizadoEn       DateTime              @updatedAt
+  planProgramadoId         String?               @db.Uuid
+  planProgramado           Plan?                 @relation("PlanProgramado", fields: [planProgramadoId], references: [id], onDelete: Restrict)
+  cambiosPlan              CambioPlan[]
+  renovaciones             Renovacion[]
+  /// HU-1709 · El cupón o convenio del alta: el porcentaje se aplica en las renovaciones mientras queden ciclos
+  /// (null = permanente). `precioPactadoSinIgv` sigue siendo el precio de lista.
+  cuponId                  String?               @db.Uuid
+  cupon                    Cupon?                @relation(fields: [cuponId], references: [id], onDelete: Restrict)
+  porcentajeDescuento      Int?
+  ciclosDescuentoRestantes Int?
+  creadoEn                 DateTime              @default(now())
+  actualizadoEn            DateTime              @updatedAt
 }
 
 /// El checkout pendiente desde /pago: datos de la empresa, montos y el evento de la pasarela que lo resolvió (idempotencia).
 model SolicitudSuscripcion {
-  id              String                     @id @default(uuid()) @db.Uuid
-  planId          String                     @db.Uuid
-  plan            Plan                       @relation(fields: [planId], references: [id])
-  ciclo           CicloSuscripcion
-  razonSocial     String
-  ruc             String?
-  tipoComprobante TipoComprobante
-  nombreAdmin     String
+  id                  String                     @id @default(uuid()) @db.Uuid
+  planId              String                     @db.Uuid
+  plan                Plan                       @relation(fields: [planId], references: [id])
+  ciclo               CicloSuscripcion
+  razonSocial         String
+  ruc                 String?
+  tipoComprobante     TipoComprobante
+  nombreAdmin         String
   /// En minúsculas.
-  correoAdmin     String
-  subtotal        Decimal                    @db.Decimal(10, 2)
-  igv             Decimal                    @db.Decimal(10, 2)
-  total           Decimal                    @db.Decimal(10, 2)
-  moneda          String                     @default("PEN")
-  estado          EstadoSolicitudSuscripcion @default(PENDIENTE)
-  pasarela        String
+  correoAdmin         String
+  subtotal            Decimal                    @db.Decimal(10, 2)
+  igv                 Decimal                    @db.Decimal(10, 2)
+  total               Decimal                    @db.Decimal(10, 2)
+  moneda              String                     @default("PEN")
+  estado              EstadoSolicitudSuscripcion @default(PENDIENTE)
+  pasarela            String
   /// El id del evento de la pasarela que la aprobó o rechazó: un evento se procesa una sola vez (RN-18-3).
-  eventoPagoId    String?                    @unique
-  motivoRechazo   String?
+  eventoPagoId        String?                    @unique
+  motivoRechazo       String?
   /// Página de entrada, UTM, referente e idioma del visitante, para el lead.
-  atribucion      Json                       @default("{}")
-  organizacionId  String?                    @unique @db.Uuid
-  organizacion    Organizacion?              @relation(fields: [organizacionId], references: [id], onDelete: SetNull)
-  suscripcion     Suscripcion?
-  cobros          Cobro[]
-  resueltaEn      DateTime?
-  creadoEn        DateTime                   @default(now())
-  actualizadoEn   DateTime                   @updatedAt
+  atribucion          Json                       @default("{}")
+  /// HU-1709 · El cupón aplicado: `subtotal` es la base ya descontada; el precio de lista y el descuento, sin IGV.
+  cuponId             String?                    @db.Uuid
+  cupon               Cupon?                     @relation(fields: [cuponId], references: [id], onDelete: Restrict)
+  subtotalListaSinIgv Decimal?                   @db.Decimal(10, 2)
+  descuentoSinIgv     Decimal?                   @db.Decimal(10, 2)
+  /// El porcentaje vigente al crear el pago (si el cupón se edita después, el alta respeta este).
+  porcentajeDescuento Int?
+  organizacionId      String?                    @unique @db.Uuid
+  organizacion        Organizacion?              @relation(fields: [organizacionId], references: [id], onDelete: SetNull)
+  suscripcion         Suscripcion?
+  cobros              Cobro[]
+  resueltaEn          DateTime?
+  creadoEn            DateTime                   @default(now())
+  actualizadoEn       DateTime                   @updatedAt
 
   @@index([correoAdmin])
+  @@index([cuponId])
 }
 
 // ---------- HU-1704 · Pasarelas de pago y webhooks (REQ-084, REQ-110, CP-144, CP-145, RN-18-3, RN-18-9) ----------
@@ -1734,4 +1751,40 @@ model DatosFiscales {
   detraccionTasa      Decimal  @default(12) @db.Decimal(5, 2)
   detraccionUmbralPen Decimal  @default(700) @db.Decimal(10, 2)
   actualizadoEn       DateTime @updatedAt
+}
+
+// ---------- HU-1709 · Cupones y convenios (REQ-089, CP-151, PNT-37) ----------
+
+enum TipoCupon {
+  CAMPANA
+  CONVENIO
+}
+
+/// Un cupón de campaña o un convenio (con dominios de correo): porcentaje sobre el precio de lista, vigencia y límite de
+/// usos. Ocultar no borra (`visible`). Los usos se cuentan al aprobarse el pago, con la fila bloqueada.
+model Cupon {
+  id               String                 @id @default(uuid()) @db.Uuid
+  /// En mayúsculas (A–Z, 0–9 y guiones).
+  codigo           String                 @unique
+  nombre           String
+  tipo             TipoCupon              @default(CAMPANA)
+  /// 1 a 100.
+  porcentaje       Int
+  /// Ciclos facturados con descuento, contando el alta; null = permanente.
+  ciclosDescuento  Int?
+  vigenciaDesde    DateTime?
+  vigenciaHasta    DateTime?
+  /// null = sin límite.
+  limiteUsos       Int?
+  usos             Int                    @default(0)
+  /// Slugs de los planes; vacío = todos los planes con tarifa.
+  planesPermitidos String[]               @default([])
+  /// En minúsculas, sin «@» (para los convenios).
+  dominiosCorreo   String[]               @default([])
+  visible          Boolean                @default(true)
+  orden            Int                    @default(0)
+  solicitudes      SolicitudSuscripcion[]
+  suscripciones    Suscripcion[]
+  creadoEn         DateTime               @default(now())
+  actualizadoEn    DateTime               @updatedAt
 }

@@ -136,6 +136,13 @@ test('HU-1706 · el administrador llega a «Plan y suscripción» desde el menú
   await expect(page.getByRole('heading', { name: 'Tu plan: Productora' })).toBeVisible();
 });
 
+test('HU-1709 · «Plan y suscripción» muestra el cupón del alta con las renovaciones que quedan con descuento', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'ADMINISTRADOR', cuotaSitio: { incluidas: 20, usadas: 3, plan: 'productora', descuento: { codigo: 'LANZAMIENTO26', porcentaje: 20, ciclosRestantes: 2 } } });
+  await page.goto('/plan');
+  await expect(page.getByRole('heading', { name: 'Tu plan: Productora' })).toBeVisible();
+  await expect(page.getByText('Cupón LANZAMIENTO26: −20 % en las próximas 2 renovaciones.')).toBeVisible();
+});
+
 test('HU-1706 · con Stripe, la subida va a la página alojada y vuelve a /plan con el plan nuevo', async ({ page }) => {
   await simularApi(page, { conSesion: true, conProyectos: true, rol: 'ADMINISTRADOR', cuotaSitio: { incluidas: 8, usadas: 2, plan: 'inicial', pago: 'redireccion' } });
   await page.goto('/plan');
