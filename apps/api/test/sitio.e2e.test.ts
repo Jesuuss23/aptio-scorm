@@ -1056,7 +1056,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
   });
 });
 
-// HU-1508, HU-1509, HU-1514, HU-1510, HU-1511 y HU-1512 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
+// HU-1508, HU-1509, HU-1514, HU-1510, HU-1511, HU-1512 y HU-1702 · Sus casos tocan la última versión y los ajustes, que son globales: corren en este mismo archivo,
 // en serie, para no pisarse con las pruebas de arriba.
 await import('./sitio-publico.casos.js');
 await import('./sitio-ajustes.casos.js');
@@ -1071,3 +1071,4 @@ await import('./popups.casos.js');
 await import('./agenda.casos.js');
 await import('./chatbot.casos.js');
 await import('./sitio-resumen.casos.js');
+await import('./planes.casos.js');

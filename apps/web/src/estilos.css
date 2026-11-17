@@ -3748,3 +3748,24 @@ ul.fila-chips {
   .res-demos li .chip { grid-column: 2; justify-self: start; }
 }
 .res-nota { margin: 0; font-size: var(--texto-sm); color: var(--color-texto); }
+/* HU-1702 · Ventas › Planes (PNT-35): una tarjeta por plan; el destacado con borde cobalto; la página de precios aparte. */
+.planes-panel { list-style: none; margin: 0; padding: 0; display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); align-items: start; }
+.planes-panel > li { min-width: 0; }
+.plan-panel { margin: 0; display: grid; gap: 12px; }
+.plan-panel.destacado { border: 2px solid var(--color-cobalto); }
+.plan-panel.oculto .tarjeta-cabeza h2 { color: var(--color-texto-sec); }
+.plan-panel .tarjeta-cabeza { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.plan-panel .tarjeta-cabeza h2 { margin: 0; }
+.plan-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-resumen { margin: 0; font-family: var(--fuente-num); }
+.plan-campos { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
+.plan-campos .campo { display: grid; gap: 6px; margin: 0; align-content: start; }
+.plan-rasgos { border: 1px solid var(--color-borde); border-radius: 8px; padding: 12px; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.plan-rasgos legend { font-weight: 600; padding: 0 4px; }
+.plan-rasgos ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.plan-rasgos li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.plan-rasgos li.oculto input { color: var(--color-texto-sec); text-decoration: line-through; }
+.plan-rasgos .boton.chico { justify-self: start; }
+.planes-pie { margin: 24px 0; }
+.planes-pie > .tarjeta { margin: 0; }
+.plan-precios { max-width: 560px; }

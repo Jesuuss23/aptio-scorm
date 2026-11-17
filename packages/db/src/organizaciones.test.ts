@@ -3,7 +3,7 @@
 // aplica las migraciones con `prisma migrate deploy`, como en la nube, y revisa con `verificar-organizaciones`.
 // Necesita PostgreSQL con permiso para crear bases; sin DATABASE_URL se omite.
 import { execFile } from 'node:child_process';
-import { cpSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,6 +47,7 @@ async function desplegar(url: string, { sinLaNueva = false } = {}) {
     temporales.push(dir);
     cpSync(schema, join(dir, 'schema.prisma'));
     cpSync(MIGRACIONES, join(dir, 'migrations'), { recursive: true });
+    // La base «de antes»: todo menos esta migración (las posteriores no tocan organizaciones y la semilla las necesita).
     rmSync(join(dir, 'migrations', MIGRACION), { recursive: true });
     schema = join(dir, 'schema.prisma');
   }
@@ -79,8 +80,10 @@ describe.skipIf(!conBase)('CP-140 · migración a la organización AulasEducativ
     for (const d of temporales) rmSync(d, { recursive: true, force: true });
   });
 
-  it('la migración es la última y solo agrega', () => {
-    expect(readdirSync(MIGRACIONES).filter((d) => /^\d{14}_/.test(d)).sort().at(-1)).toBe(MIGRACION);
+  it('la migración existe y solo agrega la organización base', () => {
+    expect(readdirSync(MIGRACIONES)).toContain(MIGRACION);
+    const sql = readFileSync(join(MIGRACIONES, MIGRACION, 'migration.sql'), 'utf8').replace(/^--.*$/gm, '');
+    expect(sql).toMatch(/^\s*INSERT INTO "Organizacion"[\s\S]*ON CONFLICT \("slug"\) DO NOTHING;\s*$/);
   });
 
   it('con los datos actuales sembrados, todo queda en AulasEducativas con los mismos conteos y 0 huérfanas', async () => {

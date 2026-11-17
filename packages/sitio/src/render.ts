@@ -14,7 +14,7 @@ import type { SectorPublicado } from '@aptio/schema/sitio-sectores';
 import { type ArticuloPublico, type BlogPublico, categoriaInicial, ULTIMOS_BLOG } from '@aptio/schema/sitio-blog';
 import { rutaServida, tituloDePagina } from '@aptio/schema/sitio-seo';
 import { robotsDeRastreadores } from '@aptio/schema/sitio-seo-ia';
-import { alternasDe, type Instantanea, navegacionDe, type PaginaServida, paginaServida } from '@aptio/schema/sitio-versiones';
+import { alternasDe, BLOQUES_DE_PLANES, type Instantanea, navegacionDe, type PaginaServida, paginaServida, type PlanesInstantanea } from '@aptio/schema/sitio-versiones';
 import { CSS_SITIO, fuentesCss } from './estilos.js';
 import { CARPETA_FUENTES, fuentes } from './fuentes.js';
 import { type Idioma, INTERFAZ, TEXTOS } from './textos.js';
@@ -25,6 +25,7 @@ import { ARCHIVO_CHAT, SCRIPT_CHAT } from './chat.js';
 import { ARCHIVO_VISITA, SCRIPT_VISITA } from './visitas.js';
 import { ANCLA_COOKIES, ARCHIVO_COOKIES, ARCHIVO_COOKIES_JSON, atributosCookies, SCRIPT_COOKIES, TEXTOS_COOKIES } from './cookies.js';
 import { ARCHIVO_AGENDA, CSS_AGENDA, RUTA_CITA, SCRIPT_AGENDA, TEXTOS_AGENDA } from './agenda.js';
+import { CSS_PLANES, SeccionPlanes } from './planes.js';
 
 export interface OpcionesRender {
   entorno: EntornoSitio;
@@ -179,7 +180,7 @@ function Encabezado({ etiqueta, titulo, bajada, id }: { etiqueta?: string; titul
   return h('div', { className: 'sh' }, etiqueta ? h('span', { className: 'tagp' }, etiqueta) : null, h('h2', { id }, titulo), bajada ? h('p', null, bajada) : null);
 }
 
-interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined; ruta: string; privacidad: boolean; whatsapp?: Marca['whatsapp'] }
+interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined; ruta: string; privacidad: boolean; whatsapp?: Marca['whatsapp']; planes?: PlanesInstantanea | undefined }
 
 const fechaBlog = (iso: string, idioma: Idioma) => new Date(iso).toLocaleDateString(idioma === 'en' ? 'en-US' : 'es-PE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Lima' });
 
@@ -336,8 +337,12 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
       return h(FormularioContacto, { c, id });
     case 'agendador':
       return h(Agendador, { c, id });
+    case 'planes':
+    case 'precios':
+      // HU-1702 · Desde los planes de la versión publicada (CP-141); los ocultos no están (CP-142).
+      return h(SeccionPlanes, { planes: c.planes, o: { base: c.base, idioma: c.idioma, entorno: c.entorno, id, ruta, completo: tipo === 'precios' } });
     default:
-      // Planes (S13), precios y comparativa llegan con su historia (SUP-193).
+      // La tabla comparativa y las preguntas de facturación no salen todavía (HU-1702, SUP-282).
       return null;
   }
 }
@@ -529,7 +534,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
   let hayH1 = false;
   const bloques = p.bloques.map((b, n) => {
     const portada = b.tipo === 'hero' || b.tipo === 'fhero';
-    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog, ruta: publica, privacidad, whatsapp: marca.whatsapp });
+    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog, ruta: publica, privacidad, whatsapp: marca.whatsapp, planes: inst.planes });
     if (nodo && portada) hayH1 = true;
     return nodo ? h(Fragment, { key: n }, nodo) : null;
   });
@@ -546,7 +551,8 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     // CP-125 · Sin indexar: `noindex` (en pruebas ya va `noindex, nofollow` en todas).
     ...(indexar || op.entorno !== 'produccion' ? {} : { robots: 'noindex' }),
     cssExtra: (p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '') + (p.bloques.some((b) => b.tipo === TIPO_FORMULARIO || b.tipo === 'agendador') ? CSS_FORMULARIO : '')
-      + (p.bloques.some((b) => b.tipo === 'agendador') ? CSS_AGENDA : ''),
+      + (p.bloques.some((b) => b.tipo === 'agendador') ? CSS_AGENDA : '')
+      + (p.bloques.some((b) => (BLOQUES_DE_PLANES as readonly string[]).includes(b.tipo)) ? CSS_PLANES : ''),
     captacion: tieneFormulario(inst) || tieneAgendador(inst),
     popups: true,
     chat: true,

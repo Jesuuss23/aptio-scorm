@@ -1267,3 +1267,43 @@ model SitioVisitaDia {
   @@unique([dia, ruta, idioma])
   @@index([dia])
 }
+
+// ---------- Planes (HU-1702, M18, REQ-082, PNT-35) ----------
+
+/// HU-1702 · Plan de suscripción que alimenta /precios y el pago. Precios en soles enteros, sin IGV. `precioMes` null =
+/// plan a medida (el botón lleva a agendar). Nace oculto; un ficticio visible bloquea publicar en producción (RN-16-3).
+/// No se borra (las suscripciones lo van a referir): se oculta.
+model Plan {
+  id               String   @id @default(uuid()) @db.Uuid
+  /// Estable para la URL (`/publico/planes/{slug}`, `/agendar-demo?plan={slug}`).
+  slug             String   @unique
+  nombre           String
+  descripcion      String   @default("")
+  precioMes        Int?
+  /// Precio anual propio; null = precioMes × 12 × (1 − descuentoAnual / 100).
+  precioAnual      Int?
+  capsulasMes      Int?
+  usuarios         Int?
+  capsulaAdicional Int?
+  textoBoton       String   @default("Suscribirme")
+  destacado        Boolean  @default(false)
+  visible          Boolean  @default(false)
+  orden            Int      @default(0)
+  /// [{ texto, visible }]
+  caracteristicas  Json     @default("[]")
+  ficticio         Boolean  @default(false)
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+
+  @@index([orden])
+}
+
+/// HU-1702 · Ajustes de la página de precios (fila única `planes`).
+model PlanesAjustes {
+  id             String   @id @default("planes")
+  mostrarAnual   Boolean  @default(true)
+  descuentoAnual Int      @default(20)
+  conIgv         Boolean  @default(false)
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+}

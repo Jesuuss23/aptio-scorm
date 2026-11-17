@@ -53,6 +53,8 @@ tags:
   description: Rutas sin sesión del sitio comercial, con límite de 60 peticiones por minuto por IP (M16)
 - name: Captación
   description: Leads del sitio con su origen y UTM, el embudo comercial y su envío a CRM o a un webhook firmado; la consulta es solo del superadmin (M17, ADR-011)
+- name: Ventas
+  description: Planes y precios de la página de precios; suscripciones y facturación llegan con sus historias. Solo del superadmin (M18, ADR-012)
 paths:
   /salud:
     get:
@@ -6567,6 +6569,205 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /ventas/planes:
+    get:
+      tags:
+      - Ventas
+      summary: Planes y ajustes de la página de precios (HU-1702, PNT-35)
+      operationId: get_ventas_planes
+      description: |-
+        Solo SUPERADMIN. Todos los planes (visibles y ocultos) en su orden, con su precio anual efectivo (el propio o el
+        mensual × 12 con el descuento anual), y los ajustes de la página de precios. Precios en soles enteros sin IGV.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPlanes'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    post:
+      tags:
+      - Ventas
+      summary: Crear un plan (HU-1702, REQ-082)
+      operationId: post_ventas_planes
+      description: |-
+        Solo SUPERADMIN. Faltan solo `slug` y `nombre`; lo demás toma los valores de un plan nuevo: oculto, sin destacar,
+        sin precio (a medida) y con el botón «Suscribirme». Va al final del orden. Si llega destacado, los demás dejan de
+        estarlo en la misma transacción. Un plan a medida (`precioMes` null) no lleva `precioAnual` ni `capsulaAdicional`.
+        409 SLUG_EN_USO si el identificador ya existe. Los planes no se borran: se ocultan. Auditoría PLAN_CREADO (de
+        plataforma, sin organización).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '409':
+          description: SLUG_EN_USO · ya hay un plan con ese identificador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/planes/orden:
+    put:
+      tags:
+      - Ventas
+      summary: Ordenar los planes (HU-1702)
+      operationId: put_ventas_planes_orden
+      description: Solo SUPERADMIN. Lleva todos los planes una vez cada uno; si no, 422 ORDEN_INCOMPLETO. Auditoría PLAN_ORDEN_CAMBIADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenPlanes'
+      responses:
+        '200':
+          description: Los planes en el orden nuevo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPlanes'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/planes/ajustes:
+    get:
+      tags:
+      - Ventas
+      summary: Ajustes de la página de precios (HU-1702)
+      operationId: get_ventas_planes_ajustes
+      description: Solo SUPERADMIN. Sin ajustes guardados devuelve los de siempre (opción anual visible, 20 % de descuento, sin IGV).
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesPlanes'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    put:
+      tags:
+      - Ventas
+      summary: Guardar los ajustes de la página de precios (HU-1702)
+      operationId: put_ventas_planes_ajustes
+      description: |-
+        Solo SUPERADMIN. `descuentoAnual` entero de 0 a 90; vale para los planes sin precio anual propio. Con `conIgv` el
+        sitio muestra los precios con el IGV de 18 % (se guardan sin IGV). Se ve en el sitio al publicar. Auditoría
+        PLAN_AJUSTES_ACTUALIZADOS con los valores de antes y de después.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjustesPlanes'
+      responses:
+        '200':
+          description: Guardados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesPlanes'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/planes/{id}:
+    patch:
+      tags:
+      - Ventas
+      summary: Editar, mostrar, ocultar o destacar un plan (HU-1702, CP-141, CP-142)
+      operationId: patch_ventas_planes_id
+      description: |-
+        Solo SUPERADMIN. Cambia solo los campos que llegan y vuelve a validar el plan completo. El `slug` no cambia (422
+        SLUG_FIJO): lo usan las URL y, desde la HU-1703, las suscripciones. Al destacar uno, los demás dejan de estarlo.
+        `ficticio: true` lo marca como dato de ejemplo: en producción nunca sale al público y, si una página publicada
+        muestra los planes, bloquea publicar (409 FICTICIOS_VISIBLES en `POST /sitio/publicar`). Lo que ve el visitante
+        cambia al publicar el sitio. Auditoría PLAN_EDITADO con los campos y, si cambió, el precio al mes de antes y de
+        después.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanEntrada'
+      responses:
+        '200':
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Plan'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /publico/planes/{slug}:
+    get:
+      tags:
+      - Sitio público
+      summary: Un plan publicado, para el pago (HU-1702, CP-141, CP-142)
+      operationId: get_publico_planes_slug
+      security: []
+      description: |-
+        Sin sesión. Lee la última versión publicada del sitio (no lo que se edita en el panel): un precio nuevo se ve al
+        publicar (CP-141). 404 NO_ENCONTRADO si el plan está oculto, no existe, la versión no publica planes (ninguna
+        página publicada los muestra) o, en producción, si es ficticio (CP-142). Solo las características visibles.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: '^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$'
+          example: productora
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanPublico'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
 components:
   securitySchemes:
     cookieSesion:
@@ -14156,3 +14357,212 @@ components:
           type: string
           format: date-time
           readOnly: true
+    CaracteristicaPlan:
+      type: object
+      required: [texto, visible]
+      properties:
+        texto:
+          type: string
+          maxLength: 120
+          example: 20 cápsulas al mes
+        visible:
+          type: boolean
+    PlanEntrada:
+      type: object
+      description: HU-1702 · Al crear, `slug` y `nombre` son obligatorios; al editar, todo es opcional. Precios en soles enteros sin IGV.
+      properties:
+        slug:
+          type: string
+          pattern: '^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$'
+          example: productora
+          description: Solo al crear; después no cambia
+        nombre:
+          type: string
+          maxLength: 60
+        descripcion:
+          type: string
+          maxLength: 200
+        precioMes:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 1290
+          description: null = a medida (sin precio; el botón lleva a agendar con ventas)
+        precioAnual:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Precio anual propio; null = el mensual × 12 con el descuento anual
+        capsulasMes:
+          type: integer
+          nullable: true
+          minimum: 0
+        usuarios:
+          type: integer
+          nullable: true
+          minimum: 0
+        capsulaAdicional:
+          type: integer
+          nullable: true
+          minimum: 1
+        textoBoton:
+          type: string
+          maxLength: 40
+          example: Suscribirme
+        destacado:
+          type: boolean
+          description: Al destacarlo, los demás dejan de estarlo
+        visible:
+          type: boolean
+        caracteristicas:
+          type: array
+          maxItems: 12
+          items:
+            $ref: '#/components/schemas/CaracteristicaPlan'
+        ficticio:
+          type: boolean
+    Plan:
+      type: object
+      required: [id, slug, nombre, descripcion, precioMes, precioAnual, precioAnualEfectivo, capsulasMes, usuarios, capsulaAdicional, textoBoton, destacado, visible, caracteristicas, orden, ficticio, actualizadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+          example: productora
+        nombre:
+          type: string
+          example: Productora
+        descripcion:
+          type: string
+        precioMes:
+          type: integer
+          nullable: true
+          example: 1290
+        precioAnual:
+          type: integer
+          nullable: true
+        precioAnualEfectivo:
+          type: integer
+          nullable: true
+          example: 12384
+          description: El precio anual propio o el mensual × 12 con el descuento; null si es a medida
+        capsulasMes:
+          type: integer
+          nullable: true
+        usuarios:
+          type: integer
+          nullable: true
+        capsulaAdicional:
+          type: integer
+          nullable: true
+        textoBoton:
+          type: string
+        destacado:
+          type: boolean
+        visible:
+          type: boolean
+        caracteristicas:
+          type: array
+          items:
+            $ref: '#/components/schemas/CaracteristicaPlan'
+        orden:
+          type: integer
+        ficticio:
+          type: boolean
+        actualizadoEn:
+          type: string
+          format: date-time
+    AjustesPlanes:
+      type: object
+      required: [mostrarAnual, descuentoAnual, conIgv]
+      properties:
+        mostrarAnual:
+          type: boolean
+          description: Mostrar el precio anual con el ahorro en cada plan
+        descuentoAnual:
+          type: integer
+          minimum: 0
+          maximum: 90
+          example: 20
+        conIgv:
+          type: boolean
+          description: Mostrar los precios con el IGV de 18 %
+    ListaPlanes:
+      type: object
+      required: [planes, ajustes]
+      properties:
+        planes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Plan'
+        ajustes:
+          $ref: '#/components/schemas/AjustesPlanes'
+    OrdenPlanes:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+          description: Todos los planes, en el orden nuevo
+    PlanPublico:
+      type: object
+      description: HU-1702 · El plan publicado como lo ve el visitante y el resumen del pago (CP-141). Soles sin IGV salvo `precioMesConIgv`.
+      required: [slug, nombre, descripcion, aMedida, precioMes, precioAnual, ahorroAnual, precioMesConIgv, capsulasMes, usuarios, capsulaAdicional, textoBoton, destacado, caracteristicas, enlace, ajustes]
+      properties:
+        slug:
+          type: string
+          example: productora
+        nombre:
+          type: string
+        descripcion:
+          type: string
+        aMedida:
+          type: boolean
+          description: Sin precio; el botón lleva a agendar
+        precioMes:
+          type: integer
+          nullable: true
+          example: 1390
+        precioAnual:
+          type: integer
+          nullable: true
+          example: 13344
+          description: El efectivo (propio o con el descuento)
+        ahorroAnual:
+          type: integer
+          nullable: true
+          example: 3336
+        precioMesConIgv:
+          type: number
+          nullable: true
+          example: 1640.2
+        capsulasMes:
+          type: integer
+          nullable: true
+        usuarios:
+          type: integer
+          nullable: true
+        capsulaAdicional:
+          type: integer
+          nullable: true
+        textoBoton:
+          type: string
+        destacado:
+          type: boolean
+        caracteristicas:
+          type: array
+          items:
+            type: string
+          description: Solo las visibles
+        enlace:
+          type: string
+          example: /agendar-demo?plan=productora
+          description: Hasta la HU-1703 (pago), agendar una demo con el plan elegido
+        ajustes:
+          $ref: '#/components/schemas/AjustesPlanes'

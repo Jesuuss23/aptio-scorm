@@ -12,6 +12,7 @@ import { ajustesPublicados, type AjustesSitio, type SitioPublicado } from './sit
 import { sectorPublicado, type SectorPublicado, testimoniosDeSector } from './sitio-sectores.js';
 import { type Redireccion, seoPublicado, type SeoPublicado } from './sitio-seo.js';
 import { leerBloqueados } from './sitio-seo-ia.js';
+import { type AjustesPlanes, AJUSTES_PLANES_POR_DEFECTO, type Caracteristica, type PlanGuardado, type PlanPublico, planesPublicos } from './planes.js';
 
 export const ORIGENES_VERSION = ['publicacion', 'pagina', 'programada', 'restauracion'] as const;
 export type OrigenVersion = (typeof ORIGENES_VERSION)[number];
@@ -55,7 +56,36 @@ export interface Instantanea {
   llmsTxt?: string;
   /** HU-1513 · CP-126 · Los rastreadores de IA bloqueados en robots.txt; falta si todos están permitidos. */
   rastreadoresBloqueados?: string[];
+  /**
+   * HU-1702 · Los planes visibles y los ajustes de la página de precios. Solo si alguna página publicada tiene el bloque
+   * Planes o Precios (así no marca cambios ni ficticios donde no se muestran); en producción, sin ficticios.
+   */
+  planes?: PlanesInstantanea;
 }
+
+/** HU-1702 · Un plan de la versión: lo público más la marca de ficticio (que nunca llega al público). */
+export type PlanInstantanea = PlanPublico & { ficticio?: true };
+export interface PlanesInstantanea { ajustes: AjustesPlanes; planes: PlanInstantanea[] }
+
+/** HU-1702 · Bloques que muestran los planes. */
+export const BLOQUES_DE_PLANES = ['planes', 'precios'] as const;
+
+/** Un plan tal como sale de la base (las características llegan como JSON). */
+export type FilaPlan = Omit<PlanGuardado, 'caracteristicas'> & { caracteristicas: unknown };
+
+const caracteristicasDe = (v: unknown): Caracteristica[] =>
+  Array.isArray(v) ? v.filter((c): c is Caracteristica => Boolean(c) && typeof c.texto === 'string' && typeof c.visible === 'boolean').map((c) => ({ texto: c.texto, visible: c.visible })) : [];
+
+/** HU-1702 · Los planes que guarda la versión: visibles, en orden, con su marca de ficticio; en producción, sin ficticios. */
+export function armarPlanes(filas: readonly FilaPlan[], ajustes: AjustesPlanes | null | undefined, entorno: EntornoSitio): PlanesInstantanea {
+  const guardados: PlanGuardado[] = elementosParaPublico(entorno, filas).map((f) => ({ ...f, caracteristicas: caracteristicasDe(f.caracteristicas) }));
+  const ficticios = new Set(guardados.filter((p) => p.ficticio).map((p) => p.slug));
+  const a = ajustes ?? AJUSTES_PLANES_POR_DEFECTO;
+  return { ajustes: { mostrarAnual: a.mostrarAnual, descuentoAnual: a.descuentoAnual, conIgv: a.conIgv }, planes: planesPublicos(guardados, a).map((p) => (ficticios.has(p.slug) ? { ...p, ficticio: true as const } : p)) };
+}
+
+/** ¿Alguna página de la instantánea muestra los planes? */
+export const muestraPlanes = (paginas: readonly Pick<PaginaInstantanea, 'bloques'>[]) => paginas.some((p) => p.bloques.some((b) => (BLOQUES_DE_PLANES as readonly string[]).includes(b.tipo)));
 
 /** Filas tal como salen de la base (solo los campos que usa la armadora). */
 export interface FilaPagina {
@@ -134,6 +164,8 @@ export function armarInstantanea(datos: {
   redirecciones?: readonly Redireccion[]; robotsExtra?: string | null;
   /** HU-1513 · Solo entran con contenido o con algún bloqueado, para no marcar cambios sobre las versiones de antes. */
   llmsTxt?: string | null; rastreadoresBloqueados?: readonly string[] | null;
+  /** HU-1702 · Solo entran si alguna página publicada muestra los planes. */
+  planes?: readonly FilaPlan[]; ajustesPlanes?: AjustesPlanes | null;
 }, entorno: EntornoSitio): Instantanea {
   const paginas = datos.paginas
     .filter((p) => p.estado === 'PUBLICADA')
@@ -151,6 +183,7 @@ export function armarInstantanea(datos: {
     ...(datos.robotsExtra?.trim() ? { robotsExtra: datos.robotsExtra.trim() } : {}),
     ...(datos.llmsTxt?.trim() ? { llmsTxt: datos.llmsTxt.trim() } : {}),
     ...(bloqueados.length ? { rastreadoresBloqueados: bloqueados } : {}),
+    ...(datos.planes && muestraPlanes(paginas) ? { planes: armarPlanes(datos.planes, datos.ajustesPlanes, entorno) } : {}),
   };
 }
 
@@ -184,6 +217,8 @@ export function ficticiosDeInstantanea(inst: Instantanea): { id: string; colecci
       }
     }
   }
+  // HU-1702 · Y los planes ficticios (por su slug, que es su id estable en la versión).
+  for (const p of inst.planes?.planes ?? []) if (p.ficticio) vistos.set(`plan:${p.slug}`, { id: p.slug, coleccion: 'planes', nombre: p.nombre });
   return [...vistos.values()];
 }
 
@@ -213,6 +248,16 @@ export function paginaServida(inst: Instantanea, ruta: string, idioma: string, e
       ...(b.elementos ? { elementos: elementosParaPublico(entorno, b.elementos.map((e) => ({ ...e, ficticio: e.ficticio ?? false }))).map((e) => ({ datos: e.datos, ...(e.ficticio ? { ficticio: true as const } : {}) })) } : {}),
     })),
   };
+}
+
+/**
+ * HU-1702 · Los planes que sirve el público (el sitio, `GET /publico/planes/{slug}` y el resumen del pago): sin la marca
+ * de ficticio y, en producción, sin los ficticios (segunda defensa). Null si la versión no publica planes.
+ */
+export function planesServidos(inst: Pick<Instantanea, 'planes'>, entorno: EntornoSitio): { ajustes: AjustesPlanes; planes: PlanPublico[] } | null {
+  if (!inst.planes) return null;
+  const planes = inst.planes.planes.filter((p) => entorno !== 'produccion' || !p.ficticio).map(({ ficticio: _f, ...p }) => p);
+  return { ajustes: inst.planes.ajustes, planes };
 }
 
 /** HU-1510 · El menú y el pie de un idioma (el inglés sin enlaces queda vacío, nunca cae al español). */

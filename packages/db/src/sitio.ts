@@ -21,8 +21,17 @@ export async function armarInstantaneaActual(bd: Bd, entorno: EntornoSitio): Pro
   // HU-1513 · También llms.txt y los rastreadores de IA bloqueados.
   const redirecciones = await bd.sitioRedireccion.findMany({ where: { activa: true } });
   const seo = await bd.sitioSeo.findUnique({ where: { id: ID_SEO } });
-  return armarInstantanea({ paginas, elementos, enlaces, ajustes, redirecciones, robotsExtra: seo?.robotsExtra ?? null, llmsTxt: seo?.llmsTxt ?? null, rastreadoresBloqueados: seo?.rastreadoresBloqueados ?? null }, entorno);
+  // HU-1702 · Los planes y los ajustes de la página de precios (entran solo si alguna página publicada los muestra).
+  const planes = await bd.plan.findMany({ orderBy: [{ orden: 'asc' }, { nombre: 'asc' }] });
+  const ajustesPlanes = await bd.planesAjustes.findUnique({ where: { id: ID_PLANES_AJUSTES } });
+  return armarInstantanea({
+    paginas, elementos, enlaces, ajustes, redirecciones, robotsExtra: seo?.robotsExtra ?? null, llmsTxt: seo?.llmsTxt ?? null, rastreadoresBloqueados: seo?.rastreadoresBloqueados ?? null,
+    planes, ajustesPlanes,
+  }, entorno);
 }
+
+/** HU-1702 · La fila única de los ajustes de la página de precios. */
+export const ID_PLANES_AJUSTES = 'planes';
 
 /** HU-1512 · La fila única de los ajustes SEO del sitio (reglas extra de robots.txt). */
 export const ID_SEO = 'seo';
