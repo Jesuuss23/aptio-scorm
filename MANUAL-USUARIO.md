@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.73 · actualizado con la undécima entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.74 · actualizado con la primera entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -32,6 +32,8 @@ Cada persona entra con su propio usuario y ve solo lo que le corresponde a su ro
 | **Producción** | Crea proyectos, sube material, sigue el avance de la generación y corrige textos de las pantallas. |
 | **Revisión del cliente** | Ve solo los proyectos de su empresa para revisarlos y comentar cada pantalla. No puede modificar la configuración. |
 | **Superadmin de la plataforma** | Administra el sitio comercial de Aptio SCORM desde el grupo **Sitio web**. No pertenece a ninguna empresa: no ve proyectos, clientes ni la sección Empresa. Nadie más ve el grupo Sitio web, ni siquiera Administración. |
+
+**Cada empresa trabaja aparte.** Aptio SCORM puede tener varias empresas (organizaciones), y cada una tiene sus propias personas, clientes, kits de marca, proyectos y entregas. Nadie ve ni cambia lo de otra empresa: si alguien abre un enlace a un proyecto, un cliente o una entrega de otra empresa, ve el mismo aviso de «no encontrado» que para algo que no existe, y el intento queda registrado para el equipo de la plataforma. Lo que tu equipo ya tenía antes de esta división quedó en la empresa **AulasEducativas**, sin cambios.
 
 ---
 
@@ -1150,6 +1152,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.74 | 2026-11-17 | Empresas separadas (sección 2): cada organización ve solo sus datos, un enlace de otra empresa da «no encontrado» y queda registrado, y lo anterior quedó en AulasEducativas. |
 | 0.73 | 2026-11-17 | Resumen del sitio (8.28): período de 7 días, 30 días o trimestre, los cuatro indicadores con su variación, el gráfico de visitas y conversiones con su tabla, el origen de los leads, las páginas con más conversiones y las próximas demos. |
 | 0.72 | 2026-11-17 | Consentimiento de cookies (8.29): la tarjeta Privacidad con «Mostrar banner de cookies» y «Pedir de nuevo el consentimiento», la analítica que se activa solo con el permiso del visitante y lo que ve el visitante (aviso, preferencias y «Configurar cookies» en el pie). |
 | 0.71 | 2026-11-17 | Chatbot del sitio (8.38): mostrarlo u ocultarlo sin publicar, nombre, saludos, tono, objetivo y horario de atención, respuestas rápidas con orden, la base de conocimiento con fuentes propias, las conversaciones de 90 días con su resultado y lo que ve el visitante (preguntar, agendar una demo y hablar con una persona). |

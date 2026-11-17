@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.73 · actualizado con la undécima entrega del Sprint 12 (17 de noviembre de 2026)**
+**Versión 0.74 · actualizado con la primera entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -553,6 +553,12 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Contador:** toda versión trae `_visita.js`, que cargan todas las páginas publicadas y manda una vez por página `POST /s/_visita`. La API suma con un `INSERT … ON CONFLICT` atómico; no cuentan bots, Lighthouse ni el superadmin con sesión (SUP-270). Límite de 60 por minuto por IP en memoria de cada instancia. La CDN debe reenviar `POST /s/_visita` al origen (SUP-274, HU-1405).
 - **Panel (PNT-24, CP-138):** `GET /sitio/resumen?periodo=7d|30d|90d`, solo SUPERADMIN, lee `SitioVisitaDia`, `Lead` y `AgendaCita`: indicadores contra el período anterior, serie diaria, origen al 100 % por mayor resto, páginas con más conversiones y próximas demos; suscripciones null hasta el S13 (SUP-271 a SUP-273).
 
+### 3.32 Organizaciones aisladas (HU-1701)
+
+- **Aislamiento (RN-18-1, ADR-012):** cada tabla raíz lleva `organizacionId` y cada servicio filtra por la organización de la sesión; las tablas hijas heredan el aislamiento de su padre. Pedir el recurso de otra organización responde el mismo 404 NO_ENCONTRADO que un id que no existe.
+- **Auditoría (CP-139):** después de responder un 404 a un usuario con organización, el filtro global de errores busca los UUID de la ruta en las tablas de las organizaciones. Si alguno es de otra, registra `ACCESO_OTRA_ORGANIZACION` en la auditoría de plataforma (`organizacionId` null, solo el superadmin) con el usuario, su rol, la organización de origen y la propietaria, el método, la ruta y los recursos. Se escribe después de responder para que el tiempo no delate el id; si falla, solo queda en el log (SUP-276, SUP-279).
+- **Migración (CP-140):** `20261117050000_organizacion_base` crea «AulasEducativas» si falta y no cambia nada si ya existe. Tras `migrate deploy`, `pnpm --filter @aptio/db verificar-organizaciones` cuenta las filas por organización y revisa huérfanas y cruces; sale con 0 si todo está íntegro, 1 si no y 2 si no llega a la base (SUP-275, SUP-280).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -694,6 +700,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.74 | 2026-11-17 | Organizaciones aisladas (3.32): 404 igual al de un id inexistente, `ACCESO_OTRA_ORGANIZACION` en la auditoría de plataforma, la migración de la organización base y `verificar-organizaciones`. |
 | 0.73 | 2026-11-17 | Resumen del sitio (3.31): `SitioVisitaDia` y el contador anónimo `_visita.js` con `POST /s/_visita`, y `GET /sitio/resumen` con sus indicadores, serie, origen, páginas y demos. |
 | 0.72 | 2026-11-17 | Consentimiento de cookies (3.30): ajustes del aviso sin migración, `_cookies.js` con la decisión en `localStorage` por 12 meses, la CSP por etiquetas publicadas y el retiro del consentimiento. |
 | 0.71 | 2026-11-17 | Chatbot del sitio (3.29): los modelos del chatbot y sus conversaciones de 90 días, `_chat.js` y `_chatbot.json` en vivo, los límites de `POST /publico/chat`, IA-20 con fuentes del sitio y «no lo sé» ante la espera o el tope de gasto, la reserva y el traspaso con vía «Chatbot», el panel y la auditoría. |
