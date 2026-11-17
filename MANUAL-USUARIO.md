@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.69 · actualizado con la séptima entrega del Sprint 12 (16 de noviembre de 2026)**
+**Versión 0.70 · actualizado con la octava entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -960,6 +960,49 @@ Debajo del formulario, **Reglas** resume en una frase dónde, cuándo y cada cu�
 - En cada página aparece un solo popup.
 - Se cierra con la ✕, con **No, gracias** o con la tecla Escape.
 
+### 8.37 Agendamiento de demos (solo superadmin)
+
+El **agendador** deja que un visitante del sitio elija día y hora para una demo y la reserve solo, sin escribir correos de ida y vuelta. Se administra en **Captación › Agendamiento**. Todas las horas son **hora de Lima**.
+
+**Asesores.** Son las personas del equipo que dan las demos. Pulsa **Nuevo asesor** y escribe su nombre, su correo y su **enlace fijo de videollamada** (por ejemplo, el de su sala de Google Meet o Zoom, que empieza con `https://`). Ese enlace va en la invitación de cada cita. El interruptor **Recibe citas** apagado hace que no reciba citas nuevas; las que ya tiene siguen.
+
+**Tipos de reunión.** Cada tipo es una reunión que se ofrece, por ejemplo «Demo del generador».
+
+- Pulsa **Nuevo tipo** y completa el **nombre en español**, el **nombre en inglés** (si lo dejas vacío, el sitio en inglés usa el español), la **duración** en minutos (de 15 a 120) y los **asesores** que la pueden dar.
+- El tipo se crea **sin ofrecer**. Enciende **Ofrecer [tipo]** cuando quieras que aparezca en el sitio. El cambio vale de inmediato, sin publicar.
+- Un tipo sin asesores no se ofrece.
+- Con **↑ ↓** cambias el orden en que aparecen en el sitio. **Editar** cambia sus datos y **Borrar** lo quita (si ya tiene citas, apágalo para conservarlas).
+
+**Horarios ofrecidos.** La tabla muestra las horas de inicio de lunes a viernes.
+
+- En **Horas de inicio** escribe las horas separadas por comas, por ejemplo `09:00, 10:00, 15:00`.
+- **Anticipación mínima:** cuántas horas antes como mínimo se puede reservar (4 por defecto).
+- **Se puede agendar hasta:** cuántos días hacia adelante se ofrecen (30 por defecto).
+- Pulsa **Guardar horarios**.
+- Los **feriados de Perú** del año aparecen en la lista y no se ofrecen nunca.
+- Para cerrar otro día (un feriado puente o una capacitación interna), elige la fecha en **Días bloqueados** y pulsa **Bloquear día**. **Desbloquear** lo vuelve a abrir.
+
+**Integraciones y recordatorios.** Hoy las citas usan el **calendario de Aptio**: cada cita ocupa al asesor y ya no se ofrece esa hora con él. Google Calendar y Outlook dicen **Próximamente**. Con **Recordatorios por correo** encendido, el visitante recibe un recordatorio 24 horas y otro 1 hora antes. La invitación siempre se envía.
+
+**Lo que ve el visitante.** En la página **Agendar demo** del sitio:
+
+1. Elige el tipo de reunión, si hay más de uno.
+2. Elige un día en el calendario. Los días sin horarios se ven tachados. Con el teclado, las flechas pasan de un día disponible a otro.
+3. Elige una hora.
+4. Escribe su nombre y su correo de trabajo (la empresa y el LMS son opcionales) y marca la casilla de aceptación del tratamiento de datos (Ley 29733).
+5. Pulsa **Confirmar demo**. Ve «Tu demo está agendada» con **Añadir a Google Calendar** y **Descargar .ics**.
+
+Si otra persona tomó esa hora un instante antes, el sitio lo avisa y muestra los horarios actualizados. Sin JavaScript, la página ofrece el formulario de contacto y el botón de WhatsApp.
+
+El visitante recibe la **invitación** por correo con la videollamada, el archivo de calendario y un enlace para **cancelar**; el asesor recibe una copia. El enlace de cancelación pide confirmar con un botón y vale hasta la hora de inicio. Para cambiar la hora, el visitante cancela y reserva otra.
+
+**Las citas.** La lista muestra por defecto las confirmadas desde hoy; cambia **Estado**, **Desde** y **Hasta** para ver otras. En cada cita:
+
+- **Cancelar:** pide confirmación y avisa por correo al visitante y al asesor.
+- **Realizada** y **No asistió:** aparecen cuando la cita ya empezó.
+
+Cada reserva entra también a **Leads y CRM** con vía «Agendador» y pasa a la etapa **Demo** (si estaba en Nuevo o Contactado). **Ver página de agenda** abre la página del sitio en otra pestaña.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1051,6 +1094,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.70 | 2026-11-17 | Agendamiento de demos (8.37): asesores con su enlace de videollamada, tipos de reunión con «Ofrecer», duración y orden, horarios de lunes a viernes, días bloqueados y feriados, recordatorios por correo, la reserva del visitante con su invitación y cancelación, y la lista de citas con «Cancelar», «Realizada» y «No asistió». |
 | 0.69 | 2026-11-16 | Popups (8.36): crear modales, deslizables y barras con disparador, páginas, frecuencia y botón (pedir el correo o abrir un enlace), activarlos sin publicar, ordenarlos, probarlos en el sitio, ver impresiones y conversión, reiniciar y borrar. |
 | 0.68 | 2026-11-16 | Leads y CRM (8.35): enviar los leads a HubSpot, Pipedrive, Zoho o un webhook, con las tarjetas Conexiones, Mapeo de campos y Webhook (copiar y regenerar la clave, enviar prueba), la columna CRM y «Reintentar». |
 | 0.67 | 2026-11-16 | Leads y CRM (8.35): el bloque «Formulario de contacto» con su casilla de aceptación, la lista de leads con origen, entrada, campaña, etapa editable y fecha, los filtros por origen y etapa, y «Exportar CSV». |

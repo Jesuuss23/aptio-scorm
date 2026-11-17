@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.69 · actualizado con la séptima entrega del Sprint 12 (16 de noviembre de 2026)**
+**Versión 0.70 · actualizado con la octava entrega del Sprint 12 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -508,6 +508,23 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Panel (PNT-31):** `GET` y `POST /captacion/popups`, `PATCH` y `DELETE /captacion/popups/{id}`, `PUT /captacion/popups/orden` y `POST /captacion/popups/{id}/reiniciar`, solo del superadmin.
 - **Auditoría:** POPUP_CREADO, POPUP_EDITADO, POPUP_BORRADO, POPUPS_ORDENADOS y POPUP_RESULTADOS_REINICIADOS.
 
+### 3.28 Agendamiento de demos (HU-1605)
+
+- **Datos (REQ-078):** migración `20261117000000_agenda`.
+  - `AgendaTipo`: nombres en español e inglés, minutos, asesores, ofrecido, orden y ficticio.
+  - `AgendaAsesor`: nombre, correo, enlace fijo de videollamada, recibe citas y ficticio.
+  - `AgendaAjustes`: una fila con las franjas, la anticipación, el horizonte, los días bloqueados y los recordatorios por correo.
+  - `AgendaCita`: tipo, asesor, inicio y fin en UTC, datos del visitante, idioma, estado (confirmada, cancelada, realizada, no asistió), lead, quién canceló, el SHA-256 del token y la fecha de cada aviso enviado.
+  - Índice único parcial `(asesorId, inicio)` de las citas confirmadas.
+- **Franjas (RN-17-5, SUP-251, SUP-252):** de lunes a viernes en hora de Lima (UTC−5 fijo), desde la anticipación hasta el horizonte, sin feriados nacionales de Perú ni días bloqueados. Una franja está libre si algún asesor del tipo no tiene otra cita confirmada que se cruce. `GET /s/_agenda.json` las sirve en vivo (la CDN 15 s), sin datos de asesores ni de otras citas.
+- **Reserva (CP-135, SUP-255):** `POST /api/v1/publico/citas` vuelve a comprobar la franja dentro de una transacción con un candado de PostgreSQL por asesor y el índice único: de dos reservas a la vez, una gana y la otra recibe 409 FRANJA_OCUPADA. Con varios asesores libres va al que tiene menos citas por delante. Límite: 5 reservas o cancelaciones cada 10 minutos y 60 lecturas por minuto por IP, en memoria.
+- **Lead (SUP-254):** cada reserva crea o actualiza el lead con vía «Agendador» y lo pasa a Demo si estaba en Nuevo o Contactado.
+- **Avisos (CP-136):** la cola `agenda` (4 intentos: 30 s, 2 min y 8 min) envía la invitación al visitante con copia al asesor (.ics `REQUEST`, Google Calendar, videollamada y cancelación), los recordatorios demorados de 24 h y 1 h si están encendidos y el aviso de cancelación (.ics `CANCEL`). Antes de cada envío el worker vuelve a mirar la cita y no repite un aviso ya enviado.
+- **Cancelación (SUP-253):** el token aleatorio solo viaja en el correo y en la tarea de la cola; la base guarda su SHA-256. `GET /s/_cita?t=…` muestra la cita y pide confirmar; `POST /s/_cita` o `POST /api/v1/publico/citas/cancelar` cancelan hasta la hora de inicio y quitan los recordatorios pendientes.
+- **Sitio:** el bloque «Agendador» reserva su alto (en Lighthouse, CLS 0 y ningún desplazamiento del bloque) y carga `_agenda.js` solo en sus páginas; sin JavaScript ofrece el formulario de contacto y el WhatsApp.
+- **Panel (PNT-33):** `GET` y `PATCH /captacion/agenda`, los tipos (`POST`, `PATCH`, `DELETE`, `PUT orden`), los asesores (`POST`, `PATCH`, `DELETE`), `GET /captacion/agenda/citas` y `PATCH /captacion/agenda/citas/{id}`, solo del superadmin.
+- **Auditoría:** AGENDA_AJUSTES_EDITADOS, AGENDA_TIPO_CREADO, AGENDA_TIPO_EDITADO, AGENDA_TIPO_BORRADO, AGENDA_TIPOS_ORDENADOS, AGENDA_ASESOR_CREADO, AGENDA_ASESOR_EDITADO, AGENDA_ASESOR_BORRADO, AGENDA_CITA_CANCELADA y AGENDA_CITA_MARCADA.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -605,6 +622,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-224 a SUP-229:** Google Search Console y el puntaje de auditoría quedan para después; las redirecciones y robots llegan con «Publicar cambios» y la CDN debe aplicarlas; las redirecciones son internas, hasta 500, y el cambio de ruta crea la 301; robots solo con Allow, Disallow y comentarios; 60 y 160 caracteres; Product sin precios y Organization solo en el inicio.
 - **SUP-200 a SUP-204:** la analítica se guarda pero se activa con el banner de cookies; el superadmin se reconoce por la cookie de sesión durante el mantenimiento (dominio de cookie compartido y CDN sin caché de respuestas privadas); el certificado lo emite la CDN; logo y favicon de hasta 200 KB.
 - **SUP-246 a SUP-250:** popups leídos en vivo (una versión anterior a la HU-1603 hay que republicarla una vez); frecuencia en `localStorage`; `/pago*` reservada para el S13; sin intención de salida en pantallas táctiles; contadores sin datos personales, con el límite de eventos en memoria; la CDN debe reenviar `POST /_popup` y `/api/v1/publico/leads` (HU-1405).
+- **SUP-251 a SUP-255:** calendario interno de Aptio con enlace fijo por asesor (Google Calendar, Outlook y WhatsApp después), Lima UTC−5 y todo en UTC, reagendar es cancelar y reservar; feriados calculados y revisados cada año; token de cancelación solo en el correo y la cola, guardado como SHA-256; el lead pasa a Demo al agendar (excepción a SUP-236); límites en memoria, `_agenda.json` 15 s en la CDN, que debe reenviar `/api/v1/publico/citas*` y `POST /s/_cita` (HU-1405).
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -648,6 +666,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.70 | 2026-11-17 | Agendamiento de demos (3.28): los modelos del agendador con su índice único parcial, las franjas en hora de Lima sin feriados, la reserva con candado por asesor y 409, el lead en Demo, la cola `agenda` con invitación, recordatorios y cancelación, el token guardado como SHA-256, el bloque del sitio con CLS 0, el panel y su auditoría; SUP-251 a SUP-255 en los supuestos. |
 | 0.69 | 2026-11-16 | Popups (3.27): `SitioPopup`, los popups en vivo con `_popups.js` y `_popups.json` (CDN 30 s), las reglas de frecuencia, páginas y pago en el navegador con `localStorage`, los contadores de `POST /s/_popup` sin datos personales, el panel y su auditoría; SUP-246 a SUP-250 en los supuestos. |
 | 0.68 | 2026-11-16 | Integración con CRM (3.26): `CrmConexion` y `LeadEnvio`, la cola `crm` con 3 reintentos de espera creciente, el webhook firmado con HMAC-SHA256 y su comprobación SSRF, las claves en el entorno y la auditoría; SUP-241 a SUP-245 en los supuestos. |
 | 0.67 | 2026-11-16 | Leads con origen y UTM (3.25): el modelo `Lead` con la atribución del primer contacto, el formulario sin JavaScript y el script propio con `sessionStorage`, la CSP con `script-src 'self'`, la API pública con límite y campo trampa, el panel con CSV y su auditoría; SUP-237 a SUP-239 en los supuestos. |
