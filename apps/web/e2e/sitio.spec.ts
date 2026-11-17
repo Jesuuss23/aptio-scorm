@@ -566,8 +566,8 @@ for (const ancho of [390, 1280]) {
     expect(res?.status()).toBe(200);
     expect(res?.headers()['content-security-policy']).toContain("default-src 'none'");
     await expect(page).toHaveTitle('Aptio SCORM · Inicio');
-    // HU-1603 · El único script es el de popups, diferido y opcional: el contenido no depende de JavaScript.
-    expect(await page.locator('script:not([type="application/ld+json"]):not([src$="_popups.js"][defer])').count()).toBe(0);
+    // HU-1603 y HU-1604 · Los únicos scripts son los de popups y chat, diferidos y opcionales: el contenido no depende de JavaScript.
+    expect(await page.locator('script:not([type="application/ld+json"]):not([src$="_popups.js"][defer]):not([src$="_chat.js"][defer])').count()).toBe(0);
     await expect(page.getByRole('heading', { level: 1 })).toHaveCount(1);
     await expect(page.getByText('Mariana Paredes')).toBeVisible();
     await expect(page.getByText('Persona de ejemplo')).toHaveCount(0);

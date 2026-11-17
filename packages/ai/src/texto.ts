@@ -223,6 +223,19 @@ function ajustarAlPedido(datos: unknown, pedido: string): unknown {
   return datos;
 }
 
+/**
+ * IA-20 (HU-1604): el modo simulado responde con la primera fuente del contexto, citándola, para que el flujo completo
+ * se pruebe sin red. Sin fuentes, la salida grabada con «fuentesCitadas» vacío (la API la vuelve «no lo sé»).
+ */
+function chatbotSimulado(grabada: unknown, pedido: string): unknown {
+  const bloque = pedido.match(/<datos_sitio tipo="fuentes">\n?([\s\S]*?)\n?<\/datos_sitio>/)?.[1] ?? '';
+  const primera = bloque.match(/\[fuente id="([^"]+)"\][^\n]*\n([^\n]+)/);
+  if (!primera) return { respuesta: 'No tengo ese dato.', fuentesCitadas: [] };
+  const texto = desneutralizar(primera[2]!).trim();
+  const respuesta = texto.length > 300 ? `${texto.slice(0, 297).trimEnd()}…` : texto;
+  return { ...(grabada as object), respuesta, fuentesCitadas: [primera[1]!] };
+}
+
 /** Desneutraliza lo que `neutralizar` escapó para ir dentro de <material_cliente>. */
 const desneutralizar = (t: string) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 const escaparRegex = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -305,7 +318,7 @@ export function proveedorSimulado(guion: Partial<Record<string, string[]>> = {})
       const pedido = mensajes[0]?.texto ?? '';
       // IA-14 (HU-1104): «crear» responde el patrón personalizado grabado; «recomendar», la recomendación de LOTO.
       const grabada = forzada ? undefined : tarea === 'IA-14' && /Tipo de pedido: tipo = "crear"/.test(pedido) ? leerSalidaSimulada(tarea, PATRON_CREADO).datos : leerSalidaSimulada(tarea).datos;
-      const texto = forzada ?? JSON.stringify(tarea === 'IA-10' ? traduccionSimulada(grabada, pedido, sistema) : ajustarAlPedido(grabada, pedido));
+      const texto = forzada ?? JSON.stringify(tarea === 'IA-10' ? traduccionSimulada(grabada, pedido, sistema) : tarea === 'IA-20' ? chatbotSimulado(grabada, pedido) : ajustarAlPedido(grabada, pedido));
       return { texto, modelo: 'simulado-loto', consumo: SIN_CONSUMO };
     },
   };

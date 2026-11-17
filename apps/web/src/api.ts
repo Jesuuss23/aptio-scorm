@@ -11,6 +11,7 @@ import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
 import type { Operacion } from '@aptio/schema/operacion';
 import type { DatosPopup } from '@aptio/schema/popups';
 import type { AjustesAgenda, EstadoCita, Feriado } from '@aptio/schema/agenda';
+import type { AccionRapida, ObjetivoChatbot, ResultadoConversacion, TonoChatbot } from '@aptio/schema/chatbot';
 
 export interface Usuario {
   id: string;
@@ -737,6 +738,20 @@ export interface FiltroCitas { estado?: EstadoCita | ''; desde?: string; hasta?:
 export type EntradaTipo = Partial<Pick<TipoReunion, 'nombreEs' | 'nombreEn' | 'minutos' | 'asesorIds' | 'visible' | 'ficticio'>>;
 export type EntradaAsesor = Partial<Pick<AsesorAgenda, 'nombre' | 'correo' | 'enlaceVideollamada' | 'visible' | 'ficticio'>>;
 
+/** HU-1604 · Captación › Chatbot (PNT-32). */
+export interface AjustesChatbotWeb { nombre: string; saludoEs: string; saludoEn: string; tono: TonoChatbot; objetivo: ObjetivoChatbot; horarioInicio: string; horarioFin: string; diasAtencion: number[]; visible: boolean }
+export interface RapidaChat { id: string; textoEs: string; textoEn: string; accion: AccionRapida; visible: boolean; orden: number; ficticio: boolean }
+export interface FuenteChatWeb { id: string; titulo: string; contenido: string; idioma: 'es' | 'en'; visible: boolean; actualizadoEn: string }
+export interface Chatbot {
+  ajustes: AjustesChatbotWeb; horario: string; enHorario: boolean; rapidas: RapidaChat[]; fuentes: FuenteChatWeb[];
+  base: { paginasEs: number; paginasEn: number; preguntasEs: number; preguntasEn: number };
+}
+export interface MensajeConversacion { de: 'visitante' | 'bot'; texto: string; en: string; fuentes?: string[]; acciones?: AccionRapida[] }
+export interface Conversacion { id: string; idioma: 'es' | 'en'; resultado: ResultadoConversacion; mensajes: MensajeConversacion[]; creadoEn: string; actualizadoEn: string; expiraEn: string }
+export interface Conversaciones { conversaciones: Conversacion[]; total: number; porResultado: Partial<Record<ResultadoConversacion, number>> }
+export type EntradaRapida = Partial<Pick<RapidaChat, 'textoEs' | 'textoEn' | 'accion' | 'visible' | 'ficticio'>>;
+export type EntradaFuente = Partial<Pick<FuenteChatWeb, 'titulo' | 'contenido' | 'idioma' | 'visible'>>;
+
 export interface LeadSitio {
   id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null;
   origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
@@ -919,6 +934,16 @@ export const api = {
     return pedir<{ citas: CitaAgenda[]; total: number }>(`/captacion/agenda/citas${q.size ? `?${q}` : ''}`);
   },
   cambiarCita: (id: string, estado: 'cancelada' | 'realizada' | 'no_asistio') => pedir<CitaAgenda>(`/captacion/agenda/citas/${id}`, json({ estado }, 'PATCH')),
+  chatbot: () => pedir<Chatbot>('/captacion/chatbot'),
+  cambiarChatbot: (c: Partial<AjustesChatbotWeb>) => pedir<AjustesChatbotWeb>('/captacion/chatbot', json(c, 'PATCH')),
+  crearRapida: (d: EntradaRapida) => pedir<RapidaChat>('/captacion/chatbot/rapidas', json(d)),
+  cambiarRapida: (id: string, d: EntradaRapida) => pedir<RapidaChat>(`/captacion/chatbot/rapidas/${id}`, json(d, 'PATCH')),
+  borrarRapida: (id: string) => pedir<void>(`/captacion/chatbot/rapidas/${id}`, { method: 'DELETE' }),
+  ordenarRapidas: (ids: string[]) => pedir<RapidaChat[]>('/captacion/chatbot/rapidas/orden', json({ ids }, 'PUT')),
+  crearFuente: (d: EntradaFuente) => pedir<FuenteChatWeb>('/captacion/chatbot/fuentes', json(d)),
+  cambiarFuente: (id: string, d: EntradaFuente) => pedir<FuenteChatWeb>(`/captacion/chatbot/fuentes/${id}`, json(d, 'PATCH')),
+  borrarFuente: (id: string) => pedir<void>(`/captacion/chatbot/fuentes/${id}`, { method: 'DELETE' }),
+  conversaciones: (resultado?: ResultadoConversacion | '') => pedir<Conversaciones>(`/captacion/chatbot/conversaciones${resultado ? `?resultado=${resultado}` : ''}`),
   seoIaSitio: () => pedir<SeoIaSitio>('/sitio/seo-ia'),
   guardarSeoIaSitio: (cambios: { llmsTxt?: string; rastreadores?: Record<string, boolean> }) => pedir<SeoIaSitio>('/sitio/seo-ia', json(cambios, 'PATCH')),
   crearPreguntaIa: (pregunta: string) => pedir<PreguntaIa>('/sitio/seo-ia/preguntas', json({ pregunta })),

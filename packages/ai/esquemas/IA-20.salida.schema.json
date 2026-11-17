@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aulaseducativas.local/esquemas/ia/IA-20.json",
+  "title": "IA-20 · Respuesta del chatbot (salida)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "respuesta": { "type": "string", "minLength": 1, "maxLength": 900 },
+    "fuentesCitadas": {
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^(pagina|pregunta|manual):[^\\s\"]{1,200}$" }
+    }
+  },
+  "required": ["respuesta", "fuentesCitadas"]
+}

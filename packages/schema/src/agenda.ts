@@ -324,15 +324,23 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export interface Reserva { tipoId: string; inicio: Date; lms: string | null; envio: EnvioLead }
 export type ResultadoReserva = { ok: true; trampa: true } | { ok: true; trampa: false; reserva: Reserva } | { ok: false; errores: ErrorCampo[] };
 
+/** Por dónde llega una reserva: el agendador del sitio o, desde HU-1604, el chatbot (CP-134). */
+export const VIAS_RESERVA = ['agendador', 'chatbot'] as const;
+
 /**
- * Lo que envía el agendador: el tipo, la franja elegida (ISO en UTC), el LMS opcional del catálogo y los datos del lead
- * (nombre, correo, empresa, consentimiento y atribución), validados como cualquier lead con vía «agendador».
+ * Lo que envía el agendador (o el chatbot, con `via: 'chatbot'`): el tipo, la franja elegida (ISO en UTC), el LMS
+ * opcional del catálogo y los datos del lead (nombre, correo, empresa, consentimiento y atribución), validados como
+ * cualquier lead con esa vía.
  */
 export function validarReserva(entrada: unknown, base = ''): ResultadoReserva {
   const e = obj(entrada);
-  const lead = validarEnvioLead({ ...e, via: 'agendador', mensaje: undefined }, base);
+  const viaValida = e.via === undefined || e.via === '' || (VIAS_RESERVA as readonly unknown[]).includes(e.via);
+  const via = e.via === 'chatbot' ? 'chatbot' : 'agendador';
+  const lead = validarEnvioLead({ ...e, via, mensaje: undefined }, base);
   const errores: ErrorCampo[] = lead.ok ? [] : [...lead.errores];
-  if (lead.ok && lead.trampa) return { ok: true, trampa: true };
+  if (via === 'chatbot' && !unaLinea(e.nombre)) errores.push({ campo: 'nombre', mensaje: 'Escribe tu nombre' });
+  if (!viaValida) errores.push({ campo: 'via', mensaje: `La vía es una de: ${VIAS_RESERVA.join(', ')}` });
+  if (lead.ok && lead.trampa && viaValida) return { ok: true, trampa: true };
   if (typeof e.tipoId !== 'string' || !UUID.test(e.tipoId)) errores.unshift({ campo: 'tipoId', mensaje: 'Elige el tipo de reunión' });
   const inicio = typeof e.inicio === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{3})?)?Z$/.test(e.inicio) ? new Date(e.inicio) : null;
   if (!inicio || Number.isNaN(inicio.getTime())) errores.unshift({ campo: 'inicio', mensaje: 'Elige el día y la hora' });

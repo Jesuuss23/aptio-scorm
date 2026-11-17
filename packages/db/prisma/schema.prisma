@@ -1181,3 +1181,73 @@ model AgendaCita {
   @@index([estado, inicio])
   @@index([inicio])
 }
+
+/// HU-1604 · Ajustes del chatbot del sitio (REQ-077, PNT-32, RN-17-4): una sola fila (`id` = "chatbot"). El horario de
+/// atención humana va en hora de Lima (UTC−5) y los días son 1 (lunes) a 7 (domingo). Reglas en `@aptio/schema/chatbot`.
+model SitioChatbot {
+  id            String   @id @default("chatbot")
+  nombre        String   @default("Ana")
+  saludoEs      String   @default("")
+  saludoEn      String   @default("")
+  /// cercano | formal | directo
+  tono          String   @default("cercano")
+  /// agendar_demo | captar_lead | derivar_whatsapp
+  objetivo      String   @default("agendar_demo")
+  horarioInicio String   @default("09:00")
+  horarioFin    String   @default("18:00")
+  diasAtencion  Int[]    @default([1, 2, 3, 4, 5])
+  /// Se sirve en vivo (`GET /s/_chatbot.json`): apagarlo vale sin republicar.
+  visible       Boolean  @default(false)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+/// HU-1604 · Una respuesta rápida del chatbot. «agendar_demo» y «hablar_persona» se resuelven en el navegador sin IA.
+model SitioChatRapida {
+  id            String   @id @default(uuid()) @db.Uuid
+  textoEs       String
+  textoEn       String   @default("")
+  /// consulta_ia | agendar_demo | hablar_persona
+  accion        String
+  visible       Boolean  @default(true)
+  orden         Int      @default(0)
+  /// Dato inventado: nunca se sirve en producción.
+  ficticio      Boolean  @default(false)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([visible, orden])
+}
+
+/// HU-1604 · Una fuente manual de la base de conocimiento del chatbot, además de las páginas y preguntas frecuentes de
+/// la versión publicada.
+model SitioChatFuente {
+  id            String   @id @default(uuid()) @db.Uuid
+  titulo        String
+  contenido     String
+  /// es | en
+  idioma        String   @default("es")
+  visible       Boolean  @default(true)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([visible, idioma])
+}
+
+/// HU-1604 · Una conversación del chatbot (CP-133, CP-134). Sin IP ni datos personales: los datos del visitante van al
+/// lead o a la cita, no aquí. Se borra a los 90 días (`expiraEn`).
+model SitioConversacion {
+  id            String   @id @default(uuid()) @db.Uuid
+  /// es | en
+  idioma        String   @default("es")
+  /// [{ de: "visitante" | "bot", texto, en, fuentes?, accion? }]
+  mensajes      Json     @default("[]")
+  /// respuesta | lead | demo | persona | sin_conversion
+  resultado     String   @default("sin_conversion")
+  expiraEn      DateTime
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  @@index([creadoEn])
+  @@index([expiraEn])
+}

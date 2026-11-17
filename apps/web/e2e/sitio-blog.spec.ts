@@ -47,7 +47,7 @@ for (const ancho of [390, 1280]) {
     await simularApi(page, SITIO);
     await page.goto('/s/');
     // HU-1603 · El único script es el de popups, diferido y opcional: los filtros no dependen de JavaScript.
-    await expect(page.locator('script:not([type="application/ld+json"]):not([src$="_popups.js"][defer])')).toHaveCount(0);
+    await expect(page.locator('script:not([type="application/ld+json"]):not([src$="_popups.js"][defer]):not([src$="_chat.js"][defer])')).toHaveCount(0);
     await expect(seccion(page).getByRole('heading', { level: 2, name: 'Ideas para producir mejores cápsulas' })).toBeVisible();
     const etiquetas = filtros(page).locator('label');
     await expect(etiquetas).toHaveText(['Todas (7) artículos', 'Microaprendizaje (1) artículo', 'Estándares (1) artículo', 'Guías (2) artículos', 'Accesibilidad (1) artículo', 'Gestión (1) artículo', 'Casos (1) artículo']);

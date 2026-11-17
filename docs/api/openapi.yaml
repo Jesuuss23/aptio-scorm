@@ -1732,6 +1732,14 @@ paths:
         (diferido, del mismo origen, sin cookies ni HTML inyectado). El contenedor reserva su alto (CLS 0) y lee las
         franjas en vivo de `GET /s/_agenda.json`; sin JavaScript el bloque ofrece el formulario de contacto
         (`POST /s/_lead`) y el WhatsApp de los ajustes. La página del enlace de cancelación es `GET /s/_cita`.
+
+        HU-1604 · Toda versión trae `_chat.js` y todas sus páginas lo cargan salvo `/pago*` (diferido, del mismo origen,
+        sin cookies; la conversación sigue en `sessionStorage`). Lee `_chatbot.json` en vivo (no sale de la versión,
+        `Cache-Control: public, max-age=0, s-maxage=30`): `ChatbotPublico`, o solo `{ "visible": false }` con el chatbot
+        oculto, y entonces no muestra el botón. Las respuestas rápidas visibles van en su orden (hasta 8; en producción,
+        nunca las ficticias); `whatsapp` es el enlace de los ajustes del sitio (null si está oculto). Una página abierta
+        con `#chat` abre el chat. El botón y el diálogo son fijos (CLS 0) y el diálogo es modal y accesible; conversa con
+        `POST /publico/chat`.
       parameters:
       - name: ruta
         in: path
@@ -1765,14 +1773,16 @@ paths:
                 type: string
             application/json:
               schema:
-                description: HU-1603 · `_popups.json`
-                type: object
-                required: [popups]
-                properties:
-                  popups:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/PopupPublico'
+                oneOf:
+                - description: HU-1603 · `_popups.json`
+                  type: object
+                  required: [popups]
+                  properties:
+                    popups:
+                      type: array
+                      items:
+                        $ref: '#/components/schemas/PopupPublico'
+                - $ref: '#/components/schemas/ChatbotPublico'
         '301':
           description: HU-1512 · Redirección activa de la versión vigente (CP-124)
           headers:
@@ -1960,6 +1970,48 @@ paths:
                 type: string
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/chat:
+    post:
+      tags:
+      - Captación
+      summary: Conversar con el chatbot del sitio (HU-1604, IA-20, CP-133, RN-17-4)
+      operationId: post_publico_chat
+      security: []
+      description: |-
+        Sin sesión, con `Cache-Control: no-store`. Lo usa `_chat.js`. El mensaje del visitante es texto plano no confiable
+        (hasta 500 caracteres): llega a IA-20 neutralizado dentro de un bloque de datos y nunca cambia las instrucciones.
+        IA-20 responde solo con fuentes del sitio publicado (páginas y preguntas frecuentes del idioma; en producción,
+        nunca las ficticias) y las fuentes manuales visibles: hasta 6 fuentes y 12 000 caracteres. Sin fuentes, con una
+        cita inventada, sin respuesta válida, pasados 20 s o con el tope de gasto de IA alcanzado, responde «no lo sé» con
+        «Agendar demo» y «Hablar con una persona» (`controlada: true`) sin inventar (CP-133).
+
+        En vez de `mensaje`, `accion` (`agendar_demo` o `hablar_persona`) solo registra la respuesta rápida que el
+        navegador resuelve sin IA: el agendador dentro del chat (`POST /publico/citas` con `via: chatbot`, CP-134) o el
+        traspaso (WhatsApp en horario y, siempre, correo y pregunta por `POST /publico/leads` con `via: chatbot`). Cada
+        conversación guarda hasta 20 mensajes del visitante (después, la respuesta del límite, sin IA) y se borra a los 90
+        días; no guarda IP ni cookies.
+
+        404 CHATBOT_OCULTO si el chatbot está oculto; 422 NO_VALIDO con el campo de cada error; 429
+        DEMASIADAS_SOLICITUDES con más de 10 mensajes por minuto desde la misma IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatEntrada'
+      responses:
+        '200':
+          description: La respuesta de IA-20 con sus fuentes, o «no lo sé» con sus dos botones
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatRespuesta'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
   /publico/citas:
     post:
       tags:
@@ -1975,7 +2027,7 @@ paths:
         un solo asesor, una recibe 201 y la otra 409 FRANJA_OCUPADA (CP-135). Con varios asesores libres elige al que
         tiene menos citas por delante.
 
-        Crea o actualiza el lead con `via: agendador` y, si estaba en Nuevo o Contactado, lo pasa a Demo (excepción a
+        Crea o actualiza el lead con `via: agendador` (o `chatbot` si la reserva llega desde el chat, CP-134) y, si estaba en Nuevo o Contactado, lo pasa a Demo (excepción a
         SUP-236, SUP-254). Encola en `agenda` la invitación al visitante con copia al asesor (con la invitación .ics, el
         enlace de Google Calendar, el enlace fijo de videollamada del asesor y el enlace de cancelación) y los
         recordatorios por correo a las 24 h y a 1 h que todavía no pasaron; el worker vuelve a mirar la cita antes de
@@ -2494,6 +2546,280 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /captacion/chatbot:
+    get:
+      tags:
+      - Captación
+      summary: El chatbot del sitio con sus respuestas rápidas y fuentes (HU-1604, PNT-32)
+      operationId: get_captacion_chatbot
+      description: |-
+        Solo SUPERADMIN, con `Cache-Control: no-store`. Los ajustes, el horario en texto, si ahora hay atención humana,
+        las respuestas rápidas en su orden, las fuentes manuales y cuántas páginas y preguntas frecuentes publicadas toma
+        del sitio por idioma.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chatbot'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar la identidad, el objetivo, el horario o mostrar el chatbot (HU-1604, REQ-077)
+      operationId: patch_captacion_chatbot
+      description: |-
+        Solo SUPERADMIN. Solo cambia los campos que llegan. Nombre hasta 40 caracteres y saludos hasta 280, en texto
+        plano; horario `HH:MM` en hora de Lima con el fin después del inicio (el fin queda fuera); `diasAtencion` del 1
+        (lunes) al 7 (domingo). `visible` lo muestra u oculta en el sitio en vivo, sin republicar. Auditoría
+        CHATBOT_AJUSTES_CAMBIADOS, CHATBOT_MOSTRADO o CHATBOT_OCULTADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjustesChatbotCambio'
+      responses:
+        '200':
+          description: Los ajustes guardados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesChatbot'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/chatbot/rapidas:
+    post:
+      tags:
+      - Captación
+      summary: Crear una respuesta rápida del chatbot (HU-1604)
+      operationId: post_captacion_chatbot_rapidas
+      description: |-
+        Solo SUPERADMIN. Texto en español obligatorio y en inglés opcional (hasta 60 caracteres, texto plano); la acción es
+        `consulta_ia` (pregunta a IA-20), `agendar_demo` o `hablar_persona` (el navegador las resuelve sin IA). Va al final
+        del orden; el sitio muestra hasta 8 visibles. 422 DEMASIADAS_RAPIDAS con 50. Auditoría CHATBOT_RAPIDA_CREADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RapidaChatEntrada'
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RapidaChat'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/chatbot/rapidas/orden:
+    put:
+      tags:
+      - Captación
+      summary: Ordenar las respuestas rápidas (HU-1604)
+      operationId: put_captacion_chatbot_rapidas_orden
+      description: Solo SUPERADMIN. Lleva todas las respuestas rápidas una vez cada una; si no, 422 ORDEN_INCOMPLETO. Auditoría CHATBOT_RAPIDAS_ORDENADAS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenRapidasChat'
+      responses:
+        '200':
+          description: Las respuestas rápidas en el orden nuevo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RapidaChat'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/chatbot/rapidas/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar, mostrar u ocultar una respuesta rápida (HU-1604)
+      operationId: patch_captacion_chatbot_rapidas_id
+      description: Solo SUPERADMIN. Solo cambia los campos que llegan, con las reglas del alta. Auditoría CHATBOT_RAPIDA_CAMBIADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RapidaChatEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RapidaChat'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Captación
+      summary: Borrar una respuesta rápida (HU-1604)
+      operationId: delete_captacion_chatbot_rapidas_id
+      description: Solo SUPERADMIN. Las demás se reordenan. Auditoría CHATBOT_RAPIDA_BORRADA.
+      responses:
+        '204':
+          description: Borrada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /captacion/chatbot/fuentes:
+    post:
+      tags:
+      - Captación
+      summary: Agregar una fuente manual a la base de conocimiento (HU-1604)
+      operationId: post_captacion_chatbot_fuentes
+      description: |-
+        Solo SUPERADMIN. Título hasta 120 caracteres y contenido hasta 4 000, en texto plano (sin etiquetas HTML), en un
+        idioma. IA-20 solo usa las visibles de su idioma, además de las páginas y preguntas frecuentes publicadas. 422
+        DEMASIADAS_FUENTES con 50. Auditoría CHATBOT_FUENTE_CREADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FuenteChatEntrada'
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FuenteChat'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/chatbot/fuentes/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar, usar o dejar de usar una fuente manual (HU-1604)
+      operationId: patch_captacion_chatbot_fuentes_id
+      description: Solo SUPERADMIN. Solo cambia los campos que llegan, con las reglas del alta. Auditoría CHATBOT_FUENTE_CAMBIADA.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FuenteChatEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FuenteChat'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Captación
+      summary: Borrar una fuente manual (HU-1604)
+      operationId: delete_captacion_chatbot_fuentes_id
+      description: Solo SUPERADMIN. Auditoría CHATBOT_FUENTE_BORRADA.
+      responses:
+        '204':
+          description: Borrada
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /captacion/chatbot/conversaciones:
+    get:
+      tags:
+      - Captación
+      summary: Conversaciones del chatbot de los últimos 90 días (HU-1604, PNT-32)
+      operationId: get_captacion_chatbot_conversaciones
+      description: |-
+        Solo SUPERADMIN, con `Cache-Control: no-store`. De la más reciente a la más antigua, con sus mensajes y su
+        resultado (el más alto que alcanzó: sin conversión, respuesta, persona, lead, demo agendada). Antes de responder
+        borra las vencidas (90 días). No guarda IP ni cookies del visitante.
+      parameters:
+      - name: resultado
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [respuesta, lead, demo, persona, sin_conversion]
+      - name: limite
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversaciones'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /captacion/agenda:
     get:
       tags:
@@ -7742,6 +8068,10 @@ components:
           type: string
           format: uuid
           description: HU-1603 · Con vía popup, el popup donde se dejó el correo (suma su conversión)
+        conversacionId:
+          type: string
+          format: uuid
+          description: HU-1604 · Con vía chatbot, la conversación del traspaso (sube su resultado a «Lead»)
         utm_source:
           type: string
           maxLength: 150
@@ -8526,7 +8856,10 @@ components:
           type: string
           format: date
     ReservaEntrada:
-      description: La franja elegida y los datos del lead (las reglas de LeadEntrada, sin `via`, que es `agendador`)
+      description: |-
+        La franja elegida y los datos del lead (las reglas de LeadEntrada). `via` es `agendador` (o se omite) desde el
+        bloque «Agendador»; `chatbot` desde el chat del sitio (HU-1604, CP-134), que además exige `nombre` y puede llevar
+        `conversacionId`. Otra vía es 422 con el campo `via`.
       allOf:
       - $ref: '#/components/schemas/LeadEntrada'
       - type: object
@@ -8543,6 +8876,375 @@ components:
           lms:
             type: string
             enum: [Moodle, Blackboard, Chamilo, Canvas, Otro, No usamos LMS]
+          conversacionId:
+            type: string
+            format: uuid
+            description: HU-1604 · Con vía chatbot, la conversación que agendó (sube su resultado a «Demo agendada»)
+    AjustesChatbot:
+      type: object
+      description: HU-1604 · Identidad, objetivo y horario de atención humana del chatbot (REQ-077, RN-17-4)
+      required: [nombre, saludoEs, saludoEn, tono, objetivo, horarioInicio, horarioFin, diasAtencion, visible]
+      properties:
+        nombre:
+          type: string
+          maxLength: 40
+          example: Ana
+        saludoEs:
+          type: string
+          maxLength: 280
+        saludoEn:
+          type: string
+          maxLength: 280
+        tono:
+          type: string
+          enum: [cercano, formal, directo]
+        objetivo:
+          type: string
+          enum: [agendar_demo, captar_lead, derivar_whatsapp]
+        horarioInicio:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          example: '09:00'
+          description: Hora de Lima
+        horarioFin:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          example: '18:00'
+          description: Hora de Lima, excluida
+        diasAtencion:
+          type: array
+          maxItems: 7
+          items:
+            type: integer
+            minimum: 1
+            maximum: 7
+          example: [1, 2, 3, 4, 5]
+          description: 1 (lunes) a 7 (domingo)
+        visible:
+          type: boolean
+          description: Se muestra en el sitio, en vivo
+    AjustesChatbotCambio:
+      type: object
+      description: Los campos de AjustesChatbot que cambian
+      properties:
+        nombre:
+          type: string
+        saludoEs:
+          type: string
+        saludoEn:
+          type: string
+        tono:
+          type: string
+          enum: [cercano, formal, directo]
+        objetivo:
+          type: string
+          enum: [agendar_demo, captar_lead, derivar_whatsapp]
+        horarioInicio:
+          type: string
+        horarioFin:
+          type: string
+        diasAtencion:
+          type: array
+          maxItems: 7
+          items:
+            type: integer
+        visible:
+          type: boolean
+    RapidaChat:
+      type: object
+      required: [id, textoEs, textoEn, accion, visible, orden, ficticio]
+      properties:
+        id:
+          type: string
+          format: uuid
+        textoEs:
+          type: string
+          maxLength: 60
+          example: ¿Funciona en Moodle?
+        textoEn:
+          type: string
+          maxLength: 60
+        accion:
+          type: string
+          enum: [consulta_ia, agendar_demo, hablar_persona]
+        visible:
+          type: boolean
+        orden:
+          type: integer
+        ficticio:
+          type: boolean
+          description: Dato inventado; nunca se sirve en producción
+    RapidaChatEntrada:
+      type: object
+      properties:
+        textoEs:
+          type: string
+          maxLength: 60
+        textoEn:
+          type: string
+          maxLength: 60
+        accion:
+          type: string
+          enum: [consulta_ia, agendar_demo, hablar_persona]
+        visible:
+          type: boolean
+        ficticio:
+          type: boolean
+    OrdenRapidasChat:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+            format: uuid
+    FuenteChat:
+      type: object
+      required: [id, titulo, contenido, idioma, visible, actualizadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        titulo:
+          type: string
+          maxLength: 120
+          example: Tiempos de producción
+        contenido:
+          type: string
+          maxLength: 4000
+        idioma:
+          type: string
+          enum: [es, en]
+        visible:
+          type: boolean
+          description: IA-20 la usa
+        actualizadoEn:
+          type: string
+          format: date-time
+    FuenteChatEntrada:
+      type: object
+      properties:
+        titulo:
+          type: string
+          maxLength: 120
+        contenido:
+          type: string
+          maxLength: 4000
+          description: Texto plano, sin etiquetas HTML
+        idioma:
+          type: string
+          enum: [es, en]
+        visible:
+          type: boolean
+    Chatbot:
+      type: object
+      required: [ajustes, horario, enHorario, rapidas, fuentes, base]
+      properties:
+        ajustes:
+          $ref: '#/components/schemas/AjustesChatbot'
+        horario:
+          type: string
+          example: Lun a vie, 9:00 a 18:00
+        enHorario:
+          type: boolean
+          description: Si ahora hay atención humana (hora de Lima)
+        rapidas:
+          type: array
+          items:
+            $ref: '#/components/schemas/RapidaChat'
+        fuentes:
+          type: array
+          items:
+            $ref: '#/components/schemas/FuenteChat'
+        base:
+          type: object
+          description: Lo que toma del sitio publicado
+          required: [paginasEs, paginasEn, preguntasEs, preguntasEn]
+          properties:
+            paginasEs:
+              type: integer
+            paginasEn:
+              type: integer
+            preguntasEs:
+              type: integer
+            preguntasEn:
+              type: integer
+    MensajeConversacion:
+      type: object
+      required: [de, texto, en]
+      properties:
+        de:
+          type: string
+          enum: [visitante, bot]
+        texto:
+          type: string
+        en:
+          type: string
+          format: date-time
+        fuentes:
+          type: array
+          description: Ids de las fuentes citadas (solo el bot)
+          items:
+            type: string
+        acciones:
+          type: array
+          description: Botones que ofreció (solo el bot)
+          items:
+            type: string
+            enum: [consulta_ia, agendar_demo, hablar_persona]
+    Conversacion:
+      type: object
+      required: [id, idioma, resultado, mensajes, creadoEn, actualizadoEn, expiraEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        idioma:
+          type: string
+          enum: [es, en]
+        resultado:
+          type: string
+          enum: [respuesta, lead, demo, persona, sin_conversion]
+        mensajes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MensajeConversacion'
+        creadoEn:
+          type: string
+          format: date-time
+        actualizadoEn:
+          type: string
+          format: date-time
+        expiraEn:
+          type: string
+          format: date-time
+          description: Se borra en esta fecha (90 días)
+    Conversaciones:
+      type: object
+      required: [conversaciones, total, porResultado]
+      properties:
+        conversaciones:
+          type: array
+          items:
+            $ref: '#/components/schemas/Conversacion'
+        total:
+          type: integer
+          description: Conversaciones guardadas de los últimos 90 días
+        porResultado:
+          type: object
+          additionalProperties:
+            type: integer
+    ChatbotPublico:
+      type: object
+      description: HU-1604 · `_chatbot.json`, lo que lee `_chat.js`; oculto, solo `visible` false
+      required: [visible]
+      properties:
+        visible:
+          type: boolean
+        nombre:
+          type: string
+        idioma:
+          type: string
+          enum: [es, en]
+        saludo:
+          type: string
+        rapidas:
+          type: array
+          maxItems: 8
+          items:
+            type: object
+            required: [id, texto, accion]
+            properties:
+              id:
+                type: string
+                format: uuid
+              texto:
+                type: string
+              accion:
+                type: string
+                enum: [consulta_ia, agendar_demo, hablar_persona]
+        enHorario:
+          type: boolean
+        horario:
+          type: string
+          example: Lun a vie, 9:00 a 18:00
+        whatsapp:
+          type: string
+          format: uri
+          nullable: true
+        objetivo:
+          type: string
+          enum: [agendar_demo, captar_lead, derivar_whatsapp]
+    ChatEntrada:
+      type: object
+      properties:
+        mensaje:
+          type: string
+          maxLength: 500
+          description: La pregunta del visitante (dato no confiable); obligatoria sin `accion`
+        accion:
+          type: string
+          enum: [agendar_demo, hablar_persona]
+          description: En vez del mensaje, la respuesta rápida que el navegador resolvió (sin IA)
+        idioma:
+          type: string
+          enum: [es, en]
+          default: es
+        conversacionId:
+          type: string
+          format: uuid
+          description: La conversación que sigue (de sessionStorage)
+    FuenteCitada:
+      type: object
+      required: [id, titulo]
+      properties:
+        id:
+          type: string
+          example: 'pregunta:3f0c9a1e-…'
+        titulo:
+          type: string
+        ruta:
+          type: string
+          example: /precios
+    RespuestaChat:
+      type: object
+      required: [texto, fuentes, acciones, controlada]
+      properties:
+        texto:
+          type: string
+          maxLength: 900
+        fuentes:
+          type: array
+          items:
+            $ref: '#/components/schemas/FuenteCitada'
+        acciones:
+          type: array
+          items:
+            type: string
+            enum: [consulta_ia, agendar_demo, hablar_persona]
+        controlada:
+          type: boolean
+          description: La respuesta controlada «no lo sé» (CP-133)
+    ChatRespuesta:
+      type: object
+      required: [conversacionId, respuesta, quedan, enHorario]
+      properties:
+        conversacionId:
+          type: string
+          format: uuid
+        respuesta:
+          type: object
+          nullable: true
+          description: null cuando llega una acción local (agendar o persona)
+          allOf:
+          - $ref: '#/components/schemas/RespuestaChat'
+        quedan:
+          type: integer
+          description: Mensajes que le quedan al visitante en esta conversación (de 20)
+        enHorario:
+          type: boolean
     CitaConfirmada:
       type: object
       required: [id, inicio, fin, tipo, enlace, google, ics, texto]

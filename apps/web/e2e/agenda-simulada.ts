@@ -81,7 +81,7 @@ export function crearAgendaSim(
         const libres = asesoresLibres(tipo.asesorIds, reserva.inicio, tipo.minutos, oc);
         const asesorId = elegirAsesor(libres, oc.filter((o) => o.inicio >= ahora()));
         if (!asesorId) return { status: 409, body: { codigo: 'FRANJA_OCUPADA', mensaje: 'Alguien acaba de tomar ese horario: elige otro' } };
-        const l = lead({ ...cuerpo, via: 'agendador' });
+        const l = lead({ ...cuerpo, via: cuerpo.via === 'chatbot' ? 'chatbot' : 'agendador' });
         if (l) l.etapa = etapaTrasAgendar(l.etapa);
         const fin = new Date(reserva.inicio.getTime() + tipo.minutos * 60_000);
         const c: CitaSim = {

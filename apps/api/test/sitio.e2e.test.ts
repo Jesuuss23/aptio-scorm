@@ -1069,3 +1069,4 @@ await import('./leads.casos.js');
 await import('./crm.casos.js');
 await import('./popups.casos.js');
 await import('./agenda.casos.js');
+await import('./chatbot.casos.js');
