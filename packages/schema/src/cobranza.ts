@@ -8,6 +8,7 @@
  * - el período siguiente: anclado al fin del anterior si se paga antes de la suspensión; si ya estaba suspendida,
  *   empieza el día del pago.
  */
+import { descontar } from './cupones.js';
 import { conIgv, igvDe, type PlanPublico } from './planes.js';
 import { type Ciclo, finPeriodo, type Moneda } from './suscripciones.js';
 
@@ -43,16 +44,29 @@ export function siguientePaso(finPeriodo: Date, intentos: number, ahora: Date): 
 /** El día de cobranza (0 = fin del período). */
 export const diaDeCobranza = (finPeriodo: Date, ahora: Date) => Math.floor((ahora.getTime() - finPeriodo.getTime()) / DIA_MS);
 
-export interface MontoRenovacion { planId: string; montoSinIgv: number; igv: number; total: number; moneda: Moneda }
+export interface MontoRenovacion {
+  planId: string;
+  /** El precio de lista sin IGV del período (el pactado o el de la bajada). */
+  listaSinIgv: number;
+  /** La base que se cobra: la lista menos el descuento del cupón, si lo hay. */
+  montoSinIgv: number; igv: number; total: number; moneda: Moneda;
+  /** HU-1709 · El porcentaje del cupón aplicado (null = sin descuento) y su monto. */
+  porcentajeDescuento: number | null; descuentoSinIgv: number;
+}
 
 /**
  * El monto del período que se renueva: el precio pactado o, con una bajada programada, el precio publicado del plan
  * nuevo por el ciclo y la moneda de la suscripción (null si ese plan ya no se cobra así: se mantiene el pactado).
+ * HU-1709: con un cupón vigente (`porcentajeDescuento`), el descuento al céntimo y el IGV sobre la base descontada.
  */
-export function montoRenovacion(s: { planId: string; precioPactadoSinIgv: number; moneda: Moneda }, programado: { id: string; precioCiclo: number | null } | null): MontoRenovacion {
+export function montoRenovacion(s: { planId: string; precioPactadoSinIgv: number; moneda: Moneda }, programado: { id: string; precioCiclo: number | null } | null, porcentajeDescuento: number | null = null): MontoRenovacion {
   const conBajada = programado && programado.precioCiclo !== null;
-  const base = conBajada ? programado.precioCiclo! : s.precioPactadoSinIgv;
-  return { planId: conBajada ? programado.id : s.planId, montoSinIgv: base, igv: igvDe(base), total: conIgv(base), moneda: s.moneda };
+  const lista = conBajada ? programado.precioCiclo! : s.precioPactadoSinIgv;
+  const d = porcentajeDescuento ? descontar(lista, porcentajeDescuento) : { descuento: 0, base: lista, igv: igvDe(lista), total: conIgv(lista) };
+  return {
+    planId: conBajada ? programado.id : s.planId, listaSinIgv: lista, montoSinIgv: d.base, igv: d.igv, total: d.total, moneda: s.moneda,
+    porcentajeDescuento: porcentajeDescuento || null, descuentoSinIgv: d.descuento,
+  };
 }
 
 /** El precio publicado de un plan por el ciclo y la moneda de la suscripción, sin IGV (null si es a medida o no se cobra así). */

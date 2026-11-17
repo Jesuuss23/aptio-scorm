@@ -1,6 +1,7 @@
 // HU-1708 · Cobranza y suspensión contra PostgreSQL real (REQ-088, CP-150, RN-18-8), con el SMTP simulado y el reloj
 // fijo: tres reintentos fallidos y suspensión el día 10; el pago tardío que reactiva; el cobro de pruebas aprobado;
 // el enlace por correo con Stripe; la idempotencia; la cancelación al fin sin renovar y la bajada aplicada.
+// HU-1709: el descuento del cupón en las renovaciones mientras queden ciclos, permanente o con la bajada.
 import { prisma, resolverPagoRenovacion } from '@aptio/db';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { avanzarRenovacion, intentoManual, type OpcionesCobranza, renovarSuscripciones } from '../src/cobranza.js';
@@ -36,7 +37,7 @@ async function limpiar() {
   orgs.length = 0;
 }
 
-async function suscripcion(datos: { pasarela?: string; ultimos4?: string | null; cancelarAlFin?: boolean; bajada?: boolean } = {}) {
+async function suscripcion(datos: { pasarela?: string; ultimos4?: string | null; cancelarAlFin?: boolean; bajada?: boolean; porcentajeDescuento?: number; ciclosDescuentoRestantes?: number | null } = {}) {
   const plan = await prisma.plan.upsert({ where: { slug: SLUG }, create: { slug: SLUG, nombre: 'Productora', precioMes: 1290 }, update: {} });
   const inicial = await prisma.plan.upsert({ where: { slug: SLUG_INICIAL }, create: { slug: SLUG_INICIAL, nombre: 'Inicial', precioMes: 490 }, update: {} });
   const org = await prisma.organizacion.create({ data: { nombre: 'Minera Andina SAC', slug: `cobranza-${PID}-${orgs.length}-${Math.random().toString(36).slice(2, 8)}` } });
@@ -47,6 +48,7 @@ async function suscripcion(datos: { pasarela?: string; ultimos4?: string | null;
       organizacionId: org.id, planId: plan.id, ciclo: 'MENSUAL', precioPactadoSinIgv: 1290, inicioPeriodo: new Date('2026-11-10T15:00:00Z'), finPeriodo: FIN,
       pasarela: datos.pasarela ?? 'pruebas', ultimos4Digitos: datos.ultimos4 === undefined ? '1111' : datos.ultimos4, cancelarAlFin: datos.cancelarAlFin ?? false,
       planProgramadoId: datos.bajada ? inicial.id : null,
+      porcentajeDescuento: datos.porcentajeDescuento ?? null, ciclosDescuentoRestantes: datos.ciclosDescuentoRestantes ?? null,
     },
   });
 }
@@ -216,5 +218,36 @@ describe.skipIf(!hayBase)('cobranza (HU-1708)', () => {
     expect(t2).toMatchObject({ planProgramadoId: null, precioPactadoSinIgv: 1290 });
     expect(t2.plan.slug).toBe(SLUG);
     expect(Number(t2.renovaciones[0]!.total)).toBe(1522.2);
+  });
+
+  it('HU-1709 · el cupón descuenta las renovaciones mientras quedan ciclos: un ciclo menos por pago; después, precio de lista', async () => {
+    const s = await suscripcion({ porcentajeDescuento: 20, ciclosDescuentoRestantes: 2 });
+    const { o } = entorno();
+    const montos: number[][] = [];
+    for (const fin of [FIN, new Date('2027-01-10T15:00:00Z'), new Date('2027-02-10T15:00:00Z')]) {
+      expect(await renovarSuscripciones(prisma, o, fin)).toMatchObject({ creadas: 1, cobradas: 1 });
+      const t = await leer(s.id);
+      const r = t.renovaciones.find((x) => x.periodoInicio.getTime() === fin.getTime())!;
+      montos.push([Number(r.montoSinIgv), Number(r.igv), Number(r.total), r.porcentajeDescuento ?? 0, Number(r.descuentoSinIgv ?? 0), t.ciclosDescuentoRestantes ?? -1]);
+      expect(t).toMatchObject({ estado: 'ACTIVA', precioPactadoSinIgv: 1290 });
+    }
+    expect(montos).toEqual([[1032, 185.76, 1217.76, 20, 258, 1], [1032, 185.76, 1217.76, 20, 258, 0], [1290, 232.2, 1522.2, 0, 0, 0]]);
+    const cobros = await prisma.cobro.findMany({ where: { renovacion: { suscripcionId: s.id } }, orderBy: { creadoEn: 'asc' } });
+    expect(cobros.map((c) => Number(c.monto))).toEqual([1217.76, 1217.76, 1522.2]);
+  });
+
+  it('HU-1709 · un convenio permanente sigue descontando; con la bajada, el descuento va sobre el precio nuevo', async () => {
+    const permanente = await suscripcion({ porcentajeDescuento: 15, ciclosDescuentoRestantes: null });
+    const conBajada = await suscripcion({ porcentajeDescuento: 10, ciclosDescuentoRestantes: 3, bajada: true });
+    const { o } = entorno(490);
+    expect(await renovarSuscripciones(prisma, o, FIN)).toMatchObject({ creadas: 2, cobradas: 2 });
+    const p = await leer(permanente.id);
+    expect([Number(p.renovaciones[0]!.total), p.ciclosDescuentoRestantes, p.porcentajeDescuento]).toEqual([1293.87, null, 15]);
+    const b = await leer(conBajada.id);
+    expect([Number(b.renovaciones[0]!.montoSinIgv), Number(b.renovaciones[0]!.total), b.precioPactadoSinIgv, b.ciclosDescuentoRestantes]).toEqual([441, 520.38, 490, 2]);
+    // Un rechazo no gasta ciclos: solo el pago aprobado.
+    const rechaza = await suscripcion({ porcentajeDescuento: 20, ciclosDescuentoRestantes: 1, ultimos4: '0002' });
+    await renovarSuscripciones(prisma, o, FIN);
+    expect((await leer(rechaza.id)).ciclosDescuentoRestantes).toBe(1);
   });
 });

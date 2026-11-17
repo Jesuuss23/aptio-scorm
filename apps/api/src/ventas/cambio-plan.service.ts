@@ -23,13 +23,14 @@ import type { UsuarioSesion } from '../comun/roles.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
 import type { CambioPlanDto, PlanBreveDto, PlanOpcionDto, SuscripcionOrgDto } from './cambio-plan.dto.js';
 import { aRenovacionDto, renovacionAbierta } from './cobranza.comun.js';
+import { renuevaConDescuento } from '@aptio/schema/cupones';
 import { CuotasService, estaCancelada } from './cuotas.service.js';
 import type { PagoCreado } from './pasarelas/contrato.js';
 import { PasarelasService } from './pasarelas.service.js';
 
 type Tx = Prisma.TransactionClient;
 const TOLERANCIA_MONTO = 0.005;
-const CON_PLANES = { plan: true, planProgramado: true } as const;
+const CON_PLANES = { plan: true, planProgramado: true, cupon: true } as const;
 type FilaSuscripcion = Prisma.SuscripcionGetPayload<{ include: typeof CON_PLANES }>;
 const CON_CAMBIO = { planOrigen: true, planDestino: true } as const;
 type FilaCambio = Prisma.CambioPlanGetPayload<{ include: typeof CON_CAMBIO }>;
@@ -92,6 +93,7 @@ export class CambioPlanService implements OnModuleDestroy {
       renovacion: renovacion && !estaCancelada(s, ahora) ? aRenovacionDto(renovacion) : null,
       inicioPeriodo: s.inicioPeriodo.toISOString(), finPeriodo: s.finPeriodo.toISOString(), cancelarAlFin: s.cancelarAlFin, canceladaEn: s.canceladaEn?.toISOString() ?? null,
       planProgramado: s.planProgramado ? breve(s.planProgramado) : null, planes, pagoDisponible: Boolean(await this.cuotas.pasarelaPara(s)),
+      descuento: s.cupon && renuevaConDescuento(s) ? { codigo: s.cupon.codigo, porcentaje: s.porcentajeDescuento!, ciclosRestantes: s.ciclosDescuentoRestantes } : null,
     };
   }
 

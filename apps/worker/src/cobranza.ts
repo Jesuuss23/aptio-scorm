@@ -14,6 +14,7 @@
  */
 import { Prisma, type PrismaClient, precioPublicado, resolverPagoRenovacion } from '@aptio/db';
 import { cobroPruebaAprueba, DIAS_INTENTOS, fechaDelPaso, montoRenovacion, periodoRenovado, siguientePaso } from '@aptio/schema/cobranza';
+import { renuevaConDescuento } from '@aptio/schema/cupones';
 import { entornoSitio, type EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { monto2, PASARELA_PRUEBA } from '@aptio/schema/suscripciones';
 import type { Correo, EnviarCorreo } from './correo.js';
@@ -94,24 +95,26 @@ export async function crearRenovacion(bd: PrismaClient, suscripcionId: string, a
       const programado = s.planProgramado
         ? { id: s.planProgramado.id, precioCiclo: await precio(s.planProgramado.slug, s.ciclo, mon) }
         : null;
-      const m = montoRenovacion({ planId: s.planId, precioPactadoSinIgv: s.precioPactadoSinIgv, moneda: mon }, programado);
+      // HU-1709 · Con el cupón del alta y ciclos por delante (o permanente), el descuento sobre el precio de lista.
+      const m = montoRenovacion({ planId: s.planId, precioPactadoSinIgv: s.precioPactadoSinIgv, moneda: mon }, programado, renuevaConDescuento(s) ? s.porcentajeDescuento : null);
       const periodo = periodoRenovado(s.finPeriodo, s.ciclo);
       const r = await tx.renovacion.create({
         data: {
           organizacionId: s.organizacionId, suscripcionId: s.id, planId: m.planId, periodoInicio: periodo.inicio, periodoFin: periodo.fin, montoSinIgv: m.montoSinIgv,
           igv: m.igv, total: m.total, moneda: m.moneda, pasarela: s.pasarela, proximoIntento: fechaDelPaso(s.finPeriodo, 0),
+          ...(m.porcentajeDescuento ? { porcentajeDescuento: m.porcentajeDescuento, descuentoSinIgv: m.descuentoSinIgv } : {}),
         },
       });
       const bajada = m.planId !== s.planId;
       await tx.suscripcion.update({
         where: { id: s.id },
-        data: { estado: 'PAGO_PENDIENTE', planProgramadoId: null, ...(bajada ? { planId: m.planId, precioPactadoSinIgv: Math.round(m.montoSinIgv) } : {}) },
+        data: { estado: 'PAGO_PENDIENTE', planProgramadoId: null, ...(bajada ? { planId: m.planId, precioPactadoSinIgv: Math.round(m.listaSinIgv) } : {}) },
       });
       await tx.auditoria.create({
         data: {
           organizacionId: s.organizacionId, usuarioId: null, accion: 'RENOVACION_CREADA', entidad: 'Renovacion', entidadId: r.id,
           datos: {
-            suscripcionId: s.id, planId: m.planId, total: m.total, moneda: m.moneda, periodoInicio: periodo.inicio.toISOString(), periodoFin: periodo.fin.toISOString(),
+            suscripcionId: s.id, planId: m.planId, total: m.total, moneda: m.moneda, porcentajeDescuento: m.porcentajeDescuento, descuento: m.descuentoSinIgv, periodoInicio: periodo.inicio.toISOString(), periodoFin: periodo.fin.toISOString(),
             bajadaAplicada: bajada ? { planOrigenId: s.planId, planDestinoId: m.planId } : null, bajadaSinPrecio: programado && !bajada ? programado.id : null,
           },
         },

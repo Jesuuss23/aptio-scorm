@@ -70,6 +70,7 @@
     "./cuotas": "./src/cuotas.ts",
     "./cambio-plan": "./src/cambio-plan.ts",
     "./cobranza": "./src/cobranza.ts",
+    "./cupones": "./src/cupones.ts",
     "./comprobantes": "./src/comprobantes.ts"
   }
 }

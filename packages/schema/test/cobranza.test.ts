@@ -27,8 +27,11 @@ describe('calendario de cobranza', () => {
 describe('monto y período de la renovación', () => {
   const s = { planId: 'productora', precioPactadoSinIgv: 1290, moneda: 'PEN' as const };
   it('renueva al precio pactado más IGV, o al publicado del plan de la bajada programada', () => {
-    expect(montoRenovacion(s, null)).toEqual({ planId: 'productora', montoSinIgv: 1290, igv: 232.2, total: 1522.2, moneda: 'PEN' });
-    expect(montoRenovacion(s, { id: 'inicial', precioCiclo: 490 })).toEqual({ planId: 'inicial', montoSinIgv: 490, igv: 88.2, total: 578.2, moneda: 'PEN' });
+    expect(montoRenovacion(s, null)).toEqual({ planId: 'productora', listaSinIgv: 1290, montoSinIgv: 1290, igv: 232.2, total: 1522.2, moneda: 'PEN', porcentajeDescuento: null, descuentoSinIgv: 0 });
+    expect(montoRenovacion(s, { id: 'inicial', precioCiclo: 490 })).toMatchObject({ planId: 'inicial', listaSinIgv: 490, montoSinIgv: 490, igv: 88.2, total: 578.2, moneda: 'PEN' });
+    // HU-1709 · Con el cupón vigente, −20 % sobre la lista y el IGV sobre la base descontada.
+    expect(montoRenovacion(s, null, 20)).toEqual({ planId: 'productora', listaSinIgv: 1290, montoSinIgv: 1032, igv: 185.76, total: 1217.76, moneda: 'PEN', porcentajeDescuento: 20, descuentoSinIgv: 258 });
+    expect(montoRenovacion(s, { id: 'inicial', precioCiclo: 490 }, 15)).toMatchObject({ planId: 'inicial', listaSinIgv: 490, montoSinIgv: 416.5, igv: 74.97, total: 491.47 });
     // El plan de la bajada ya no se cobra en ese ciclo: se mantiene el pactado.
     expect(montoRenovacion(s, { id: 'inicial', precioCiclo: null })).toMatchObject({ planId: 'productora', total: 1522.2 });
   });

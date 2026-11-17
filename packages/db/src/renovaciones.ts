@@ -5,6 +5,7 @@
  */
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { periodoAlPagar, precioCicloPublicado } from '@aptio/schema/cobranza';
+import { descontarCiclo } from '@aptio/schema/cupones';
 import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { planesServidos } from '@aptio/schema/sitio-versiones';
 import type { Moneda } from '@aptio/schema/suscripciones';
@@ -91,11 +92,15 @@ export async function resolverPagoRenovacion(tx: Tx, renovacionId: string, pago:
   });
   await tx.suscripcion.update({
     where: { id: s.id },
-    data: { estado: 'ACTIVA', inicioPeriodo: periodo.inicio, finPeriodo: periodo.fin, ...(pago.ultimos4 ? { ultimos4Digitos: pago.ultimos4 } : {}) },
+    data: {
+      estado: 'ACTIVA', inicioPeriodo: periodo.inicio, finPeriodo: periodo.fin, ...(pago.ultimos4 ? { ultimos4Digitos: pago.ultimos4 } : {}),
+      // HU-1709 · Pagada una renovación con el descuento del cupón, queda un ciclo menos (null sigue permanente).
+      ...(r.porcentajeDescuento !== null ? { ciclosDescuentoRestantes: descontarCiclo(s.ciclosDescuentoRestantes) } : {}),
+    },
   });
   const cobroId = await cobrar(true);
   await auditar(suspendida ? 'SUSCRIPCION_REACTIVADA' : 'SUSCRIPCION_RENOVADA', {
-    planId: r.planId, total: Number(r.total), moneda: r.moneda, inicioPeriodo: periodo.inicio.toISOString(), finPeriodo: periodo.fin.toISOString(), intentos: r.intentos, cobroId,
+    planId: r.planId, total: Number(r.total), moneda: r.moneda, porcentajeDescuento: r.porcentajeDescuento, inicioPeriodo: periodo.inicio.toISOString(), finPeriodo: periodo.fin.toISOString(), intentos: r.intentos, cobroId,
   });
   return { desenlace: suspendida ? 'reactivada' : 'renovada', duplicado: false, cobroId };
 }

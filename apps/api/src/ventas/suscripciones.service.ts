@@ -6,6 +6,7 @@ import {
   TAREA_EMITIR_COMPROBANTE,
 } from '@aptio/colas';
 import { Prisma, resolverPagoRenovacion, ultimaVersion } from '@aptio/db';
+import { ciclosRestantesTrasAlta, type ResumenConDescuento, sinDescuento } from '@aptio/schema/cupones';
 import { CATALOGO_PASARELAS, esCodigoPasarela } from '@aptio/schema/pasarelas';
 import { CAMPO_TRAMPA, type EnvioLead, validarEnvioLead } from '@aptio/schema/leads';
 import { planesServidos } from '@aptio/schema/sitio-versiones';
@@ -29,6 +30,8 @@ import type { PagoRenovacionDto } from './cobranza.dto.js';
 import { CobranzaService } from './cobranza.service.js';
 import type { CompraCapsulasDto } from './cuotas.dto.js';
 import { CuotasService } from './cuotas.service.js';
+import { CuponesService } from './cupones.service.js';
+import type { VistaCuponDto } from './cupones.dto.js';
 import { PasarelasService } from './pasarelas.service.js';
 import type { CheckoutCreadoDto, EstadoCheckoutDto, WebhookRecibidoDto } from './suscripciones.dto.js';
 
@@ -36,12 +39,16 @@ export { CABECERA_FIRMA, firmar, firmaValida } from './pasarelas/pruebas.js';
 
 /** Checkouts por IP en cada ventana (como los leads); más, 429. Aparte del límite general de /publico/* (SUP-169). */
 export const LIMITE_CHECKOUT = { envios: 10, ventanaMs: 10 * 60_000 } as const;
+/** HU-1709 · Consultas de cupón por IP en cada ventana (para que no se adivinen códigos); más, 429. */
+export const LIMITE_CUPON = { envios: 20, ventanaMs: 10 * 60_000 } as const;
 /** HU-1704 · Diferencia tolerada entre el monto que informa la pasarela y el total de la solicitud (redondeo). */
 const TOLERANCIA_MONTO = 0.005;
 
 type FilaSolicitud = Prisma.SolicitudSuscripcionGetPayload<{ include: { plan: true; suscripcion: true } }>;
 const CON_PLAN = { plan: true, suscripcion: true } as const;
 
+/** HU-1709 · Un cupón del 100 % deja el total en 0: el pago en línea no cobra 0 (SUP-327). */
+const SIN_COBRO = 'Con este cupón no queda nada por pagar en línea: agenda una demo y activamos tu cuenta';
 const noValido = (errores: { campo: string; mensaje: string }[]) => new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje: errores.map((e) => e.mensaje).join('. '), detalles: errores });
 
 /**
@@ -61,12 +68,13 @@ const noValido = (errores: { campo: string; mensaje: string }[]) => new Unproces
 export class SuscripcionesService implements OnModuleDestroy {
   private readonly log = new Logger('Suscripciones');
   private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
+  private readonly ventanasCupon = new Map<string, { inicio: number; cuenta: number }>();
   private cola?: Queue<DatosBienvenida>;
   private colaCobros?: Queue<DatosComprobante>;
   /** El último encolado de la bienvenida y del comprobante (las pruebas lo esperan; la respuesta a la pasarela no). */
   ultimoEncolado: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService, private readonly cambios: CambioPlanService, private readonly cobranza: CobranzaService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService, private readonly cambios: CambioPlanService, private readonly cobranza: CobranzaService, private readonly cupones: CuponesService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -89,18 +97,19 @@ export class SuscripcionesService implements OnModuleDestroy {
   /** Vacía el límite por IP (pruebas). */
   reiniciarLimite(): void {
     this.ventanas.clear();
+    this.ventanasCupon.clear();
   }
 
-  private contar(ip: string, ahora: number): void {
-    let v = this.ventanas.get(ip);
-    if (!v || ahora - v.inicio >= LIMITE_CHECKOUT.ventanaMs) {
+  private contar(ip: string, ahora: number, ventanas = this.ventanas, limite: { envios: number; ventanaMs: number } = LIMITE_CHECKOUT): void {
+    let v = ventanas.get(ip);
+    if (!v || ahora - v.inicio >= limite.ventanaMs) {
       v = { inicio: ahora, cuenta: 0 };
-      this.ventanas.set(ip, v);
-      if (this.ventanas.size > 10_000) for (const [k, x] of this.ventanas) if (ahora - x.inicio >= LIMITE_CHECKOUT.ventanaMs) this.ventanas.delete(k);
+      ventanas.set(ip, v);
+      if (ventanas.size > 10_000) for (const [k, x] of ventanas) if (ahora - x.inicio >= limite.ventanaMs) ventanas.delete(k);
     }
     v.cuenta += 1;
-    if (v.cuenta > LIMITE_CHECKOUT.envios) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo', reintentarEn: Math.ceil((v.inicio + LIMITE_CHECKOUT.ventanaMs - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
+    if (v.cuenta > limite.envios) {
+      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo', reintentarEn: Math.ceil((v.inicio + limite.ventanaMs - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
     }
   }
 
@@ -114,14 +123,10 @@ export class SuscripcionesService implements OnModuleDestroy {
   // ── Checkout ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
   /**
-   * Paso 3 de `/pago`: valida la empresa, toma el precio del plan de la versión publicada en la moneda pedida (soles por
-   * defecto), crea la solicitud pendiente y prepara el cobro en la pasarela que cobra esa moneda (HU-1704).
-   * 404 si el plan no se publica o es a medida; 409 si el correo ya es de un usuario; 422 si el plan no se cobra en esa
-   * moneda; 503 si ninguna pasarela cobra esa moneda; 502 si la pasarela no responde.
+   * El plan publicado y su resumen en el ciclo y la moneda pedidos (soles y mensual por defecto). 404 si el plan no se
+   * publica o es a medida; 422 (con `previos`) si el ciclo o la moneda no valen o el plan no se cobra así.
    */
-  async crearCheckout(entrada: unknown, ip: string, ahora = new Date()): Promise<CheckoutCreadoDto> {
-    this.contar(ip, ahora.getTime());
-    const e = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>;
+  private async planYResumen(e: Record<string, unknown>, previos: { campo: string; mensaje: string }[] = []) {
     const v = await ultimaVersion(this.bd);
     const servidos = v ? planesServidos(v.instantanea, entornoActual()) : null;
     const publico = servidos?.planes.find((p) => p.slug === e.plan);
@@ -130,13 +135,56 @@ export class SuscripcionesService implements OnModuleDestroy {
     const moneda: Moneda = e.moneda === undefined || e.moneda === '' ? 'PEN' : (e.moneda as Moneda);
     const errores = esCiclo(ciclo) ? [] : [{ campo: 'ciclo', mensaje: 'El ciclo es MENSUAL o ANUAL' }];
     if (!esMoneda(moneda)) errores.push({ campo: 'moneda', mensaje: 'La moneda es PEN o USD' });
-    const empresa = validarEmpresa(e);
-    if (!empresa.ok) errores.push(...empresa.errores);
-    if (errores.length || !empresa.ok) throw noValido(errores);
+    errores.push(...previos);
+    if (errores.length) throw noValido(errores);
     if (moneda === 'USD' && (publico.precioMesUsd ?? null) === null) throw noValido([{ campo: 'moneda', mensaje: 'Este plan no se cobra en dólares' }]);
     const resumen = resumenCheckout(publico, ciclo, servidos.ajustes.mostrarAnual, moneda);
     if (!resumen) throw noValido([{ campo: 'ciclo', mensaje: 'Este plan no se ofrece con pago anual' }]);
+    return { v, publico, ciclo, moneda, resumen };
+  }
+
+  /**
+   * HU-1709 · `POST /publico/checkout/cupon`: el resumen con el descuento, sin crear nada. Si el cupón no vale, 422
+   * CUPON_NO_VALIDO con el motivo y el resumen de siempre: el total no cambia (CP-151).
+   */
+  async vistaCupon(entrada: unknown, ip: string, ahora = new Date()): Promise<VistaCuponDto> {
+    this.contar(ip, ahora.getTime(), this.ventanasCupon, LIMITE_CUPON);
+    const e = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>;
+    if (typeof e.cupon !== 'string' || !e.cupon.trim()) throw noValido([{ campo: 'cupon', mensaje: 'Escribe el código del cupón' }]);
+    const { publico, resumen } = await this.planYResumen(e);
+    const correo = typeof e.correoAdmin === 'string' ? e.correoAdmin : null;
+    const ruc = typeof e.ruc === 'string' ? e.ruc : null;
+    const { resultado } = await this.cupones.aplicar(e.cupon, { slug: publico.slug, aMedida: publico.aMedida }, resumen, { correo, ruc }, ahora);
+    if (!resultado.ok) {
+      throw new UnprocessableEntityException({ codigo: 'CUPON_NO_VALIDO', mensaje: resultado.mensaje, detalles: [{ campo: 'cupon', mensaje: resultado.mensaje, motivo: resultado.codigo, fecha: resultado.fecha, resumen: resultado.resumen }] });
+    }
+    if (resultado.resumen.total <= 0) throw new UnprocessableEntityException({ codigo: 'CUPON_NO_VALIDO', mensaje: SIN_COBRO, detalles: [{ campo: 'cupon', mensaje: SIN_COBRO, motivo: 'CUPON_SIN_COBRO', fecha: null, resumen: sinDescuento(resumen) }] });
+    return { resumen: resultado.resumen };
+  }
+
+  /**
+   * Paso 3 de `/pago`: valida la empresa, toma el precio del plan de la versión publicada en la moneda pedida (soles por
+   * defecto), crea la solicitud pendiente y prepara el cobro en la pasarela que cobra esa moneda (HU-1704).
+   * 404 si el plan no se publica o es a medida; 409 si el correo ya es de un usuario; 422 si el plan no se cobra en esa
+   * moneda; 503 si ninguna pasarela cobra esa moneda; 502 si la pasarela no responde.
+   */
+  async crearCheckout(entrada: unknown, ip: string, ahora = new Date()): Promise<CheckoutCreadoDto> {
+    this.contar(ip, ahora.getTime());
+    const e = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>;
+    const empresa = validarEmpresa(e);
+    const { v, publico, ciclo, moneda, resumen: lista } = await this.planYResumen(e, empresa.ok ? [] : empresa.errores);
+    if (!empresa.ok) throw noValido(empresa.errores);
     const { datos } = empresa;
+    // HU-1709 · El cupón se vuelve a validar aquí (la vista previa no reserva nada): si no vale, 422 con el campo `cupon`.
+    let resumen: ResumenConDescuento = sinDescuento(lista);
+    let cuponId: string | null = null;
+    if (typeof e.cupon === 'string' && e.cupon.trim()) {
+      const a = await this.cupones.aplicar(e.cupon, { slug: publico.slug, aMedida: publico.aMedida }, lista, { correo: datos.correoAdmin, ruc: datos.ruc }, ahora);
+      if (!a.resultado.ok) throw noValido([{ campo: 'cupon', mensaje: a.resultado.mensaje, motivo: a.resultado.codigo } as { campo: string; mensaje: string }]);
+      if (a.resultado.resumen.total <= 0) throw noValido([{ campo: 'cupon', mensaje: SIN_COBRO }]);
+      resumen = a.resultado.resumen;
+      cuponId = a.cuponId;
+    }
     if (await this.bd.usuario.findUnique({ where: { email: datos.correoAdmin } })) {
       throw new ConflictException({ codigo: 'CORREO_EN_USO', mensaje: 'Ese correo ya tiene una cuenta: inicia sesión en la plataforma o usa otro correo' });
     }
@@ -150,7 +198,8 @@ export class SuscripcionesService implements OnModuleDestroy {
     const s = await this.bd.solicitudSuscripcion.create({
       data: {
         planId: plan.id, ciclo, razonSocial: datos.razonSocial, ruc: datos.ruc, tipoComprobante: empresa.tipoComprobante, nombreAdmin: datos.nombreAdmin, correoAdmin: datos.correoAdmin,
-        subtotal: resumen.subtotal, igv: resumen.igv, total: resumen.total, moneda, pasarela: config.codigo, atribucion: (atribucion ?? {}) as unknown as Prisma.InputJsonValue,
+        subtotal: resumen.base, igv: resumen.igv, total: resumen.total, moneda, pasarela: config.codigo, atribucion: (atribucion ?? {}) as unknown as Prisma.InputJsonValue,
+        ...(cuponId ? { cuponId, subtotalListaSinIgv: resumen.subtotal, descuentoSinIgv: resumen.descuento, porcentajeDescuento: resumen.cupon!.porcentaje } : {}),
       },
     });
     const idioma = e.idioma === 'en' ? 'en' : 'es';
@@ -445,10 +494,15 @@ export class SuscripcionesService implements OnModuleDestroy {
         const admin = await tx.usuario.create({ data: { email: s.correoAdmin, nombre: s.nombreAdmin, rol: 'ADMINISTRADOR', organizacionId: org.id } });
         const { token, hashToken } = nuevoToken();
         await tx.tokenAcceso.create({ data: { usuarioId: admin.id, tipo: 'INVITACION', hashToken, expira: new Date(ahora.getTime() + VIGENCIA_BIENVENIDA_MS) } });
+        // HU-1709 · Con cupón: se suma su uso (con la fila bloqueada) y la suscripción guarda el porcentaje y los ciclos que
+        // quedan. El precio pactado es el de lista: el descuento se aplica aparte en cada renovación.
+        const descuento = s.cuponId
+          ? { cuponId: s.cuponId, porcentajeDescuento: s.porcentajeDescuento, ciclosDescuentoRestantes: ciclosRestantesTrasAlta((await this.cupones.usarEnAlta(tx, s.cuponId, { solicitudId: s.id, organizacionId: org.id, eventoId: ev.eventoId })).ciclosDescuento) }
+          : {};
         const suscripcion = await tx.suscripcion.create({
           data: {
-            organizacionId: org.id, planId: s.planId, ciclo: s.ciclo, precioPactadoSinIgv: Number(s.subtotal), moneda: s.moneda, estado: 'ACTIVA', inicioPeriodo: ahora,
-            finPeriodo: finPeriodo(ahora, s.ciclo), pasarela, ultimos4Digitos: ev.ultimos4, solicitudId: s.id,
+            organizacionId: org.id, planId: s.planId, ciclo: s.ciclo, precioPactadoSinIgv: Number(s.subtotalListaSinIgv ?? s.subtotal), moneda: s.moneda, estado: 'ACTIVA', inicioPeriodo: ahora,
+            finPeriodo: finPeriodo(ahora, s.ciclo), pasarela, ultimos4Digitos: ev.ultimos4, solicitudId: s.id, ...descuento,
           },
         });
         const cobro = await cobrar(suscripcion.id);
@@ -458,7 +512,7 @@ export class SuscripcionesService implements OnModuleDestroy {
         await tx.auditoria.create({
           data: {
             organizacionId: org.id, usuarioId: null, accion: 'SUSCRIPCION_CREADA', entidad: 'Suscripcion', entidadId: s.id,
-            datos: { pasarela, eventoId: ev.eventoId, planId: s.planId, ciclo: s.ciclo, total: Number(s.total), moneda: s.moneda, adminId: admin.id, cobroId: cobro.id },
+            datos: { pasarela, eventoId: ev.eventoId, planId: s.planId, ciclo: s.ciclo, total: Number(s.total), moneda: s.moneda, adminId: admin.id, cobroId: cobro.id, cuponId: s.cuponId, descuento: s.descuentoSinIgv === null ? null : Number(s.descuentoSinIgv) },
           },
         });
         alta = { lead, envio, token, solicitudId: s.id };

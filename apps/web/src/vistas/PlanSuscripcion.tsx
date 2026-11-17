@@ -304,6 +304,7 @@ export function PlanSuscripcion() {
           <section className="tarjeta" aria-labelledby="plan-actual">
             <h2 id="plan-actual">Tu plan: {s.plan.nombre}</h2>
             <p>{cuotaDe(s.plan.capsulasMes)} · {monto2(s.precioPactadoSinIgv, s.moneda)} {porCiclo(s.ciclo)} sin IGV ({s.ciclo === 'ANUAL' ? 'pago anual' : 'pago mensual'})</p>
+            {s.descuento ? <p className="nota validado">Cupón {s.descuento.codigo}: −{s.descuento.porcentaje} % {s.descuento.ciclosRestantes === null ? 'en cada renovación' : s.descuento.ciclosRestantes === 1 ? 'en la próxima renovación' : `en las próximas ${s.descuento.ciclosRestantes} renovaciones`}.</p> : null}
             <p className="sec">
               {cancelada ? `Tu suscripción terminó el ${fechaLarga(s.canceladaEn ?? s.finPeriodo)}.`
                 : s.renovacion ? `El período terminó el ${fechaLarga(s.finPeriodo)}: falta pagar la renovación.`

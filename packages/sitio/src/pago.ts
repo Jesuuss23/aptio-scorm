@@ -5,6 +5,8 @@
  * 1. Empresa: razón social, RUC opcional (con el dígito verificador de SUNAT: con RUC, factura; sin RUC, boleta),
  *    administrador, correo y consentimiento;
  * 2. Resumen: mensual o anual (si la página lo ofrece), subtotal, IGV de 18 % y total, con el precio del plan publicado;
+ *    HU-1709: el «Código de cupón» con «Aplicar» (vista previa en `POST …/checkout/cupon`, mensaje en `role="status"`) y
+ *    la fila del descuento; con un rechazo, el motivo y el total sin cambios (CP-151);
  * 3. Pago: la pasarela de pruebas (solo en el entorno de pruebas), la página alojada de la pasarela (Stripe Checkout,
  *    HU-1704) o su formulario incrustado (Culqi Checkout); la tarjeta nunca pasa por Aptio SCORM (PCI SAQ A). Si no hay
  *    pasarela, el aviso con «Agendar demo»;
@@ -45,6 +47,16 @@ export const TEXTOS_PAGO = {
     moneda: 'Moneda', soles: 'Soles (S/)', dolares: 'Dólares (US$)', pagarCon: 'Pagar con',
     redireccion: 'Te llevaremos a la página segura de {p} para pagar. Tu tarjeta no pasa por Aptio SCORM.', formulario: 'Escribirás tu tarjeta en la ventana segura de {p}. Tu tarjeta no pasa por Aptio SCORM.',
     cancelado: 'Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.', abriendo: 'Abriendo la ventana de pago…',
+    cupon: 'Código de cupón (opcional)', cuponAyuda: 'Si tienes un cupón o un convenio, escríbelo y pulsa Aplicar.', aplicar: 'Aplicar', aplicando: 'Aplicando…', quitar: 'Quitar el cupón',
+    descuento: 'Descuento {c} (−{p} %)', cuponOk: 'Cupón {c} aplicado: −{p} % {d}.', cuponQuitado: 'Quitaste el cupón: el total vuelve al precio del plan.', eCupon: 'Escribe el código del cupón',
+    ciclos1: 'en el primer pago', ciclosN: 'en los primeros {n} pagos', permanente: 'en cada pago',
+    motivos: {
+      CUPON_NO_EXISTE: 'Ese cupón no existe: revisa el código.', CUPON_INACTIVO: 'Este cupón ya no está disponible.', CUPON_NO_VIGENTE: 'Este cupón vale desde el {f}.',
+      CUPON_VENCIDO: 'Este cupón venció el {f}.', CUPON_AGOTADO: 'Este cupón ya se usó todas las veces permitidas.', CUPON_NO_APLICA_PLAN: 'Este cupón no aplica al plan elegido.',
+      CUPON_CORREO_CONVENIO: 'Este convenio es para correos institucionales: vuelve al paso 1 y usa el tuyo como correo del administrador.', CUPON_YA_USADO: 'Tu empresa ya usó este cupón.',
+      CUPON_SIN_COBRO: 'Con este cupón no queda nada por pagar en línea: agenda una demo y activamos tu cuenta.',
+    },
+    sinCambio: 'El total no cambia.',
   },
   en: {
     titulo: 'Subscribe to Aptio SCORM', descripcion: 'Get your plan in three steps: your company details, the summary with IGV tax, and the payment.',
@@ -68,6 +80,16 @@ export const TEXTOS_PAGO = {
     moneda: 'Currency', soles: 'Peruvian soles (S/)', dolares: 'US dollars (US$)', pagarCon: 'Pay with',
     redireccion: "We'll take you to {p}'s secure page to pay. Your card never goes through Aptio SCORM.", formulario: "You'll enter your card in {p}'s secure window. Your card never goes through Aptio SCORM.",
     cancelado: 'You cancelled the payment. You can try again whenever you want.', abriendo: 'Opening the payment window…',
+    cupon: 'Coupon code (optional)', cuponAyuda: 'If you have a coupon or an agreement code, enter it and press Apply.', aplicar: 'Apply', aplicando: 'Applying…', quitar: 'Remove the coupon',
+    descuento: 'Discount {c} (−{p} %)', cuponOk: 'Coupon {c} applied: −{p} % {d}.', cuponQuitado: 'You removed the coupon: the total goes back to the plan price.', eCupon: 'Enter the coupon code',
+    ciclos1: 'on the first payment', ciclosN: 'on the first {n} payments', permanente: 'on every payment',
+    motivos: {
+      CUPON_NO_EXISTE: "That coupon doesn't exist: check the code.", CUPON_INACTIVO: 'This coupon is no longer available.', CUPON_NO_VIGENTE: 'This coupon is valid from {f}.',
+      CUPON_VENCIDO: 'This coupon expired on {f}.', CUPON_AGOTADO: 'This coupon has reached its usage limit.', CUPON_NO_APLICA_PLAN: "This coupon doesn't apply to the chosen plan.",
+      CUPON_CORREO_CONVENIO: 'This agreement is for institutional emails: go back to step 1 and use yours as the administrator email.', CUPON_YA_USADO: 'Your company already used this coupon.',
+      CUPON_SIN_COBRO: 'With this coupon there is nothing left to pay online: book a demo and we will activate your account.',
+    },
+    sinCambio: 'The total stays the same.',
   },
 } as const;
 
@@ -97,6 +119,8 @@ export const CSS_PAGO = [
   '.pg .btn:focus-visible,.pg input:focus-visible{outline:3px solid var(--b700);outline-offset:2px}',
   '.pg-msg{margin:0;padding:12px 16px;border-radius:8px;background:var(--warn-soft);color:#78350F}.pg-msg:focus{outline:3px solid var(--b700);outline-offset:2px}.pg-msg ul{margin:8px 0 0;padding-left:20px}',
   '.pg-nota{margin:0;padding:12px 16px;border-radius:8px;background:var(--b50);border:1px solid var(--b200);font-size:14px}',
+  '.pg-cupon{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}.pg-cupon p{grid-column:1/-1}.pg-cupon .pg-acciones{grid-column:1/-1}',
+  '.pg-cupon-msg{margin:0;min-height:22px;font-size:14px;font-weight:700}.pg-cupon-msg.ok{color:#166534}.pg-cupon-msg.no{color:#B91C1C}',
   '@media (max-width:560px){.pg{padding:16px;min-height:1000px}}',
 ].join('');
 
@@ -109,7 +133,7 @@ export const SCRIPT_CHECKOUT = `(function(){try{
 var raiz=document.querySelector('[data-checkout]');if(!raiz)return;
 var b=raiz.getAttribute('data-base')||'',L=document.documentElement.lang==='en'?'en':'es',T=${JSON.stringify(TEXTOS_PAGO)}[L],API=${JSON.stringify(RUTA_CHECKOUT_API)},PL=${JSON.stringify(RUTA_PLANES_API)};
 var q=new URLSearchParams(location.search),slug=(q.get('plan')||'').slice(0,60);
-var S={paso:1,plan:null,ajustes:null,ciclo:'MENSUAL',moneda:'PEN',monedas:['PEN'],d:{razonSocial:'',ruc:'',nombreAdmin:'',correoAdmin:'',consentimiento:false},err:{},aviso:null,co:null,res:null,sinPasarela:false,ocupado:false,volviendo:false};
+var S={paso:1,plan:null,ajustes:null,ciclo:'MENSUAL',moneda:'PEN',monedas:['PEN'],d:{razonSocial:'',ruc:'',nombreAdmin:'',correoAdmin:'',consentimiento:false},err:{},aviso:null,co:null,res:null,sinPasarela:false,ocupado:false,volviendo:false,cupon:null,cuponTexto:'',cuponMsg:null,aplicando:false};
 var NOMBRES={stripe:'Stripe',culqi:'Culqi'},CULQI=${JSON.stringify(SCRIPT_CULQI)};
 var CAMPOS=['razonSocial','ruc','nombreAdmin','correoAdmin','consentimiento'];
 function el(t,a,h){var e=document.createElement(t);if(a)for(var k in a){var v=a[k];if(v===null||v===undefined||v===false)continue;if(k==='text')e.textContent=v;else if(k.indexOf('on')===0)e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?'':v)}if(h)for(var i=0;i<h.length;i++)if(h[i])e.appendChild(typeof h[i]==='string'?document.createTextNode(h[i]):h[i]);return e}
@@ -122,6 +146,10 @@ function ahorro(){return S.moneda==='USD'?Math.max(0,mes()*12-anualP()):S.plan.a
 function r2(n){return Math.round(n*100)/100}
 function igv(n){return r2(n*0.18)}
 function conIgv(n){return r2(n+n*0.18)}
+function desc(s){return S.cupon?r2(s*S.cupon.porcentaje/100):0}
+function diaTexto(d){try{return new Intl.DateTimeFormat(L==='en'?'en-US':'es-PE',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z'))}catch(e){return d}}
+function motivoTexto(x){var m=x&&T.motivos[x.motivo];return m?m.replace('{f}',x.fecha?diaTexto(x.fecha):''):(x&&x.mensaje)||T.fallo}
+function ciclosTexto(n){return n===null||n===undefined?T.permanente:n===1?T.ciclos1:T.ciclosN.replace('{n}',n)}
 function rucOk(r){if(!/^(10|15|16|17|20)\\d{9}$/.test(r))return false;var p=[5,4,3,2,7,6,5,4,3,2],s=0;for(var i=0;i<10;i++)s+=p[i]*(+r[i]);var d=11-s%11;return(d===10?0:d===11?1:d)===+r[10]}
 function rutaL(r){return b+(L==='en'?'/en'+(r==='/'?'':r):r)}
 function agendar(){return rutaL('/agendar-demo')+(slug?'?plan='+encodeURIComponent(slug):'')}
@@ -160,17 +188,35 @@ if(S.monedas.length>1)hijos.push(radios('moneda',T.moneda,[['PEN',T.soles],['USD
 s=subtotal();
 if(anualDisponible()){var ah=ahorro(),op=[['MENSUAL',T.mensual+' · '+fmt(mes())+' '+T.alMes],['ANUAL',T.anual+' · '+fmt(anualP())+' '+T.alAnio+(ah?' ('+T.ahorras+' '+fmt(ah)+')':'')]];
 hijos.push(radios('ciclo',T.ciclo,op,S.ciclo,function(c){S.ciclo=c}))}
-var dl=el('dl',null,[].concat(fila(T.planElegido,S.plan.nombre+' · '+(S.ciclo==='ANUAL'?T.anual:T.mensual)),fila(T.subtotal,fmt(s)),fila(T.igv,fmt(igv(s))),fila(T.comprobante,r?T.factura+' '+r:T.boleta),fila(T.total,fmt(conIgv(s)),true)));
+hijos.push(formaCupon());
+var dsc=desc(s),base=r2(s-dsc);
+var dl=el('dl',null,[].concat(fila(T.planElegido,S.plan.nombre+' · '+(S.ciclo==='ANUAL'?T.anual:T.mensual)),fila(T.subtotal,fmt(s)),S.cupon?fila(T.descuento.replace('{c}',S.cupon.codigo).replace('{p}',S.cupon.porcentaje),'−'+fmt(dsc)):[],fila(T.igv,fmt(igv(base))),fila(T.comprobante,r?T.factura+' '+r:T.boleta),fila(T.total,fmt(conIgv(base)),true)));
 hijos.push(dl);
 hijos.push(el('div',{'class':'pg-acciones'},[el('button',{'class':'btn',type:'button',text:T.volver,onclick:function(){S.aviso=null;ir(1)}}),el('button',{'class':'btn primary',type:'button',id:'pg-a-pagar',disabled:S.ocupado,text:S.ocupado?T.enviando:T.aPagar,onclick:crear})]));
 return hijos}
+function formaCupon(){var e=S.cuponMsg&&!S.cuponMsg.ok,desc_=['pg-cupon-a','pg-cupon-m'].join(' ');
+return el('form',{'class':'pg-cupon',novalidate:true,onsubmit:aplicarCupon},[el('p',null,[el('label',{'for':'pg-cupon',text:T.cupon}),
+el('input',{id:'pg-cupon',name:'cupon',type:'text',value:S.cupon?S.cupon.codigo:S.cuponTexto,maxlength:'30',autocomplete:'off',autocapitalize:'characters',spellcheck:'false','aria-invalid':e?'true':null,'aria-describedby':desc_}),
+el('span',{id:'pg-cupon-a','class':'pg-ayuda',text:T.cuponAyuda})]),
+el('div',{'class':'pg-acciones'},[el('button',{'class':'btn',type:'submit',id:'pg-aplicar',disabled:S.aplicando,text:S.aplicando?T.aplicando:T.aplicar}),S.cupon?el('button',{'class':'btn',type:'button',id:'pg-quitar',text:T.quitar,onclick:quitarCupon}):null]),
+el('p',{id:'pg-cupon-m','class':'pg-cupon-msg'+(S.cuponMsg?(S.cuponMsg.ok?' ok':' no'):''),role:'status','aria-live':'polite'})])}
+function anunciar(){var m=raiz.querySelector('#pg-cupon-m');if(m&&S.cuponMsg){var t=S.cuponMsg.texto;setTimeout(function(){m.textContent=t},60)}}
+function enfocarCupon(id){var x=raiz.querySelector('#'+(id||'pg-cupon'));if(x)x.focus();anunciar()}
+function aplicarCupon(ev){ev.preventDefault();if(S.aplicando)return;var v=(ev.target.elements.namedItem('cupon').value||'').trim().toUpperCase();S.cuponTexto=v;
+if(!v){S.cupon=null;S.cuponMsg={ok:false,texto:T.eCupon};pintar();return enfocarCupon()}
+S.aplicando=true;S.cuponMsg=null;pintar();
+fetch(API+'/cupon',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:slug,ciclo:S.ciclo,moneda:S.moneda,cupon:v,correoAdmin:S.d.correoAdmin,ruc:S.d.ruc}),credentials:'omit'}).then(json).then(function(r){S.aplicando=false;
+if(r.s===200&&r.d.resumen&&r.d.resumen.cupon){var c=r.d.resumen.cupon;S.cupon={codigo:c.codigo,porcentaje:c.porcentaje,ciclos:c.ciclosDescuento};S.cuponMsg={ok:true,texto:T.cuponOk.replace('{c}',c.codigo).replace('{p}',c.porcentaje).replace('{d}',ciclosTexto(c.ciclosDescuento))};pintar();return enfocarCupon('pg-quitar')}
+S.cupon=null;var d=r.d&&r.d.detalles&&r.d.detalles[0];S.cuponMsg={ok:false,texto:(r.s===429?T.demasiados:r.s===422?motivoTexto(d):T.fallo)+' '+T.sinCambio};pintar();enfocarCupon()}).catch(function(){S.aplicando=false;S.cupon=null;S.cuponMsg={ok:false,texto:T.fallo+' '+T.sinCambio};pintar();enfocarCupon()})}
+function quitarCupon(){S.cupon=null;S.cuponTexto='';S.cuponMsg={ok:true,texto:T.cuponQuitado};pintar();enfocarCupon()}
 function crear(){if(S.ocupado)return;S.ocupado=true;S.aviso=null;pintar();
-var c={plan:slug,ciclo:S.ciclo,moneda:S.moneda,razonSocial:S.d.razonSocial,ruc:S.d.ruc,nombreAdmin:S.d.nombreAdmin,correoAdmin:S.d.correoAdmin,consentimiento:S.d.consentimiento,idioma:L,paginaFormulario:location.pathname};
+var c={plan:slug,ciclo:S.ciclo,moneda:S.moneda,cupon:S.cupon?S.cupon.codigo:undefined,razonSocial:S.d.razonSocial,ruc:S.d.ruc,nombreAdmin:S.d.nombreAdmin,correoAdmin:S.d.correoAdmin,consentimiento:S.d.consentimiento,idioma:L,paginaFormulario:location.pathname};
 var s=sesion();for(var k in s)if(typeof s[k]==='string'&&!(k in c))c[k]=s[k];if(!c.paginaEntrada)c.paginaEntrada=location.pathname;
 fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(c),credentials:'omit'}).then(json).then(function(r){S.ocupado=false;
 if(r.s===201){S.co=r.d;S.sinPasarela=false;return ir(3)}
 if(r.s===503){S.co=null;S.sinPasarela=true;return ir(3)}
 if(r.s===409){S.err={correoAdmin:T.enUso};S.aviso={texto:T.enUso};ir(1);var x=raiz.querySelector('#pg-correoAdmin');if(x)x.focus();return}
+if(r.s===422&&(r.d.detalles||[]).some(function(x){return x.campo==='cupon'})){var dc=r.d.detalles.filter(function(x){return x.campo==='cupon'})[0];S.cupon=null;S.cuponMsg={ok:false,texto:motivoTexto(dc)+' '+T.sinCambio};pintar();return enfocarCupon()}
 if(r.s===422){var det=r.d.detalles||[],e={};det.forEach(function(x){if(CAMPOS.indexOf(x.campo)>=0)e[x.campo]=x.mensaje});S.aviso={texto:T.revisa,lista:det.map(function(x){return x.mensaje})};
 if(Object.keys(e).length){S.err=e;ir(1);var y=raiz.querySelector('#pg-'+Object.keys(e)[0]);if(y)y.focus();return}pintar();return foco()}
 if(r.s===404){S.aviso={texto:T.noPlan,enlace:{href:agendar(),texto:T.agendar}};pintar();return foco()}
