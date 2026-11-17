@@ -1,11 +1,12 @@
 /**
  * HU-1702 · Bloques «Planes (resumen)» y «Planes y precios» (REQ-082, CP-141, CP-142), en HTML estático desde la versión
  * publicada, sin JavaScript (CLS 0): precio al mes (o «A medida»), la línea anual con el ahorro si la página la muestra,
- * características visibles, «Más elegido» en el destacado y, en Precios, la cápsula adicional. Cada botón lleva a
- * agendar con el plan elegido hasta la HU-1703 (pago). La tabla comparativa y las preguntas de facturación no salen.
+ * características visibles, «Más elegido» en el destacado y, en Precios, la cápsula adicional. HU-1703 · El botón de un
+ * plan con precio lleva al pago (`/pago?plan=`) y el de uno a medida, a agendar una demo con el plan elegido. La tabla
+ * comparativa y las preguntas de facturación no salen.
  */
 import { createElement as h, type ReactNode } from 'react';
-import { conIgv, RUTA_AGENDAR_PLAN, soles } from '@aptio/schema/planes';
+import { conIgv, RUTA_AGENDAR_PLAN, RUTA_PAGO, soles } from '@aptio/schema/planes';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import type { PlanesInstantanea, PlanInstantanea } from '@aptio/schema/sitio-versiones';
 import type { Idioma } from './textos.js';
@@ -51,7 +52,7 @@ function Tarjeta({ p, ajustes, o }: { p: PlanInstantanea; ajustes: PlanesInstant
   const T = TEXTOS_PLANES[o.idioma];
   const precio = (n: number) => soles(ajustes.conIgv ? conIgv(n) : n);
   const sufijo = ajustes.conIgv ? T.conIgv : T.masIgv;
-  const enlace = `${o.ruta(RUTA_AGENDAR_PLAN)}?plan=${encodeURIComponent(p.slug)}`;
+  const enlace = `${o.ruta(p.precioMes === null ? RUTA_AGENDAR_PLAN : RUTA_PAGO)}?plan=${encodeURIComponent(p.slug)}`;
   const anual = ajustes.mostrarAnual && p.precioAnual !== null
     ? h('p', { className: 'fine' }, `${T.o} ${precio(p.precioAnual)} ${T.alAnio}${p.ahorroAnual ? ` (${T.ahorras} ${precio(p.ahorroAnual)})` : ''}`)
     : null;

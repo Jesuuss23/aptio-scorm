@@ -46,6 +46,8 @@ model Organizacion {
   conexionesIA      ConfigProveedor[]
   auditoria         Auditoria[]
   subidas           Subida[]
+  suscripcion       Suscripcion?
+  solicitudes       SolicitudSuscripcion[]
 }
 
 // ---------- Personas y acceso ----------
@@ -1295,6 +1297,9 @@ model Plan {
   creadoEn         DateTime @default(now())
   actualizadoEn    DateTime @updatedAt
 
+  suscripciones Suscripcion[]
+  solicitudes   SolicitudSuscripcion[]
+
   @@index([orden])
 }
 
@@ -1306,4 +1311,82 @@ model PlanesAjustes {
   conIgv         Boolean  @default(false)
   creadoEn       DateTime @default(now())
   actualizadoEn  DateTime @updatedAt
+}
+
+// ---------- HU-1703 · Alta de suscripción (REQ-083, CP-143, RN-18-2, RN-18-3) ----------
+
+enum CicloSuscripcion {
+  MENSUAL
+  ANUAL
+}
+
+enum EstadoSuscripcion {
+  ACTIVA
+}
+
+enum TipoComprobante {
+  FACTURA // con RUC
+  BOLETA // sin RUC
+}
+
+enum EstadoSolicitudSuscripcion {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+}
+
+/// La suscripción de una organización: una por organización. El precio pactado no cambia si cambia el plan (RN-18-2, SUP-285).
+model Suscripcion {
+  id                  String                @id @default(uuid()) @db.Uuid
+  organizacionId      String                @unique @db.Uuid
+  organizacion        Organizacion          @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  planId              String                @db.Uuid
+  plan                Plan                  @relation(fields: [planId], references: [id])
+  ciclo               CicloSuscripcion
+  /// Soles enteros sin IGV por ciclo (el mes o el año).
+  precioPactadoSinIgv Int
+  moneda              String                @default("PEN")
+  estado              EstadoSuscripcion     @default(ACTIVA)
+  inicioPeriodo       DateTime
+  finPeriodo          DateTime
+  /// prueba (HU-1703); las reales llegan con la HU-1704.
+  pasarela            String
+  ultimos4Digitos     String?
+  solicitudId         String?               @unique @db.Uuid
+  solicitud           SolicitudSuscripcion? @relation(fields: [solicitudId], references: [id])
+  creadoEn            DateTime              @default(now())
+  actualizadoEn       DateTime              @updatedAt
+}
+
+/// El checkout pendiente desde /pago: datos de la empresa, montos y el evento de la pasarela que lo resolvió (idempotencia).
+model SolicitudSuscripcion {
+  id              String                     @id @default(uuid()) @db.Uuid
+  planId          String                     @db.Uuid
+  plan            Plan                       @relation(fields: [planId], references: [id])
+  ciclo           CicloSuscripcion
+  razonSocial     String
+  ruc             String?
+  tipoComprobante TipoComprobante
+  nombreAdmin     String
+  /// En minúsculas.
+  correoAdmin     String
+  subtotal        Decimal                    @db.Decimal(10, 2)
+  igv             Decimal                    @db.Decimal(10, 2)
+  total           Decimal                    @db.Decimal(10, 2)
+  moneda          String                     @default("PEN")
+  estado          EstadoSolicitudSuscripcion @default(PENDIENTE)
+  pasarela        String
+  /// El id del evento de la pasarela que la aprobó o rechazó: un evento se procesa una sola vez (RN-18-3).
+  eventoPagoId    String?                    @unique
+  motivoRechazo   String?
+  /// Página de entrada, UTM, referente e idioma del visitante, para el lead.
+  atribucion      Json                       @default("{}")
+  organizacionId  String?                    @unique @db.Uuid
+  organizacion    Organizacion?              @relation(fields: [organizacionId], references: [id], onDelete: SetNull)
+  suscripcion     Suscripcion?
+  resueltaEn      DateTime?
+  creadoEn        DateTime                   @default(now())
+  actualizadoEn   DateTime                   @updatedAt
+
+  @@index([correoAdmin])
 }

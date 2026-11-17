@@ -31,7 +31,7 @@ const publicar = async (page: Page) => {
   await pulsar(page, boton, 'Enter');
 };
 
-test('CP-141 · subir la Productora a S/ 1.390 con el teclado y publicar: /precios muestra el precio nuevo y el botón lleva a agendar con el plan', async ({ page }) => {
+test('CP-141 · subir la Productora a S/ 1.390 con el teclado y publicar: /precios muestra el precio nuevo y el botón lleva al pago con el plan', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await simularApi(page, SITIO);
   await page.goto('/s/precios');
@@ -64,7 +64,7 @@ test('CP-141 · subir la Productora a S/ 1.390 con el teclado y publicar: /preci
   await expect(enSitio).toContainText('S/ 1,390');
   await expect(enSitio).toContainText('o S/ 13,344 al año (ahorras S/ 3,336)');
   await expect(enSitio.getByText('Más elegido', { exact: true })).toBeVisible();
-  await expect(enSitio.getByRole('link', { name: 'Suscribirme' })).toHaveAttribute('href', '/s/agendar-demo?plan=productora');
+  await expect(enSitio.getByRole('link', { name: 'Suscribirme' })).toHaveAttribute('href', '/s/pago?plan=productora');
   await expect(tarjetaSitio(page, 'Empresa').getByText('A medida', { exact: true })).toBeVisible();
   await expect(page.locator('script[src*="plan"]')).toHaveCount(0);
   // El resumen del inicio enlaza a la página de precios.

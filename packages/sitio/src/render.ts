@@ -25,6 +25,7 @@ import { ARCHIVO_CHAT, SCRIPT_CHAT } from './chat.js';
 import { ARCHIVO_VISITA, SCRIPT_VISITA } from './visitas.js';
 import { ANCLA_COOKIES, ARCHIVO_COOKIES, ARCHIVO_COOKIES_JSON, atributosCookies, SCRIPT_COOKIES, TEXTOS_COOKIES } from './cookies.js';
 import { ARCHIVO_AGENDA, CSS_AGENDA, RUTA_CITA, SCRIPT_AGENDA, TEXTOS_AGENDA } from './agenda.js';
+import { ARCHIVO_CHECKOUT, CSS_PAGO, RUTA_PAGO_SITIO, SCRIPT_CHECKOUT, TEXTOS_PAGO } from './pago.js';
 import { CSS_PLANES, SeccionPlanes } from './planes.js';
 
 export interface OpcionesRender {
@@ -447,7 +448,7 @@ export const sinJsonLd = (html: string): string => html.replace(/<script type="a
 export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_(?:popups|chat|visita)\.js" defer="" data-base="[^"]*"><\/script>/g, '')
   .replace(/<script src="[^"]*\/_cookies\.js" defer=""(?: data-[a-z0-9]+="[^"]*")*><\/script>/g, '');
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, chat = false, agenda = false, cookies = null, visita = false, children }: {
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, chat = false, agenda = false, checkout = false, cookies = null, visita = false, children }: {
   titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
   og?: OpenGraph; jsonLd?: unknown;
   /** HU-1601 · Carga el script propio de captación (primera visita y UTM); la CSP solo permite scripts del mismo origen. */
@@ -458,6 +459,8 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
   chat?: boolean;
   /** HU-1605 · Carga el agendador (`_agenda.js`): solo en las páginas con el bloque. */
   agenda?: boolean;
+  /** HU-1703 · Carga el checkout (`_checkout.js`): solo en `/pago`. */
+  checkout?: boolean;
   /** HU-1606 · Los `data-*` de `_cookies.js` (las etiquetas publicadas); sin ellos, no se carga. */
   cookies?: Record<string, string> | null;
   /** HU-1607 · Cuenta la visita (anónima) con `_visita.js`: solo en las páginas publicadas. */
@@ -489,6 +492,7 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       popups ? h('script', { src: `${base}/${ARCHIVO_POPUPS}`, defer: true, 'data-base': base }) : null,
       chat ? h('script', { src: `${base}/${ARCHIVO_CHAT}`, defer: true, 'data-base': base }) : null,
       agenda ? h('script', { src: `${base}/${ARCHIVO_AGENDA}`, defer: true }) : null,
+      checkout ? h('script', { src: `${base}/${ARCHIVO_CHECKOUT}`, defer: true }) : null,
       cookies ? h('script', { src: `${base}/${ARCHIVO_COOKIES}`, defer: true, ...cookies }) : null,
       visita ? h('script', { src: `${base}/${ARCHIVO_VISITA}`, defer: true, 'data-base': base }) : null),
     h('body', null, children));
@@ -613,6 +617,32 @@ export function renderizarGracias(inst: Instantanea, op: OpcionesRender, idioma:
       h('section', { className: 'no-encontrada' }, h('div', { className: 'in' },
         h('h1', null, T.gracias), h('p', { role: 'status' }, T.graciasTexto),
         h('a', { className: 'btn primary', href: `${op.base}${i === 'en' ? '/en' : '/'}` }, INTERFAZ[i].volver))))));
+}
+
+/** HU-1703 · ¿La versión publica algún plan con precio? Entonces trae `/pago` y `_checkout.js`. */
+export const tienePago = (inst: Pick<Instantanea, 'planes' | 'paginas'>): boolean =>
+  !!inst.planes?.planes.some((p) => p.precioMes !== null) && !inst.paginas.some((p) => p.ruta === RUTA_PAGO_SITIO);
+
+/**
+ * HU-1703 · La página del pago (`{base}/pago?plan={slug}` y `{base}/en/pago`): con el menú y el pie, sin indexar, sin
+ * popups ni chat (RN-17-3). El contenedor reserva su alto y el script lo llena; sin JavaScript, lleva a agendar una demo.
+ */
+export function renderizarPago(inst: Instantanea, op: OpcionesRender, idioma: string = 'es'): string {
+  const i = idiomaDe(idioma);
+  const T = TEXTOS_PAGO[i];
+  const marca = marcaDe(inst);
+  const agendar = `${op.base}${rutaPublica('/agendar-demo', i)}`;
+  return documento(h(Documento, { titulo: `${T.titulo} · ${marca.nombre}`, descripcion: T.descripcion, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon, robots: 'noindex, nofollow', cssExtra: CSS_PAGO, checkout: true,
+    cookies: inst.sitio?.cookies ? atributosCookies(inst.sitio.cookies, inst.paginas.some((x) => x.ruta === '/privacidad' && x.idioma === i) ? `${op.base}${rutaPublica('/privacidad', i)}` : null) : null },
+    h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: RUTA_PAGO_SITIO, marca: { ...marca, whatsapp: null }, landings: landingsDe(inst, i), cookies: !!inst.sitio?.cookies },
+      h('section', { 'aria-labelledby': 'pago-titulo' }, h('div', { className: 'in pago' },
+        h('h1', { id: 'pago-titulo' }, T.titulo),
+        h('p', { className: 'lead' }, T.descripcion),
+        h('div', { className: 'pg', 'data-checkout': '', 'data-base': op.base, 'aria-live': 'polite', 'aria-busy': 'true' },
+          h('p', { className: 'pg-plan pg-cargando' }, T.cargando),
+          h('noscript', null,
+            h('p', null, T.sinJs),
+            h('p', null, h('a', { className: 'btn primary', href: agendar }, T.agendar)))))))));
 }
 
 /**
@@ -776,6 +806,12 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     ...(inst.sitio?.cookies ? [
       { archivo: ARCHIVO_COOKIES, contenido: SCRIPT_COOKIES, mime: 'text/javascript; charset=utf-8' },
       { archivo: ARCHIVO_COOKIES_JSON, contenido: JSON.stringify(inst.sitio.cookies), mime: 'application/json' },
+    ] : []),
+    // HU-1703 · El pago y su script, solo si la versión publica un plan con precio.
+    ...(tienePago(inst) ? [
+      { archivo: archivoDeRuta(rutaPublica(RUTA_PAGO_SITIO, 'es')), contenido: renderizarPago(inst, op, 'es'), mime: html },
+      ...(inst.paginas.some((p) => p.idioma === 'en') ? [{ archivo: archivoDeRuta(rutaPublica(RUTA_PAGO_SITIO, 'en')), contenido: renderizarPago(inst, op, 'en'), mime: html }] : []),
+      { archivo: ARCHIVO_CHECKOUT, contenido: SCRIPT_CHECKOUT, mime: 'text/javascript; charset=utf-8' },
     ] : []),
     // HU-1605 · El agendador, solo si alguna página lo tiene.
     ...(tieneAgendador(inst) ? [{ archivo: ARCHIVO_AGENDA, contenido: SCRIPT_AGENDA, mime: 'text/javascript; charset=utf-8' }] : []),

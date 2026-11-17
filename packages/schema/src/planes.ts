@@ -13,8 +13,12 @@ export const IGV = 0.18;
 export const SLUG_PLAN = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 export const LIMITES_PLAN = { nombre: 60, descripcion: 200, textoBoton: 40, caracteristica: 120, caracteristicas: 12, precio: 1_000_000, cantidad: 100_000 } as const;
 export const AJUSTES_PLANES_POR_DEFECTO: AjustesPlanes = { mostrarAnual: true, descuentoAnual: 20, conIgv: false };
-/** HU-1702 · Hasta la HU-1703 (pago), cada botón de plan lleva a agendar una demo con el plan elegido. */
+/** HU-1702 · Un plan a medida lleva a agendar una demo con el plan elegido. */
 export const RUTA_AGENDAR_PLAN = '/agendar-demo';
+/** HU-1703 · Un plan con precio lleva al pago (`/pago?plan={slug}`). */
+export const RUTA_PAGO = '/pago';
+/** El destino del botón de un plan: el pago si tiene precio; agendar una demo si es a medida. */
+export const enlacePlan = (slug: string, aMedida: boolean) => `${aMedida ? RUTA_AGENDAR_PLAN : RUTA_PAGO}?plan=${encodeURIComponent(slug)}`;
 
 export interface Caracteristica { texto: string; visible: boolean }
 
@@ -157,7 +161,7 @@ export function planesPublicos(planes: readonly PlanGuardado[], ajustes: Ajustes
         textoBoton: p.textoBoton,
         destacado: p.destacado,
         caracteristicas: p.caracteristicas.filter((c) => c.visible).map((c) => c.texto),
-        enlace: `${RUTA_AGENDAR_PLAN}?plan=${encodeURIComponent(p.slug)}`,
+        enlace: enlacePlan(p.slug, aMedida),
       };
     });
 }

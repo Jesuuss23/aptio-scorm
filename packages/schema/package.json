@@ -64,6 +64,7 @@
     "./popups": "./src/popups.ts",
     "./agenda": "./src/agenda.ts",
     "./sitio-versiones": "./src/sitio-versiones.ts",
-    "./planes": "./src/planes.ts"
+    "./planes": "./src/planes.ts",
+    "./suscripciones": "./src/suscripciones.ts"
   }
 }

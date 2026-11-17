@@ -3,12 +3,13 @@
 import { config } from 'dotenv';
 config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
-  COLA_AGENDA, COLA_CRM, COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
+  COLA_AGENDA, COLA_CRM, COLA_SUSCRIPCIONES, COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
   type DatosPrerender, idPrerender, idRehacerPrerender, TAREA_PRERENDER, CADA_BLOG_MS, type DatosBlog, TAREA_BLOG,
 } from '@aptio/colas';
 import { sincronizarBlog } from './blog.js';
 import { crearTrabajadorCrm } from './crm.js';
 import { crearTrabajadorAgenda } from './agenda.js';
+import { crearTrabajadorSuscripciones } from './suscripciones.js';
 import { opcionesRenderDesdeEnv } from '@aptio/sitio';
 import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
 import { configurarAvisoLimite } from './conexiones.js';
@@ -181,6 +182,9 @@ crm.on('failed', (job, err) => console.error(`[${COLA_CRM}] el envío ${job?.dat
 // HU-1605 · Invitación, recordatorios (24 h y 1 h) y cancelación de las demos, con reintentos si falla el SMTP (CP-136).
 const agenda = crearTrabajadorAgenda(prisma, correoDesdeEntorno(process.env), { sitioUrl: opcionesRenderDesdeEnv().sitioUrl, connection: opcionesRedis(), prefix: prefijoColas() });
 agenda.on('failed', (job, err) => console.error(`[${COLA_AGENDA}] el aviso ${job?.data.aviso} de la cita ${job?.data.citaId} no salió (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
+// HU-1703 · El correo de bienvenida de una suscripción pagada, con reintentos si falla el SMTP (CP-143).
+const suscripciones = crearTrabajadorSuscripciones(prisma, correoDesdeEntorno(process.env), { connection: opcionesRedis(), prefix: prefijoColas() });
+suscripciones.on('failed', (job, err) => console.error(`[${COLA_SUSCRIPCIONES}] la bienvenida de la solicitud ${job?.data.solicitudId} no salió (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 
 async function respaldar(datos: DatosRespaldo) {
   const r = await crearRespaldo({
@@ -197,10 +201,10 @@ async function respaldar(datos: DatosRespaldo) {
 for (const t of trabajadores) {
   t.on('failed', (job, err) => console.error(`[${t.name}] trabajo ${job?.data.trabajoId} falló: ${err.message}`));
 }
-console.log(`Worker escuchando las colas ${[...COLAS, COLA_MANTENIMIENTO, COLA_CRM, COLA_AGENDA].join(', ')} en ${opcionesRedis().host}:${opcionesRedis().port}`);
+console.log(`Worker escuchando las colas ${[...COLAS, COLA_MANTENIMIENTO, COLA_CRM, COLA_AGENDA, COLA_SUSCRIPCIONES].join(', ')} en ${opcionesRedis().host}:${opcionesRedis().port}`);
 
 async function cerrar() {
-  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close(), crm.close(), agenda.close()]);
+  await Promise.all([...trabajadores.map((t) => t.close()), mantenedor.close(), mantenimiento.close(), crm.close(), agenda.close(), suscripciones.close()]);
   await cerrarOcr();
   redis.disconnect();
   await prisma.$disconnect();

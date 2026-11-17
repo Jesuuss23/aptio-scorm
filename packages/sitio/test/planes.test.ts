@@ -25,14 +25,15 @@ describe('bloque «Planes y precios»', () => {
     expect(inicial).toContain('al mes + IGV');
     expect(inicial).toContain('o S/ 4,704 al año (ahorras S/ 1,176)');
     expect(inicial).toContain('Cápsula adicional: S/ 89');
-    expect(inicial).toContain('href="/s/agendar-demo?plan=inicial"');
+    expect(inicial).toContain('href="/s/pago?plan=inicial"');
     expect(productora).toMatch(/^<article class="plan star"/);
     expect(productora).toContain('<span class="badge5">Más elegido</span>');
-    expect(productora).toContain('class="btn primary" href="/s/agendar-demo?plan=productora"');
+    expect(productora).toContain('class="btn primary" href="/s/pago?plan=productora"');
     expect(empresa).toContain('<p class="price">A medida</p>');
     expect(empresa).not.toContain('al año');
     expect(empresa).not.toContain('Cápsula adicional');
     expect(empresa).toContain('>Hablar con ventas</a>');
+    expect(empresa).toContain('href="/s/agendar-demo?plan=empresa"');
     expect(html.indexOf('plan=inicial')).toBeLessThan(html.indexOf('plan=productora'));
     expect(html).toContain(CSS_PLANES);
     expect(html).not.toContain('<script src="/s/_planes');

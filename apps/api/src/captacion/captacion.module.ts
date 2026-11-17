@@ -17,5 +17,6 @@ import { PopupsService } from './popups.service.js';
   imports: [CorreoModule],
   controllers: [PopupsPublicoController, AgendaPublicoController, ChatbotPublicoController, LeadsController, LeadsPublicoController, CrmController, PopupsController, AgendaController, ChatbotController],
   providers: [LeadsService, CrmService, PopupsService, AgendaService, ChatbotService],
+  exports: [LeadsService],
 })
 export class CaptacionModule {}

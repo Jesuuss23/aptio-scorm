@@ -1072,3 +1072,4 @@ await import('./agenda.casos.js');
 await import('./chatbot.casos.js');
 await import('./sitio-resumen.casos.js');
 await import('./planes.casos.js');
+await import('./suscripciones.casos.js');

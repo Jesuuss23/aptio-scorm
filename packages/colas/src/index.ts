@@ -85,6 +85,23 @@ export const opcionesTareaAgenda = (citaId: string, aviso: AvisoAgenda, demoraMs
   removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
 });
 
+/**
+ * HU-1703 · Correo de bienvenida de una suscripción pagada (REQ-083, CP-143). Fuera de COLAS: no es un trabajo de IA.
+ * Un trabajo por solicitud (`jobId` fijo, así un evento repetido no manda dos correos): 1 intento y 3 reintentos (30 s,
+ * 2 min, 8 min) si falla el SMTP; la organización y la suscripción ya existen y no se tocan. `enlace` es el de crear la
+ * clave del administrador (la base solo guarda el SHA-256 de su token).
+ */
+export const COLA_SUSCRIPCIONES = 'suscripciones';
+export const TAREA_BIENVENIDA = 'suscripcion-bienvenida';
+export const ESPERAS_SUSCRIPCIONES_MS = [30_000, 120_000, 480_000] as const;
+export const INTENTOS_SUSCRIPCIONES = ESPERAS_SUSCRIPCIONES_MS.length + 1;
+export interface DatosBienvenida { solicitudId: string; enlace: string }
+export const idTareaBienvenida = (solicitudId: string) => `bienvenida-${solicitudId}`;
+export const opcionesTareaBienvenida = (solicitudId: string) => ({
+  jobId: idTareaBienvenida(solicitudId), attempts: INTENTOS_SUSCRIPCIONES, backoff: { type: 'suscripciones' },
+  removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
+});
+
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 
 /** Datos con los que se encola un trabajo. El detalle vive en TrabajoIA (base de datos). */

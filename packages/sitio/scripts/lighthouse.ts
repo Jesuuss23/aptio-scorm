@@ -10,6 +10,9 @@
  * HU-1606 · El sitio de ejemplo trae etiquetas (IDs de ejemplo), así que las dos páginas se miden con el aviso de cookies
  * visible (sin decisión guardada) y la CSP de esa versión; falla si algún desplazamiento viene del aviso.
  * HU-1607 · Cada página medida carga `_visita.js`, que manda su visita a `POST /s/_visita` (aquí, 204 como la API).
+ * HU-1703 · También mide `/pago?plan=productora` con el checkout (el plan de ejemplo en `GET /api/v1/publico/planes/…`):
+ * LCP, accesibilidad y CLS con los mismos umbrales, y falla si algún desplazamiento viene del checkout. La página no se
+ * indexa a propósito (`noindex`), así que su SEO se informa sin umbral.
  *
  * Sin `SITIO_LIGHTHOUSE_URL`, sirve en un puerto local el sitio de ejemplo de producción pre-renderizado con
  * `@aptio/sitio` y las mismas cabeceras que `GET /s/*`. Con `SITIO_LIGHTHOUSE_URL=http://localhost:3000/s/` mide el
@@ -21,6 +24,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import * as chromeLauncher from 'chrome-launcher';
 import lighthouse from 'lighthouse';
+import { planesServidos } from '@aptio/schema/sitio-versiones';
 import { agendaDeEjemplo, ARCHIVO_AGENDA_JSON, ARCHIVO_CHATBOT_JSON, ARCHIVO_POPUPS_JSON, chatbotDeEjemplo, cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, popupsDeEjemplo, renderizar404, renderizarSitio, resolverPedido, RUTA_EVENTO_POPUP, RUTA_VISITA } from '../src/index.js';
 
 export const UMBRALES = { lcpMs: 2500, seo: 0.9, accesibilidad: 0.9, cls: 0.1 };
@@ -49,6 +53,13 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
     if (url === `/s/${RUTA_EVENTO_POPUP}` && req.method === 'POST') return void res.writeHead(204).end();
     // HU-1607 · La visita anónima que manda `_visita.js` en cada página medida (la API responde 204).
     if (url === `/s/${RUTA_VISITA}` && req.method === 'POST') return void res.writeHead(204, { 'Cache-Control': 'no-store' }).end();
+    // HU-1703 · El plan publicado que lee el checkout, como lo sirve la API.
+    const plan = url.match(/^\/api\/v1\/publico\/planes\/([a-z0-9-]+)$/);
+    if (plan) {
+      const servidos = planesServidos(inst, 'produccion');
+      const p = servidos?.planes.find((x) => x.slug === plan[1]);
+      return void res.writeHead(p ? 200 : 404, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }).end(JSON.stringify(p ? { ...p, ajustes: servidos!.ajustes } : { codigo: 'NO_ENCONTRADO' }));
+    }
     // HU-1605 · Las franjas libres en vivo, como las sirve la API.
     // HU-1604 · El chatbot activo: el botón flotante del chat está en todas las páginas medidas.
     if (url.split('?')[0] === `/s/${ARCHIVO_CHATBOT_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }).end(JSON.stringify(chatbotDeEjemplo(url.includes('idioma=en') ? 'en' : 'es', new Date())));
@@ -75,6 +86,8 @@ const PAGINAS = [
   { nombre: 'agendar-demo', ruta: 'agendar-demo', bloque: 'el agendador, el chat o el aviso de cookies', propio: /booker|\bag-|data-agenda|#agendar|\bch-|\bck-/ },
   // HU-1702 · /precios con los planes de la versión publicada, en HTML estático (CLS 0).
   { nombre: 'precios', ruta: 'precios', bloque: 'los planes, el chat o el aviso de cookies', propio: /\bplan|price|badge5|\bch-|\bck-/ },
+  // HU-1703 · /pago con el checkout: sin indexar a propósito, así que el SEO se informa sin umbral.
+  { nombre: 'pago', ruta: 'pago?plan=productora', bloque: 'el checkout o el aviso de cookies', propio: /\bpg|data-checkout|\bck-/, sinSeo: true },
 ] as const;
 const ruta = rutaChrome();
 const chrome = await chromeLauncher.launch({ ...(ruta ? { chromePath: ruta } : {}), chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu'] });
@@ -97,17 +110,18 @@ try {
     writeFileSync(`lighthouse/${p.nombre}.html`, html!);
     const filas = [
       ['LCP', `${(lcp / 1000).toFixed(2)} s`, `< ${UMBRALES.lcpMs / 1000} s`, lcp < UMBRALES.lcpMs],
-      ['SEO', String(Math.round(seo * 100)), `≥ ${UMBRALES.seo * 100}`, seo >= UMBRALES.seo],
+      ...('sinSeo' in p ? [] : [['SEO', String(Math.round(seo * 100)), `≥ ${UMBRALES.seo * 100}`, seo >= UMBRALES.seo] as const]),
       ['Accesibilidad', String(Math.round(a11y * 100)), `≥ ${UMBRALES.accesibilidad * 100}`, a11y >= UMBRALES.accesibilidad],
       ['CLS', cls.toFixed(5), `< ${UMBRALES.cls}`, cls < UMBRALES.cls],
       ...(local ? [[`Desplazamientos causados por ${p.bloque}`, String(delBloque.length), '= 0', delBloque.length === 0] as const] : []),
     ] as const;
-    console.log(`${p.nombre === 'inicio' ? 'CP-120' : p.nombre === 'precios' ? 'HU-1702' : 'HU-1605'} · Lighthouse ${lhr.lighthouseVersion} en celular sobre ${url}`);
+    console.log(`${p.nombre === 'inicio' ? 'CP-120' : p.nombre === 'precios' ? 'HU-1702' : p.nombre === 'pago' ? 'HU-1703' : 'HU-1605'} · Lighthouse ${lhr.lighthouseVersion} en celular sobre ${url}`);
     for (const [n, v, u, ok] of filas) console.log(`  ${ok ? '✓' : '✗'} ${n}: ${v} (umbral ${u})`);
+    if ('sinSeo' in p) console.log(`  · SEO (informativo, la página no se indexa): ${Math.round(seo * 100)}`);
     console.log(`  · Rendimiento (informativo): ${Math.round(rendimiento * 100)}. Informe en packages/sitio/lighthouse/${p.nombre}.html`);
     if (desplazamientos.length) console.log(`  · Elementos que se desplazaron: ${desplazamientos.join(', ')}`);
     for (const a of Object.values(lhr.audits)) {
-      if (a.score !== null && a.score < 1 && ['seo', 'accessibility'].some((c) => lhr.categories[c]?.auditRefs.some((x) => x.id === a.id && x.weight > 0))) console.log(`  - ${a.id}: ${a.title}`);
+      if (a.score !== null && a.score < 1 && ('sinSeo' in p ? ['accessibility'] : ['seo', 'accessibility']).some((c) => lhr.categories[c]?.auditRefs.some((x) => x.id === a.id && x.weight > 0))) console.log(`  - ${a.id}: ${a.title}`);
     }
     if (!filas.every((f) => f[3])) process.exitCode = 1;
   }

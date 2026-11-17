@@ -163,13 +163,13 @@ describe.skipIf(!hayBase && !process.env.CI)('planes administrables (HU-1702)', 
     expect(r.body).toEqual({
       slug: 'productora', nombre: 'Productora', descripcion: '', aMedida: false, precioMes: 1390, precioAnual: 13344, ahorroAnual: 3336, precioMesConIgv: 1640.2,
       capsulasMes: null, usuarios: null, capsulaAdicional: 69, textoBoton: 'Suscribirme', destacado: true, caracteristicas: ['20 cápsulas al mes'],
-      enlace: '/agendar-demo?plan=productora', ajustes: { mostrarAnual: true, descuentoAnual: 20, conIgv: false },
+      enlace: '/pago?plan=productora', ajustes: { mostrarAnual: true, descuentoAnual: 20, conIgv: false },
     });
     expect(r.body).not.toHaveProperty('ficticio');
     const pagina = await html();
     expect(pagina).toContain('S/ 1,390');
     expect(pagina).toContain('o S/ 13,344 al año (ahorras S/ 3,336)');
-    expect(pagina).toContain('href="/agendar-demo?plan=productora"');
+    expect(pagina).toContain('href="/pago?plan=productora"');
     expect(pagina).toContain('<span class="badge5">Más elegido</span>');
     expect((await publico('empresa')).body).toMatchObject({ aMedida: true, precioMes: null, precioAnual: null });
   });
