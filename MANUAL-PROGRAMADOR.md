@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.75 · actualizado con la segunda entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.76 · actualizado con la tercera entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -120,6 +120,14 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
   - **API:** `ResumenService` (`resumen()` con `Promise.all` sobre `SitioVisitaDia`, `Lead` y `AgendaCita`; `registrar()` con el límite por IP en memoria y un `INSERT … ON CONFLICT` con `$executeRaw`), `ResumenController` (`GET /sitio/resumen`, solo SUPERADMIN) y `VisitasPublicoController` (`POST /s/_visita`, excluido del prefijo en `app.ts`).
   - **Web:** `vistas/SitioResumen.tsx` en `/sitio`, `api.resumenSitio(periodo)` y la simulación de `/sitio/resumen` y `POST /s/_visita` en `e2e/api-simulada.ts` (`visitasSitio`, `visitasRecibidasSim`).
   - **Pruebas:** `packages/schema/test/resumen-sitio.test.ts`, `packages/sitio/test/visitas.test.ts`, `apps/api/test/sitio-resumen.casos.ts` y `apps/web/e2e/sitio-resumen.spec.ts`; `scripts/lighthouse.ts` responde 204 a la visita.
+- **Suscripciones (HU-1703, REQ-083, CP-143, RN-18-2, RN-18-3):**
+  - **Modelo:** migración `20261117070000_suscripciones` con `Suscripcion` (`organizacionId` único, `precioPactadoSinIgv`, `solicitudId` único) y `SolicitudSuscripcion` (`eventoPagoId` único, montos `Decimal(10,2)`, `atribucion` JSON con el `EnvioLead`). Las FK a `Plan` son `RESTRICT`: una prueba que borra planes tiene que borrar antes sus solicitudes y suscripciones.
+  - **Reglas:** `@aptio/schema/suscripciones` (`rucValido`, `validarEmpresa`, `tipoComprobanteDe`, `resumenCheckout`, `sumarMeses`, `finPeriodo`, `slugOrganizacion`, `leerEventoPrueba`, `soles2`, `TARJETAS_PRUEBA`, `PASARELA_PRUEBA`). `@aptio/schema/planes` suma `RUTA_PAGO` y `enlacePlan`.
+  - **API:** `apps/api/src/ventas/suscripciones.service.ts` (`crearCheckout`, `estado`, `pagarPrueba`, `recibirWebhook`, `firmar`, `firmaValida`) con `CheckoutPublicoController` y `WebhooksPagoController` (`@Publico()`). `configurarApp` monta `cuerpoCrudo(64 KB)` en `/api/v1/webhooks/pago` antes de los parsers: deja `req.body` como Buffer y marca la petición como leída. `VentasModule` importa `AuthModule` y `CaptacionModule` (que exporta `LeadsService`, con `guardarEnTransaccion` y `trasGuardar`). `TokensService` exporta `nuevoToken` y `VIGENCIA_BIENVENIDA_MS`.
+  - **Colas y worker:** `COLA_SUSCRIPCIONES`, `TAREA_BIENVENIDA`, `DatosBienvenida` y `opcionesTareaBienvenida` en `@aptio/colas`; `apps/worker/src/suscripciones.ts` (`procesarBienvenida`, `correoBienvenida`, `crearTrabajadorSuscripciones`).
+  - **Sitio:** `packages/sitio/src/pago.ts` (`SCRIPT_CHECKOUT`, `CSS_PAGO`, `TEXTOS_PAGO`, `ARCHIVO_CHECKOUT`); `renderizarPago` y `tienePago` en `render.ts`; `resolverPedido` sirve `_checkout.js`. `scripts/lighthouse.ts` mide `/pago?plan=productora` (SEO informativo: no se indexa).
+  - **Web (simulación):** `e2e/suscripciones-simuladas.ts` (`checkoutsSim`) atiende `/publico/planes/*` y `/publico/checkout*` en `simularApi`.
+  - **Pruebas:** `packages/schema/test/suscripciones.test.ts`, `packages/sitio/test/pago.test.ts`, `apps/worker/test/suscripciones.test.ts`, `apps/api/test/suscripciones.casos.ts` (al final de `sitio.e2e.test.ts`; en las pruebas el cuerpo del webhook va como texto, no como Buffer, para que supertest no lo serialice) y `apps/web/e2e/suscripcion-pago.spec.ts`.
 - **Planes (HU-1702, REQ-082, PNT-35, CP-141, CP-142):**
   - **Modelo:** migración `20261117060000_planes` con `Plan` y `PlanesAjustes` (registro único `ID_PLANES_AJUSTES = 'planes'`, exportado por `@aptio/db`). La semilla hace upsert por slug de `PLANES_DE_EJEMPLO` con `ficticio: true`.
   - **Reglas:** `@aptio/schema/planes` (`validarPlan(v, { parcial })`, `validarPlanCompleto`, `validarAjustesPlanes`, `precioAnualDe`, `ahorroAnualDe`, `conIgv`, `soles`, `planesPublicos`, `RUTA_AGENDAR_PLAN`). En `sitio-versiones`, `Instantanea.planes` lo arma `armarPlanes` solo si `muestraPlanes(paginas)`; `planesServidos(inst, entorno)` es lo que se sirve (sin ficticios en producción); `ficticiosDeInstantanea` suma los planes.
@@ -443,6 +451,7 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `SITIO_URL` | api, worker | Dominio del sitio comercial para el canonical y el sitemap (por defecto `https://aptioscorm.com`, hasta la HU-1509) |
 | `SITIO_BASE` | api, worker | Base de las rutas del sitio pre-renderizado (por defecto `/s`; vacío en producción detrás de la CDN, HU-1508) |
 | `SITIO_ENTORNO` | api, worker | `pruebas` o `produccion` (por defecto). En producción, los datos ficticios visibles bloquean publicar (HU-1505) |
+| `PAGO_PRUEBA_SECRETO` | api | Secreto HMAC de la pasarela de pruebas (HU-1703); solo se usa con `SITIO_ENTORNO=pruebas` (sin la variable, un secreto local fijo) |
 | `PG_BIN_DIR` | worker, `respaldo:restaurar` | Carpeta de `pg_dump` y `pg_restore` de la versión del servidor (en CI, `/usr/lib/postgresql/16/bin`) |
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL_*`, `ANTHROPIC_ESFUERZO` | worker | IA de texto |
@@ -510,6 +519,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.76 | 2026-11-17 | HU-1703: migración `20261117070000_suscripciones`, `@aptio/schema/suscripciones`, el checkout y el webhook firmado de la API con el cuerpo crudo, la cola `suscripciones` del worker, la página `/pago` con `_checkout.js` y sus pruebas, y la variable `PAGO_PRUEBA_SECRETO`. |
 | 0.75 | 2026-11-17 | HU-1702: migración `20261117060000_planes`, `@aptio/schema/planes`, el módulo `ventas` de la API, los bloques de planes del sitio, Ventas › Planes y sus pruebas. |
 | 0.74 | 2026-11-17 | HU-1701: migración `20261117050000_organizacion_base`, `@aptio/db/organizaciones` con `verificar-organizaciones`, `AuditorAccesoCruzado` en el filtro de errores y las pruebas CP-139 y CP-140. |
 | 0.73 | 2026-11-17 | HU-1607: `SitioVisitaDia` con su migración, `@aptio/schema/resumen-sitio`, `_visita.js`, `POST /s/_visita`, `GET /sitio/resumen`, el Resumen nuevo y sus pruebas. |

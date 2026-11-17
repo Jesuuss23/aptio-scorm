@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.75 · actualizado con la segunda entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.76 · actualizado con la tercera entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -564,8 +564,15 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Planes (REQ-082, PNT-35):** el superadmin crea, edita, ordena, oculta y destaca los planes en Ventas › Planes (`/ventas/planes`). Los planes no se borran y su identificador no cambia; un solo plan destacado a la vez. Precios en soles enteros sin IGV; el precio anual es el propio o el mensual × 12 con el descuento anual; el IGV (18 %) se suma solo al mostrarlo si los ajustes lo piden (SUP-281, SUP-286).
 - **Publicación (CP-141, CP-142):** los planes visibles y los ajustes viajan en la versión publicada del sitio cuando alguna página publicada muestra un bloque de planes. /precios y `GET /api/v1/publico/planes/{slug}` leen esa versión: un cambio de precio se ve al publicar y un plan oculto da 404 (SUP-283, SUP-287).
 - **Ficticios:** en producción un plan ficticio visible bloquea publicar si una página publicada muestra los planes, y nunca sale al público; la semilla carga los 3 planes del prototipo como ficticios hasta validar los precios (DA-12).
-- **Sitio:** los bloques salen en HTML estático, sin JavaScript (CLS 0). El botón de cada plan lleva a `/agendar-demo?plan=` hasta el pago de la HU-1703 (SUP-284).
+- **Sitio:** los bloques salen en HTML estático, sin JavaScript (CLS 0). El botón de un plan con precio lleva a `/pago?plan=` (HU-1703) y el de un plan a medida a `/agendar-demo?plan=` (SUP-284).
 - **Auditoría:** PLAN_CREADO, PLAN_EDITADO (con el precio al mes de antes y de después), PLAN_ORDEN_CAMBIADO y PLAN_AJUSTES_ACTUALIZADOS, en la auditoría de plataforma.
+
+### 3.34 Alta de suscripción desde /precios (HU-1703)
+
+- **Checkout (REQ-083, RN-18-2):** `/pago?plan={slug}` es una página estática del sitio, sin indexar, sin popups ni chat, que solo existe si la versión publica un plan con precio. Su script (`_checkout.js`) pide la empresa (RUC opcional con el dígito verificador de SUNAT: con RUC, factura; sin RUC, boleta), el resumen mensual o anual con IGV de 18 % y el pago. `POST /api/v1/publico/checkout` vuelve a validar, toma el precio de la versión publicada y crea la `SolicitudSuscripcion` pendiente; responde 404 si el plan es a medida, está oculto o es ficticio en producción, 409 CORREO_EN_USO si el correo ya es de un usuario y 503 PAGO_NO_DISPONIBLE si no hay pasarela. Límite: 10 checkouts por IP cada 10 minutos.
+- **Webhook (RN-18-3, CP-143):** `POST /api/v1/webhooks/pago/{pasarela}` recibe el cuerpo crudo (hasta 64 KB) y comprueba `X-Aptio-Firma: sha256=<HMAC-SHA256 hex>` en tiempo constante; si no coincide, 401 y auditoría PAGO_FIRMA_NO_VALIDA. Un evento se procesa una sola vez (`eventoPagoId` único): el repetido responde 200 con `duplicado: true`. Un pago rechazado deja la solicitud RECHAZADA. Uno aprobado crea, en una sola transacción, la organización vacía, su ADMINISTRADOR sin clave con un token de bienvenida de 72 horas, la `Suscripcion` ACTIVA con el precio pactado sin IGV y el fin del período, y el lead «Suscripción» en Ganado; auditoría SUSCRIPCION_CREADA. Después encola la bienvenida en la cola `suscripciones` (4 intentos: 30 s, 2 min y 8 min) y avisa del lead.
+- **Pasarela de pruebas (SUP-288):** solo con `SITIO_ENTORNO=pruebas`. `POST /publico/checkout/{id}/pago-prueba` firma un evento con `PAGO_PRUEBA_SECRETO` y lo procesa como el webhook (4111 1111 1111 1111 aprueba; 4000 0000 0000 0002 rechaza). En producción no existe y el paso 3 ofrece agendar una demo hasta la HU-1704.
+- **Fuera de alcance:** pasarelas reales (HU-1704), emisión del comprobante SUNAT (HU-1707), cuotas (HU-1705) y la vista Ventas › Suscripciones. Un pago aprobado cuyo correo ya tenía cuenta queda sin alta, con SUSCRIPCION_SIN_ALTA, para resolverlo a mano (SUP-291).
 
 ## 4. Datos
 
@@ -575,6 +582,7 @@ El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/s
 | --- | --- |
 | `Organizacion` | Inquilino: todo dato raíz lleva `organizacionId` (ADR-012) |
 | `Plan`, `PlanesAjustes` | Planes de la página de precios (slug fijo, precios en soles sin IGV, características, visible, destacado, orden, ficticio) y los ajustes de la página (opción anual, descuento, IGV); de plataforma, sin organización (HU-1702) |
+| `Suscripcion`, `SolicitudSuscripcion` | La suscripción de cada organización (plan, ciclo, precio pactado sin IGV, estado, período, pasarela y 4 últimos dígitos) y el checkout de `/pago` (empresa, RUC, comprobante, montos con IGV, estado y el evento de pago que lo resolvió) (HU-1703) |
 | `Usuario`, `TokenAcceso` | Personas, rol, clave (argon2id), versión de sesión, y tokens de invitación y recuperación (guardados como hash) |
 | `Cliente`, `KitMarca`, `PantallaModelo`, `GlosarioTermino`, `PronunciacionTermino` | Clientes y su identidad visual y de voz |
 | `Proyecto` | Un SCORM: cliente, estado, parámetros y datos técnicos opcionales |
@@ -709,6 +717,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.76 | 2026-11-17 | Alta de suscripción (3.34): la página `/pago`, `POST /publico/checkout`, el webhook firmado e idempotente, la transacción del alta, la cola `suscripciones`, la pasarela de pruebas y las tablas `Suscripcion` y `SolicitudSuscripcion`. |
 | 0.75 | 2026-11-17 | Planes administrables (3.33): planes en la versión publicada, `GET /publico/planes/{slug}`, bloqueo por planes ficticios en producción y las tablas `Plan` y `PlanesAjustes`. |
 | 0.74 | 2026-11-17 | Organizaciones aisladas (3.32): 404 igual al de un id inexistente, `ACCESO_OTRA_ORGANIZACION` en la auditoría de plataforma, la migración de la organización base y `verificar-organizaciones`. |
 | 0.73 | 2026-11-17 | Resumen del sitio (3.31): `SitioVisitaDia` y el contador anónimo `_visita.js` con `POST /s/_visita`, y `GET /sitio/resumen` con sus indicadores, serie, origen, páginas y demos. |

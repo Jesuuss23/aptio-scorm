@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.75 · actualizado con la segunda entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.76 · actualizado con la tercera entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1082,7 +1082,21 @@ En **Ventas › Planes** decides qué planes ve el visitante en la página **Pre
 
 **Publicar.** Lo que cambias aquí se ve en el sitio cuando pulsas **Publicar cambios** (arriba a la derecha). Hasta entonces, la página Precios sigue con lo de antes. Si un plan visible está marcado como ficticio, en producción no se puede publicar: el aviso lo nombra y te trae aquí para ocultarlo o desmarcarlo.
 
-**Lo que ve el visitante.** En **Precios** (y en el resumen de planes del inicio, si la página lo tiene), cada plan con su precio al mes o «A medida», la línea anual si la activaste, sus características visibles y la etiqueta **Más elegido** en el destacado. Por ahora el botón de cada plan lleva a **Agendar demo**; más adelante llevará al pago. Si cambias un precio, las suscripciones que ya existan conservarán el suyo.
+**Lo que ve el visitante.** En **Precios** (y en el resumen de planes del inicio, si la página lo tiene), cada plan con su precio al mes o «A medida», la línea anual si la activaste, sus características visibles y la etiqueta **Más elegido** en el destacado. El botón de un plan con precio lleva a **Suscribirse** (8.40); el de un plan a medida lleva a **Agendar demo** con el plan elegido. Si cambias un precio, las suscripciones que ya existan conservan el suyo.
+
+### 8.40 Suscribirse a un plan desde la página de precios
+
+En **Precios**, el botón de un plan con precio (por ejemplo, **Suscribirme**) abre la página **Suscríbete a Aptio SCORM**, que se completa en tres pasos. Todo se puede hacer con el teclado y con un lector de pantalla; los errores se nombran arriba y junto a cada campo.
+
+1. **Empresa.** Escribe la razón social (o tu nombre), el RUC si quieres factura, el nombre y el correo de quien administrará la cuenta, y marca la casilla de los términos y del tratamiento de datos personales. Con RUC se emite **factura**; sin RUC, **boleta de venta**. Si el RUC no es válido, la página lo dice antes de seguir.
+2. **Resumen.** Elige **Mensual** o **Anual** (si la página de precios muestra la opción anual) y revisa el subtotal, el IGV de 18 %, el comprobante y el **Total a pagar**. Con **Volver** cambias los datos.
+3. **Pago.** Escribe la tarjeta y pulsa **Pagar**. Si el pago se rechaza, la página lo avisa y te deja intentarlo de nuevo desde el resumen.
+
+**Al terminar.** La página dice **Tu suscripción está activa**, con el plan, el total y hasta cuándo está pagado. Al correo del administrador llega la bienvenida con un enlace para crear su clave (vale 72 horas; si vence, usa **¿Olvidaste tu clave?** con el mismo correo). La cuenta de la empresa empieza vacía y esa persona es su administrador. En **Captación › Leads y CRM** aparece el contacto con origen **Suscripción** y en la etapa **Ganado**.
+
+**Si el correo ya tiene una cuenta,** la página pide iniciar sesión o usar otro correo. **Si el plan es a medida** o no está publicado, la página ofrece ver los planes o agendar una demo.
+
+**Mientras no haya pago en línea.** En el sitio de producción el pago con tarjeta todavía no está disponible: en el paso 3 la página lo dice y ofrece **Agendar una demo** con el plan elegido. En el sitio de pruebas hay una pasarela de pruebas que no cobra nada: la tarjeta 4111 1111 1111 1111 aprueba y la 4000 0000 0000 0002 rechaza. El comprobante electrónico todavía no se emite: llegará con la facturación.
 
 ## 9. Preguntas frecuentes
 
@@ -1175,6 +1189,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.76 | 2026-11-17 | Suscribirse a un plan (8.40): los tres pasos de la página de pago (empresa con RUC y factura o boleta, resumen mensual o anual con IGV y pago), la confirmación y el correo de bienvenida, y el aviso de agendar una demo mientras no haya pago en línea. |
 | 0.75 | 2026-11-17 | Planes y precios (8.39): una tarjeta por plan con «Mostrar plan», «Destacar como Más elegido», precios, características y orden; la página de precios con la opción anual, el descuento y el IGV; los cambios se ven al publicar. |
 | 0.74 | 2026-11-17 | Empresas separadas (sección 2): cada organización ve solo sus datos, un enlace de otra empresa da «no encontrado» y queda registrado, y lo anterior quedó en AulasEducativas. |
 | 0.73 | 2026-11-17 | Resumen del sitio (8.28): período de 7 días, 30 días o trimestre, los cuatro indicadores con su variación, el gráfico de visitas y conversiones con su tabla, el origen de los leads, las páginas con más conversiones y las próximas demos. |
