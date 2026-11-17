@@ -10,6 +10,7 @@ import { esArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import { esArchivoBlog } from '@aptio/schema/sitio-blog';
 import { ARCHIVO_CAPTACION, RUTA_GRACIAS } from './captacion.js';
 import { ARCHIVO_POPUPS } from './popups.js';
+import { ARCHIVO_AGENDA } from './agenda.js';
 import { ARCHIVO_LLMS, archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
 
 export type Pedido =
@@ -33,6 +34,8 @@ export function resolverPedido(ruta: string): Pedido | null {
   if (limpia === `/${ARCHIVO_CAPTACION}`) return { tipo: 'script', archivo: ARCHIVO_CAPTACION };
   // HU-1603 · El script de popups (en toda versión desde esta historia).
   if (limpia === `/${ARCHIVO_POPUPS}`) return { tipo: 'script', archivo: ARCHIVO_POPUPS };
+  // HU-1605 · El agendador: solo existe si alguna página lo tiene.
+  if (limpia === `/${ARCHIVO_AGENDA}`) return { tipo: 'script', archivo: ARCHIVO_AGENDA };
   if (limpia === `/${RUTA_GRACIAS}` || limpia === `/en/${RUTA_GRACIAS}`) return { tipo: 'pagina', archivo: `${limpia.slice(1)}.html`, ruta: limpia };
   const partes = limpia.split('/').slice(1).filter((p) => p !== '');
   if (partes.length === 2 && partes[0] === CARPETA_FUENTES) return FUENTE.test(partes[1]!) ? { tipo: 'fuente', archivo: partes[1]! } : null;

@@ -3491,3 +3491,135 @@ ul.fila-chips {
 .popup-reglas {
   margin: 0;
 }
+
+/* HU-1605 · Captación › Agendamiento (PNT-33): tarjetas de tipos, horarios de lunes a viernes, días y feriados. */
+.agenda-tipos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+}
+.agenda-tipo {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 16px;
+  min-width: 0;
+}
+.agenda-tipo.oculto h3 {
+  color: var(--color-texto-sec);
+}
+.agenda-tipo-cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agenda-tipo-cabeza h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.agenda-datos {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.agenda-datos > div {
+  display: flex;
+  gap: 8px;
+}
+.agenda-datos dt {
+  font-weight: 600;
+  min-width: 72px;
+}
+.agenda-datos dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.agenda-form {
+  margin-bottom: 24px;
+}
+.agenda-asesores {
+  border: 1px solid var(--color-borde);
+  border-radius: 9px;
+  padding: 8px 12px;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+.agenda-asesores legend {
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  padding: 0 4px;
+}
+.agenda-tarjetas {
+  margin-bottom: 24px;
+}
+.agenda-semana {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  margin-bottom: 16px;
+}
+.agenda-semana th {
+  font-size: var(--texto-sm);
+  text-align: center;
+}
+.agenda-semana abbr {
+  text-decoration: none;
+}
+.agenda-semana td {
+  text-align: center;
+  padding: 0;
+}
+.agenda-franja {
+  display: block;
+  border-radius: 6px;
+  padding: 4px 0;
+  font-size: var(--texto-sm);
+  font-weight: 600;
+  background: var(--color-validado-suave);
+  color: var(--color-validado);
+}
+.agenda-bloqueo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.agenda-bloqueo label {
+  font-size: var(--texto-sm);
+  font-weight: 600;
+}
+.agenda-dias,
+.agenda-feriados {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.agenda-dias li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.agenda-feriados li {
+  font-size: var(--texto-sm);
+}
+.agenda-feriados li.pasado {
+  color: var(--color-texto-sec);
+}
+.agenda-fecha {
+  display: inline-block;
+  min-width: 88px;
+  font-weight: 600;
+}

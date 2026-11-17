@@ -30,6 +30,7 @@ import { aplicarPausas, type PropuestaPausas } from '@aptio/schema/pausas';
 import { rangoPeriodo } from '../src/vistas/costos-periodo.ts';
 import { CLAVES_ETAPA, normalizarParametros, PARAMETROS_EJEMPLO } from '@aptio/schema/rentabilidad';
 import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from '@aptio/schema/conexiones';
+import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 /** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
@@ -187,6 +188,8 @@ export interface OpcionesSimulacion {
   crmSitio?: { conexiones?: Partial<Record<TipoCrm, { activa?: boolean; mapeo?: Record<string, string>; url?: string | null; secreto?: string | null }>>; claves?: TipoCrm[]; envios?: Record<string, EnvioSim[]>; pruebaFalla?: boolean };
   /** HU-1603 · Popups guardados en Captación › Popups. */
   popupsSitio?: PopupSim[];
+  /** HU-1605 · Tipos de reunión, asesores, ajustes y citas de Captación › Agendamiento. */
+  agendaSitio?: AgendaSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -456,7 +459,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [] }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {} }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -539,6 +542,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     encolarCrmSim(lead.id);
     return { ok: true, lead };
   };
+  // HU-1605 · El agendador: el panel lo edita y el sitio lo lee en vivo (`/s/_agenda.json`); cada reserva crea o
+  // actualiza el lead con vía «Agendador».
+  const agendaSim = crearAgendaSim(agendaSitio, entornoSitio, (cuerpo) => {
+    const r = capturarLeadSim(cuerpo);
+    return r.ok ? r.lead : null;
+  });
   let bloqueadosSim: string[] = seoIaSitio.bloqueados ?? [];
   const preguntasIaSim: { id: string; pregunta: string; menciones: Menciones; creadoEn: string; actualizadoEn: string }[] = (seoIaSitio.preguntas ?? []).map((pregunta, i) => ({
     id: `00000000-0000-4000-b000-${String(i + 1).padStart(12, '0')}`, pregunta, menciones: leerMenciones(null), creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z',
@@ -673,6 +682,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (route.request().method() === 'GET' && ruta === '/_popups.json') {
       const lista = popupsSim.filter((x) => x.visible && !(entornoSitio === 'produccion' && x.ficticio)).map((x) => aPopupPublico(x as unknown as Parameters<typeof aPopupPublico>[0]));
       return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }, body: JSON.stringify({ popups: lista }) });
+    }
+    if (route.request().method() === 'GET' && ruta === '/_agenda.json') {
+      const datos = agendaSim.publica(new URL(route.request().url()).searchParams);
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=15' }, body: JSON.stringify(datos) });
     }
     if (route.request().method() === 'POST' && ruta === '/_popup') {
       const { popupId, evento } = route.request().postDataJSON() as { popupId: string; evento: string };
@@ -1232,6 +1245,16 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const pp = r.ok && r.lead && cuerpo.via === 'popup' ? popupsSim.find((x) => x.id === cuerpo.popupId && x.accion === 'pedir_correo') : undefined;
       if (pp) pp.conversiones += 1;
       return r.ok ? responder(201, { recibido: true }) : responder(422, { codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
+    }
+    // HU-1605 · La reserva pública y Captación › Agendamiento (PNT-33).
+    if (ruta === '/publico/citas' && req.method() === 'POST') {
+      const r = agendaSim.reservar(req.postDataJSON() as Record<string, unknown>);
+      return responder(r.status, r.body);
+    }
+    if (ruta === '/captacion/agenda' || ruta.startsWith('/captacion/agenda/')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = agendaSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
+      return responder(r.status, r.body);
     }
     if (ruta === '/captacion/popups' || ruta.startsWith('/captacion/popups/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });

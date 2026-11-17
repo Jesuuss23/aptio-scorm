@@ -10,6 +10,7 @@ import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/pro
 import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
 import type { Operacion } from '@aptio/schema/operacion';
 import type { DatosPopup } from '@aptio/schema/popups';
+import type { AjustesAgenda, EstadoCita, Feriado } from '@aptio/schema/agenda';
 
 export interface Usuario {
   id: string;
@@ -723,6 +724,19 @@ export interface PopupSitio extends DatosPopup {
   actualizadoEn: string;
 }
 
+/** HU-1605 · Captación › Agendamiento (PNT-33). */
+export interface TipoReunion { id: string; nombreEs: string; nombreEn: string; minutos: number; asesorIds: string[]; visible: boolean; orden: number; ficticio: boolean }
+export interface AsesorAgenda { id: string; nombre: string; correo: string; enlaceVideollamada: string; visible: boolean; ficticio: boolean; citasProximas: number }
+export interface Agenda { ajustes: AjustesAgenda; feriados: Feriado[]; tipos: TipoReunion[]; asesores: AsesorAgenda[] }
+export interface CitaAgenda {
+  id: string; inicio: string; fin: string; fecha: string; hora: string; estado: EstadoCita; tipoId: string; tipo: string; asesorId: string; asesor: string;
+  nombre: string; correo: string; empresa: string | null; lms: string | null; idioma: 'es' | 'en'; leadId: string | null; canceladaPor: 'visitante' | 'superadmin' | null;
+  invitacionEnviadaEn: string | null; recordatorio24hEnviadoEn: string | null; recordatorio1hEnviadoEn: string | null; creadoEn: string;
+}
+export interface FiltroCitas { estado?: EstadoCita | ''; desde?: string; hasta?: string }
+export type EntradaTipo = Partial<Pick<TipoReunion, 'nombreEs' | 'nombreEn' | 'minutos' | 'asesorIds' | 'visible' | 'ficticio'>>;
+export type EntradaAsesor = Partial<Pick<AsesorAgenda, 'nombre' | 'correo' | 'enlaceVideollamada' | 'visible' | 'ficticio'>>;
+
 export interface LeadSitio {
   id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null;
   origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
@@ -890,6 +904,21 @@ export const api = {
   borrarPopup: (id: string) => pedir<void>(`/captacion/popups/${id}`, { method: 'DELETE' }),
   ordenarPopups: (ids: string[]) => pedir<{ popups: PopupSitio[] }>('/captacion/popups/orden', json({ ids }, 'PUT')),
   reiniciarPopup: (id: string) => pedir<PopupSitio>(`/captacion/popups/${id}/reiniciar`, { method: 'POST' }),
+  // HU-1605 · Captación › Agendamiento (PNT-33).
+  agenda: () => pedir<Agenda>('/captacion/agenda'),
+  cambiarAjustesAgenda: (c: Partial<AjustesAgenda>) => pedir<AjustesAgenda>('/captacion/agenda', json(c, 'PATCH')),
+  crearTipoReunion: (d: EntradaTipo) => pedir<TipoReunion>('/captacion/agenda/tipos', json(d)),
+  cambiarTipoReunion: (id: string, d: EntradaTipo) => pedir<TipoReunion>(`/captacion/agenda/tipos/${id}`, json(d, 'PATCH')),
+  borrarTipoReunion: (id: string) => pedir<void>(`/captacion/agenda/tipos/${id}`, { method: 'DELETE' }),
+  ordenarTiposReunion: (ids: string[]) => pedir<TipoReunion[]>('/captacion/agenda/tipos/orden', json({ ids }, 'PUT')),
+  crearAsesor: (d: EntradaAsesor) => pedir<AsesorAgenda>('/captacion/agenda/asesores', json(d)),
+  cambiarAsesor: (id: string, d: EntradaAsesor) => pedir<AsesorAgenda>(`/captacion/agenda/asesores/${id}`, json(d, 'PATCH')),
+  borrarAsesor: (id: string) => pedir<void>(`/captacion/agenda/asesores/${id}`, { method: 'DELETE' }),
+  citas: (f: FiltroCitas = {}) => {
+    const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v).map(([k, v]) => [k, String(v)]));
+    return pedir<{ citas: CitaAgenda[]; total: number }>(`/captacion/agenda/citas${q.size ? `?${q}` : ''}`);
+  },
+  cambiarCita: (id: string, estado: 'cancelada' | 'realizada' | 'no_asistio') => pedir<CitaAgenda>(`/captacion/agenda/citas/${id}`, json({ estado }, 'PATCH')),
   seoIaSitio: () => pedir<SeoIaSitio>('/sitio/seo-ia'),
   guardarSeoIaSitio: (cambios: { llmsTxt?: string; rastreadores?: Record<string, boolean> }) => pedir<SeoIaSitio>('/sitio/seo-ia', json(cambios, 'PATCH')),
   crearPreguntaIa: (pregunta: string) => pedir<PreguntaIa>('/sitio/seo-ia/preguntas', json({ pregunta })),

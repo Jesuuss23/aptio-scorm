@@ -9,8 +9,8 @@ export const MENU: GrupoMenu[] = [
   { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }, { ruta: '/conexiones-ia', nombre: 'Conexiones IA' }, { ruta: '/operacion', nombre: 'Operación' }] },
   // HU-1501 · Solo el superadmin (ADR-011). Páginas, Contenido y Blog (HU-1511); SEO se suma con su historia.
   { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }, { ruta: '/sitio/blog', nombre: 'Blog' }, { ruta: '/sitio/seo', nombre: 'SEO' }, { ruta: '/sitio/seo-ia', nombre: 'SEO para IA' }] },
-  // HU-1601 · Captación: Leads y CRM. HU-1603: Popups. Chatbot y Agendamiento se suman con sus historias.
-  { nombre: 'Captación', items: [{ ruta: '/captacion/popups', nombre: 'Popups' }, { ruta: '/captacion/leads', nombre: 'Leads y CRM' }] },
+  // HU-1601 · Captación: Leads y CRM. HU-1603: Popups. HU-1605: Agendamiento. El chatbot se suma con su historia.
+  { nombre: 'Captación', items: [{ ruta: '/captacion/popups', nombre: 'Popups' }, { ruta: '/captacion/agendamiento', nombre: 'Agendamiento' }, { ruta: '/captacion/leads', nombre: 'Leads y CRM' }] },
   // HU-1509 · Configuración del sitio, también solo del superadmin.
   { nombre: 'Configuración', items: [{ ruta: '/sitio/ajustes', nombre: 'Ajustes del sitio' }] },
 ];
@@ -50,6 +50,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (camino === '/sitio/seo') return { grupo: 'Sitio web', nombre: 'SEO', activo: '/sitio/seo' };
   if (camino === '/sitio/seo-ia') return { grupo: 'Sitio web', nombre: 'SEO para IA', activo: '/sitio/seo-ia' };
   if (camino === '/captacion/popups') return { grupo: 'Captación', nombre: 'Popups', activo: '/captacion/popups' };
+  if (camino === '/captacion/agendamiento') return { grupo: 'Captación', nombre: 'Agendamiento', activo: '/captacion/agendamiento' };
   if (camino === '/captacion/leads') return { grupo: 'Captación', nombre: 'Leads y CRM', activo: '/captacion/leads' };
   if (camino === '/sitio/ajustes') return { grupo: 'Configuración', nombre: 'Ajustes del sitio', activo: '/sitio/ajustes' };
   const editorPagina = camino.match(/^\/sitio\/paginas\/([0-9a-f-]{36})$/i);

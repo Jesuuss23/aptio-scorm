@@ -21,6 +21,7 @@ import { type Idioma, INTERFAZ, TEXTOS } from './textos.js';
 import { CAMPO_TRAMPA, LIMITES_LEAD, PARAMETROS_UTM } from '@aptio/schema/leads';
 import { ARCHIVO_CAPTACION, RUTA_GRACIAS, RUTA_LEAD, SCRIPT_CAPTACION, TIPO_FORMULARIO } from './captacion.js';
 import { ARCHIVO_POPUPS, SCRIPT_POPUPS } from './popups.js';
+import { ARCHIVO_AGENDA, CSS_AGENDA, RUTA_CITA, SCRIPT_AGENDA, TEXTOS_AGENDA } from './agenda.js';
 
 export interface OpcionesRender {
   entorno: EntornoSitio;
@@ -173,7 +174,7 @@ function Encabezado({ etiqueta, titulo, bajada, id }: { etiqueta?: string; titul
   return h('div', { className: 'sh' }, etiqueta ? h('span', { className: 'tagp' }, etiqueta) : null, h('h2', { id }, titulo), bajada ? h('p', null, bajada) : null);
 }
 
-interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined; ruta: string; privacidad: boolean }
+interface Contexto { base: string; idioma: Idioma; entorno: EntornoSitio; titulo: string; nivelPortada: 'h1' | 'h2'; clave: string; sector?: SectorPublicado | undefined; landings: LandingPublica[]; blog?: BlogPublico | null | undefined; ruta: string; privacidad: boolean; whatsapp?: Marca['whatsapp'] }
 
 const fechaBlog = (iso: string, idioma: Idioma) => new Date(iso).toLocaleDateString(idioma === 'en' ? 'en-US' : 'es-PE', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'America/Lima' });
 
@@ -328,8 +329,10 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
       return h(SeccionBlog, { blog: c.blog, c, id });
     case TIPO_FORMULARIO:
       return h(FormularioContacto, { c, id });
+    case 'agendador':
+      return h(Agendador, { c, id });
     default:
-      // Planes (S13), precios, comparativa y agendador llegan con su historia (SUP-193).
+      // Planes (S13), precios y comparativa llegan con su historia (SUP-193).
       return null;
   }
 }
@@ -341,10 +344,16 @@ function bloque(tipo: string, elementos: Elemento[] | undefined, c: Contexto): R
  */
 function FormularioContacto({ c, id }: { c: Contexto; id: string }) {
   const T = TEXTOS[c.idioma].FORMULARIO;
-  const campo = (n: string) => `${id}-${n}`;
   return h('section', { id: 'contacto', className: 'bg-ice', 'aria-labelledby': id }, h('div', { className: 'in' },
     h(Encabezado, { id, etiqueta: T.etiqueta, titulo: T.titulo, bajada: T.texto }),
-    h('form', { className: 'fcontacto', method: 'post', action: `${c.base}/${RUTA_LEAD}`, 'data-captacion': '' },
+    h(CamposContacto, { c, id })));
+}
+
+/** Los campos del formulario de contacto (también van dentro del agendador cuando no hay JavaScript). */
+function CamposContacto({ c, id }: { c: Contexto; id: string }) {
+  const T = TEXTOS[c.idioma].FORMULARIO;
+  const campo = (n: string) => `${id}-${n}`;
+  return h('form', { className: 'fcontacto', method: 'post', action: `${c.base}/${RUTA_LEAD}`, 'data-captacion': '' },
       h('div', { className: 'fc-dos' },
         h('p', null, h('label', { htmlFor: campo('nombre') }, T.nombre), h('input', { id: campo('nombre'), name: 'nombre', type: 'text', required: true, maxLength: LIMITES_LEAD.nombre, autoComplete: 'name' })),
         h('p', null, h('label', { htmlFor: campo('correo') }, T.correo), h('input', { id: campo('correo'), name: 'correo', type: 'email', required: true, maxLength: LIMITES_LEAD.correo, autoComplete: 'email' }))),
@@ -360,7 +369,28 @@ function FormularioContacto({ c, id }: { c: Contexto; id: string }) {
       h('input', { type: 'hidden', name: 'paginaEntrada', value: '' }),
       h('input', { type: 'hidden', name: 'referente', value: '' }),
       PARAMETROS_UTM.map((u) => h('input', { key: u, type: 'hidden', name: u, value: '' })),
-      h('p', null, h('button', { className: 'btn primary', type: 'submit' }, T.enviar)))));
+      h('p', null, h('button', { className: 'btn primary', type: 'submit' }, T.enviar)));
+}
+
+/**
+ * HU-1605 · El agendador (REQ-078, RN-17-5). Los horarios son en vivo: el script `_agenda.js` llena el contenedor, que
+ * reserva su alto para que la página no se mueva al cargar (CLS 0). Sin JavaScript, el `<noscript>` ofrece el
+ * formulario de contacto y el WhatsApp de los ajustes.
+ */
+function Agendador({ c, id }: { c: Contexto; id: string }) {
+  const T = TEXTOS_AGENDA[c.idioma];
+  return h('section', { id: 'agendar', 'aria-labelledby': id }, h('div', { className: 'in book' },
+    h('div', null,
+      h('span', { className: 'tagp' }, T.etiqueta),
+      h('h2', { id }, T.titulo),
+      h('p', { className: 'lead' }, T.texto),
+      h('ul', { className: 'puntos' }, T.puntos.map((p) => h('li', { key: p }, p)))),
+    h('div', { className: 'booker', 'data-agenda': '', 'data-base': c.base, 'aria-live': 'polite', 'aria-busy': 'true' },
+      h('p', { className: 'ag-zona ag-cargando' }, T.cargando),
+      h('noscript', null,
+        h('p', null, T.sinJs),
+        c.whatsapp ? h('p', null, h('a', { href: enlaceWhatsapp(c.whatsapp), target: '_blank', rel: 'noopener' }, T.whatsapp)) : null,
+        h(CamposContacto, { c, id: `${id}-c` })))));
 }
 
 /** HU-1601 · Estilos del formulario; solo van en las páginas que lo tienen. */
@@ -383,6 +413,8 @@ export const CSS_FORMULARIO = [
 
 /** HU-1601 · ¿La versión tiene algún formulario de contacto? Entonces todas sus páginas cargan el script de captación. */
 export const tieneFormulario = (inst: Pick<Instantanea, 'paginas'>): boolean => inst.paginas.some((p) => p.bloques.some((b) => b.tipo === TIPO_FORMULARIO));
+/** HU-1605 · ¿Alguna página publicada tiene el agendador? Entonces la versión trae `_agenda.js` (y el formulario sin JavaScript). */
+export const tieneAgendador = (inst: Pick<Instantanea, 'paginas'>): boolean => inst.paginas.some((p) => p.bloques.some((b) => b.tipo === 'agendador'));
 
 /** HU-1512 · Open Graph de una página: título, descripción, URL, tipo, nombre del sitio e idioma. */
 interface OpenGraph { titulo: string; descripcion: string; url: string; sitio: string; idioma: Idioma }
@@ -404,13 +436,15 @@ export const sinJsonLd = (html: string): string => html.replace(/<script type="a
  */
 export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_popups\.js" defer="" data-base="[^"]*"><\/script>/g, '');
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, children }: {
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, agenda = false, children }: {
   titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
   og?: OpenGraph; jsonLd?: unknown;
   /** HU-1601 · Carga el script propio de captación (primera visita y UTM); la CSP solo permite scripts del mismo origen. */
   captacion?: boolean;
   /** HU-1603 · Carga el script de popups, que los lee en vivo (`_popups.json`). Solo en las páginas del sitio. */
-  popups?: boolean; children?: ReactNode;
+  popups?: boolean;
+  /** HU-1605 · Carga el agendador (`_agenda.js`): solo en las páginas con el bloque. */
+  agenda?: boolean; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -435,7 +469,8 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       lista.filter((f) => f.precargar).map((f) => h('link', { key: f.archivo, rel: 'preload', href: `${base}/${CARPETA_FUENTES}/${f.archivo}`, as: 'font', type: 'font/woff2', crossOrigin: 'anonymous' })),
       h('style', { dangerouslySetInnerHTML: { __html: fuentesCss(lista, base) + CSS_SITIO + cssExtra } }),
       captacion ? h('script', { src: `${base}/${ARCHIVO_CAPTACION}`, defer: true, 'data-base': base }) : null,
-      popups ? h('script', { src: `${base}/${ARCHIVO_POPUPS}`, defer: true, 'data-base': base }) : null),
+      popups ? h('script', { src: `${base}/${ARCHIVO_POPUPS}`, defer: true, 'data-base': base }) : null,
+      agenda ? h('script', { src: `${base}/${ARCHIVO_AGENDA}`, defer: true }) : null),
     h('body', null, children));
 }
 
@@ -479,7 +514,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
   let hayH1 = false;
   const bloques = p.bloques.map((b, n) => {
     const portada = b.tipo === 'hero' || b.tipo === 'fhero';
-    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog, ruta: publica, privacidad });
+    const nodo = bloque(b.tipo, b.elementos, { base: op.base, idioma: i, entorno: op.entorno, titulo: p.titulo, nivelPortada: portada && !hayH1 ? 'h1' : 'h2', clave: String(n), sector: p.sector, landings, blog: op.blog, ruta: publica, privacidad, whatsapp: marca.whatsapp });
     if (nodo && portada) hayH1 = true;
     return nodo ? h(Fragment, { key: n }, nodo) : null;
   });
@@ -495,9 +530,11 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     titulo, descripcion, canonical, alternas: alternasHref(inst, p.ruta, op.sitioUrl), idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon,
     // CP-125 · Sin indexar: `noindex` (en pruebas ya va `noindex, nofollow` en todas).
     ...(indexar || op.entorno !== 'produccion' ? {} : { robots: 'noindex' }),
-    cssExtra: (p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '') + (p.bloques.some((b) => b.tipo === TIPO_FORMULARIO) ? CSS_FORMULARIO : ''),
-    captacion: tieneFormulario(inst),
+    cssExtra: (p.bloques.some((b) => b.tipo === 'bloglista') ? cssBlog(op.blog) : '') + (p.bloques.some((b) => b.tipo === TIPO_FORMULARIO || b.tipo === 'agendador') ? CSS_FORMULARIO : '')
+      + (p.bloques.some((b) => b.tipo === 'agendador') ? CSS_AGENDA : ''),
+    captacion: tieneFormulario(inst) || tieneAgendador(inst),
     popups: true,
+    agenda: p.bloques.some((b) => b.tipo === 'agendador'),
     og: { titulo, descripcion, url: canonical, sitio: marca.nombre, idioma: i },
     jsonLd: datosEstructurados(p, { titulo, descripcion, url: canonical, idioma: i, marca, sitioUrl: op.sitioUrl }),
   }, h(Marco, { nav: navegacionDe(inst, i), op, idioma: i, actual: p.ruta, marca, landings, selector: selectorDe(inst, p.ruta, i) }, cuerpo)));
@@ -572,6 +609,62 @@ export function renderizarErrorFormulario(inst: Pick<Instantanea, 'sitio'> | nul
           h('a', { className: 'btn primary', href: `${op.base}${d.volverA ? `${d.volverA === '/' ? '/' : d.volverA}#contacto` : i === 'en' ? '/en' : '/'}` }, d.volverA ? T.regresar : INTERFAZ[i].volver)))))));
 }
 
+/** HU-1605 · Lo que muestra la página del enlace de cancelación. */
+export type EstadoPaginaCita =
+  | { estado: 'activa'; token: string; tipo: string; texto: string }
+  | { estado: 'cancelada'; tipo: string; texto: string }
+  | { estado: 'no_encontrada' | 'inactiva' | 'empezada' };
+
+const TEXTOS_CITA = {
+  es: {
+    activa: 'Cancelar tu demo', activaTexto: 'Si cancelas, liberamos el horario y te enviamos la confirmación por correo. Para cambiar la fecha, cancela y vuelve a agendar.',
+    boton: 'Cancelar mi demo', mantener: 'Mantener la demo', cancelada: 'Tu demo se canceló', canceladaTexto: 'Te enviamos la confirmación por correo.',
+    no_encontrada: 'No encontramos esta cita', no_encontradaTexto: 'El enlace no corresponde a ninguna cita. Revisa que esté completo.',
+    inactiva: 'Esta cita ya no está activa', inactivaTexto: 'Ya se canceló o ya se realizó.', empezada: 'Esta cita ya empezó', empezadaTexto: 'No se puede cancelar desde el enlace. Escríbenos si necesitas ayuda.',
+    agendar: 'Agendar otra demo',
+  },
+  en: {
+    activa: 'Cancel your demo', activaTexto: 'If you cancel, we free the time and email you a confirmation. To change the date, cancel and book again.',
+    boton: 'Cancel my demo', mantener: 'Keep the demo', cancelada: 'Your demo was cancelled', canceladaTexto: 'We emailed you a confirmation.',
+    no_encontrada: "We couldn't find this booking", no_encontradaTexto: "The link doesn't match any booking. Check that it is complete.",
+    inactiva: 'This booking is no longer active', inactivaTexto: 'It was already cancelled or it already took place.', empezada: 'This booking already started', empezadaTexto: "It can't be cancelled from the link. Write to us if you need help.",
+    agendar: 'Book another demo',
+  },
+} as const;
+
+/**
+ * HU-1605 · La página del enlace de cancelación de la invitación (`{base}/_cita?t=…`): muestra la cita y pide confirmar
+ * con un botón (un formulario `POST`, sin JavaScript), y luego el resultado. Sin indexar ni menú; el token va en un campo
+ * oculto y nunca en un enlace de la página.
+ */
+export function renderizarCita(inst: Pick<Instantanea, 'sitio'> | null, op: OpcionesRender, d: EstadoPaginaCita, idioma: string = 'es'): string {
+  const i = idiomaDe(idioma);
+  const T = TEXTOS_CITA[i];
+  const marca = { ...marcaDe(inst), whatsapp: null };
+  const inicio = `${op.base}${i === 'en' ? '/en' : '/'}`;
+  const agendar = `${op.base}${rutaPublica('/agendar-demo', i)}`;
+  const titulo = T[d.estado];
+  const cuerpo = d.estado === 'activa'
+    ? h(Fragment, null,
+      h('p', null, h('strong', null, d.tipo), h('br'), d.texto),
+      h('p', null, T.activaTexto),
+      h('form', { method: 'post', action: `${op.base}/${RUTA_CITA}`, className: 'cita-form' },
+        h('input', { type: 'hidden', name: 't', value: d.token }),
+        h('input', { type: 'hidden', name: 'idioma', value: i }),
+        h('button', { className: 'btn primary', type: 'submit' }, T.boton),
+        h('a', { className: 'btn', href: inicio }, T.mantener)))
+    : d.estado === 'cancelada'
+      ? h(Fragment, null,
+        h('p', { role: 'status' }, h('strong', null, d.tipo), h('br'), d.texto, h('br'), T.canceladaTexto),
+        h('a', { className: 'btn primary', href: agendar }, T.agendar))
+      : h(Fragment, null, h('p', { role: d.estado === 'no_encontrada' ? 'alert' : 'status' }, T[`${d.estado}Texto`]), h('a', { className: 'btn primary', href: agendar }, T.agendar));
+  return documento(h(Documento, { titulo: `${titulo} · ${marca.nombre}`, descripcion: titulo, canonical: null, idioma: i, entorno: op.entorno, base: op.base, favicon: marca.favicon, robots: 'noindex, nofollow', cssExtra: '.cita-form{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:24px}.cita-form .btn{min-height:48px;cursor:pointer}' },
+    h(Fragment, null,
+      h('header', { className: 'shead' }, h('div', { className: 'in' }, h('span', { className: 'wm' }, h(Marcador, { marca, base: op.base })))),
+      h('main', { id: 'contenido' },
+        h('section', { className: 'no-encontrada' }, h('div', { className: 'in' }, h('h1', null, titulo), cuerpo))))));
+}
+
 /**
  * HU-1509 · CP-121 · La página de aviso del modo mantenimiento (se sirve con 503): solo la marca, el aviso y el mensaje
  * opcional del superadmin, sin menú ni enlaces, y `noindex`. El texto se escapa como todo lo demás (RN-16-7).
@@ -641,14 +734,17 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     { archivo: '404.html', contenido: renderizar404(inst, op), mime: html },
     { archivo: 'sitemap.xml', contenido: sitemapXml(inst, op.sitioUrl), mime: 'application/xml; charset=utf-8' },
     { archivo: 'robots.txt', contenido: robotsTxt(op, inst.robotsExtra, inst.rastreadoresBloqueados), mime: 'text/plain; charset=utf-8' },
-    // HU-1601 · Solo si alguna página publicada tiene el formulario: el script de captación y la página de gracias.
-    ...(tieneFormulario(inst) ? [
+    // HU-1601 · Solo si alguna página publicada tiene el formulario (HU-1605: o el agendador, que lo trae sin
+    // JavaScript): el script de captación y la página de gracias.
+    ...(tieneFormulario(inst) || tieneAgendador(inst) ? [
       { archivo: ARCHIVO_CAPTACION, contenido: SCRIPT_CAPTACION, mime: 'text/javascript; charset=utf-8' },
       { archivo: `${RUTA_GRACIAS}.html`, contenido: renderizarGracias(inst, op, 'es'), mime: html },
       ...(inst.paginas.some((p) => p.idioma === 'en') ? [{ archivo: `en/${RUTA_GRACIAS}.html`, contenido: renderizarGracias(inst, op, 'en'), mime: html }] : []),
     ] : []),
     // HU-1603 · El script de popups va en toda versión: los popups se leen en vivo, sin republicar.
     { archivo: ARCHIVO_POPUPS, contenido: SCRIPT_POPUPS, mime: 'text/javascript; charset=utf-8' },
+    // HU-1605 · El agendador, solo si alguna página lo tiene.
+    ...(tieneAgendador(inst) ? [{ archivo: ARCHIVO_AGENDA, contenido: SCRIPT_AGENDA, mime: 'text/javascript; charset=utf-8' }] : []),
     ...(inst.llmsTxt?.trim() ? [{ archivo: ARCHIVO_LLMS, contenido: `${inst.llmsTxt.trim()}\n`, mime: 'text/plain; charset=utf-8' }] : []),
     ...(inst.redirecciones?.length ? [{ archivo: ARCHIVO_REDIRECCIONES, contenido: JSON.stringify(inst.redirecciones), mime: 'application/json' }] : []),
   ];

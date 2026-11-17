@@ -16,6 +16,7 @@ export function configurarApp(app: INestApplication): INestApplication {
     // HU-1603 · Y los eventos de los popups (`POST /s/_popup`).
     exclude: [
       { path: 's', method: RequestMethod.GET }, { path: 's/{*ruta}', method: RequestMethod.GET }, { path: 's/_lead', method: RequestMethod.POST }, { path: 's/_popup', method: RequestMethod.POST },
+      { path: 's/_cita', method: RequestMethod.POST },
     ],
   });
   app.use(cookieParser());

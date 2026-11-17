@@ -1727,6 +1727,11 @@ paths:
         HU-1603 · `_popups.json` (en vivo, no sale de la versión) devuelve `{ popups: PopupPublico[] }`: solo los popups
         activos y, en producción, nunca los ficticios, sin su nombre interno ni sus resultados. Lleva `Cache-Control:
         public, max-age=0, s-maxage=30`: apagar un popup vale en menos de un minuto sin republicar (CP-132).
+
+        HU-1605 · Con el bloque «Agendador» en la versión, la versión trae `_agenda.js` y solo sus páginas lo cargan
+        (diferido, del mismo origen, sin cookies ni HTML inyectado). El contenedor reserva su alto (CLS 0) y lee las
+        franjas en vivo de `GET /s/_agenda.json`; sin JavaScript el bloque ofrece el formulario de contacto
+        (`POST /s/_lead`) y el WhatsApp de los ajustes. La página del enlace de cancelación es `GET /s/_cita`.
       parameters:
       - name: ruta
         in: path
@@ -1812,6 +1817,225 @@ paths:
           description: Contado (o ignorado)
         '400':
           description: NO_VALIDO · `popupId` no es un UUID o `evento` no es `impresion` ni `conversion`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /s/_agenda.json:
+    get:
+      tags:
+      - Sitio público
+      summary: Tipos de reunión y franjas libres del agendador, en vivo (HU-1605, CP-135)
+      operationId: get_sitio_agenda_json
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión. Lo lee `_agenda.js`, que solo cargan las páginas con el bloque «Agendador» (diferido, del mismo
+        origen). No sale de la versión publicada: cambiar tipos, asesores u horarios en el panel vale sin republicar.
+        Ofrece los tipos visibles con al menos un asesor visible (en producción, nunca los ficticios) y, del tipo pedido
+        (o el primero), las franjas libres de lunes a viernes en hora de Lima (UTC−5 todo el año, SUP-251) desde la
+        anticipación mínima hasta el horizonte, sin feriados nacionales de Perú ni días bloqueados. Una franja queda libre
+        si al menos un asesor del tipo no tiene otra cita confirmada que se cruce: la franja ocupada del asesor no
+        aparece. No dice nada de los asesores ni de otras citas. `Cache-Control: public, max-age=0, s-maxage=15`: la
+        reserva vuelve a comprobar la franja. 429 DEMASIADAS_SOLICITUDES con más de 60 lecturas por minuto desde la misma
+        IP.
+      parameters:
+      - name: tipo
+        in: query
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - name: idioma
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [es, en]
+          default: es
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgendaPublica'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /s/_cita:
+    get:
+      tags:
+      - Sitio público
+      summary: Página del enlace de cancelación de una cita (HU-1605)
+      operationId: get_sitio_cita
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión y sin JavaScript. El enlace del correo de invitación y de los recordatorios lleva el token de
+        cancelación (`t`); la base de datos solo guarda su SHA-256 (SUP-253). La página muestra el tipo de reunión y la
+        fecha con «(hora de Lima)» o «(Lima time)» en el idioma de la cita, y pide confirmar con el botón «Cancelar mi
+        demo» (un formulario `POST /s/_cita`): abrir el enlace no cancela nada. Si la cita ya se canceló, ya pasó o ya
+        empezó, lo dice. `noindex, nofollow`, `Cache-Control: private, no-store` y `Referrer-Policy: no-referrer`.
+      parameters:
+      - name: t
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 16
+          maxLength: 100
+      responses:
+        '200':
+          description: La página con la cita y el botón de confirmar (text/html)
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: El enlace no corresponde a ninguna cita (la página lo dice, text/html)
+          content:
+            text/html:
+              schema:
+                type: string
+    post:
+      tags:
+      - Sitio público
+      summary: Confirmar la cancelación desde la página del enlace (HU-1605)
+      operationId: post_sitio_cita
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión. El formulario de la página del enlace (`application/x-www-form-urlencoded`, que la CDN debe reenviar
+        al origen). Hace lo mismo que `POST /publico/citas/cancelar` y responde con la página del resultado en el idioma
+        de la cita: cancelada (200), no encontrada (404), ya no activa o ya empezó (409).
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [t]
+              properties:
+                t:
+                  type: string
+                  maxLength: 100
+                idioma:
+                  type: string
+                  enum: [es, en]
+      responses:
+        '200':
+          description: La página «Tu demo se canceló» (text/html)
+          content:
+            text/html:
+              schema:
+                type: string
+        '404':
+          description: El enlace no corresponde a ninguna cita (text/html)
+          content:
+            text/html:
+              schema:
+                type: string
+        '409':
+          description: La cita ya no está activa o ya empezó (text/html)
+          content:
+            text/html:
+              schema:
+                type: string
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/citas:
+    post:
+      tags:
+      - Captación
+      summary: Reservar una franja del agendador (HU-1605, CP-135, CP-136)
+      operationId: post_publico_citas
+      security: []
+      description: |-
+        Sin sesión. Lo usa `_agenda.js`. Los datos del visitante siguen las reglas de `POST /publico/leads` (texto plano
+        no confiable, `consentimiento: true` por la Ley 29733, campo trampa `website`: con él lleno responde 201 con
+        `cita: null` y no guarda nada). La franja se vuelve a comprobar en una transacción con un candado por asesor y un
+        índice único parcial (asesor e inicio de las citas confirmadas): de dos reservas a la vez de la misma franja con
+        un solo asesor, una recibe 201 y la otra 409 FRANJA_OCUPADA (CP-135). Con varios asesores libres elige al que
+        tiene menos citas por delante.
+
+        Crea o actualiza el lead con `via: agendador` y, si estaba en Nuevo o Contactado, lo pasa a Demo (excepción a
+        SUP-236, SUP-254). Encola en `agenda` la invitación al visitante con copia al asesor (con la invitación .ics, el
+        enlace de Google Calendar, el enlace fijo de videollamada del asesor y el enlace de cancelación) y los
+        recordatorios por correo a las 24 h y a 1 h que todavía no pasaron; el worker vuelve a mirar la cita antes de
+        enviar cada uno (CP-136). La respuesta trae lo que muestra la confirmación del sitio.
+
+        422 NO_VALIDO con el campo de cada error, TIPO_NO_DISPONIBLE si el tipo ya no se ofrece, FRANJA_NO_VALIDA si esa
+        hora no se ofrece; 429 DEMASIADAS_SOLICITUDES con más de 5 reservas en 10 minutos desde la misma IP (además del
+        límite general de `/publico/*`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservaEntrada'
+      responses:
+        '201':
+          description: Reservada (o descartada por el campo trampa, con `cita` null)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservaRecibida'
+        '409':
+          description: FRANJA_OCUPADA · otro visitante tomó la franja; el sitio vuelve a pedir los horarios
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/citas/cancelar:
+    post:
+      tags:
+      - Captación
+      summary: Cancelar una cita con el token del enlace (HU-1605)
+      operationId: post_publico_citas_cancelar
+      security: []
+      description: |-
+        Sin sesión. Vale hasta la hora de inicio. Cancela, quita los recordatorios pendientes y encola el aviso de
+        cancelación al visitante con copia al asesor (con la invitación .ics `METHOD:CANCEL`). Reagendar es cancelar y
+        reservar otra vez (SUP-251). 404 CITA_NO_ENCONTRADA; 409 CITA_NO_ACTIVA si ya no está confirmada o CITA_YA_EMPEZO;
+        429 con el mismo límite de las reservas.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelacionEntrada'
+      responses:
+        '200':
+          description: Cancelada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cancelacion'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: CITA_NO_ACTIVA o CITA_YA_EMPEZO
           content:
             application/json:
               schema:
@@ -2270,6 +2494,363 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /captacion/agenda:
+    get:
+      tags:
+      - Captación
+      summary: Ajustes, feriados, tipos de reunión y asesores del agendador (HU-1605, PNT-33)
+      operationId: get_captacion_agenda
+      description: |-
+        Solo SUPERADMIN, con `Cache-Control: no-store`. Los feriados nacionales de Perú de este año y el siguiente (fijos más
+        Jueves y Viernes Santo, SUP-252); los tipos en su orden con sus asesores; los asesores con sus citas confirmadas por
+        delante.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agenda'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar los horarios, plazos, días bloqueados o recordatorios (HU-1605)
+      operationId: patch_captacion_agenda
+      description: |-
+        Solo SUPERADMIN. Solo cambia los campos que llegan. `franjas`: de 1 a 16 horas de inicio HH:MM de lunes a viernes en
+        hora de Lima; `anticipacionHoras` de 0 a 72; `horizonteDias` de 1 a 90; `diasBloqueados` fechas AAAA-MM-DD (hasta
+        200); `recordatoriosCorreo` enciende o apaga los recordatorios de 24 h y 1 h (la invitación siempre sale). Vale en
+        el sitio sin republicar. Auditoría AGENDA_AJUSTES_EDITADOS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjustesAgendaCambio'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AjustesAgenda'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/agenda/tipos:
+    post:
+      tags:
+      - Captación
+      summary: Crear un tipo de reunión (HU-1605)
+      operationId: post_captacion_agenda_tipos
+      description: |-
+        Solo SUPERADMIN. `nombreEs` obligatorio (hasta 80), `nombreEn` opcional (si falta, el sitio en inglés usa el
+        español), `minutos` de 15 a 120 (30 por defecto), `asesorIds` de asesores que existen. Nace sin ofrecer salvo
+        `visible: true`, al final del orden. Auditoría AGENDA_TIPO_CREADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipoReunionEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoReunion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/agenda/tipos/orden:
+    put:
+      tags:
+      - Captación
+      summary: Ordenar los tipos de reunión (HU-1605)
+      operationId: put_captacion_agenda_tipos_orden
+      description: |-
+        Solo SUPERADMIN. Lleva todos los tipos una vez cada uno; si no, 422 ORDEN_INCOMPLETO. Auditoría AGENDA_TIPOS_ORDENADOS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenTiposReunion'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TipoReunion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/agenda/tipos/{id}:
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar u ofrecer un tipo de reunión (HU-1605)
+      operationId: patch_captacion_agenda_tipos_id
+      description: |-
+        Solo SUPERADMIN. Solo cambia los campos que llegan; `asesorIds` reemplaza la lista. `visible` es «Ofrecer [tipo]»:
+        vale en el sitio sin republicar. Auditoría AGENDA_TIPO_EDITADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TipoReunionEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TipoReunion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Captación
+      summary: Borrar un tipo de reunión sin citas (HU-1605)
+      operationId: delete_captacion_agenda_tipos_id
+      description: |-
+        Solo SUPERADMIN. 409 TIPO_CON_CITAS si tiene citas: se apaga para conservar el historial. El resto se reordena sin
+        huecos. Auditoría AGENDA_TIPO_BORRADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Borrado
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: TIPO_CON_CITAS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /captacion/agenda/asesores:
+    post:
+      tags:
+      - Captación
+      summary: Agregar un asesor con su enlace fijo de videollamada (HU-1605)
+      operationId: post_captacion_agenda_asesores
+      description: |-
+        Solo SUPERADMIN. `nombre` (hasta 120), `correo` y `enlaceVideollamada` https:// sin usuario ni clave (hasta 500).
+        Recibe citas (`visible`) salvo `visible: false`. Su disponibilidad es el calendario interno de Aptio: Google
+        Calendar y Outlook quedan para después (SUP-251). Auditoría AGENDA_ASESOR_CREADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsesorEntrada'
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asesor'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/agenda/asesores/{id}:
+    patch:
+      tags:
+      - Captación
+      summary: Cambiar un asesor o dejar de darle citas (HU-1605)
+      operationId: patch_captacion_agenda_asesores_id
+      description: |-
+        Solo SUPERADMIN. Solo cambia los campos que llegan. Con `visible: false` no recibe citas nuevas; las que tiene
+        siguen. Auditoría AGENDA_ASESOR_EDITADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsesorEntrada'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asesor'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+    delete:
+      tags:
+      - Captación
+      summary: Borrar un asesor sin citas (HU-1605)
+      operationId: delete_captacion_agenda_asesores_id
+      description: |-
+        Solo SUPERADMIN. 409 ASESOR_CON_CITAS si tiene citas. Auditoría AGENDA_ASESOR_BORRADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Borrado
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: ASESOR_CON_CITAS
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /captacion/agenda/citas:
+    get:
+      tags:
+      - Captación
+      summary: Citas del agendador por estado y rango de fechas (HU-1605, PNT-33)
+      operationId: get_captacion_agenda_citas
+      description: |-
+        Solo SUPERADMIN, con `Cache-Control: no-store`. De la más próxima a la más lejana, hasta 500; `total` cuenta todas.
+        `desde` y `hasta` son fechas de Lima, incluidas.
+      parameters:
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [confirmada, cancelada, realizada, no_asistio]
+      - name: desde
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+          example: '2026-11-01'
+      - name: hasta
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+          example: '2026-11-30'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Citas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /captacion/agenda/citas/{id}:
+    patch:
+      tags:
+      - Captación
+      summary: Cancelar una cita o marcarla como realizada o no asistió (HU-1605)
+      operationId: patch_captacion_agenda_citas_id
+      description: |-
+        Solo SUPERADMIN. `cancelada` solo para una cita confirmada: quita los recordatorios y encola el aviso de
+        cancelación al visitante con copia al asesor. `realizada` y `no_asistio` solo después de su inicio (si no, 422
+        CITA_FUTURA) y nunca para una cancelada (409 CITA_NO_ACTIVA). Auditoría AGENDA_CITA_CANCELADA o AGENDA_CITA_MARCADA.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambioCita'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cita'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: CITA_NO_ACTIVA
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /operacion:
     get:
       tags:
@@ -7611,6 +8192,418 @@ components:
           items:
             type: string
             format: uuid
+    AjustesAgenda:
+      type: object
+      description: HU-1605 · Horarios y plazos del agendador (una sola fila)
+      required: [franjas, anticipacionHoras, horizonteDias, diasBloqueados, recordatoriosCorreo]
+      properties:
+        franjas:
+          type: array
+          minItems: 1
+          maxItems: 16
+          items:
+            type: string
+            pattern: '^([01]\d|2[0-3]):[0-5]\d$'
+          example: ['09:00', '10:00', '11:30', '15:00', '16:30']
+          description: Horas de inicio de lunes a viernes, en hora de Lima
+        anticipacionHoras:
+          type: integer
+          minimum: 0
+          maximum: 72
+          example: 4
+        horizonteDias:
+          type: integer
+          minimum: 1
+          maximum: 90
+          example: 30
+        diasBloqueados:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+            format: date
+          description: Fechas de Lima que no se ofrecen, además de los feriados
+        recordatoriosCorreo:
+          type: boolean
+          description: Recordatorios por correo a las 24 h y a 1 h
+    AjustesAgendaCambio:
+      type: object
+      description: Solo los campos que cambian, con las reglas de AjustesAgenda
+      properties:
+        franjas:
+          type: array
+          items:
+            type: string
+        anticipacionHoras:
+          type: integer
+        horizonteDias:
+          type: integer
+        diasBloqueados:
+          type: array
+          items:
+            type: string
+            format: date
+        recordatoriosCorreo:
+          type: boolean
+    Feriado:
+      type: object
+      required: [fecha, nombre]
+      properties:
+        fecha:
+          type: string
+          format: date
+          example: '2026-12-08'
+        nombre:
+          type: string
+          example: Inmaculada Concepción
+    TipoReunion:
+      type: object
+      required: [id, nombreEs, nombreEn, minutos, asesorIds, visible, orden, ficticio]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombreEs:
+          type: string
+          maxLength: 80
+          example: Demo del generador
+        nombreEn:
+          type: string
+          maxLength: 80
+          example: Generator demo
+        minutos:
+          type: integer
+          minimum: 15
+          maximum: 120
+          example: 30
+        asesorIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        visible:
+          type: boolean
+          description: «Ofrecer [tipo]» en el sitio
+        orden:
+          type: integer
+        ficticio:
+          type: boolean
+          description: Dato inventado; nunca se ofrece en producción
+    TipoReunionEntrada:
+      type: object
+      properties:
+        nombreEs:
+          type: string
+          maxLength: 80
+        nombreEn:
+          type: string
+          maxLength: 80
+        minutos:
+          type: integer
+          minimum: 15
+          maximum: 120
+        asesorIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uuid
+        visible:
+          type: boolean
+        ficticio:
+          type: boolean
+    OrdenTiposReunion:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          maxItems: 200
+          items:
+            type: string
+            format: uuid
+    Asesor:
+      type: object
+      required: [id, nombre, correo, enlaceVideollamada, visible, ficticio, citasProximas]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+          example: Carla Montoya
+        correo:
+          type: string
+          format: email
+        enlaceVideollamada:
+          type: string
+          format: uri
+          example: https://meet.google.com/abc-defg-hij
+        visible:
+          type: boolean
+          description: Recibe citas nuevas
+        ficticio:
+          type: boolean
+        citasProximas:
+          type: integer
+          description: Citas confirmadas por delante
+    AsesorEntrada:
+      type: object
+      properties:
+        nombre:
+          type: string
+          maxLength: 120
+        correo:
+          type: string
+          format: email
+          maxLength: 254
+        enlaceVideollamada:
+          type: string
+          format: uri
+          maxLength: 500
+          description: https://, sin usuario ni clave
+        visible:
+          type: boolean
+        ficticio:
+          type: boolean
+    Agenda:
+      type: object
+      required: [ajustes, feriados, tipos, asesores]
+      properties:
+        ajustes:
+          $ref: '#/components/schemas/AjustesAgenda'
+        feriados:
+          type: array
+          items:
+            $ref: '#/components/schemas/Feriado'
+        tipos:
+          type: array
+          items:
+            $ref: '#/components/schemas/TipoReunion'
+        asesores:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asesor'
+    Cita:
+      type: object
+      required: [id, inicio, fin, fecha, hora, estado, tipoId, tipo, asesorId, asesor, nombre, correo, empresa, lms, idioma, leadId, canceladaPor, invitacionEnviadaEn, recordatorio24hEnviadoEn, recordatorio1hEnviadoEn, creadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+        fin:
+          type: string
+          format: date-time
+        fecha:
+          type: string
+          format: date
+          description: Fecha de Lima
+        hora:
+          type: string
+          example: '10:00'
+          description: Hora de Lima
+        estado:
+          type: string
+          enum: [confirmada, cancelada, realizada, no_asistio]
+        tipoId:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+        asesorId:
+          type: string
+          format: uuid
+        asesor:
+          type: string
+        nombre:
+          type: string
+        correo:
+          type: string
+        empresa:
+          type: string
+          nullable: true
+        lms:
+          type: string
+          nullable: true
+          enum: [Moodle, Blackboard, Chamilo, Canvas, Otro, No usamos LMS, null]
+        idioma:
+          type: string
+          enum: [es, en]
+        leadId:
+          type: string
+          format: uuid
+          nullable: true
+        canceladaPor:
+          type: string
+          nullable: true
+          enum: [visitante, superadmin, null]
+        invitacionEnviadaEn:
+          type: string
+          format: date-time
+          nullable: true
+        recordatorio24hEnviadoEn:
+          type: string
+          format: date-time
+          nullable: true
+        recordatorio1hEnviadoEn:
+          type: string
+          format: date-time
+          nullable: true
+        creadoEn:
+          type: string
+          format: date-time
+    Citas:
+      type: object
+      required: [citas, total]
+      properties:
+        citas:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/Cita'
+        total:
+          type: integer
+    CambioCita:
+      type: object
+      required: [estado]
+      properties:
+        estado:
+          type: string
+          enum: [cancelada, realizada, no_asistio]
+    FranjaAgenda:
+      type: object
+      required: [fecha, hora, inicio]
+      properties:
+        fecha:
+          type: string
+          format: date
+          description: Fecha de Lima
+        hora:
+          type: string
+          example: '10:00'
+          description: Hora de Lima
+        inicio:
+          type: string
+          format: date-time
+          description: En UTC; es lo que se manda al reservar
+    AgendaPublica:
+      type: object
+      description: HU-1605 · Lo que el sitio recibe del agendador (sin datos de asesores ni de otras citas)
+      required: [zona, tipos, tipoId, franjas, hoy, horizonte]
+      properties:
+        zona:
+          type: string
+          enum: [America/Lima]
+        tipos:
+          type: array
+          items:
+            type: object
+            required: [id, nombre, minutos]
+            properties:
+              id:
+                type: string
+                format: uuid
+              nombre:
+                type: string
+                description: En el idioma pedido (el español si no hay nombre en inglés)
+              minutos:
+                type: integer
+        tipoId:
+          type: string
+          format: uuid
+          nullable: true
+        franjas:
+          type: array
+          items:
+            $ref: '#/components/schemas/FranjaAgenda'
+        hoy:
+          type: string
+          format: date
+        horizonte:
+          type: string
+          format: date
+    ReservaEntrada:
+      description: La franja elegida y los datos del lead (las reglas de LeadEntrada, sin `via`, que es `agendador`)
+      allOf:
+      - $ref: '#/components/schemas/LeadEntrada'
+      - type: object
+        required: [tipoId, inicio]
+        properties:
+          tipoId:
+            type: string
+            format: uuid
+          inicio:
+            type: string
+            format: date-time
+            example: '2026-11-17T15:00:00.000Z'
+            description: El `inicio` de una franja de `GET /s/_agenda.json`
+          lms:
+            type: string
+            enum: [Moodle, Blackboard, Chamilo, Canvas, Otro, No usamos LMS]
+    CitaConfirmada:
+      type: object
+      required: [id, inicio, fin, tipo, enlace, google, ics, texto]
+      properties:
+        id:
+          type: string
+          format: uuid
+        inicio:
+          type: string
+          format: date-time
+        fin:
+          type: string
+          format: date-time
+        tipo:
+          type: string
+          example: Demo del generador
+        enlace:
+          type: string
+          format: uri
+          description: El enlace fijo de videollamada del asesor
+        google:
+          type: string
+          format: uri
+          description: Añadir a Google Calendar
+        ics:
+          type: string
+          description: La invitación iCalendar (METHOD:REQUEST)
+        texto:
+          type: string
+          example: martes 17 de noviembre de 2026, 10:00 (hora de Lima)
+    ReservaRecibida:
+      type: object
+      required: [recibido, cita]
+      properties:
+        recibido:
+          type: boolean
+          example: true
+        cita:
+          type: object
+          nullable: true
+          description: null cuando se descarta por el campo trampa
+          allOf:
+          - $ref: '#/components/schemas/CitaConfirmada'
+    CancelacionEntrada:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          maxLength: 100
+          description: El token del enlace de la invitación
+    Cancelacion:
+      type: object
+      required: [cancelada, texto]
+      properties:
+        cancelada:
+          type: boolean
+          example: true
+        texto:
+          type: string
+          example: martes 17 de noviembre de 2026, 10:00 (hora de Lima)
     PopupPublico:
       type: object
       description: Lo que el sitio recibe de cada popup activo (sin nombre interno ni resultados)

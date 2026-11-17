@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { leerAjustesSitio, type Prisma } from '@aptio/db';
+import { etapaTrasAgendar } from '@aptio/schema/agenda';
 import { etiquetaOrigen, fusionarLead, leadNuevo, leadsACsv, leerHistorial, LIMITES_LEAD, resumenUtm, validarEnvioLead, type EnvioLead } from '@aptio/schema/leads';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
@@ -80,6 +81,20 @@ export class LeadsService {
     // HU-1602 · Al CRM y al webhook activos: el alta, o un contacto nuevo del mismo correo.
     this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
     return { estado: 'guardado', leadId: lead.id, nuevo };
+  }
+
+  /**
+   * HU-1605 · El lead de una demo agendada (vía agendador, ya validado con la reserva): se guarda como cualquier envío,
+   * pasa a «Demo» si estaba en «Nuevo» o «Contactado» (SUP-254, excepción a SUP-236), avisa al correo de leads y va al
+   * CRM. El límite por IP lo aplica la reserva.
+   */
+  async registrarAgendado(envio: EnvioLead, ahora = new Date()): Promise<{ leadId: string; nuevo: boolean }> {
+    let { lead, nuevo } = await this.guardar(envio, ahora);
+    const etapa = etapaTrasAgendar(lead.etapa);
+    if (etapa !== lead.etapa) lead = await this.bd.lead.update({ where: { id: lead.id }, data: { etapa } });
+    this.ultimoAviso = this.avisar(lead, nuevo, envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
+    this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
+    return { leadId: lead.id, nuevo };
   }
 
   /** Un lead por correo: si dos envíos llegan juntos, el segundo se suma al primero en vez de fallar. */

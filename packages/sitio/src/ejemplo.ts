@@ -6,6 +6,7 @@
  * testimonio va marcado como ficticio para probar que en producción no sale. HU-1512: el inicio va como FAQPage y Personaje
  * con su propio meta título, como Product.
  */
+import { type AgendaPublica, AJUSTES_AGENDA_POR_DEFECTO, deLima, fechaLima, franjasLibres, sumarDias } from '@aptio/schema/agenda';
 import type { PopupPublico } from '@aptio/schema/popups';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
@@ -27,10 +28,12 @@ const landing = (id: string, sector: string, titulo: string, texto: string, blog
 });
 const enlace = (id: string, zona: string, texto: string, ruta: string | null, orden: number, padreId: string | null = null, idioma = 'es') => ({ id, zona, padreId, texto, ruta, orden, visible: true, idioma });
 
-export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion'): Instantanea {
+/** HU-1605 · `agenda: true` suma la página «Agendar demo» con el agendador (para Lighthouse y Playwright). */
+export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra: { agenda?: boolean } = {}): Instantanea {
   n = 0;
   return armarInstantanea({
     paginas: [
+      ...(extra.agenda ? [{ ...pagina('agendar', '/agendar-demo', 'Agendar demo', ['agendador']), metaDescripcion: 'Te mostramos el generador con un documento tuyo. Elige día y hora en horario de Lima.' }] : []),
       // HU-1512 · El inicio con sus preguntas en FAQPage; Personaje con meta título y descripción propios, como Product.
       { ...pagina('inicio', '/', 'Inicio', ['hero', 'metricas', 'confianza', 'logos', 'pasos', 'funcionalidades', 'lms', 'sectores', 'testimonios', 'faq', 'bloglista', 'cta']), datosEstructurados: 'FAQPage' },
       landing('mineria-y-energia', 'Minería y energía', 'Cápsulas de seguridad para operaciones mineras y de energía', 'Bloqueo y etiquetado, trabajos en altura y espacios confinados en cápsulas de 5 minutos para el celular.', 'Casos'),
@@ -110,4 +113,15 @@ export function popupsDeEjemplo(): PopupPublico[] {
     id: '00000000-0000-4000-9900-000000000001', tipo: 'barra', idioma: 'es', disparador: 'al_cargar', valorDisparador: null, paginas: ['*'],
     titulo: 'Nuevo: versión en inglés dentro del mismo paquete SCORM.', texto: '', boton: 'Ver cómo funciona', accion: 'enlace_interno', enlaceDestino: '/funcionalidades/personaje', frecuenciaDias: 7,
   }];
+}
+
+/**
+ * HU-1605 · La agenda en vivo de ejemplo (lo que respondería `GET /s/_agenda.json`): la demo de 30 minutos con un
+ * asesor libre, con las franjas por defecto desde `ahora`.
+ */
+export function agendaDeEjemplo(ahora = new Date()): AgendaPublica {
+  const hoy = fechaLima(ahora);
+  const tipo = { id: '00000000-0000-4000-9900-0000000000a1', nombre: 'Demo del generador', minutos: 30 };
+  const franjas = franjasLibres(AJUSTES_AGENDA_POR_DEFECTO, { minutos: 30, asesorIds: ['asesor'] }, [{ asesorId: 'asesor', inicio: deLima(sumarDias(hoy, 1), '10:00'), fin: deLima(sumarDias(hoy, 1), '10:30') }], ahora);
+  return { zona: 'America/Lima', tipos: [tipo], tipoId: tipo.id, franjas, hoy, horizonte: sumarDias(hoy, AJUSTES_AGENDA_POR_DEFECTO.horizonteDias) };
 }

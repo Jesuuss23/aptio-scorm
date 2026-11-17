@@ -62,6 +62,29 @@ export const opcionesTareaCrm = (entrega: string) => ({
   jobId: `crm-${entrega}`, attempts: INTENTOS_CRM, backoff: { type: 'crm' }, removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
 });
 
+/**
+ * HU-1605 · Avisos del agendamiento (RN-17-5, CP-136). Fuera de COLAS: no son trabajos de una organización. Un trabajo
+ * por aviso y cita: la invitación y la cancelación salen al momento; los recordatorios se programan con espera hasta 24 h
+ * y 1 h antes del inicio y se quitan si la cita se cancela. 1 intento y 3 reintentos (30 s, 2 min, 8 min) si falla el
+ * SMTP; la cita ya está confirmada y no se toca. El worker vuelve a leer la cita antes de enviar.
+ */
+export const COLA_AGENDA = 'agenda';
+export const TAREA_AGENDA = 'agenda-aviso';
+export const AVISOS_AGENDA = ['invitacion', 'recordatorio24h', 'recordatorio1h', 'cancelacion'] as const;
+export type AvisoAgenda = (typeof AVISOS_AGENDA)[number];
+export const ESPERAS_AGENDA_MS = [30_000, 120_000, 480_000] as const;
+export const INTENTOS_AGENDA = ESPERAS_AGENDA_MS.length + 1;
+/**
+ * `token` es el del enlace de cancelación: solo viaja en la invitación y los recordatorios (la base guarda su SHA-256).
+ * Una cancelación no lo lleva.
+ */
+export interface DatosAgenda { citaId: string; aviso: AvisoAgenda; token?: string }
+export const idTareaAgenda = (citaId: string, aviso: AvisoAgenda) => `agenda-${citaId}-${aviso}`;
+export const opcionesTareaAgenda = (citaId: string, aviso: AvisoAgenda, demoraMs = 0) => ({
+  jobId: idTareaAgenda(citaId, aviso), delay: Math.max(0, demoraMs), attempts: INTENTOS_AGENDA, backoff: { type: 'agenda' },
+  removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
+});
+
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 
 /** Datos con los que se encola un trabajo. El detalle vive en TrabajoIA (base de datos). */

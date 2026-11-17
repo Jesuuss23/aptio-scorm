@@ -985,10 +985,10 @@ model WpArticulo {
 /// contacto (origen, vía, página de entrada y UTM) y no cambia; cada envío posterior suma al historial. Los campos del
 /// CRM llegan con la HU-1602. Reglas en `@aptio/schema/leads`.
 model Lead {
-  id                 String      @id @default(uuid()) @db.Uuid
+  id                 String       @id @default(uuid()) @db.Uuid
   /// En minúsculas y sin espacios.
-  correo             String      @unique
-  nombre             String      @default("")
+  correo             String       @unique
+  nombre             String       @default("")
   empresa            String?
   mensaje            String?
   /// formulario | popup | chatbot | agendador | suscripcion | boletin | asistente_ia
@@ -1003,17 +1003,18 @@ model Lead {
   utmTerm            String?
   utmContent         String?
   referente          String?
-  idioma             String      @default("es")
+  idioma             String       @default("es")
   /// NUEVO | CONTACTADO | DEMO | PROPUESTA | GANADO | PERDIDO
-  etapa              String      @default("NUEVO")
-  consentimiento     Boolean     @default(false)
+  etapa              String       @default("NUEVO")
+  consentimiento     Boolean      @default(false)
   consentimientoEn   DateTime?
-  totalContactos     Int         @default(1)
+  totalContactos     Int          @default(1)
   /// [{ en, via, pagina, mensaje? }] con cada envío recibido, del más antiguo al más nuevo (hasta 50).
-  historialContactos Json        @default("[]")
-  creadoEn           DateTime    @default(now())
-  actualizadoEn      DateTime    @updatedAt
+  historialContactos Json         @default("[]")
+  creadoEn           DateTime     @default(now())
+  actualizadoEn      DateTime     @updatedAt
   envios             LeadEnvio[]
+  citas              AgendaCita[]
 
   @@index([origen, creadoEn])
   @@index([etapa, creadoEn])
@@ -1093,4 +1094,90 @@ model SitioPopup {
   actualizadoEn   DateTime @updatedAt
 
   @@index([visible, idioma, orden])
+}
+
+/// HU-1605 · Un tipo de reunión que ofrece el agendador (REQ-078, PNT-33, RN-17-5): duración y asesores que lo atienden.
+/// Reglas en `@aptio/schema/agenda`.
+model AgendaTipo {
+  id            String         @id @default(uuid()) @db.Uuid
+  nombreEs      String
+  nombreEn      String         @default("")
+  /// De 15 a 120.
+  minutos       Int            @default(30)
+  asesores      AgendaAsesor[]
+  /// Un tipo nuevo se crea oculto (RN-16-2).
+  visible       Boolean        @default(false)
+  orden         Int            @default(0)
+  /// Dato inventado: nunca se ofrece en producción.
+  ficticio      Boolean        @default(false)
+  creadoEn      DateTime       @default(now())
+  actualizadoEn DateTime       @updatedAt
+  citas         AgendaCita[]
+
+  @@index([visible, orden])
+}
+
+/// HU-1605 · Un asesor que atiende demos: su correo recibe la copia de cada invitación y su enlace fijo de videollamada
+/// (https) va en la invitación. Su calendario es el de Aptio (sus citas confirmadas): Google Calendar y Outlook llegan
+/// con su propia historia (SUP-251).
+model AgendaAsesor {
+  id                 String       @id @default(uuid()) @db.Uuid
+  nombre             String
+  correo             String
+  enlaceVideollamada String
+  visible            Boolean      @default(true)
+  ficticio           Boolean      @default(false)
+  creadoEn           DateTime     @default(now())
+  actualizadoEn      DateTime     @updatedAt
+  tipos              AgendaTipo[]
+  citas              AgendaCita[]
+}
+
+/// HU-1605 · Ajustes del agendador: una sola fila (`id` = "agenda"). Las franjas son horas de inicio de lunes a viernes
+/// en hora de Lima (UTC−5); los días bloqueados son fechas `AAAA-MM-DD` de Lima.
+model AgendaAjustes {
+  id                  String   @id @default("agenda")
+  franjas             String[] @default(["09:00", "10:00", "11:30", "15:00", "16:30"])
+  anticipacionHoras   Int      @default(4)
+  horizonteDias       Int      @default(30)
+  diasBloqueados      String[] @default([])
+  recordatoriosCorreo Boolean  @default(true)
+  creadoEn            DateTime @default(now())
+  actualizadoEn       DateTime @updatedAt
+}
+
+/// HU-1605 · Una cita del agendador (CP-135, CP-136). `inicio` y `fin` en UTC. Un índice único parcial (en la
+/// migración: Prisma no los declara) impide dos citas confirmadas del mismo asesor a la misma hora. El enlace de
+/// cancelación lleva un token cuyo SHA-256 se guarda aquí; el token no se guarda.
+model AgendaCita {
+  id                       String       @id @default(uuid()) @db.Uuid
+  tipoId                   String       @db.Uuid
+  tipo                     AgendaTipo   @relation(fields: [tipoId], references: [id], onDelete: Restrict)
+  asesorId                 String       @db.Uuid
+  asesor                   AgendaAsesor @relation(fields: [asesorId], references: [id], onDelete: Restrict)
+  inicio                   DateTime
+  fin                      DateTime
+  nombre                   String
+  /// En minúsculas y sin espacios.
+  correo                   String
+  empresa                  String?
+  lms                      String?
+  /// es | en: el idioma de la invitación y los recordatorios.
+  idioma                   String       @default("es")
+  /// confirmada | cancelada | realizada | no_asistio
+  estado                   String       @default("confirmada")
+  leadId                   String?      @db.Uuid
+  lead                     Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  tokenCancelacionHash     String       @unique
+  canceladaPor             String?
+  invitacionEnviadaEn      DateTime?
+  recordatorio24hEnviadoEn DateTime?
+  recordatorio1hEnviadoEn  DateTime?
+  cancelacionEnviadaEn     DateTime?
+  creadoEn                 DateTime     @default(now())
+  actualizadoEn            DateTime     @updatedAt
+
+  @@index([asesorId, inicio])
+  @@index([estado, inicio])
+  @@index([inicio])
 }
