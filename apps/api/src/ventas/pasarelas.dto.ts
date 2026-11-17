@@ -33,7 +33,9 @@ export class OrdenPasarelasDto {
 /** HU-1704 · Un cobro aprobado (sin datos de tarjeta: solo la referencia y los 4 últimos dígitos, REQ-110). */
 export class CobroDto {
   @ApiProperty({ format: 'uuid' }) id: string;
-  @ApiProperty({ format: 'uuid' }) solicitudId: string;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'El alta que pagó; null si es una compra de cápsulas (HU-1705)' }) solicitudId: string | null;
+  @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'HU-1705 · La compra de cápsulas adicionales que pagó' }) compraCapsulasId: string | null;
+  @ApiProperty({ enum: ['SUSCRIPCION', 'CAPSULAS'], description: 'HU-1705 · Qué pagó: el alta o cápsulas adicionales' }) concepto: 'SUSCRIPCION' | 'CAPSULAS';
   @ApiProperty({ type: String, format: 'uuid', nullable: true, description: 'null = pago aprobado sin alta (SUP-291)' }) suscripcionId: string | null;
   @ApiProperty({ example: 'Minera Andina SAC' }) razonSocial: string;
   @ApiProperty({ example: 'ana@minera.pe' }) correoAdmin: string;

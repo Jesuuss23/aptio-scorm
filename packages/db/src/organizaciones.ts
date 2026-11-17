@@ -30,6 +30,9 @@ export const TABLAS_ORGANIZACION = [
   // HU-1703 · La suscripción de cada organización y el checkout (sin organización mientras no se paga).
   { tabla: 'Suscripcion', opcional: false },
   { tabla: 'SolicitudSuscripcion', opcional: true },
+  // HU-1705 · Consumos de cápsulas (uno por proyecto) y compras de adicionales.
+  { tabla: 'ConsumoCapsula', opcional: false },
+  { tabla: 'CompraCapsulas', opcional: false },
 ] as const;
 export type TablaOrganizacion = (typeof TABLAS_ORGANIZACION)[number]['tabla'];
 
@@ -53,6 +56,9 @@ const REGLAS: { regla: string; sql: string }[] = [
   { regla: 'Recurso: proyecto de otra organización', sql: `SELECT count(*) FROM "Recurso" x JOIN "Proyecto" p ON p."id" = x."proyectoId" WHERE x."organizacionId" <> p."organizacionId"` },
   { regla: 'TrabajoIA: proyecto de otra organización', sql: `SELECT count(*) FROM "TrabajoIA" x JOIN "Proyecto" p ON p."id" = x."proyectoId" WHERE x."organizacionId" IS DISTINCT FROM p."organizacionId"` },
   { regla: 'MedicionProceso: proyecto de otra organización', sql: `SELECT count(*) FROM "MedicionProceso" x JOIN "Proyecto" p ON p."id" = x."proyectoId" WHERE x."organizacionId" <> p."organizacionId"` },
+  { regla: 'ConsumoCapsula: proyecto de otra organización', sql: `SELECT count(*) FROM "ConsumoCapsula" x JOIN "Proyecto" p ON p."id" = x."proyectoId" WHERE x."organizacionId" <> p."organizacionId"` },
+  { regla: 'ConsumoCapsula: suscripción de otra organización', sql: `SELECT count(*) FROM "ConsumoCapsula" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
+  { regla: 'CompraCapsulas: suscripción de otra organización', sql: `SELECT count(*) FROM "CompraCapsulas" x JOIN "Suscripcion" s ON s."id" = x."suscripcionId" WHERE x."organizacionId" <> s."organizacionId"` },
 ];
 
 export interface ConteoOrganizacion { organizacionId: string | null; slug: string | null; tabla: TablaOrganizacion; filas: number }

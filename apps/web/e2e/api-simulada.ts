@@ -35,6 +35,7 @@ import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
 import { crearPlanesSim, type PlanesSitioSim } from './planes-simulados';
 import { crearSuscripcionesSim, ORIGEN_STRIPE_SIMULADO } from './suscripciones-simuladas';
+import { crearCuotasSim, type CuotaSitioSim, ORIGEN_PAGO_CAPSULAS } from './cuotas-simuladas';
 import { crearPasarelasSim, type PasarelasSitioSim } from './pasarelas-simuladas';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
@@ -205,6 +206,8 @@ export interface OpcionesSimulacion {
   planesSitio?: PlanesSitioSim;
   /** HU-1704 · Ventas › Pasarelas: si Stripe tiene sus variables, qué pasarelas se muestran y los cobros sin cuenta. */
   pasarelasSitio?: PasarelasSitioSim;
+  /** HU-1705 · La cuota de cápsulas de la organización; sin ella, `/organizacion/cuota` responde 404 y no se muestra. */
+  cuotaSitio?: CuotaSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -479,9 +482,10 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, cuotaSitio }: OpcionesSimulacion) {
   const planesSim = crearPlanesSim(planesSitio);
   const pasarelasSim = crearPasarelasSim(pasarelasSitio, () => entornoSitio);
+  const cuotasSim = crearCuotasSim(cuotaSitio, () => rol ?? USUARIO.rol);
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -783,6 +787,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     return a ? enviar(200, pedido!.tipo, a.contenido, undefined, ultima.instantanea.sitio?.cookies ?? null) : enviar(404, '404', archivos.find((x) => x.archivo === '404.html')!.contenido);
   });
 
+  // HU-1705 · La página alojada de la pasarela para las cápsulas adicionales.
+  await page.route(`${ORIGEN_PAGO_CAPSULAS}/**`, (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').pop() ?? '';
+    const html = cuotasSim.paginaPago(id);
+    return html ? route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }) : route.fulfill({ status: 404, body: 'no' });
+  });
   // HU-1704 · La página alojada de Stripe, simulada fuera del sitio.
   await page.route(`${ORIGEN_STRIPE_SIMULADO}/**`, (route) => {
     const id = new URL(route.request().url()).pathname.split('/').pop() ?? '';
@@ -1368,6 +1378,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       const r = agendaSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
       return responder(r.status, r.body);
     }
+    if (ruta.startsWith('/organizacion/cuota')) {
+      const r = cuotasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).origin);
+      if (r) return responder(r.status, r.body);
+    }
     if (ruta.startsWith('/ventas/pasarelas') || ruta.startsWith('/ventas/cobros')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const r = pasarelasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
@@ -1860,6 +1874,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (generaciones.some((g) => g.proyectoId === proyectoId && ['EN_COLA', 'EN_CURSO'].includes(g.estado))) {
         return responder(409, { codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
       }
+      const sinCuota = cuotasSim.consumir(proyectoId);
+      if (sinCuota) return responder(sinCuota.status, sinCuota.body);
       return responder(202, conAvance(crear()));
     }
     const etapaDe = ruta.match(/^\/generaciones\/([0-9a-f-]+)\/etapas\/([A-Z_]+)$/);

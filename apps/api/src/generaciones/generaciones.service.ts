@@ -7,6 +7,7 @@ import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { ColasService } from '../trabajos/colas.service.js';
+import { CuotasService } from '../ventas/cuotas.service.js';
 import type { EtapaResultadoDto, GeneracionDto, GeneracionEntradaDto, NarracionSolicitudDto, RegeneracionDto } from './generacion.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
@@ -40,6 +41,7 @@ export class GeneracionesService {
   constructor(
     private readonly baseDatos: BaseDatosService,
     private readonly colas: ColasService,
+    private readonly cuotas: CuotasService,
   ) {}
 
   private get bd() {
@@ -97,6 +99,8 @@ export class GeneracionesService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${proyectoId}))`;
       const activa = await tx.generacion.findFirst({ where: { proyectoId, estado: { in: [...ACTIVOS] } }, select: { id: true } });
       if (activa) throw new ConflictException({ codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto', detalles: [{ generacionId: activa.id }] });
+      // HU-1705 · La primera generación del proyecto consume una cápsula (402 CUOTA_AGOTADA sin cuota); las siguientes no.
+      const capsula = await this.cuotas.consumir(tx, u, p.organizacionId, proyectoId);
       const nueva = await tx.generacion.create({
         data: {
           organizacionId: p.organizacionId, proyectoId, iniciadoPorId: u.id, parametros: parametros as Prisma.InputJsonValue,
@@ -106,7 +110,7 @@ export class GeneracionesService {
       });
       await tx.proyecto.update({ where: { id: proyectoId }, data: { estado: 'GENERANDO' } });
       await tx.auditoria.create({
-        data: { organizacionId: p.organizacionId, usuarioId: u.id, accion: 'GENERACION_LANZADA', entidad: 'Generacion', entidadId: nueva.id, datos: parametros as Prisma.InputJsonValue },
+        data: { organizacionId: p.organizacionId, usuarioId: u.id, accion: 'GENERACION_LANZADA', entidad: 'Generacion', entidadId: nueva.id, datos: { ...parametros, capsula } as Prisma.InputJsonValue },
       });
       return nueva;
     });

@@ -749,8 +749,23 @@ export interface PasarelaVenta {
 }
 /** HU-1704 · Un cobro aprobado (sin datos de tarjeta, REQ-110). */
 export interface CobroVenta {
-  id: string; solicitudId: string; suscripcionId: string | null; razonSocial: string; correoAdmin: string; nombrePlan: string; monto: number; moneda: 'PEN' | 'USD'; pasarela: string;
+  id: string; solicitudId: string | null; compraCapsulasId: string | null; concepto: 'SUSCRIPCION' | 'CAPSULAS'; suscripcionId: string | null; razonSocial: string; correoAdmin: string; nombrePlan: string; monto: number; moneda: 'PEN' | 'USD'; pasarela: string;
   ultimos4Digitos: string | null; estado: 'APROBADO' | 'REEMBOLSADO'; motivoSinAlta: string | null; reembolsable: boolean; reembolsoId: string | null; reembolsadoEn: string | null; creadoEn: string;
+}
+
+/** HU-1705 · La cuota de cápsulas de la ventana mensual y la compra de adicionales (REQ-085, CP-146). */
+export interface OfertaAdicional { unitario: number; igv: number; total: number; moneda: 'PEN' | 'USD'; disponible: boolean }
+export interface CuotaCapsulas {
+  ilimitada: boolean; ventanaInicio: string; ventanaFin: string; incluidas: number | null; adicionales: number; usadas: number; disponibles: number | null;
+  oferta: OfertaAdicional | null; puedeComprar: boolean; planes: string;
+}
+export type PagoCompra =
+  | { tipo: 'simulado' }
+  | { tipo: 'redireccion'; url: string; referencia?: string }
+  | { tipo: 'formulario'; llavePublica: string; montoCentimos: number; moneda: 'PEN' | 'USD'; descripcion: string };
+export interface CompraCapsulas {
+  id: string; estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'; cantidad: number; subtotal: number; igv: number; total: number; moneda: 'PEN' | 'USD'; pasarela: string;
+  motivoRechazo: string | null; pago?: PagoCompra; cuota: CuotaCapsulas;
 }
 
 /** HU-1605 · Captación › Agendamiento (PNT-33). */
@@ -973,6 +988,11 @@ export const api = {
   ordenarPasarelas: (codigos: CodigoPasarela[]) => pedir<{ pasarelas: PasarelaVenta[] }>('/ventas/pasarelas/orden', json({ codigos }, 'PUT')),
   cobros: (sinAlta?: boolean) => pedir<{ cobros: CobroVenta[] }>(`/ventas/cobros${sinAlta === undefined ? '' : `?sinAlta=${sinAlta}`}`),
   reembolsarCobro: (id: string) => pedir<CobroVenta>(`/ventas/cobros/${id}/reembolsar`, { method: 'POST' }),
+  cuota: () => pedir<CuotaCapsulas>('/organizacion/cuota'),
+  comprarCapsulas: (cantidad: number) => pedir<CompraCapsulas>('/organizacion/cuota/adicionales', json({ cantidad })),
+  compraCapsulas: (id: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}`),
+  pagarPruebaCompra: (id: string, tarjeta: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}/pago-prueba`, json({ tarjeta })),
+  tokenCompra: (id: string, token: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}/token`, json({ token })),
   // HU-1605 · Captación › Agendamiento (PNT-33).
   agenda: () => pedir<Agenda>('/captacion/agenda'),
   cambiarAjustesAgenda: (c: Partial<AjustesAgenda>) => pedir<AjustesAgenda>('/captacion/agenda', json(c, 'PATCH')),

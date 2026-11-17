@@ -654,7 +654,8 @@ ul.fila-chips {
   font-size: var(--texto-sm);
   font-weight: 700;
   background: var(--color-suave);
-  color: var(--color-texto-sec);
+  /* El gris secundario sobre --color-suave queda en 4.34:1; el número pendiente usa el texto principal. */
+  color: var(--color-texto);
 }
 .etapa.hecha .etapa-numero {
   background: var(--color-validado);
@@ -3774,3 +3775,36 @@ ul.fila-chips {
 .cobros-sin-alta { margin-top: 32px; display: grid; gap: 12px; }
 .cobros-sin-alta .tarjeta-cabeza h2 { margin: 0; }
 .cobros-sin-alta table { width: 100%; }
+
+/* HU-1705 · Cuota de cápsulas y compra de adicionales. */
+.cuota-capsulas {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.cuota-capsulas p {
+  margin: 0;
+}
+.barra.llena > i {
+  background: var(--color-aviso);
+}
+.compra-adicionales {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.compra-elegir,
+.compra-pago .acciones-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+.cuota-agotada p {
+  margin: 0;
+}
+/* Sobre el fondo ámbar del aviso, el gris secundario no llega a 4.5:1: hereda el color del aviso. */
+.cuota-agotada .sec,
+.cuota-agotada .campo {
+  color: inherit;
+}
