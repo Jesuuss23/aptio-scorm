@@ -80,7 +80,7 @@ describe('script de captación', () => {
     expect(tieneFormulario(inst)).toBe(true);
     // También en el inicio, que no tiene el formulario: ahí llega la visita con su UTM.
     const inicio = sinJsonLd(renderizarPagina(inst, '/', 'es', op)!);
-    expect(inicio.match(/<script[^>]*>/g)).toEqual(['<script src="/s/_captacion.js" defer="" data-base="/s">', '<script src="/s/_popups.js" defer="" data-base="/s">', '<script src="/s/_chat.js" defer="" data-base="/s">']);
+    expect(inicio.match(/<script[^>]*>/g)).toEqual(['<script src="/s/_captacion.js" defer="" data-base="/s">', '<script src="/s/_popups.js" defer="" data-base="/s">', '<script src="/s/_chat.js" defer="" data-base="/s">', '<script src="/s/_visita.js" defer="" data-base="/s">']);
     expect(inicio).not.toContain('fcontacto');
     const archivos = renderizarSitio(inst, op);
     expect(archivos.find((a) => a.archivo === ARCHIVO_CAPTACION)).toEqual({ archivo: '_captacion.js', contenido: SCRIPT_CAPTACION, mime: 'text/javascript; charset=utf-8' });

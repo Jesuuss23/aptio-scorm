@@ -1251,3 +1251,19 @@ model SitioConversacion {
   @@index([creadoEn])
   @@index([expiraEn])
 }
+
+/// HU-1607 · Visitas del sitio por día, ruta e idioma (REQ-080, PNT-24), sumadas por `POST /s/_visita`. Anónimas: sin
+/// IP, cookies ni identificadores. `dia` es la fecha en hora de Lima (UTC−5). `visitas` son las sesiones que empezaron
+/// en esa ruta y `paginasVistas`, todas las vistas de la página.
+model SitioVisitaDia {
+  id            String   @id @default(uuid()) @db.Uuid
+  dia           DateTime @db.Date
+  ruta          String
+  /// es | en
+  idioma        String   @default("es")
+  visitas       Int      @default(0)
+  paginasVistas Int      @default(0)
+
+  @@unique([dia, ruta, idioma])
+  @@index([dia])
+}

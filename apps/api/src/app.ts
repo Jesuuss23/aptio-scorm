@@ -13,10 +13,10 @@ export function configurarApp(app: INestApplication): INestApplication {
   // HU-1508 · El sitio público pre-renderizado queda fuera del prefijo de la API.
   app.setGlobalPrefix(PREFIJO, {
     // HU-1601 · También el envío del formulario de contacto (`POST /s/_lead`), que funciona sin JavaScript.
-    // HU-1603 · Y los eventos de los popups (`POST /s/_popup`).
+    // HU-1603 · Y los eventos de los popups (`POST /s/_popup`). HU-1607 · Y las visitas anónimas (`POST /s/_visita`).
     exclude: [
       { path: 's', method: RequestMethod.GET }, { path: 's/{*ruta}', method: RequestMethod.GET }, { path: 's/_lead', method: RequestMethod.POST }, { path: 's/_popup', method: RequestMethod.POST },
-      { path: 's/_cita', method: RequestMethod.POST },
+      { path: 's/_cita', method: RequestMethod.POST }, { path: 's/_visita', method: RequestMethod.POST },
     ],
   });
   app.use(cookieParser());

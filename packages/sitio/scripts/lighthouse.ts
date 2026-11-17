@@ -9,6 +9,7 @@
  * también falla la medición si algún desplazamiento viene de él.
  * HU-1606 · El sitio de ejemplo trae etiquetas (IDs de ejemplo), así que las dos páginas se miden con el aviso de cookies
  * visible (sin decisión guardada) y la CSP de esa versión; falla si algún desplazamiento viene del aviso.
+ * HU-1607 · Cada página medida carga `_visita.js`, que manda su visita a `POST /s/_visita` (aquí, 204 como la API).
  *
  * Sin `SITIO_LIGHTHOUSE_URL`, sirve en un puerto local el sitio de ejemplo de producción pre-renderizado con
  * `@aptio/sitio` y las mismas cabeceras que `GET /s/*`. Con `SITIO_LIGHTHOUSE_URL=http://localhost:3000/s/` mide el
@@ -20,7 +21,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import * as chromeLauncher from 'chrome-launcher';
 import lighthouse from 'lighthouse';
-import { agendaDeEjemplo, ARCHIVO_AGENDA_JSON, ARCHIVO_CHATBOT_JSON, ARCHIVO_POPUPS_JSON, chatbotDeEjemplo, cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, popupsDeEjemplo, renderizar404, renderizarSitio, resolverPedido, RUTA_EVENTO_POPUP } from '../src/index.js';
+import { agendaDeEjemplo, ARCHIVO_AGENDA_JSON, ARCHIVO_CHATBOT_JSON, ARCHIVO_POPUPS_JSON, chatbotDeEjemplo, cabecerasSitio, instantaneaDeEjemplo, leerFuente, noModificado, popupsDeEjemplo, renderizar404, renderizarSitio, resolverPedido, RUTA_EVENTO_POPUP, RUTA_VISITA } from '../src/index.js';
 
 export const UMBRALES = { lcpMs: 2500, seo: 0.9, accesibilidad: 0.9, cls: 0.1 };
 
@@ -46,6 +47,8 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
     // HU-1603 · Los popups en vivo (aquí, uno de ejemplo activo) y sus eventos, como los atiende la API.
     if (url === `/s/${ARCHIVO_POPUPS_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }).end(JSON.stringify({ popups: popupsDeEjemplo() }));
     if (url === `/s/${RUTA_EVENTO_POPUP}` && req.method === 'POST') return void res.writeHead(204).end();
+    // HU-1607 · La visita anónima que manda `_visita.js` en cada página medida (la API responde 204).
+    if (url === `/s/${RUTA_VISITA}` && req.method === 'POST') return void res.writeHead(204, { 'Cache-Control': 'no-store' }).end();
     // HU-1605 · Las franjas libres en vivo, como las sirve la API.
     // HU-1604 · El chatbot activo: el botón flotante del chat está en todas las páginas medidas.
     if (url.split('?')[0] === `/s/${ARCHIVO_CHATBOT_JSON}`) return void res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=30' }).end(JSON.stringify(chatbotDeEjemplo(url.includes('idioma=en') ? 'en' : 'es', new Date())));

@@ -47,6 +47,7 @@
     "./conexiones": "./src/conexiones.ts",
     "./operacion": "./src/operacion.ts",
     "./cookies": "./src/cookies.ts",
+    "./resumen-sitio": "./src/resumen-sitio.ts",
     "./sitio-ajustes": "./src/sitio-ajustes.ts",
     "./sitio-blog": "./src/sitio-blog.ts",
     "./sitio-bloques": "./src/sitio-bloques.ts",
