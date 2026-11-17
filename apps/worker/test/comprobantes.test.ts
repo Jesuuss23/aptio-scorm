@@ -117,6 +117,32 @@ describe.skipIf(!hayBase)('cola comprobantes (HU-1707)', () => {
     expect(String(archivos.get(comp.s3KeyXml!)!.cuerpo)).toContain('<cbc:ID schemeID="0">-</cbc:ID>');
   });
 
+  it('HU-1711 · un comprobante nuevo usa los datos que el administrador editó en el portal; el ya emitido no cambia', async () => {
+    const primero = await cobro(null);
+    const { deps } = entorno();
+    const r1 = await procesarComprobante(prisma, { cobroId: primero.id }, deps);
+    const boleta = await prisma.comprobante.findUniqueOrThrow({ where: { id: r1.comprobanteId! } });
+    expect(boleta).toMatchObject({ tipo: 'BOLETA', ruc: null, razonSocial: 'Ana Quispe', direccion: null, correoFacturacion: CORREO });
+    const sus = await prisma.suscripcion.findUniqueOrThrow({ where: { id: primero.suscripcionId! } });
+    await prisma.datosFacturacionOrg.create({
+      data: { organizacionId: sus.organizacionId, razonSocial: 'Minera Andina SAC', ruc: RUC_CLIENTE, direccion: 'Av. Arequipa 123, Lima', correoFacturacion: `pagos-${PID}@worker.example`, tipoComprobantePreferido: 'FACTURA' },
+    });
+    n += 1;
+    const segundo = await prisma.cobro.create({ data: { solicitudSuscripcionId: primero.solicitudSuscripcionId, suscripcionId: sus.id, eventoPagoId: `cpe-${PID}-${n}`, monto: 1522.2, moneda: 'PEN', pasarela: 'pruebas', ultimos4Digitos: '1111' } });
+    const r2 = await procesarComprobante(prisma, { cobroId: segundo.id }, deps);
+    const factura = await prisma.comprobante.findUniqueOrThrow({ where: { id: r2.comprobanteId! } });
+    expect(factura).toMatchObject({ tipo: 'FACTURA', serie: SERIES.serieFactura, ruc: RUC_CLIENTE, razonSocial: 'Minera Andina SAC', direccion: 'Av. Arequipa 123, Lima', correoFacturacion: `pagos-${PID}@worker.example`, organizacionId: sus.organizacionId });
+    // El primero se repite y sigue siendo la boleta con sus datos de entonces.
+    await procesarComprobante(prisma, { cobroId: primero.id }, deps);
+    expect(await prisma.comprobante.findUniqueOrThrow({ where: { id: boleta.id } })).toMatchObject({ tipo: 'BOLETA', ruc: null, razonSocial: 'Ana Quispe', correoFacturacion: CORREO });
+    // Con boleta preferida, aunque la organización tenga RUC, el siguiente es boleta.
+    await prisma.datosFacturacionOrg.update({ where: { organizacionId: sus.organizacionId }, data: { tipoComprobantePreferido: 'BOLETA' } });
+    n += 1;
+    const tercero = await prisma.cobro.create({ data: { solicitudSuscripcionId: primero.solicitudSuscripcionId, suscripcionId: sus.id, eventoPagoId: `cpe-${PID}-${n}`, monto: 1522.2, moneda: 'PEN', pasarela: 'pruebas', ultimos4Digitos: '1111' } });
+    const r3 = await procesarComprobante(prisma, { cobroId: tercero.id }, deps);
+    expect(await prisma.comprobante.findUniqueOrThrow({ where: { id: r3.comprobanteId! } })).toMatchObject({ tipo: 'BOLETA', ruc: null, razonSocial: 'Minera Andina SAC' });
+  });
+
   it('la tarea repetida (incluso a la vez) deja un solo comprobante, un solo número y un solo correo', async () => {
     const c = await cobro(RUC_CLIENTE);
     const { enviados, deps } = entorno();

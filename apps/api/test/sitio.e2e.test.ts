@@ -1080,3 +1080,4 @@ await import('./comprobantes.casos.js');
 await import('./cobranza.casos.js');
 await import('./cupones.casos.js');
 await import('./ingresos.casos.js');
+await import('./facturacion-org.casos.js');

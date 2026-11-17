@@ -21,6 +21,7 @@ import { PersonajeVozVista } from './vistas/PersonajeVozVista';
 import { Rentabilidad } from './vistas/Rentabilidad';
 import { ConexionesIA } from './vistas/ConexionesIA';
 import { OperacionVista } from './vistas/OperacionVista';
+import { FacturacionOrg } from './vistas/FacturacionOrg';
 import { PlanSuscripcion } from './vistas/PlanSuscripcion';
 import { MedidorCostoIA } from './vistas/MedidorCostoIA';
 import { EditorPaginaSitio } from './vistas/EditorPaginaSitio';
@@ -120,11 +121,11 @@ export function App() {
   const venCostos = VEN_COSTOS.includes(usuario.rol);
   const veOperacion = VEN_OPERACION.includes(usuario.rol);
   const veSitio = VEN_SITIO.includes(usuario.rol);
-  // HU-1706 · Plan y suscripción: solo el administrador de la organización.
+  // HU-1706 · Plan y suscripción y HU-1711 · Facturación: solo el administrador de la organización.
   const vePlan = usuario.rol === 'ADMINISTRADOR';
   // Nuevo SCORM y Rentabilidad solo aparecen a quien puede usarlos (RN-01-2: la API también lo valida).
   // HU-1501 · El superadmin ve solo «Sitio web»; el resto de los roles nunca lo ve (CP-109).
-  const menu = MENU.filter((g) => GRUPOS_SUPERADMIN.includes(g.nombre) === veSitio).map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion) && (i.ruta !== '/plan' || vePlan)) })).filter((g) => g.items.length);
+  const menu = MENU.filter((g) => GRUPOS_SUPERADMIN.includes(g.nombre) === veSitio).map((g) => ({ ...g, items: g.items.filter((i) => (i.ruta !== '/nuevo' || puedeCrear) && (i.ruta !== '/rentabilidad' || venCostos) && (i.ruta !== '/conexiones-ia' || veConexiones) && (i.ruta !== '/operacion' || veOperacion) && (!['/plan', '/facturacion'].includes(i.ruta) || vePlan)) })).filter((g) => g.items.length);
   return (
     <CobranzaContexto.Provider value={cobranza}>
     <Estructura
@@ -193,6 +194,8 @@ export function App() {
         <SitioAjustes />
       ) : vista?.activo === '/plan' && vePlan ? (
         <PlanSuscripcion />
+      ) : vista?.activo === '/facturacion' && vePlan ? (
+        <FacturacionOrg />
       ) : vista?.activo === '/operacion' && veOperacion ? (
         <OperacionVista />
       ) : vista?.activo === '/conexiones-ia' && veConexiones ? (

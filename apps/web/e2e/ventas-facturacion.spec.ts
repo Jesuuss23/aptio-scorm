@@ -134,7 +134,9 @@ test('HU-1707 · un administrador no ve Ventas › Facturación', async ({ page 
   await simularApi(page, { conSesion: true, conProyectos: true, rol: 'ADMINISTRADOR' });
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Facturación' })).toHaveCount(0);
+  // HU-1711: el administrador sí tiene «Facturación» en Empresa (/facturacion), pero nunca la de Ventas.
+  await expect(page.locator('a[href="/ventas/facturacion"]')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Facturación' })).toHaveAttribute('href', '/facturacion');
   await page.goto('/ventas/facturacion');
   await expect(page.getByRole('heading', { level: 1, name: 'Facturación' })).toHaveCount(0);
 });

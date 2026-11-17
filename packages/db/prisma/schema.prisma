@@ -53,6 +53,7 @@ model Organizacion {
   cambiosPlan       CambioPlan[]
   comprobantes      Comprobante[]
   renovaciones      Renovacion[]
+  datosFacturacion  DatosFacturacionOrg?
 }
 
 // ---------- Personas y acceso ----------
@@ -1787,4 +1788,20 @@ model Cupon {
   suscripciones    Suscripcion[]
   creadoEn         DateTime               @default(now())
   actualizadoEn    DateTime               @updatedAt
+}
+
+/// HU-1711 · Los datos de facturación que el administrador edita en el portal (PNT-40). Al emitir un comprobante nuevo,
+/// el worker los usa antes que los de la solicitud del alta (SUP-318); los ya emitidos no cambian.
+model DatosFacturacionOrg {
+  id                       String          @id @default(uuid()) @db.Uuid
+  organizacionId           String          @unique @db.Uuid
+  organizacion             Organizacion    @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  razonSocial              String
+  /// 11 dígitos con el dígito verificador de SUNAT; obligatorio para factura.
+  ruc                      String?
+  direccion                String?
+  correoFacturacion        String
+  tipoComprobantePreferido TipoComprobante
+  creadoEn                 DateTime        @default(now())
+  actualizadoEn            DateTime        @updatedAt
 }

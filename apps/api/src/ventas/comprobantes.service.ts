@@ -22,7 +22,7 @@ const noValido = (errores: { campo: string; mensaje: string }[]) => new Unproces
 const noEncontrado = () => new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El comprobante no existe' });
 /** Sin la variable, un secreto local fijo que solo vale en pruebas (como la pasarela de pruebas). */
 const SECRETO_OSE_PRUEBAS_LOCAL = 'secreto-local-del-ose-de-pruebas';
-const CON_REFERENCIA = { comprobanteReferencia: { select: { serie: true, numero: true } } } as const;
+export const CON_REFERENCIA = { comprobanteReferencia: { select: { serie: true, numero: true } } } as const;
 type Fila = Prisma.ComprobanteGetPayload<{ include: typeof CON_REFERENCIA }>;
 
 /**
@@ -200,7 +200,7 @@ export class ComprobantesService implements OnModuleDestroy {
   }
 }
 
-function aDto(c: Fila): ComprobanteDto {
+export function aDto(c: Fila): ComprobanteDto {
   return {
     id: c.id, tipo: c.tipo, serie: c.serie, numero: c.numero, numeroCompleto: numeroCompleto(c.serie, c.numero), cobroId: c.cobroId,
     referencia: c.comprobanteReferencia ? numeroCompleto(c.comprobanteReferencia.serie, c.comprobanteReferencia.numero) : null,

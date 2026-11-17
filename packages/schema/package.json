@@ -72,6 +72,7 @@
     "./cobranza": "./src/cobranza.ts",
     "./cupones": "./src/cupones.ts",
     "./ingresos": "./src/ingresos.ts",
+    "./facturacion-org": "./src/facturacion-org.ts",
     "./comprobantes": "./src/comprobantes.ts"
   }
 }

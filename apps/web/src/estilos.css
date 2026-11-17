@@ -3906,3 +3906,11 @@ ul.fila-chips {
 .tarjeta.ingresos { margin-bottom: 16px; }
 .ingresos-mes { display: flex; flex-wrap: wrap; gap: 8px; }
 .ingresos .res-indicadores dd.num { font-size: var(--texto-sm); }
+
+/* HU-1711 · Facturación de la organización (PNT-40): las 4 secciones, una debajo de otra. */
+.facturacion-org { display: grid; gap: 16px; margin-top: 16px; }
+.facturacion-org > .tarjeta { display: grid; gap: 12px; }
+.facturacion-org .tarjeta-cabeza h2 { margin: 0; }
+.facturacion-org .cuota-capsulas { margin: 0; }
+.facturacion-org .campo { display: grid; gap: 6px; }
+.fo-tarjeta { display: grid; gap: 12px; max-width: 32rem; }
