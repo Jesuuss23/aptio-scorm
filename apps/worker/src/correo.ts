@@ -10,6 +10,8 @@ export interface Correo {
   copia?: string;
   /** HU-1605 · Una invitación iCalendar (RFC 5545): va como `text/calendar` con su método y como adjunto `.ics`. */
   calendario?: { metodo: 'REQUEST' | 'CANCEL'; contenido: string; archivo: string };
+  /** HU-1707 · Archivos adjuntos (el PDF y el XML del comprobante). */
+  adjuntos?: { archivo: string; contenido: Uint8Array | string; mime: string }[];
 }
 export type EnviarCorreo = (correo: Correo) => Promise<void>;
 
@@ -26,6 +28,7 @@ export function correoDesdeEntorno(env: NodeJS.ProcessEnv = process.env): Enviar
     await transporte.sendMail({
       from: remitente, to: c.para, subject: c.asunto, text: c.texto, ...(c.copia ? { cc: c.copia } : {}),
       ...(c.calendario ? { icalEvent: { method: c.calendario.metodo, filename: c.calendario.archivo, content: c.calendario.contenido } } : {}),
+      ...(c.adjuntos?.length ? { attachments: c.adjuntos.map((a) => ({ filename: a.archivo, content: typeof a.contenido === 'string' ? a.contenido : Buffer.from(a.contenido), contentType: a.mime })) } : {}),
     });
   };
 }

@@ -55,6 +55,8 @@ export function configurarApp(app: INestApplication): INestApplication {
   // HU-1703 · Los webhooks de pago llegan como el cuerpo crudo (Buffer): la firma HMAC se calcula sobre los bytes tal como
   // llegaron, antes de que el parser de JSON los toque. Hasta 64 KB; más, 413.
   app.use(`/${PREFIJO}/webhooks/pago`, cuerpoCrudo(64 * 1024));
+  // HU-1707 · Igual el aviso del OSE.
+  app.use(`/${PREFIJO}/webhooks/ose`, cuerpoCrudo(64 * 1024));
   // HU-1509 · El logo y el favicon llegan como el archivo mismo (SVG o PNG), hasta 200 KB; más, 413 DEMASIADO_GRANDE.
   (app as NestExpressApplication).useBodyParser('raw', { type: ['image/svg+xml', 'image/png'], limit: '200kb' });
   app.enableCors({ origin: process.env.WEB_URL ?? 'http://localhost:5173', credentials: true });

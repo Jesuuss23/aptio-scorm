@@ -117,18 +117,26 @@ export const opcionesTareaVencer = (suscripcionId: string, esperaMs: number) => 
 
 /**
  * HU-1704 · «Emitir comprobante» de cada cobro aprobado (RN-18-4, CP-144). Un trabajo por cobro (`jobId` = id del cobro):
- * un evento repetido no crea otro cobro ni otro trabajo. La emisión ante el OSE/PSE y su trabajador llegan con la
- * HU-1707; hasta entonces los trabajos esperan en la cola. Los completados se guardan 90 días para que el id siga
+ * un evento repetido no crea otro cobro ni otro trabajo. HU-1707: el worker emite el comprobante ante el OSE. Los completados se guardan 90 días para que el id siga
  * deduplicando.
  */
 export const COLA_COMPROBANTES = 'comprobantes';
 export const TAREA_EMITIR_COMPROBANTE = 'emitir-comprobante';
 export const INTENTOS_COMPROBANTES = 6;
-export interface DatosComprobante { cobroId: string }
-export const opcionesTareaComprobante = (cobroId: string) => ({
-  jobId: cobroId, attempts: INTENTOS_COMPROBANTES, backoff: { type: 'exponential', delay: 60_000 },
+/**
+ * HU-1707 · Sin `tipo`, la factura o la boleta del cobro; con `NOTA_CREDITO`, la nota de crédito de su reembolso. Con
+ * `comprobanteId`, vuelve a enviar ese comprobante (corregido u observado) o, si el OSE ya lo aceptó, solo lo envía por
+ * correo.
+ */
+export interface DatosComprobante { cobroId: string; tipo?: 'NOTA_CREDITO'; comprobanteId?: string }
+export const opcionesTareaComprobante = (cobroId: string, jobId: string = cobroId) => ({
+  jobId, attempts: INTENTOS_COMPROBANTES, backoff: { type: 'exponential', delay: 60_000 },
   removeOnComplete: { age: 90 * 24 * 3600 }, removeOnFail: false,
 });
+/** HU-1707 · La nota de crédito de un cobro reembolsado: una por cobro. */
+export const idTareaNotaCredito = (cobroId: string) => `nota-${cobroId}`;
+/** HU-1707 · Un reenvío (corrección o evento del OSE): uno por comprobante y número de intento o evento. */
+export const idTareaReenvio = (comprobanteId: string, marca: string | number) => `reenvio-${comprobanteId}-${marca}`;
 
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 

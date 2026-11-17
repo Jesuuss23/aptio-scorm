@@ -68,7 +68,7 @@ export class CobrosController {
 
   @Post(':id/reembolsar')
   @HttpCode(200)
-  @ApiOkResponse({ type: CobroDto, description: 'La pasarela devolvió el dinero: REEMBOLSADO. Auditoría COBRO_REEMBOLSADO (la nota de crédito llega con la HU-1707)' })
+  @ApiOkResponse({ type: CobroDto, description: 'La pasarela devolvió el dinero: REEMBOLSADO. Auditoría COBRO_REEMBOLSADO y se encola la nota de crédito (HU-1707)' })
   @ApiNotFoundResponse({ description: 'El cobro no existe' })
   @ApiConflictResponse({ description: 'COBRO_CON_SUSCRIPCION (se devuelve al cancelar) o COBRO_YA_REEMBOLSADO' })
   @ApiBadGatewayResponse({ description: 'PASARELA_NO_RESPONDE: el cobro sigue APROBADO. Auditoría COBRO_REEMBOLSO_FALLIDO' })

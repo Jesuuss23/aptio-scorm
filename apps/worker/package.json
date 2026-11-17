@@ -32,13 +32,13 @@
     "ioredis": "^6.0.0",
     "jszip": "^3.10.2",
     "nodemailer": "^10.4.0",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.7.284",
     "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
     "@types/nodemailer": "^8.0.2",
-    "pdf-lib": "^1.17.1",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
     "vitest": "^3.2.7"

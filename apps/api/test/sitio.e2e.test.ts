@@ -1076,3 +1076,4 @@ await import('./suscripciones.casos.js');
 await import('./pasarelas.casos.js');
 await import('./cuotas.casos.js');
 await import('./cambio-plan.casos.js');
+await import('./comprobantes.casos.js');

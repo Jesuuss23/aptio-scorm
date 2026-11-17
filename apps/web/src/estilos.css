@@ -3885,3 +3885,19 @@ ul.fila-chips {
   border-top: 1px solid var(--color-borde);
   padding-top: 4px;
 }
+
+/* HU-1707 · Ventas › Facturación (PNT-37): pestañas, filtro, la tabla de comprobantes (en el celular, una tarjeta por fila)
+   y el formulario para corregir y reenviar un observado. */
+.facturacion-panel { display: grid; gap: 16px; margin-top: 16px; }
+.facturacion-filtro { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 12px; }
+.facturacion-filtro .campo { display: grid; gap: 6px; margin: 0; }
+.corregir-comprobante { display: grid; gap: 12px; }
+.corregir-comprobante h3 { margin: 0; }
+.corregir-comprobante form { display: grid; gap: 12px; }
+.tabla-comprobantes { width: 100%; }
+@media (max-width: 720px) {
+  .tabla-comprobantes thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .tabla-comprobantes tr { display: block; border-top: 1px solid var(--color-borde); padding: 8px 0; }
+  .tabla-comprobantes th[scope='row'], .tabla-comprobantes td { display: block; text-align: left; padding: 4px 0; border: 0; }
+  .tabla-comprobantes td::before { content: attr(data-etiqueta); display: block; font-size: var(--texto-xs); color: var(--color-texto-sec); }
+}
