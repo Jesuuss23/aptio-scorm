@@ -51,6 +51,7 @@ model Organizacion {
   consumosCapsulas  ConsumoCapsula[]
   comprasCapsulas   CompraCapsulas[]
   cambiosPlan       CambioPlan[]
+  comprobantes      Comprobante[]
 }
 
 // ---------- Personas y acceso ----------
@@ -1443,6 +1444,8 @@ model Cobro {
   /// HU-1706 · La subida de plan que pagó este cobro (la diferencia prorrateada).
   cambioPlanId           String?               @db.Uuid
   cambioPlan             CambioPlan?           @relation(fields: [cambioPlanId], references: [id], onDelete: Restrict)
+  /// HU-1707 · El comprobante del cobro y, si se reembolsó, su nota de crédito.
+  comprobantes           Comprobante[]
   suscripcionId          String?               @db.Uuid
   suscripcion            Suscripcion?          @relation(fields: [suscripcionId], references: [id], onDelete: SetNull)
   /// El id del evento de la pasarela: un evento produce un solo cobro (RN-18-3, CP-144).
@@ -1576,4 +1579,105 @@ model PasarelaConfig {
   modo          ModoPasarela @default(pruebas)
   creadoEn      DateTime     @default(now())
   actualizadoEn DateTime     @updatedAt
+}
+
+// ---------- HU-1707 · Comprobantes electrónicos SUNAT (REQ-087, CP-148, CP-149, RN-18-4, RN-18-5, RN-18-9) ----------
+
+enum TipoCpe {
+  FACTURA
+  BOLETA
+  NOTA_CREDITO
+}
+
+enum EstadoComprobante {
+  PENDIENTE
+  ACEPTADO
+  OBSERVADO
+  RECHAZADO
+}
+
+/// Un comprobante electrónico por cobro y tipo (la tarea «emitir-comprobante» es idempotente por `(cobroId, tipo)`). La
+/// nota de crédito de un reembolso apunta al comprobante original. Montos en la moneda del cobro (RN-18-9). Sin
+/// organización = cobro sin alta (SUP-291), emitido con los datos de la solicitud.
+model Comprobante {
+  id                      String            @id @default(uuid()) @db.Uuid
+  organizacionId          String?           @db.Uuid
+  organizacion            Organizacion?     @relation(fields: [organizacionId], references: [id], onDelete: SetNull)
+  cobroId                 String            @db.Uuid
+  cobro                   Cobro             @relation(fields: [cobroId], references: [id], onDelete: Restrict)
+  tipo                    TipoCpe
+  serie                   String
+  numero                  Int
+  /// Solo en una nota de crédito: el comprobante que corrige.
+  comprobanteReferenciaId String?           @db.Uuid
+  comprobanteReferencia   Comprobante?      @relation("NotaDeComprobante", fields: [comprobanteReferenciaId], references: [id], onDelete: Restrict)
+  notas                   Comprobante[]     @relation("NotaDeComprobante")
+  /// Receptor: RUC en una factura; sin documento en una boleta (SUP-316).
+  ruc                     String?
+  razonSocial             String
+  direccion               String?
+  correoFacturacion       String
+  moneda                  String
+  baseSinIgv              Decimal           @db.Decimal(10, 2)
+  igv                     Decimal           @db.Decimal(10, 2)
+  total                   Decimal           @db.Decimal(10, 2)
+  /// Solo con la detracción activa y en facturas en soles desde el umbral (RN-18-5, por validar con el contador).
+  detraccion              Decimal?          @db.Decimal(10, 2)
+  estado                  EstadoComprobante @default(PENDIENTE)
+  motivo                  String?
+  proveedor               String
+  ambiente                String
+  s3KeyPdf                String?
+  s3KeyXml                String?
+  intentos                Int               @default(0)
+  emitidoEn               DateTime          @default(now())
+  enviadoEn               DateTime?
+  correoEnviadoEn         DateTime?
+  creadoEn                DateTime          @default(now())
+  actualizadoEn           DateTime          @updatedAt
+  eventos                 EventoOse[]
+
+  @@unique([cobroId, tipo])
+  @@unique([serie, numero])
+  @@index([estado])
+  @@index([organizacionId])
+}
+
+/// El correlativo de cada serie. Se toma con `SELECT … FOR UPDATE` dentro de la transacción que crea el comprobante.
+model SerieComprobante {
+  serie         String   @id
+  tipo          TipoCpe
+  ultimoNumero  Int      @default(0)
+  actualizadoEn DateTime @updatedAt
+}
+
+/// Un evento del webhook del OSE se procesa una sola vez (id = proveedor + id del evento).
+model EventoOse {
+  id            String            @id
+  comprobanteId String            @db.Uuid
+  comprobante   Comprobante       @relation(fields: [comprobanteId], references: [id], onDelete: Cascade)
+  estado        EstadoComprobante
+  recibidoEn    DateTime          @default(now())
+
+  @@index([comprobanteId])
+}
+
+/// Datos fiscales del emisor, una sola fila (`id = 'principal'`). Los secretos del OSE viven solo en variables de entorno.
+model DatosFiscales {
+  id                  String   @id @default("principal")
+  rucEmisor           String?
+  razonSocialEmisor   String   @default("")
+  direccionEmisor     String   @default("")
+  serieFactura        String   @default("F001")
+  serieBoleta         String   @default("B001")
+  serieNotaFactura    String   @default("FC01")
+  serieNotaBoleta     String   @default("BC01")
+  /// pruebas (simulado, DA-09) u otro proveedor cuando se elija.
+  proveedor           String   @default("pruebas")
+  ambiente            String   @default("pruebas")
+  detraccionActiva    Boolean  @default(false)
+  /// Porcentaje; por validar con el contador (RN-18-5).
+  detraccionTasa      Decimal  @default(12) @db.Decimal(5, 2)
+  detraccionUmbralPen Decimal  @default(700) @db.Decimal(10, 2)
+  actualizadoEn       DateTime @updatedAt
 }

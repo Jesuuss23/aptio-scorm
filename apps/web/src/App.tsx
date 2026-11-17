@@ -32,6 +32,7 @@ import { CaptacionAgendamiento } from './vistas/CaptacionAgendamiento';
 import { CaptacionChatbot } from './vistas/CaptacionChatbot';
 import { CaptacionLeads } from './vistas/CaptacionLeads';
 import { CaptacionPopups } from './vistas/CaptacionPopups';
+import { VentasFacturacion } from './vistas/VentasFacturacion';
 import { VentasPasarelas } from './vistas/VentasPasarelas';
 import { VentasPlanes } from './vistas/VentasPlanes';
 import { SitioContenido } from './vistas/SitioContenido';
@@ -164,6 +165,8 @@ export function App() {
         <VentasPlanes />
       ) : vista?.activo === '/ventas/pasarelas' && veSitio ? (
         <VentasPasarelas />
+      ) : vista?.activo === '/ventas/facturacion' && veSitio ? (
+        <VentasFacturacion />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (
         <SitioAjustes />
       ) : vista?.activo === '/plan' && vePlan ? (

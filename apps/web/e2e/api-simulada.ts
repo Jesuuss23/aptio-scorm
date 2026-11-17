@@ -37,6 +37,7 @@ import { crearPlanesSim, type PlanesSitioSim } from './planes-simulados';
 import { crearSuscripcionesSim, ORIGEN_STRIPE_SIMULADO } from './suscripciones-simuladas';
 import { crearCuotasSim, type CuotaSitioSim, ORIGEN_PAGO_CAPSULAS } from './cuotas-simuladas';
 import { crearPasarelasSim, type PasarelasSitioSim } from './pasarelas-simuladas';
+import { crearComprobantesSim, type FacturacionSitioSim } from './comprobantes-simulados';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
 
@@ -206,6 +207,8 @@ export interface OpcionesSimulacion {
   planesSitio?: PlanesSitioSim;
   /** HU-1704 · Ventas › Pasarelas: si Stripe tiene sus variables, qué pasarelas se muestran y los cobros sin cuenta. */
   pasarelasSitio?: PasarelasSitioSim;
+  /** HU-1707 · Ventas › Facturación: los comprobantes y los datos fiscales. */
+  facturacionSitio?: FacturacionSitioSim;
   /** HU-1705 · La cuota de cápsulas de la organización; sin ella, `/organizacion/cuota` responde 404 y no se muestra. */
   cuotaSitio?: CuotaSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
@@ -482,9 +485,10 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, cuotaSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio }: OpcionesSimulacion) {
   const planesSim = crearPlanesSim(planesSitio);
   const pasarelasSim = crearPasarelasSim(pasarelasSitio, () => entornoSitio);
+  const comprobantesSim = crearComprobantesSim(facturacionSitio, () => entornoSitio);
   const cuotasSim = crearCuotasSim(cuotaSitio, () => rol ?? USUARIO.rol);
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
@@ -1380,6 +1384,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     }
     if (ruta.startsWith('/organizacion/cuota') || ruta.startsWith('/organizacion/suscripcion')) {
       const r = cuotasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).origin);
+      if (r) return responder(r.status, r.body);
+    }
+    if (ruta.startsWith('/ventas/comprobantes') || ruta === '/ventas/datos-fiscales') {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = comprobantesSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
+      if (r?.binario) return route.fulfill({ status: 200, contentType: r.binario.mime, headers: { 'Content-Disposition': `attachment; filename="${r.binario.nombre}"` }, body: r.binario.contenido });
       if (r) return responder(r.status, r.body);
     }
     if (ruta.startsWith('/ventas/pasarelas') || ruta.startsWith('/ventas/cobros')) {

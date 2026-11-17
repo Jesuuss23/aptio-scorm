@@ -439,7 +439,7 @@ export class SuscripcionesService implements OnModuleDestroy {
     }
     const cobro = cobroId as string | null;
     if (cobro) {
-      // HU-1704 · Un trabajo «emitir comprobante» por cobro (`jobId` = id del cobro); la emisión llega con la HU-1707.
+      // HU-1704 · Un trabajo «emitir comprobante» por cobro (`jobId` = id del cobro); lo emite el worker (HU-1707).
       tareas.push(this.colaComprobantes.add(TAREA_EMITIR_COMPROBANTE, { cobroId: cobro }, opcionesTareaComprobante(cobro))
         .catch((e: unknown) => this.log.error(`No se pudo encolar el comprobante del cobro ${cobro}: ${e instanceof Error ? e.message : String(e)}`)));
     }

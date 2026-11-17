@@ -6906,8 +6906,8 @@ paths:
       description: |-
         Solo SUPERADMIN. Solo cobros APROBADO sin suscripción (el de una suscripción se devuelve al cancelarla, HU-1706).
         Pasa a REEMBOLSADO y pide la devolución a la pasarela (Idempotency-Key `reembolso-<id>`); si la pasarela falla,
-        vuelve a APROBADO y responde 502. Auditoría COBRO_REEMBOLSADO o COBRO_REEMBOLSO_FALLIDO. La nota de crédito llega
-        con la HU-1707.
+        vuelve a APROBADO y responde 502. Auditoría COBRO_REEMBOLSADO o COBRO_REEMBOLSO_FALLIDO. HU-1707: reembolsado,
+        encola en `comprobantes` la nota de crédito (jobId `nota-<cobroId>`) que corrige la factura o la boleta del cobro.
       parameters:
       - name: id
         in: path
@@ -6940,6 +6940,222 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /ventas/comprobantes:
+    get:
+      tags:
+      - Ventas
+      summary: Comprobantes electrónicos SUNAT (HU-1707, REQ-087, PNT-37)
+      operationId: get_ventas_comprobantes
+      description: |-
+        Solo SUPERADMIN. Los 200 más recientes, con el filtro por estado SUNAT. Cada cobro aprobado emite su factura (con
+        RUC válido, RN-18-4) o su boleta; un reembolso emite la nota de crédito. Los emite el worker (cola `comprobantes`)
+        ante el OSE del proveedor elegido (DA-09: hoy solo el simulado, SUP-314).
+      parameters:
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [PENDIENTE, ACEPTADO, OBSERVADO, RECHAZADO]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaComprobantes'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/comprobantes/{id}:
+    get:
+      tags:
+      - Ventas
+      summary: Un comprobante (HU-1707)
+      operationId: get_ventas_comprobantes_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comprobante'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /ventas/comprobantes/{id}/pdf:
+    get:
+      tags:
+      - Ventas
+      summary: PDF del comprobante (HU-1707, CP-148)
+      operationId: get_ventas_comprobantes_id_pdf
+      description: Solo SUPERADMIN. Lo lee del almacenamiento (S3) con `Content-Disposition` y el nombre SUNAT (`RUC-tipo-serie-número`). Auditoría COMPROBANTE_DESCARGADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: El archivo
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: NO_ENCONTRADO, o ARCHIVO_PENDIENTE si el worker aún no lo generó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /ventas/comprobantes/{id}/xml:
+    get:
+      tags:
+      - Ventas
+      summary: XML UBL 2.1 del comprobante (HU-1707, CP-148)
+      operationId: get_ventas_comprobantes_id_xml
+      description: Solo SUPERADMIN. Lo lee del almacenamiento (S3) con `Content-Disposition` y el nombre SUNAT (`RUC-tipo-serie-número`). Auditoría COMPROBANTE_DESCARGADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: El archivo
+          content:
+            application/xml:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: NO_ENCONTRADO, o ARCHIVO_PENDIENTE si el worker aún no lo generó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /ventas/comprobantes/{id}/reenviar:
+    post:
+      tags:
+      - Ventas
+      summary: Corregir el receptor y reenviar (HU-1707, CP-149)
+      operationId: post_ventas_comprobantes_id_reenviar
+      description: |-
+        Solo SUPERADMIN. Para un comprobante OBSERVADO o PENDIENTE: guarda el receptor corregido (una factura exige RUC
+        válido; el correo debe ser válido), lo deja PENDIENTE y encola su reenvío al OSE con el mismo serie y número
+        (jobId `reenvio-<id>-<intentos>-<marca>`). Auditoría COMPROBANTE_REENVIADO con el receptor de antes y el de después.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceptorComprobante'
+      responses:
+        '200':
+          description: Reenviado; queda PENDIENTE hasta la respuesta del OSE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comprobante'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: COMPROBANTE_NO_REENVIABLE · ya aceptado o rechazado (un rechazado no reutiliza su número)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '503':
+          description: COLA_NO_DISPONIBLE · no se pudo encolar el reenvío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /ventas/datos-fiscales:
+    get:
+      tags:
+      - Ventas
+      summary: Datos fiscales del emisor (HU-1707)
+      operationId: get_ventas_datos_fiscales
+      description: Solo SUPERADMIN. Emisor, series, proveedor OSE (con si está disponible en este entorno), ambiente y detracción. Los secretos del OSE viven en variables de entorno y nunca se devuelven.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosFiscales'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+    put:
+      tags:
+      - Ventas
+      summary: Guardar los datos fiscales (HU-1707, RN-18-9)
+      operationId: put_ventas_datos_fiscales
+      description: |-
+        Solo SUPERADMIN. Valida el RUC del emisor (o vacío: los comprobantes quedan pendientes), las series (F o B y 4
+        caracteres, todas distintas), el proveedor, el ambiente (el OSE de pruebas solo en pruebas) y la detracción (tasa
+        de 0 a 100 y umbral en soles; por validar con el contador, SUP-317). Auditoría DATOS_FISCALES_ACTUALIZADOS.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatosFiscalesEntrada'
+      responses:
+        '200':
+          description: Guardado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosFiscales'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /publico/planes/{slug}:
     get:
       tags:
@@ -7621,7 +7837,7 @@ paths:
 
         HU-1704 · Cada pago aprobado guarda un Cobro (monto con IGV, moneda, pasarela, referencia y 4 últimos dígitos,
         `eventoPagoId` único) y encola en `comprobantes` la tarea «emitir-comprobante» con jobId = id del cobro (CP-144;
-        la emite la HU-1707). Si el monto o la moneda no coinciden con la solicitud (PAGO_MONTO_NO_COINCIDE), el correo ya
+        la emite el worker, HU-1707). Si el monto o la moneda no coinciden con la solicitud (PAGO_MONTO_NO_COINCIDE), el correo ya
         tiene cuenta (SUSCRIPCION_SIN_ALTA) o la solicitud ya no estaba pendiente (PAGO_SIN_SOLICITUD_PENDIENTE), el
         cobro queda sin alta para que el superadmin lo reembolse.
 
@@ -7694,6 +7910,73 @@ paths:
                 $ref: '#/components/schemas/Error'
         '422':
           description: EVENTO_NO_VALIDO · el evento no tiene la forma esperada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /webhooks/ose/{proveedor}:
+    post:
+      tags:
+      - Ventas
+      summary: Aviso del OSE con el estado de un comprobante (HU-1707)
+      operationId: post_webhooks_ose_proveedor
+      security: []
+      description: |-
+        Sin sesión; firmado sobre el cuerpo tal como llega (hasta 64 KB). `proveedor` es `pruebas` (solo con
+        SITIO_ENTORNO=pruebas; `X-Aptio-Firma: sha256=<hex>` con OSE_PRUEBAS_SECRETO_WEBHOOK; cuerpo `{ id, serie, numero,
+        estado: ACEPTADO | OBSERVADO | RECHAZADO, motivo? }`). Si la firma no coincide, 401 FIRMA_NO_VALIDA y no cambia
+        nada. Idempotente: el mismo `id` de aviso se procesa una vez (`duplicado: true`). Un estado final (aceptado o
+        rechazado) no vuelve atrás. Aceptado y sin correo enviado, encola el envío del PDF y el XML. Auditoría
+        COMPROBANTE_ESTADO_OSE.
+      parameters:
+      - name: proveedor
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [pruebas]
+      - name: X-Aptio-Firma
+        in: header
+        required: true
+        description: 'pruebas: `sha256=` y el HMAC-SHA256 en hexadecimal del cuerpo'
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Procesado, o repetido sin efecto
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [recibido, duplicado]
+                properties:
+                  recibido:
+                    type: boolean
+                  duplicado:
+                    type: boolean
+        '401':
+          description: FIRMA_NO_VALIDA · no cambia ningún comprobante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '413':
+          description: DEMASIADO_GRANDE · más de 64 KB
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: EVENTO_NO_VALIDO · el aviso no tiene la forma esperada
           content:
             application/json:
               schema:
@@ -15798,3 +16081,175 @@ components:
           description: HU-1703 · El pago (`/pago?plan=`) si el plan tiene precio; agendar una demo con el plan elegido si es a medida
         ajustes:
           $ref: '#/components/schemas/AjustesPlanes'
+    Comprobante:
+      type: object
+      description: HU-1707 · Un comprobante electrónico SUNAT (REQ-087)
+      required: [id, tipo, serie, numero, numeroCompleto, cobroId, referencia, ruc, razonSocial, direccion, correoFacturacion, moneda, baseSinIgv, igv, total, detraccion, estado, motivo, proveedor, ambiente, conArchivos, reenviable, intentos, emitidoEn, correoEnviadoEn]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [FACTURA, BOLETA, NOTA_CREDITO]
+        serie:
+          type: string
+          example: F001
+        numero:
+          type: integer
+          example: 1
+        numeroCompleto:
+          type: string
+          example: F001-00000001
+        cobroId:
+          type: string
+          format: uuid
+        referencia:
+          type: string
+          nullable: true
+          example: F001-00000001
+          description: La nota de crédito, el comprobante que corrige
+        ruc:
+          type: string
+          nullable: true
+          description: null en una boleta sin documento (SUP-316)
+        razonSocial:
+          type: string
+        direccion:
+          type: string
+          nullable: true
+        correoFacturacion:
+          type: string
+        moneda:
+          type: string
+          enum: [PEN, USD]
+        baseSinIgv:
+          type: number
+          example: 1290
+        igv:
+          type: number
+          example: 232.2
+          description: RN-18-5 · 18 %, como diferencia del total y la base redondeada al céntimo
+        total:
+          type: number
+          example: 1522.2
+        detraccion:
+          type: number
+          nullable: true
+          example: 182.66
+          description: RN-18-9 · Solo con la detracción activa, en facturas en soles desde el umbral
+        estado:
+          type: string
+          enum: [PENDIENTE, ACEPTADO, OBSERVADO, RECHAZADO]
+        motivo:
+          type: string
+          nullable: true
+        proveedor:
+          type: string
+          example: pruebas
+        ambiente:
+          type: string
+          enum: [pruebas, produccion]
+        conArchivos:
+          type: boolean
+        reenviable:
+          type: boolean
+        intentos:
+          type: integer
+        emitidoEn:
+          type: string
+          format: date-time
+        correoEnviadoEn:
+          type: string
+          format: date-time
+          nullable: true
+    ListaComprobantes:
+      type: object
+      required: [comprobantes]
+      properties:
+        comprobantes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comprobante'
+    ReceptorComprobante:
+      type: object
+      description: HU-1707 · CP-149 · El receptor corregido
+      required: [razonSocial, correoFacturacion]
+      properties:
+        ruc:
+          type: string
+          nullable: true
+          example: '20131312955'
+          description: Obligatorio y válido en una factura
+        razonSocial:
+          type: string
+          maxLength: 200
+        direccion:
+          type: string
+          nullable: true
+          maxLength: 250
+        correoFacturacion:
+          type: string
+          format: email
+          maxLength: 254
+    DatosFiscalesEntrada:
+      type: object
+      description: HU-1707 · Los datos fiscales del emisor. Sin secretos (viven en variables de entorno)
+      required: [rucEmisor, razonSocialEmisor, direccionEmisor, serieFactura, serieBoleta, serieNotaFactura, serieNotaBoleta, proveedor, ambiente, detraccionActiva, detraccionTasa, detraccionUmbralPen]
+      properties:
+        rucEmisor:
+          type: string
+          nullable: true
+          example: '20000000001'
+        razonSocialEmisor:
+          type: string
+        direccionEmisor:
+          type: string
+        serieFactura:
+          type: string
+          example: F001
+        serieBoleta:
+          type: string
+          example: B001
+        serieNotaFactura:
+          type: string
+          example: FC01
+        serieNotaBoleta:
+          type: string
+          example: BC01
+        proveedor:
+          type: string
+          example: pruebas
+        ambiente:
+          type: string
+          enum: [pruebas, produccion]
+        detraccionActiva:
+          type: boolean
+          description: Por validar con el contador (SUP-317)
+        detraccionTasa:
+          type: number
+          example: 12
+        detraccionUmbralPen:
+          type: number
+          example: 700
+    DatosFiscales:
+      allOf:
+      - $ref: '#/components/schemas/DatosFiscalesEntrada'
+      - type: object
+        required: [proveedores, actualizadoEn]
+        properties:
+          proveedores:
+            type: array
+            items:
+              type: object
+              required: [codigo, nombre, disponible]
+              properties:
+                codigo:
+                  type: string
+                nombre:
+                  type: string
+                disponible:
+                  type: boolean
+          actualizadoEn:
+            type: string
+            format: date-time

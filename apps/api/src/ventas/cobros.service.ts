@@ -3,6 +3,7 @@ import type { Prisma } from '@aptio/db';
 import { esCodigoPasarela } from '@aptio/schema/pasarelas';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
+import { ComprobantesService } from './comprobantes.service.js';
 import { ErrorPasarela } from './pasarelas/contrato.js';
 import { PasarelasService } from './pasarelas.service.js';
 import type { CobroDto, CobrosDto } from './pasarelas.dto.js';
@@ -15,14 +16,14 @@ type FilaCobro = Prisma.CobroGetPayload<{ include: typeof CON_SOLICITUD }>;
 
 /**
  * HU-1704 · Los cobros aprobados (REQ-084, REQ-110) y el reembolso de un pago aprobado sin alta (SUP-291): el superadmin
- * lo pide, la pasarela devuelve el dinero y el cobro queda REEMBOLSADO con auditoría. La nota de crédito llega con la
- * HU-1707. Un cobro con suscripción no se reembolsa aquí: eso es cancelar, que llega con la HU-1706.
+ * lo pide, la pasarela devuelve el dinero y el cobro queda REEMBOLSADO con auditoría. HU-1707: se encola la nota de
+ * crédito que corrige su comprobante. Un cobro con suscripción no se reembolsa aquí: eso es cancelar, que llega con la HU-1706.
  */
 @Injectable()
 export class CobrosService {
   private readonly log = new Logger('Cobros');
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly pasarelas: PasarelasService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly pasarelas: PasarelasService, private readonly comprobantes: ComprobantesService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -62,6 +63,8 @@ export class CobrosService {
       await this.bd.auditoria.create({
         data: { organizacionId: null, usuarioId: u.id, accion: 'COBRO_REEMBOLSADO', entidad: 'Cobro', entidadId: id, datos: { pasarela: c.pasarela, monto: Number(c.monto), moneda: c.moneda, reembolsoId, solicitudId: c.solicitudSuscripcionId, compraCapsulasId: c.compraCapsulasId, cambioPlanId: c.cambioPlanId } },
       });
+      // HU-1707 · La nota de crédito (FC01 o BC01) por el total, que referencia la factura o la boleta del cobro.
+      await this.comprobantes.encolarNotaCredito(id);
       return this.aDto(hecho, await this.correosDe([hecho]));
     } catch (e) {
       await this.bd.cobro.update({ where: { id }, data: { estado: 'APROBADO', reembolsadoEn: null } });

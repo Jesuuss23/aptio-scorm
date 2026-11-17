@@ -753,6 +753,24 @@ export interface CobroVenta {
   ultimos4Digitos: string | null; estado: 'APROBADO' | 'REEMBOLSADO'; motivoSinAlta: string | null; reembolsable: boolean; reembolsoId: string | null; reembolsadoEn: string | null; creadoEn: string;
 }
 
+/** HU-1707 · Un comprobante electrónico SUNAT (Ventas › Facturación, PNT-37). */
+export type EstadoComprobante = 'PENDIENTE' | 'ACEPTADO' | 'OBSERVADO' | 'RECHAZADO';
+export interface ComprobanteVenta {
+  id: string; tipo: 'FACTURA' | 'BOLETA' | 'NOTA_CREDITO'; serie: string; numero: number; numeroCompleto: string; cobroId: string; referencia: string | null;
+  ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string; moneda: 'PEN' | 'USD'; baseSinIgv: number; igv: number; total: number;
+  detraccion: number | null; estado: EstadoComprobante; motivo: string | null; proveedor: string; ambiente: string; conArchivos: boolean; reenviable: boolean;
+  intentos: number; emitidoEn: string; correoEnviadoEn: string | null;
+}
+export interface ReceptorComprobante { ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string }
+/** HU-1707 · Los datos fiscales del emisor. Los secretos del OSE viven en variables de entorno, nunca aquí. */
+export interface DatosFiscalesVenta {
+  rucEmisor: string | null; razonSocialEmisor: string; direccionEmisor: string; serieFactura: string; serieBoleta: string; serieNotaFactura: string; serieNotaBoleta: string;
+  proveedor: string; ambiente: 'pruebas' | 'produccion'; detraccionActiva: boolean; detraccionTasa: number; detraccionUmbralPen: number;
+}
+export interface DatosFiscalesConProveedores extends DatosFiscalesVenta {
+  proveedores: { codigo: string; nombre: string; disponible: boolean }[]; actualizadoEn: string;
+}
+
 /** HU-1705 · La cuota de cápsulas de la ventana mensual y la compra de adicionales (REQ-085, CP-146). */
 export interface OfertaAdicional { unitario: number; igv: number; total: number; moneda: 'PEN' | 'USD'; disponible: boolean }
 export interface CuotaCapsulas {
@@ -1003,6 +1021,26 @@ export const api = {
   ordenarPasarelas: (codigos: CodigoPasarela[]) => pedir<{ pasarelas: PasarelaVenta[] }>('/ventas/pasarelas/orden', json({ codigos }, 'PUT')),
   cobros: (sinAlta?: boolean) => pedir<{ cobros: CobroVenta[] }>(`/ventas/cobros${sinAlta === undefined ? '' : `?sinAlta=${sinAlta}`}`),
   reembolsarCobro: (id: string) => pedir<CobroVenta>(`/ventas/cobros/${id}/reembolsar`, { method: 'POST' }),
+  // HU-1707 · Ventas › Facturación
+  comprobantes: (estado?: EstadoComprobante) => pedir<{ comprobantes: ComprobanteVenta[] }>(`/ventas/comprobantes${estado ? `?estado=${estado}` : ''}`),
+  reenviarComprobante: (id: string, r: ReceptorComprobante) => pedir<ComprobanteVenta>(`/ventas/comprobantes/${id}/reenviar`, json(r)),
+  /** El PDF o el XML como archivo (con la sesión): el nombre viene de Content-Disposition. */
+  archivoComprobante: async (id: string, formato: 'pdf' | 'xml'): Promise<{ archivo: Blob; nombre: string }> => {
+    let res: Response;
+    try {
+      res = await fetch(`/api/v1/ventas/comprobantes/${id}/${formato}`, { credentials: 'same-origin' });
+    } catch {
+      throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+    }
+    if (!res.ok) {
+      const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string };
+      throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'No se pudo descargar el archivo');
+    }
+    const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `comprobante.${formato}`;
+    return { archivo: await res.blob(), nombre };
+  },
+  datosFiscales: () => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales'),
+  guardarDatosFiscales: (d: DatosFiscalesVenta) => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales', json(d, 'PUT')),
   cuota: () => pedir<CuotaCapsulas>('/organizacion/cuota'),
   comprarCapsulas: (cantidad: number) => pedir<CompraCapsulas>('/organizacion/cuota/adicionales', json({ cantidad })),
   compraCapsulas: (id: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}`),
