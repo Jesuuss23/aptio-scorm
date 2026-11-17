@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.80 · actualizado con la primera entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.81 · actualizado con la segunda entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1163,6 +1163,23 @@ Usa **Estado SUNAT** para ver solo los de un estado y **Actualizar** para traer 
 
 Hoy los comprobantes se emiten en un **ambiente de pruebas** que no los envía a SUNAT y no tienen valor tributario, hasta que se elija el proveedor. Todo se usa con el teclado: las pestañas cambian con las flechas y los botones con Enter.
 
+### 8.45 Pago de la renovación y cuenta en solo lectura
+
+Al terminar cada período de tu plan se cobra la renovación. Si el cobro no se completa, verás arriba de todas las pantallas un aviso para tu organización:
+
+- **Falta el pago de la renovación:** el período terminó y falta pagar. El aviso dice el total y la fecha límite. Mientras tanto se trabaja con normalidad. El cobro se vuelve a intentar a los 1, 3 y 7 días, y en cada intento el administrador recibe un correo con el enlace para pagar.
+- **Cuenta en solo lectura:** pasaron 10 días sin pago. Puedes ver los proyectos y descargar lo exportado (**Exportar SCORM** sigue disponible), pero no puedes crear proyectos ni clientes, generar ni editar hasta regularizar. **Nuevo SCORM** y **Generar SCORM** no aparecen y, si intentas guardar algo, se explica por qué no se puede.
+
+Pulsa **Cómo regularizar** en el aviso para ver qué hacer. Si eres el administrador, pulsa **Pagar ahora**: te lleva a **Plan y suscripción**, donde la sección **Paga la renovación** (o **Reactiva tu cuenta**, si ya está en solo lectura) muestra el monto sin IGV, el IGV y el total. Pulsa **Pagar ahora** con el total y paga con la pasarela de tu suscripción: en el sitio de pruebas, escribe la tarjeta de prueba (4111 1111 1111 1111 aprueba, 4000 0000 0000 0002 rechaza) y pulsa **Pagar**; con Stripe vas a su página de pago y vuelves a **Plan y suscripción**. Cuando el pago se aprueba, el aviso desaparece y todo vuelve a la normalidad al instante. Si pagas antes de los 10 días, el período nuevo sigue al anterior; si ya estaba en solo lectura, el período nuevo empieza el día del pago. Si el pago se rechaza, nada cambia y puedes intentarlo otra vez. Si no eres el administrador, pídele que pague.
+
+Mientras hay un pago pendiente no se puede cambiar de plan. Si pediste cancelar al fin del período, no se cobra la renovación. Si habías programado bajar de plan, la renovación ya se cobra con el plan nuevo.
+
+### 8.46 Suscripciones (superadmin)
+
+En **Ventas › Suscripciones** ves el estado de cobro de cada organización: **Activa**, **Pago pendiente**, **Suspendida** o **Cancelada**. Para cada una, la tabla muestra el plan, la pasarela con los últimos 4 dígitos de la tarjeta y el cobro: el total de la renovación, en qué intento va y la fecha del siguiente, la fecha de la suspensión o el motivo del último rechazo. Usa **Estado** para ver solo las de un estado y **Actualizar** para traer los cambios.
+
+**Reintentar ahora** cobra otra vez una renovación pendiente o vencida sin esperar el próximo intento: con la pasarela de pruebas cobra con la tarjeta guardada; con Stripe o Culqi le envía otra vez al administrador el correo con el enlace para pagar. Con **Actualizar** ves el resultado. El reintento queda registrado. Todo se usa con el teclado.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1254,6 +1271,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.81 | 2026-11-17 | Pago de la renovación (8.45): el aviso «Falta el pago de la renovación» con la fecha límite, la cuenta en solo lectura a los 10 días (ver y descargar, sin generar ni editar), «Cómo regularizar» y «Pagar ahora» en Plan y suscripción; Ventas › Suscripciones con el filtro y «Reintentar ahora» (8.46). |
 | 0.80 | 2026-11-17 | Facturación (8.44): los comprobantes de cada pago con su estado SUNAT, la descarga del PDF y el XML, «Corregir y reenviar» un observado y los datos fiscales con la detracción por validar con el contador. El pago ya envía el comprobante por correo (8.40). |
 | 0.79 | 2026-11-17 | Plan y suscripción (8.43): subir de plan pagando solo la diferencia por los días que faltan, bajar de plan desde la renovación, cancelar al fin del período sin devolución y «Seguir con mi plan». |
 | 0.78 | 2026-11-17 | Cápsulas del mes y cápsulas adicionales (8.42): el indicador en Proyectos, qué cuenta como cápsula, cuándo se renueva, el aviso al agotarse y la compra de 1 a 10 adicionales por el administrador. |

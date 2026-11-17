@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.80 · actualizado con la primera entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.81 · actualizado con la segunda entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -610,6 +610,16 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Nota de crédito:** reembolsar un cobro encola la tarea con `tipo: NOTA_CREDITO` (jobId `nota-<cobro>`): FC01 o BC01 según el original, por el total, con su referencia y el motivo 06. Si el original aún no existe, la tarea reintenta.
 - **Fuera de alcance:** el proveedor OSE real y la firma del XML (DA-09), pedir el DNI en boletas desde S/ 700 (SUP-316), el portal de comprobantes de la organización (HU-1711) y las notas de crédito por otros motivos.
 
+### 3.39 Cobranza y suspensión (HU-1708)
+
+- **Calendario (REQ-088, RN-18-8, SUP-322):** la tarea periódica `renovar-suscripciones` (cola `suscripciones`, cada 15 min) primero vence las suscripciones con `cancelarAlFin` y el período cumplido (CANCELADA, sin renovar), luego crea la `Renovacion` de cada suscripción ACTIVA con `finPeriodo` alcanzado y después avanza las pendientes. La renovación es única por suscripción y período (idempotente). Al crearla aplica la bajada programada y la suscripción pasa a PAGO_PENDIENTE. Intento 0 al fin del período, reintentos a +1, +3 y +7 días y suspensión a +10, en pasos de 24 h; cada intento se reserva con una actualización condicional.
+- **Monto (SUP-321):** el precio pactado sin IGV o, con una bajada programada, el precio publicado vigente del plan nuevo en el ciclo y la moneda de la suscripción, más 18 % de IGV. El aviso de 30 días por cambio de precio (RN-18-2) queda diferido.
+- **Cobro (SUP-319):** con la pasarela de pruebas (solo con SITIO_ENTORNO=pruebas) cada intento cobra solo con la tarjeta guardada (la terminada en 0002 rechaza). Con Stripe o Culqi, hasta la HU-1711, cada intento envía a los administradores activos el correo con el total y el enlace a `/plan?renovacion=<id>`. WhatsApp queda pendiente (SUP-320).
+- **Pago:** el mismo `POST /webhooks/pago/{pasarela}` resuelve la renovación (después de la solicitud y la compra, antes del cambio de plan), con la `Suscripcion` bloqueada (`FOR UPDATE`). Aprobado, la renovación pasa a APROBADA y la suscripción a ACTIVA con el período nuevo: anclado al fin del anterior si pagó antes de la suspensión o desde el día del pago si estaba SUSPENDIDA. Se crea el `Cobro` con `renovacionId` y se encola «emitir-comprobante» con jobId = cobro (SUSCRIPCION_RENOVADA o SUSCRIPCION_REACTIVADA). Un evento repetido no cambia nada. Un monto distinto o una renovación ya cerrada dejan el cobro sin acreditar y reembolsable. `Cobro_origen_check` exige exactamente uno de los cuatro orígenes.
+- **Solo lectura (CP-150, SUP-323):** con la suscripción SUSPENDIDA, la guarda global `GuardaSuspension` responde 403 SUSCRIPCION_SUSPENDIDA (con el enlace para regularizar, el total y si el usuario puede pagar) a toda escritura de los usuarios de la organización. Quedan permitidas la sesión, validar y exportar, y `/organizacion/suscripcion/*`. La lectura y las descargas siguen; el superadmin no se ve afectado. Al día 10 se envía el correo de suspensión (SUSCRIPCION_SUSPENDIDA en la auditoría).
+- **Consola:** `GET /organizacion/cobranza` da a todo usuario de la organización el estado para el aviso global (PNT-36). El ADMINISTRADOR paga con `POST /organizacion/suscripcion/renovacion/pago`, `…/pago-prueba` y `…/token` (RENOVACION_PAGO_INICIADO). El SUPERADMIN tiene `GET /ventas/suscripciones` (filtro por estado) y `POST /ventas/suscripciones/{id}/reintentar` (202, encola un intento fuera del calendario; RENOVACION_REINTENTO_PEDIDO).
+- **Fuera de alcance:** los medios de pago guardados de Stripe y Culqi (HU-1711), el aviso por WhatsApp (SUP-320) y el aviso de 30 días por cambio de precio (RN-18-2).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -713,6 +723,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-246 a SUP-250:** popups leídos en vivo (una versión anterior a la HU-1603 hay que republicarla una vez); frecuencia en `localStorage`; `/pago*` reservada para el S13; sin intención de salida en pantallas táctiles; contadores sin datos personales, con el límite de eventos en memoria; la CDN debe reenviar `POST /_popup` y `/api/v1/publico/leads` (HU-1405).
 - **SUP-251 a SUP-255:** calendario interno de Aptio con enlace fijo por asesor (Google Calendar, Outlook y WhatsApp después), Lima UTC−5 y todo en UTC, reagendar es cancelar y reservar; feriados calculados y revisados cada año; token de cancelación solo en el correo y la cola, guardado como SHA-256; el lead pasa a Demo al agendar (excepción a SUP-236); límites en memoria, `_agenda.json` 15 s en la CDN, que debe reenviar `/api/v1/publico/citas*` y `POST /s/_cita` (HU-1405).
 - **SUP-314 a SUP-318:** OSE simulado bajo DA-09 y XML sin firma; correlativo bajo bloqueo y número no reutilizado; boleta sin DNI desde S/ 700 por validar; detracción desactivada por validar con el contador; factura o boleta según la solicitud y el RUC.
+- **SUP-319 a SUP-323:** solo la pasarela de pruebas cobra sola la renovación (Stripe y Culqi envían el enlace por correo hasta la HU-1711); WhatsApp pendiente; aviso de 30 días por cambio de precio diferido; calendario en pasos de 24 h desde el fin del período; solo lectura con las excepciones de sesión, exportar y pagar.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -756,6 +767,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.81 | 2026-11-17 | Cobranza y suspensión (3.39): la tarea `renovar-suscripciones` con la renovación idempotente, los intentos de los días 0, 1, 3 y 7, la suspensión al día 10, el pago por el webhook único que reactiva y extiende el período, la guarda de solo lectura, el aviso global y Ventas › Suscripciones con «Reintentar ahora». |
 | 0.80 | 2026-11-17 | Comprobantes electrónicos SUNAT (3.38): la emisión idempotente con el correlativo bajo bloqueo, el XML UBL 2.1 y el PDF en S3, el OSE simulado (DA-09), el correo con los adjuntos, la consola de Facturación, el webhook firmado del OSE y la nota de crédito al reembolsar. |
 | 0.79 | 2026-11-17 | Cambio de plan y cancelación (3.37): el prorrateo por día UTC, la vista previa, la subida pagada por el webhook único con su cobro y comprobante, la bajada programada, la cancelación al fin del período con su tarea retrasada y la cuota 0 de una suscripción cancelada. |
 | 0.78 | 2026-11-17 | Cuotas de cápsulas (3.36): la ventana mensual, el consumo transaccional con 402 CUOTA_AGOTADA, la compra de adicionales con la pasarela de la suscripción y su paso por el webhook único. |
