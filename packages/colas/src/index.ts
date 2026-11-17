@@ -102,6 +102,21 @@ export const opcionesTareaBienvenida = (solicitudId: string) => ({
   removeOnComplete: { age: 24 * 3600, count: 1_000 }, removeOnFail: { age: 7 * 24 * 3600 },
 });
 
+/**
+ * HU-1704 · «Emitir comprobante» de cada cobro aprobado (RN-18-4, CP-144). Un trabajo por cobro (`jobId` = id del cobro):
+ * un evento repetido no crea otro cobro ni otro trabajo. La emisión ante el OSE/PSE y su trabajador llegan con la
+ * HU-1707; hasta entonces los trabajos esperan en la cola. Los completados se guardan 90 días para que el id siga
+ * deduplicando.
+ */
+export const COLA_COMPROBANTES = 'comprobantes';
+export const TAREA_EMITIR_COMPROBANTE = 'emitir-comprobante';
+export const INTENTOS_COMPROBANTES = 6;
+export interface DatosComprobante { cobroId: string }
+export const opcionesTareaComprobante = (cobroId: string) => ({
+  jobId: cobroId, attempts: INTENTOS_COMPROBANTES, backoff: { type: 'exponential', delay: 60_000 },
+  removeOnComplete: { age: 90 * 24 * 3600 }, removeOnFail: false,
+});
+
 export const esCola = (valor: string): valor is NombreCola => (COLAS as readonly string[]).includes(valor);
 
 /** Datos con los que se encola un trabajo. El detalle vive en TrabajoIA (base de datos). */

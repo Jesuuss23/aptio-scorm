@@ -3,6 +3,7 @@
 // (mensual o anual con IGV de 18 %) y Pago con la pasarela de pruebas (rechazo y aprobación), hasta la confirmación. En
 // producción no hay pasarela y ofrece agendar una demo; un plan a medida no se paga en línea; sin JavaScript, agendar.
 // Sin popups ni chat en /pago. axe WCAG 2.2 A/AA en cada paso a 390 y 1280 px.
+// HU-1704 (RN-18-9): en dólares con la pasarela simulada y con la página alojada de Stripe (simulada), con regreso a /pago.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { simularApi } from './api-simulada';
@@ -173,4 +174,93 @@ test('sin JavaScript, /pago lleva a agendar una demo', async ({ browser }) => {
   await expect(pg.getByRole('link', { name: 'Agendar una demo' })).toHaveAttribute('href', '/s/agendar-demo');
   await expect(pg.getByText('Cargando el plan…')).toBeHidden();
   await contexto.close();
+});
+
+const SITIO_USD = { ...SITIO, planesSitio: { ejemplo: true, usd: { productora: 349 } } };
+const empresaPorTeclado = async (page: Page) => {
+  await escribir(page, 'Razón social o nombre', 'Global Learning LLC');
+  await escribir(page, 'Nombre de quien administrará la cuenta', 'Sam Lee');
+  await escribir(page, 'Correo de quien administrará la cuenta', 'sam@global.example');
+  await page.getByLabel(/Acepto los términos/).focus();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Enter');
+};
+
+for (const ancho of [1280, 390]) {
+  test(`HU-1704 · en dólares con la pasarela simulada: moneda con el teclado, IGV y confirmación en US$ (${ancho} px)`, async ({ page }) => {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await simularApi(page, { ...SITIO_USD, entornoSitio: 'pruebas' });
+    checkoutsSim.length = 0;
+    await page.goto('/s/pago?plan=productora');
+    await expect(titulo(page, 'Datos de la empresa')).toBeVisible();
+    await empresaPorTeclado(page);
+
+    await expect(titulo(page, 'Resumen de tu suscripción')).toBeFocused();
+    await expect(page.getByRole('group', { name: 'Moneda' })).toBeVisible();
+    await expect(page.getByRole('radio', { name: 'Soles (S/)' })).toBeChecked();
+    await sinViolaciones(page);
+    await page.getByRole('radio', { name: 'Soles (S/)' }).focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('radio', { name: 'Dólares (US$)' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Dólares (US$)' })).toBeFocused();
+    const resumen = page.locator('.pg dl');
+    await expect(resumen).toContainText('US$ 349.00');
+    await expect(resumen).toContainText('US$ 62.82');
+    await expect(resumen).toContainText('US$ 411.82');
+    await expect(page.getByRole('radio', { name: /Anual · US\$ 3,350.00 al año/ })).toBeVisible();
+    await sinViolaciones(page);
+    await pulsar(page, 'Continuar al pago');
+
+    await expect(titulo(page, 'Pago')).toBeFocused();
+    await expect(page.getByText(/Pasarela de pruebas: no se cobra nada/)).toBeVisible();
+    await escribir(page, 'Número de tarjeta', '4111 1111 1111 1111');
+    await sinViolaciones(page);
+    await pulsar(page, 'Pagar US$ 411.82');
+    await expect(titulo(page, 'Tu suscripción está activa')).toBeFocused();
+    await expect(page.getByRole('status')).toContainText('US$ 411.82');
+    await sinViolaciones(page);
+    await sinDesbordeHorizontal(page);
+    expect(checkoutsSim.map((c) => [c.estado, c.pasarela, c.resumen.moneda])).toEqual([['APROBADA', 'pruebas', 'USD']]);
+    expect(checkoutsSim[0]!.cuerpo).toMatchObject({ moneda: 'USD', ciclo: 'MENSUAL' });
+  });
+}
+
+test('HU-1704 · con Stripe: «Pagar con Stripe» lleva a su página alojada y, al volver, /pago confirma la suscripción en dólares', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await simularApi(page, { ...SITIO_USD, entornoSitio: 'pruebas', pasarelasSitio: { stripe: true, visibles: { pruebas: false, stripe: true } } });
+  checkoutsSim.length = 0;
+  // Cancelar en la pasarela vuelve con el aviso.
+  await page.goto('/s/pago?plan=productora&cancelado=1');
+  await expect(page.getByRole('alert')).toContainText('Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.');
+  await empresaPorTeclado(page);
+  await page.getByRole('radio', { name: 'Dólares (US$)' }).check();
+  await pulsar(page, 'Continuar al pago');
+
+  await expect(titulo(page, 'Pago')).toBeFocused();
+  await expect(page.getByText('Te llevaremos a la página segura de Stripe para pagar. Tu tarjeta no pasa por Aptio SCORM.')).toBeVisible();
+  await expect(page.getByLabel('Número de tarjeta')).toHaveCount(0);
+  const pagar = page.getByRole('link', { name: 'Pagar con Stripe · US$ 411.82' });
+  await expect(pagar).toHaveAccessibleDescription(/página segura de Stripe/);
+  await sinViolaciones(page);
+  await pagar.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Stripe Checkout (simulado)' })).toBeVisible();
+  await page.getByRole('link', { name: 'Volver a Aptio SCORM' }).click();
+
+  await expect(page).toHaveURL(/\/s\/pago\?plan=productora&checkout=[0-9a-f-]{36}$/);
+  await expect(titulo(page, 'Tu suscripción está activa')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('status')).toContainText('Te enviamos un correo a sam@global.example');
+  await expect(page.getByRole('status')).toContainText('US$ 411.82');
+  await sinViolaciones(page);
+  expect(checkoutsSim.map((c) => [c.estado, c.pasarela, c.resumen.moneda])).toEqual([['APROBADA', 'stripe', 'USD']]);
+});
+
+test('HU-1704 · sin pasarela que cobre en dólares no se ofrece la moneda', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await simularApi(page, { ...SITIO_USD, entornoSitio: 'pruebas', pasarelasSitio: { visibles: { pruebas: false, culqi: false, stripe: false } } });
+  await page.goto('/s/pago?plan=productora');
+  await empresaPorTeclado(page);
+  await expect(titulo(page, 'Resumen de tu suscripción')).toBeFocused();
+  await expect(page.getByRole('group', { name: 'Moneda' })).toHaveCount(0);
+  await expect(page.locator('.pg dl')).toContainText('S/ 1,522.20');
 });

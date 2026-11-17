@@ -1284,6 +1284,10 @@ model Plan {
   precioMes        Int?
   /// Precio anual propio; null = precioMes × 12 × (1 − descuentoAnual / 100).
   precioAnual      Int?
+  /// HU-1704 · Dólares enteros sin IGV, opcionales (RN-18-9). Sin precio en USD, el plan se cobra solo en soles.
+  precioMesUsd     Int?
+  /// Precio anual propio en USD; null = precioMesUsd × 12 × (1 − descuentoAnual / 100).
+  precioAnualUsd   Int?
   capsulasMes      Int?
   usuarios         Int?
   capsulaAdicional Int?
@@ -1354,6 +1358,7 @@ model Suscripcion {
   ultimos4Digitos     String?
   solicitudId         String?               @unique @db.Uuid
   solicitud           SolicitudSuscripcion? @relation(fields: [solicitudId], references: [id])
+  cobros              Cobro[]
   creadoEn            DateTime              @default(now())
   actualizadoEn       DateTime              @updatedAt
 }
@@ -1384,9 +1389,63 @@ model SolicitudSuscripcion {
   organizacionId  String?                    @unique @db.Uuid
   organizacion    Organizacion?              @relation(fields: [organizacionId], references: [id], onDelete: SetNull)
   suscripcion     Suscripcion?
+  cobros          Cobro[]
   resueltaEn      DateTime?
   creadoEn        DateTime                   @default(now())
   actualizadoEn   DateTime                   @updatedAt
 
   @@index([correoAdmin])
+}
+
+// ---------- HU-1704 · Pasarelas de pago y webhooks (REQ-084, REQ-110, CP-144, CP-145, RN-18-3, RN-18-9) ----------
+
+enum EstadoCobro {
+  APROBADO
+  REEMBOLSADO
+}
+
+enum ModoPasarela {
+  pruebas
+  produccion
+}
+
+/// Un cobro por cada evento de pago aprobado (idempotencia por `eventoPagoId`). Nunca guarda el número ni otro dato
+/// sensible de la tarjeta: solo la referencia de la pasarela y los 4 últimos dígitos (REQ-110). Sin suscripción = pago
+/// aprobado sin alta (SUP-291), que el superadmin puede reembolsar.
+model Cobro {
+  id                     String               @id @default(uuid()) @db.Uuid
+  solicitudSuscripcionId String               @db.Uuid
+  solicitud              SolicitudSuscripcion @relation(fields: [solicitudSuscripcionId], references: [id])
+  suscripcionId          String?              @db.Uuid
+  suscripcion            Suscripcion?         @relation(fields: [suscripcionId], references: [id], onDelete: SetNull)
+  /// El id del evento de la pasarela: un evento produce un solo cobro (RN-18-3, CP-144).
+  eventoPagoId           String               @unique
+  /// Con IGV, en la moneda del cobro.
+  monto                  Decimal              @db.Decimal(10, 2)
+  moneda                 String
+  pasarela               String
+  /// Referencia de la transacción en la pasarela (Stripe: payment intent; Culqi: cargo), para reembolsar.
+  tokenPago              String?
+  ultimos4Digitos        String?
+  estado                 EstadoCobro          @default(APROBADO)
+  reembolsoId            String?
+  reembolsadoEn          DateTime?
+  creadoEn               DateTime             @default(now())
+  actualizadoEn          DateTime             @updatedAt
+
+  @@index([solicitudSuscripcionId])
+  @@index([suscripcionId])
+}
+
+/// Cómo se ofrece cada pasarela en el pago: nombre, mostrar/ocultar, orden y modo. Las llaves y secretos nunca van aquí:
+/// solo en variables de entorno.
+model PasarelaConfig {
+  /// pruebas, culqi o stripe.
+  codigo        String       @id
+  nombre        String
+  visible       Boolean      @default(false)
+  orden         Int          @default(0)
+  modo          ModoPasarela @default(pruebas)
+  creadoEn      DateTime     @default(now())
+  actualizadoEn DateTime     @updatedAt
 }

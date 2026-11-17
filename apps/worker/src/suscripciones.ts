@@ -6,7 +6,7 @@
  */
 import type { PrismaClient } from '@aptio/db';
 import { COLA_SUSCRIPCIONES, type DatosBienvenida, ESPERAS_SUSCRIPCIONES_MS } from '@aptio/colas';
-import { soles2 } from '@aptio/schema/suscripciones';
+import { monto2 } from '@aptio/schema/suscripciones';
 import { type ConnectionOptions, Worker } from 'bullmq';
 import type { Correo, EnviarCorreo } from './correo.js';
 
@@ -25,7 +25,7 @@ export function correoBienvenida(s: Solicitud, enlace: string): Correo {
     `Hola, ${s.nombreAdmin}:`, '',
     `Tu suscripción a Aptio SCORM está activa. Ya creamos la cuenta de ${s.razonSocial} y tú eres su administrador.`, '',
     `Plan: ${s.plan.nombre} (${ciclo})`,
-    `Total pagado: ${soles2(Number(s.total))} (incluye IGV de 18 %)`,
+    `Total pagado: ${monto2(Number(s.total), s.moneda)} (incluye IGV de 18 %)`,
     ...(s.suscripcion ? [`Período pagado hasta el ${fechaLarga(s.suscripcion.finPeriodo)}`] : []),
     `Comprobante: ${s.tipoComprobante === 'FACTURA' ? `factura a nombre del RUC ${s.ruc}` : 'boleta de venta'}`, '',
     'Crea tu clave con este enlace (vale 72 horas y un solo uso):', enlace, '',

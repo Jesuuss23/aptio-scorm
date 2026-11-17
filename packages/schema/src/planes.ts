@@ -6,7 +6,8 @@
  * - un solo plan destacado a la vez;
  * - la proyección pública: solo los planes visibles, en orden, con sus características visibles.
  *
- * Precios en soles enteros sin IGV. `precioMes` null = plan a medida (sin precio; el botón lleva a agendar).
+ * Precios en soles enteros sin IGV. `precioMes` null = plan a medida (sin precio; el botón lleva a agendar). HU-1704:
+ * precios opcionales en dólares (`precioMesUsd`, `precioAnualUsd`) para cobrar con Stripe a clientes del exterior (RN-18-9).
  */
 
 export const IGV = 0.18;
@@ -29,6 +30,10 @@ export interface DatosPlan {
   descripcion: string;
   precioMes: number | null;
   precioAnual: number | null;
+  /** HU-1704 · Dólares enteros sin IGV, opcionales (RN-18-9). Sin precio en USD, el plan se cobra solo en soles. */
+  precioMesUsd: number | null;
+  /** Precio anual propio en USD; null = precioMesUsd × 12 × (1 − descuento). */
+  precioAnualUsd: number | null;
   capsulasMes: number | null;
   usuarios: number | null;
   capsulaAdicional: number | null;
@@ -61,6 +66,9 @@ export function validarPlan(v: Partial<Record<keyof DatosPlan, unknown>>, { parc
   for (const k of ['precioMes', 'precioAnual', 'capsulaAdicional'] as const) {
     if (hay(k) && !enteroONulo(v[k], 1, LIMITES_PLAN.precio)) e.push({ campo: k, mensaje: 'Soles enteros mayores que 0, o vacío' });
   }
+  for (const k of ['precioMesUsd', 'precioAnualUsd'] as const) {
+    if (hay(k) && !enteroONulo(v[k] ?? null, 1, LIMITES_PLAN.precio)) e.push({ campo: k, mensaje: 'Dólares enteros mayores que 0, o vacío' });
+  }
   for (const k of ['capsulasMes', 'usuarios'] as const) {
     if (hay(k) && !enteroONulo(v[k], 1, LIMITES_PLAN.cantidad)) e.push({ campo: k, mensaje: 'Un número entero mayor que 0, o vacío (ilimitado o según contrato)' });
   }
@@ -82,6 +90,8 @@ export function validarPlanCompleto(p: DatosPlan): ErrorCampo[] {
   const e = validarPlan(p);
   if (p.precioMes === null && p.precioAnual !== null) e.push({ campo: 'precioAnual', mensaje: 'Un plan a medida no lleva precio anual' });
   if (p.precioMes === null && p.capsulaAdicional !== null) e.push({ campo: 'capsulaAdicional', mensaje: 'Un plan a medida no lleva cápsula adicional' });
+  if (p.precioMes === null && p.precioMesUsd !== null) e.push({ campo: 'precioMesUsd', mensaje: 'Un plan a medida no lleva precio en dólares' });
+  if (p.precioMesUsd === null && p.precioAnualUsd !== null) e.push({ campo: 'precioAnualUsd', mensaje: 'El precio anual en dólares necesita el precio mensual en dólares' });
   return e;
 }
 
@@ -106,6 +116,13 @@ export function precioAnualDe(p: Pick<DatosPlan, 'precioMes' | 'precioAnual'>, d
   return Math.round(p.precioMes * 12 * (1 - descuentoAnual / 100));
 }
 
+/** HU-1704 · Precio anual efectivo en USD: el propio o mensual en USD × 12 × (1 − descuento). Null si no hay precio en USD. */
+export function precioAnualUsdDe(p: Partial<Pick<DatosPlan, 'precioMesUsd' | 'precioAnualUsd'>>, descuentoAnual: number): number | null {
+  const mes = p.precioMesUsd ?? null;
+  if (mes === null) return null;
+  return p.precioAnualUsd ?? Math.round(mes * 12 * (1 - descuentoAnual / 100));
+}
+
 /** Lo que se ahorra al año frente a pagar 12 meses (0 si el anual no es más barato). Null si es a medida. */
 export function ahorroAnualDe(p: Pick<DatosPlan, 'precioMes' | 'precioAnual'>, descuentoAnual: number): number | null {
   const anual = precioAnualDe(p, descuentoAnual);
@@ -128,6 +145,10 @@ export interface PlanPublico {
   ahorroAnual: number | null;
   /** Precio al mes con IGV (si los precios se muestran con IGV, es el que se muestra). */
   precioMesConIgv: number | null;
+  /** HU-1704 · Al mes en USD sin IGV, o null si el plan no se cobra en dólares. */
+  precioMesUsd: number | null;
+  /** HU-1704 · El anual efectivo en USD sin IGV. */
+  precioAnualUsd: number | null;
   capsulasMes: number | null;
   usuarios: number | null;
   capsulaAdicional: number | null;
@@ -155,6 +176,8 @@ export function planesPublicos(planes: readonly PlanGuardado[], ajustes: Ajustes
         precioAnual: precioAnualDe(p, ajustes.descuentoAnual),
         ahorroAnual: ahorroAnualDe(p, ajustes.descuentoAnual),
         precioMesConIgv: p.precioMes === null ? null : conIgv(p.precioMes),
+        precioMesUsd: aMedida ? null : (p.precioMesUsd ?? null),
+        precioAnualUsd: aMedida ? null : precioAnualUsdDe(p, ajustes.descuentoAnual),
         capsulasMes: p.capsulasMes,
         usuarios: p.usuarios,
         capsulaAdicional: aMedida ? null : p.capsulaAdicional,
@@ -172,20 +195,26 @@ export function soles(n: number): string {
   return `S/ ${n.toLocaleString('en-US', { minimumFractionDigits: entero ? 0 : 2, maximumFractionDigits: 2 })}`;
 }
 
+/** HU-1704 · Precio en dólares: `US$ 349`, `US$ 411.82`. */
+export function dolares(n: number): string {
+  const entero = Number.isInteger(n);
+  return `US$ ${n.toLocaleString('en-US', { minimumFractionDigits: entero ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
 /** Los 3 planes del prototipo (`docs/23`, sección 7): ficticios, con precios por validar (DA-12, SUP-277). */
 export const PLANES_DE_EJEMPLO: (DatosPlan & { orden: number })[] = [
   {
-    slug: 'inicial', nombre: 'Inicial', descripcion: 'Para equipos de capacitación que empiezan con microaprendizaje.', precioMes: 490, precioAnual: null,
+    slug: 'inicial', nombre: 'Inicial', descripcion: 'Para equipos de capacitación que empiezan con microaprendizaje.', precioMes: 490, precioAnual: null, precioMesUsd: null, precioAnualUsd: null,
     capsulasMes: 5, usuarios: 3, capsulaAdicional: 89, textoBoton: 'Suscribirme', destacado: false, visible: true, orden: 0,
     caracteristicas: ['5 cápsulas al mes', 'Español', 'SCORM 1.2 y HTML', '1 kit de marca', 'Soporte por correo'].map((texto) => ({ texto, visible: true })),
   },
   {
-    slug: 'productora', nombre: 'Productora', descripcion: 'Para productoras y áreas que entregan cápsulas cada semana.', precioMes: 1290, precioAnual: null,
+    slug: 'productora', nombre: 'Productora', descripcion: 'Para productoras y áreas que entregan cápsulas cada semana.', precioMes: 1290, precioAnual: null, precioMesUsd: null, precioAnualUsd: null,
     capsulasMes: 20, usuarios: 10, capsulaAdicional: 69, textoBoton: 'Suscribirme', destacado: true, visible: true, orden: 1,
     caracteristicas: ['20 cápsulas al mes', 'Español e inglés', 'Kits de marca ilimitados', 'Revisor del cliente con comentarios', 'Video interactivo', 'Soporte por WhatsApp'].map((texto) => ({ texto, visible: true })),
   },
   {
-    slug: 'empresa', nombre: 'Empresa', descripcion: 'Para corporaciones con varios equipos y requisitos de seguridad.', precioMes: null, precioAnual: null,
+    slug: 'empresa', nombre: 'Empresa', descripcion: 'Para corporaciones con varios equipos y requisitos de seguridad.', precioMes: null, precioAnual: null, precioMesUsd: null, precioAnualUsd: null,
     capsulasMes: null, usuarios: null, capsulaAdicional: null, textoBoton: 'Hablar con ventas', destacado: false, visible: true, orden: 2,
     caracteristicas: ['Cápsulas según contrato', 'Inicio de sesión único (SSO)', 'Retención de documentos a medida', 'Responsable de cuenta en Lima', 'Facturación anual'].map((texto) => ({ texto, visible: true })),
   },

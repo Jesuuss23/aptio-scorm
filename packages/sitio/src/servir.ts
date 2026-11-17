@@ -78,12 +78,26 @@ export const POLITICA_CONTENIDO = "default-src 'none'; script-src 'self'; style-
  * HU-1606 · La CSP de las páginas de una versión: con etiquetas publicadas (GA4, Tag Manager, Meta Pixel), suma solo los
  * orígenes que cada una necesita en `script-src`, `connect-src` e `img-src`; sin ellas, `POLITICA_CONTENIDO` tal cual.
  */
-export function politicaContenido(cookies: CookiesPublicadas | null | undefined): string {
+export function politicaContenido(cookies: CookiesPublicadas | null | undefined, opciones: { pago?: boolean } = {}): string {
   const d = dominiosCsp(cookies ?? null);
-  if (!d.script.length) return POLITICA_CONTENIDO;
-  const mas = (lista: string[]) => (lista.length ? ` ${lista.join(' ')}` : '');
-  return `default-src 'none'; script-src 'self'${mas(d.script)}; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${mas(d.img)}; connect-src 'self'${mas(d.connect)}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
+  const pago = opciones.pago === true;
+  if (!d.script.length && !pago) return POLITICA_CONTENIDO;
+  const mas = (lista: readonly string[]) => (lista.length ? ` ${lista.join(' ')}` : '');
+  const script = [...d.script, ...(pago ? CSP_CULQI.script : [])];
+  const connect = [...d.connect, ...(pago ? CSP_CULQI.connect : [])];
+  const marco = pago ? `; frame-src ${CSP_CULQI.frame.join(' ')}` : '';
+  return `default-src 'none'; script-src 'self'${mas(script)}; style-src 'unsafe-inline'; font-src 'self'; img-src 'self' data:${mas(d.img)}; connect-src 'self'${mas(connect)}${marco}; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`;
 }
+
+/**
+ * HU-1704 · Solo en `/pago`: el formulario incrustado de Culqi (Culqi Checkout) carga su script y abre su ventana en un
+ * marco de Culqi, así la tarjeta nunca pasa por nuestra página. Orígenes por confirmar en el sandbox de Culqi (SUP-294).
+ * Stripe no necesita nada: se paga en su página alojada.
+ */
+export const CSP_CULQI = { script: ['https://checkout.culqi.com'], connect: ['https://secure.culqi.com', 'https://api.culqi.com'], frame: ['https://checkout.culqi.com'] } as const;
+
+/** HU-1704 · ¿El archivo es la página del pago (`pago/index.html` o `en/pago/index.html`)? */
+export const esArchivoPago = (archivo: string | undefined) => archivo === 'pago/index.html' || archivo === 'en/pago/index.html';
 
 /** Tipo de un archivo de marca por su extensión. */
 export const mimeMarca = (archivo: string) => (archivo.endsWith('.png') ? 'image/png' : 'image/svg+xml');
@@ -105,7 +119,7 @@ export function cabecerasSitio(tipo: Pedido['tipo'] | '404' | '503', cuerpo: Uin
   return {
     ...base,
     'Cache-Control': cache,
-    ...(tipo === 'pagina' || tipo === '404' || tipo === '503' ? { 'Content-Security-Policy': tipo === 'pagina' ? politicaContenido(opciones.cookies) : POLITICA_CONTENIDO, 'Referrer-Policy': 'strict-origin-when-cross-origin' } : {}),
+    ...(tipo === 'pagina' || tipo === '404' || tipo === '503' ? { 'Content-Security-Policy': tipo === 'pagina' ? politicaContenido(opciones.cookies, { pago: esArchivoPago(opciones.archivo) }) : POLITICA_CONTENIDO, 'Referrer-Policy': 'strict-origin-when-cross-origin' } : {}),
     ...(tipo === '503' ? { 'Retry-After': String(REINTENTO_MANTENIMIENTO_S) } : {}),
   };
 }

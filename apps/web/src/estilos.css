@@ -3769,3 +3769,8 @@ ul.fila-chips {
 .planes-pie { margin: 24px 0; }
 .planes-pie > .tarjeta { margin: 0; }
 .plan-precios { max-width: 560px; }
+
+/* HU-1704 · Ventas › Pasarelas: las tarjetas reusan las de Planes; la tabla de pagos sin cuenta, la de Popups. */
+.cobros-sin-alta { margin-top: 32px; display: grid; gap: 12px; }
+.cobros-sin-alta .tarjeta-cabeza h2 { margin: 0; }
+.cobros-sin-alta table { width: 100%; }

@@ -1,11 +1,12 @@
 // HU-1703 · Reglas del alta de suscripción (REQ-083, CP-143, RN-18-2, RN-18-3).
 import { describe, expect, it } from 'vitest';
 import {
-  finPeriodo, leerEventoPrueba, resumenCheckout, rucValido, slugOrganizacion, soles2, sumarMeses, tipoComprobanteDe, validarEmpresa,
+  centimos, finPeriodo, leerEventoPrueba, monedasDelPlan, monto2, resumenCheckout, rucValido, slugOrganizacion, soles2, sumarMeses, tipoComprobanteDe, validarEmpresa,
 } from '../src/suscripciones.js';
 
 const empresa = { razonSocial: '  Minera  Andina SAC ', ruc: '20131312955', nombreAdmin: 'Ana Quispe', correoAdmin: 'Ana@Minera.PE', consentimiento: true };
 const plan = { slug: 'productora', nombre: 'Productora', aMedida: false, precioMes: 1290, precioAnual: 12384 };
+const planUsd = { ...plan, precioMesUsd: 349, precioAnualUsd: 3350 };
 
 describe('RUC', () => {
   it('acepta RUC con el dígito verificador correcto', () => {
@@ -90,10 +91,42 @@ describe('slug y evento', () => {
   it('lee el evento de la pasarela de pruebas y descarta lo inválido', () => {
     const id = '0F8FAD5B-D9CB-469F-A165-70867728950E';
     expect(leerEventoPrueba({ id: 'evt_1', tipo: 'pago.aprobado', solicitudId: id, ultimos4: '1111' }))
-      .toEqual({ eventoId: 'evt_1', solicitudId: id.toLowerCase(), resultado: 'aprobado', ultimos4: '1111', motivo: null });
+      .toEqual({ eventoId: 'evt_1', solicitudId: id.toLowerCase(), resultado: 'aprobado', ultimos4: '1111', motivo: null, referencia: 'evt_1', monto: null, moneda: null });
     expect(leerEventoPrueba({ id: 'evt_2', tipo: 'pago.rechazado', solicitudId: id, motivo: 'Fondos insuficientes' })?.resultado).toBe('rechazado');
     expect(leerEventoPrueba({ id: 'evt_3', tipo: 'otro', solicitudId: id })).toBeNull();
     expect(leerEventoPrueba({ id: 'evt 4', tipo: 'pago.aprobado', solicitudId: id })).toBeNull();
     expect(leerEventoPrueba('x')).toBeNull();
+  });
+});
+
+describe('HU-1704 · dólares', () => {
+  it('el resumen en USD usa los precios en dólares del plan con IGV de 18 % por defecto', () => {
+    expect(resumenCheckout(planUsd, 'MENSUAL', true, 'USD')).toEqual({ plan: 'productora', nombrePlan: 'Productora', ciclo: 'MENSUAL', subtotal: 349, igv: 62.82, total: 411.82, moneda: 'USD' });
+    expect(resumenCheckout(planUsd, 'ANUAL', true, 'USD')).toMatchObject({ subtotal: 3350, igv: 603, total: 3953, moneda: 'USD' });
+    expect(resumenCheckout(planUsd, 'MENSUAL', true)).toMatchObject({ subtotal: 1290, moneda: 'PEN' });
+  });
+  it('null en USD si el plan no tiene precio en dólares o si pide el anual sin ofrecerlo', () => {
+    expect(resumenCheckout(plan, 'MENSUAL', true, 'USD')).toBeNull();
+    expect(resumenCheckout({ ...planUsd, precioAnualUsd: null }, 'ANUAL', true, 'USD')).toBeNull();
+    expect(resumenCheckout(planUsd, 'ANUAL', false, 'USD')).toBeNull();
+  });
+  it('ofrece dólares solo con precio en USD y una pasarela que cobre en dólares', () => {
+    expect(monedasDelPlan({ aMedida: false, precioMesUsd: 349 }, ['PEN', 'USD'])).toEqual(['PEN', 'USD']);
+    expect(monedasDelPlan({ aMedida: false, precioMesUsd: 349 }, ['PEN'])).toEqual(['PEN']);
+    expect(monedasDelPlan({ aMedida: false, precioMesUsd: null }, ['PEN', 'USD'])).toEqual(['PEN']);
+    expect(monedasDelPlan({ aMedida: false }, ['PEN', 'USD'])).toEqual(['PEN']);
+    expect(monedasDelPlan({ aMedida: true, precioMesUsd: null }, ['PEN', 'USD'])).toEqual([]);
+  });
+  it('formatea el monto según la moneda y lo pasa a céntimos sin errores de coma flotante', () => {
+    expect(monto2(411.82, 'USD')).toBe('US$ 411.82');
+    expect(monto2(1522.2, 'PEN')).toBe('S/ 1,522.20');
+    expect(centimos(1522.2)).toBe(152220);
+    expect(centimos(0.29)).toBe(29);
+    expect(centimos(411.82)).toBe(41182);
+  });
+  it('el evento de pruebas lleva el monto y la moneda si vienen', () => {
+    const id = '0f8fad5b-d9cb-469f-a165-70867728950e';
+    expect(leerEventoPrueba({ id: 'evt_9', tipo: 'pago.aprobado', solicitudId: id, monto: 411.82, moneda: 'USD' })).toMatchObject({ monto: 411.82, moneda: 'USD', referencia: 'evt_9' });
+    expect(leerEventoPrueba({ id: 'evt_9', tipo: 'pago.aprobado', solicitudId: id, monto: -1, moneda: 'EUR' })).toMatchObject({ monto: null, moneda: null });
   });
 });

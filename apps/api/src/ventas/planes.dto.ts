@@ -15,6 +15,9 @@ export class PlanDto {
   @ApiProperty({ type: Number, nullable: true, example: 1290, description: 'null = a medida' }) precioMes: number | null;
   @ApiProperty({ type: Number, nullable: true, description: 'Precio anual propio; null = precioMes × 12 × (1 − descuentoAnual / 100)' }) precioAnual: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 12384, description: 'El anual que se cobra (el propio o el calculado); null si es a medida' }) precioAnualEfectivo: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 349, description: 'HU-1704 · Dólares enteros sin IGV; null = el plan no se cobra en dólares' }) precioMesUsd: number | null;
+  @ApiProperty({ type: Number, nullable: true, description: 'HU-1704 · Anual propio en USD; null = precioMesUsd × 12 × (1 − descuentoAnual / 100)' }) precioAnualUsd: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 3350, description: 'HU-1704 · El anual en USD que se cobra; null si no hay precio en dólares' }) precioAnualUsdEfectivo: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 20 }) capsulasMes: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 10, description: 'null = ilimitados o según contrato' }) usuarios: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 69 }) capsulaAdicional: number | null;
@@ -45,6 +48,8 @@ export class PlanEntradaDto {
   @ApiPropertyOptional() @IsOptional() @IsString() descripcion?: string;
   @ApiPropertyOptional({ type: Number, nullable: true }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() precioMes?: number | null;
   @ApiPropertyOptional({ type: Number, nullable: true }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() precioAnual?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'HU-1704 · Dólares enteros sin IGV' }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() precioMesUsd?: number | null;
+  @ApiPropertyOptional({ type: Number, nullable: true, description: 'HU-1704 · Anual propio en USD' }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() precioAnualUsd?: number | null;
   @ApiPropertyOptional({ type: Number, nullable: true }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() capsulasMes?: number | null;
   @ApiPropertyOptional({ type: Number, nullable: true }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() usuarios?: number | null;
   @ApiPropertyOptional({ type: Number, nullable: true }) @IsOptional() @ValidateIf((_, v) => v !== null) @IsInt() capsulaAdicional?: number | null;
@@ -69,6 +74,9 @@ export class PlanPublicoDto {
   @ApiProperty({ type: Number, nullable: true, example: 13344 }) precioAnual: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 3336, description: 'Frente a pagar 12 meses' }) ahorroAnual: number | null;
   @ApiProperty({ type: Number, nullable: true, example: 1640.2, description: 'Precio al mes con IGV (18 %)' }) precioMesConIgv: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 349, description: 'HU-1704 · Al mes en USD sin IGV; solo si se puede pagar en dólares' }) precioMesUsd: number | null;
+  @ApiProperty({ type: Number, nullable: true, example: 3350, description: 'HU-1704 · El anual en USD sin IGV; solo si se puede pagar en dólares' }) precioAnualUsd: number | null;
+  @ApiProperty({ type: [String], enum: ['PEN', 'USD'], example: ['PEN', 'USD'], description: 'HU-1704 · Las monedas en que se puede pagar ahora' }) monedas: ('PEN' | 'USD')[];
   @ApiProperty({ type: Number, nullable: true }) capsulasMes: number | null;
   @ApiProperty({ type: Number, nullable: true }) usuarios: number | null;
   @ApiProperty({ type: Number, nullable: true }) capsulaAdicional: number | null;

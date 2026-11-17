@@ -72,6 +72,14 @@ describe.skipIf(!hayBase)('cola suscripciones (HU-1703)', () => {
     expect(c.texto).toContain(ENLACE);
   });
 
+  it('HU-1704 · una suscripción en dólares muestra el total en USD', async () => {
+    const s = await solicitud(true);
+    await prisma.solicitudSuscripcion.update({ where: { id: s.id }, data: { moneda: 'USD', subtotal: 349, igv: 62.82, total: 411.82 } });
+    const correo = smtp();
+    await procesarBienvenida(prisma, { solicitudId: s.id, enlace: ENLACE }, correo.enviar);
+    expect(correo.enviados[0]!.texto).toContain('Total pagado: US$ 411.82 (incluye IGV de 18 %)');
+  });
+
   it('una solicitud rechazada o sin organización no recibe correo', async () => {
     const s = await solicitud(false);
     const correo = smtp();

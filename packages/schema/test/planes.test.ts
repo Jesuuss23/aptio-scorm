@@ -1,7 +1,7 @@
 // HU-1702 · Reglas de los planes (REQ-082, CP-141, CP-142, RN-18-5).
 import { describe, expect, it } from 'vitest';
 import {
-  AJUSTES_PLANES_POR_DEFECTO, ahorroAnualDe, apagarOtrosDestacados, conIgv, igvDe, PLANES_DE_EJEMPLO, planesPublicos, type PlanGuardado, precioAnualDe, soles,
+  AJUSTES_PLANES_POR_DEFECTO, ahorroAnualDe, apagarOtrosDestacados, conIgv, igvDe, PLANES_DE_EJEMPLO, planesPublicos, type PlanGuardado, precioAnualDe, soles, precioAnualUsdDe, dolares,
   validarAjustesPlanes, validarPlan, validarPlanCompleto,
 } from '../src/planes.js';
 
@@ -67,6 +67,25 @@ describe('validación', () => {
   it('parcial: solo lo que viene; a medida sin anual ni adicional', () => {
     expect(validarPlan({ precioMes: 1390 }, { parcial: true })).toEqual([]);
     expect(validarPlanCompleto({ ...PLANES_DE_EJEMPLO[2]!, precioAnual: 100 }).map((e) => e.campo)).toEqual(['precioAnual']);
+  });
+  it('HU-1704 · precios en dólares: enteros positivos, no en planes a medida y el anual pide el mensual', () => {
+    expect(validarPlan({ precioMesUsd: 349, precioAnualUsd: null }, { parcial: true })).toEqual([]);
+    expect(validarPlan({ precioMesUsd: 0, precioAnualUsd: 1.5 }, { parcial: true }).map((e) => e.campo)).toEqual(['precioMesUsd', 'precioAnualUsd']);
+    expect(validarPlanCompleto({ ...PLANES_DE_EJEMPLO[2]!, precioMesUsd: 10 }).map((e) => e.campo)).toEqual(['precioMesUsd']);
+    expect(validarPlanCompleto({ ...PLANES_DE_EJEMPLO[1]!, precioAnualUsd: 3000 }).map((e) => e.campo)).toEqual(['precioAnualUsd']);
+    expect(validarPlanCompleto({ ...PLANES_DE_EJEMPLO[1]!, precioMesUsd: 349 })).toEqual([]);
+  });
+  it('HU-1704 · el anual en USD es el propio o el mensual × 12 con el descuento; la proyección los lleva', () => {
+    expect(precioAnualUsdDe({ precioMesUsd: 349, precioAnualUsd: null }, 20)).toBe(3350);
+    expect(precioAnualUsdDe({ precioMesUsd: 349, precioAnualUsd: 3000 }, 20)).toBe(3000);
+    expect(precioAnualUsdDe({ precioMesUsd: null, precioAnualUsd: null }, 20)).toBeNull();
+    expect(precioAnualUsdDe({}, 20)).toBeNull();
+    const guardados = PLANES_DE_EJEMPLO.map((p, i) => ({ ...p, id: `p${i}`, ficticio: false, ...(p.slug === 'productora' ? { precioMesUsd: 349 } : {}) }));
+    const r = planesPublicos(guardados, AJUSTES_PLANES_POR_DEFECTO);
+    expect(r.find((p) => p.slug === 'productora')).toMatchObject({ precioMesUsd: 349, precioAnualUsd: 3350 });
+    expect(r.find((p) => p.slug === 'inicial')).toMatchObject({ precioMesUsd: null, precioAnualUsd: null });
+    expect(dolares(349)).toBe('US$ 349');
+    expect(dolares(411.82)).toBe('US$ 411.82');
   });
 
   it('ajustes de la página de precios', () => {

@@ -1073,3 +1073,4 @@ await import('./chatbot.casos.js');
 await import('./sitio-resumen.casos.js');
 await import('./planes.casos.js');
 await import('./suscripciones.casos.js');
+await import('./pasarelas.casos.js');

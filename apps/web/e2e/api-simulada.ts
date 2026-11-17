@@ -34,7 +34,8 @@ import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from 
 import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
 import { crearPlanesSim, type PlanesSitioSim } from './planes-simulados';
-import { crearSuscripcionesSim } from './suscripciones-simuladas';
+import { crearSuscripcionesSim, ORIGEN_STRIPE_SIMULADO } from './suscripciones-simuladas';
+import { crearPasarelasSim, type PasarelasSitioSim } from './pasarelas-simuladas';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
 
@@ -202,6 +203,8 @@ export interface OpcionesSimulacion {
   visitasSitio?: VisitaDiaSim[];
   /** HU-1702 · Los planes de Ventas › Planes y los ajustes de la página de precios. */
   planesSitio?: PlanesSitioSim;
+  /** HU-1704 · Ventas › Pasarelas: si Stripe tiene sus variables, qué pasarelas se muestran y los cobros sin cuenta. */
+  pasarelasSitio?: PasarelasSitioSim;
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -476,8 +479,9 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio }: OpcionesSimulacion) {
   const planesSim = crearPlanesSim(planesSitio);
+  const pasarelasSim = crearPasarelasSim(pasarelasSitio, () => entornoSitio);
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -590,7 +594,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-1703 · El checkout de /pago: el plan sale de la última versión (como la API).
   const suscripcionesSim = crearSuscripcionesSim({
     planes: () => { const v = versionesSim.at(-1); return v ? planesServidos(v.instantanea, entornoSitio) : null; },
-    entorno: () => entornoSitio, correosEnUso: () => [USUARIO.email],
+    entorno: () => entornoSitio, correosEnUso: () => [USUARIO.email], pasarelas: pasarelasSim,
   });
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
@@ -779,6 +783,12 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     return a ? enviar(200, pedido!.tipo, a.contenido, undefined, ultima.instantanea.sitio?.cookies ?? null) : enviar(404, '404', archivos.find((x) => x.archivo === '404.html')!.contenido);
   });
 
+  // HU-1704 · La página alojada de Stripe, simulada fuera del sitio.
+  await page.route(`${ORIGEN_STRIPE_SIMULADO}/**`, (route) => {
+    const id = new URL(route.request().url()).pathname.split('/').pop() ?? '';
+    const html = suscripcionesSim.paginaStripe(id);
+    return html ? route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html }) : route.fulfill({ status: 404, body: 'no' });
+  });
   await page.route('**/s3-simulado/**', (route) => {
     const nombre = new URL(route.request().url()).pathname.split('/').pop() ?? '';
     if (subidas.has(nombre)) {
@@ -1324,7 +1334,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}), ...r301 });
     }
     if (ruta.startsWith('/publico/planes/') || ruta.startsWith('/publico/checkout')) {
-      const r = suscripcionesSim.publico(ruta, req.method(), (req.method() === 'POST' ? req.postDataJSON() ?? {} : {}) as Record<string, unknown>);
+      const r = suscripcionesSim.publico(ruta, req.method(), (req.method() === 'POST' ? req.postDataJSON() ?? {} : {}) as Record<string, unknown>, new URL(req.url()).origin);
       if (r) return responder(r.status, r.body);
     }
     // HU-1601 · La entrada pública de leads (popup, chatbot, agendador y suscripción) y Captación › Leads y CRM (PNT-34).
@@ -1357,6 +1367,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
       const r = agendaSim.panel(ruta, req.method(), (req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
       return responder(r.status, r.body);
+    }
+    if (ruta.startsWith('/ventas/pasarelas') || ruta.startsWith('/ventas/cobros')) {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const r = pasarelasSim.panel(ruta, req.method(), (req.method() === 'GET' ? {} : req.postDataJSON() ?? {}) as Record<string, unknown>, new URL(req.url()).searchParams);
+      if (r) return responder(r.status, r.body);
     }
     if (ruta === '/ventas/planes' || ruta.startsWith('/ventas/planes/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });

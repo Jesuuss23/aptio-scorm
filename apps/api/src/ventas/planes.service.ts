@@ -1,23 +1,26 @@
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ID_PLANES_AJUSTES, type Plan, Prisma, ultimaVersion } from '@aptio/db';
 import {
-  AJUSTES_PLANES_POR_DEFECTO, type AjustesPlanes, type Caracteristica, type DatosPlan, type ErrorCampo, precioAnualDe, validarAjustesPlanes, validarPlan, validarPlanCompleto,
+  AJUSTES_PLANES_POR_DEFECTO, type AjustesPlanes, type Caracteristica, type DatosPlan, type ErrorCampo, precioAnualDe, precioAnualUsdDe, validarAjustesPlanes, validarPlan, validarPlanCompleto,
 } from '@aptio/schema/planes';
+import { monedasDelPlan } from '@aptio/schema/suscripciones';
 import { planesServidos } from '@aptio/schema/sitio-versiones';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
+import { PasarelasService } from './pasarelas.service.js';
 import type { AjustesPlanesDto, PlanDto, PlanEntradaDto, PlanesDto, PlanPublicoDto } from './planes.dto.js';
 
 /** Un plan nuevo: oculto, sin destacar y con el texto de botón de siempre (solo faltan slug y nombre). */
 const PLAN_NUEVO: Omit<DatosPlan, 'slug' | 'nombre'> = {
-  descripcion: '', precioMes: null, precioAnual: null, capsulasMes: null, usuarios: null, capsulaAdicional: null, textoBoton: 'Suscribirme', destacado: false, visible: false, caracteristicas: [],
+  descripcion: '', precioMes: null, precioAnual: null, precioMesUsd: null, precioAnualUsd: null, capsulasMes: null, usuarios: null, capsulaAdicional: null, textoBoton: 'Suscribirme', destacado: false, visible: false, caracteristicas: [],
 };
-const CAMPOS: (keyof DatosPlan)[] = ['slug', 'nombre', 'descripcion', 'precioMes', 'precioAnual', 'capsulasMes', 'usuarios', 'capsulaAdicional', 'textoBoton', 'destacado', 'visible', 'caracteristicas'];
+const CAMPOS: (keyof DatosPlan)[] = ['slug', 'nombre', 'descripcion', 'precioMes', 'precioAnual', 'precioMesUsd', 'precioAnualUsd', 'capsulasMes', 'usuarios', 'capsulaAdicional', 'textoBoton', 'destacado', 'visible', 'caracteristicas'];
 
 const caracteristicasDe = (v: unknown): Caracteristica[] => (Array.isArray(v) ? (v as Caracteristica[]) : []);
 const datosDe = (p: Plan): DatosPlan => ({
-  slug: p.slug, nombre: p.nombre, descripcion: p.descripcion, precioMes: p.precioMes, precioAnual: p.precioAnual, capsulasMes: p.capsulasMes, usuarios: p.usuarios,
+  slug: p.slug, nombre: p.nombre, descripcion: p.descripcion, precioMes: p.precioMes, precioAnual: p.precioAnual, precioMesUsd: p.precioMesUsd, precioAnualUsd: p.precioAnualUsd,
+  capsulasMes: p.capsulasMes, usuarios: p.usuarios,
   capsulaAdicional: p.capsulaAdicional, textoBoton: p.textoBoton, destacado: p.destacado, visible: p.visible, caracteristicas: caracteristicasDe(p.caracteristicas),
 });
 const presentes = (dto: PlanEntradaDto): Record<string, unknown> => Object.fromEntries(Object.entries(dto).filter(([, v]) => v !== undefined));
@@ -33,7 +36,7 @@ const noValido = (errores: ErrorCampo[]) => new UnprocessableEntityException({ c
  */
 @Injectable()
 export class PlanesService {
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly pasarelas: PasarelasService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -109,13 +112,19 @@ export class PlanesService {
     return datos;
   }
 
-  /** CP-141 · CP-142 · El plan de la versión publicada: 404 si está oculto, no existe o la versión no publica planes. */
+  /**
+   * CP-141 · CP-142 · El plan de la versión publicada: 404 si está oculto, no existe o la versión no publica planes.
+   * HU-1704 · Con las monedas en que se puede pagar: los precios en USD salen solo si el plan los tiene y una pasarela
+   * visible y activa cobra en dólares.
+   */
   async publico(slug: string): Promise<PlanPublicoDto> {
     const v = await ultimaVersion(this.bd);
     const servidos = v ? planesServidos(v.instantanea, entornoActual()) : null;
     const plan = servidos?.planes.find((p) => p.slug === slug);
     if (!servidos || !plan) throw new NotFoundException({ codigo: 'NO_ENCONTRADO', mensaje: 'El plan no existe o no está publicado' });
-    return { ...plan, ajustes: servidos.ajustes };
+    const monedas = monedasDelPlan(plan, await this.pasarelas.monedas());
+    const usd = monedas.includes('USD');
+    return { ...plan, precioMesUsd: usd ? (plan.precioMesUsd ?? null) : null, precioAnualUsd: usd ? (plan.precioAnualUsd ?? null) : null, monedas, ajustes: servidos.ajustes };
   }
 
   private validar(d: DatosPlan): DatosPlan {
@@ -134,7 +143,7 @@ export class PlanesService {
   }
 
   private aDto(p: Plan, ajustes: AjustesPlanes): PlanDto {
-    return { id: p.id, ...datosDe(p), precioAnualEfectivo: precioAnualDe(p, ajustes.descuentoAnual), orden: p.orden, ficticio: p.ficticio, actualizadoEn: p.actualizadoEn.toISOString() };
+    return { id: p.id, ...datosDe(p), precioAnualEfectivo: precioAnualDe(p, ajustes.descuentoAnual), precioAnualUsdEfectivo: precioAnualUsdDe(p, ajustes.descuentoAnual), orden: p.orden, ficticio: p.ficticio, actualizadoEn: p.actualizadoEn.toISOString() };
   }
 
   private async auditar(u: UsuarioSesion, accion: string, entidadId: string | null, datos: Prisma.InputJsonValue) {
