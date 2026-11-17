@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.79 · actualizado con la sexta entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.80 · actualizado con la primera entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1101,7 +1101,7 @@ En **Precios**, el botón de un plan con precio (por ejemplo, **Suscribirme**) a
 
 **Si el correo ya tiene una cuenta,** la página pide iniciar sesión o usar otro correo. **Si el plan es a medida** o no está publicado, la página ofrece ver los planes o agendar una demo.
 
-**Si no hay pago en línea.** Si ninguna pasarela está activa para esa moneda, en el paso 3 la página lo dice y ofrece **Agendar una demo** con el plan elegido. En el sitio de pruebas hay una pasarela de pruebas que no cobra nada: la tarjeta 4111 1111 1111 1111 aprueba y la 4000 0000 0000 0002 rechaza. El comprobante electrónico todavía no se emite: llegará con la facturación.
+**Si no hay pago en línea.** Si ninguna pasarela está activa para esa moneda, en el paso 3 la página lo dice y ofrece **Agendar una demo** con el plan elegido. En el sitio de pruebas hay una pasarela de pruebas que no cobra nada: la tarjeta 4111 1111 1111 1111 aprueba y la 4000 0000 0000 0002 rechaza. Al aprobarse el pago, llega por correo el comprobante electrónico (factura o boleta) con su PDF y su XML.
 
 ### 8.41 Pasarelas de pago (superadmin)
 
@@ -1143,6 +1143,25 @@ Si eres el administrador de tu organización, en el menú **Empresa** está **Pl
 **Seguir con mi plan.** Mientras no llegue el fin del período, si pediste cancelar o bajar de plan, pulsa **Seguir con mi plan** para dejarlo todo como estaba.
 
 Desde el aviso **Se agotaron las cápsulas de este mes**, el enlace **Ver planes** lleva al administrador a esta pantalla. Todo se usa con el teclado: los botones con Enter y el resumen recibe el foco al abrirse.
+
+### 8.44 Facturación: comprobantes electrónicos (superadmin)
+
+En **Ventas › Facturación** están los comprobantes electrónicos de cada pago aprobado. Cada pago emite una **factura** si el cliente pidió factura y su RUC es válido, o una **boleta** si no. Cuando se reembolsa un pago en **Ventas › Pasarelas**, se emite una **nota de crédito** que corrige su comprobante. El cliente recibe por correo cada comprobante aceptado, con el PDF y el XML.
+
+**Pestaña Comprobantes.** La tabla muestra el número (por ejemplo F001-00000001), el cliente, el total con el IGV y el **Estado SUNAT**:
+
+- **Aceptado:** el comprobante es válido y ya se envió al cliente.
+- **Pendiente:** aún no hay respuesta, o faltan los datos fiscales del emisor; el motivo lo dice.
+- **Observado:** hay que corregir algo, por ejemplo el RUC del cliente; el motivo lo explica.
+- **Rechazado:** no vale; su número no se vuelve a usar.
+
+Usa **Estado SUNAT** para ver solo los de un estado y **Actualizar** para traer los cambios. Los botones **PDF** y **XML** descargan cada archivo.
+
+**Corregir y reenviar.** En un comprobante observado o pendiente, pulsa **Corregir y reenviar**. Revisa lo que respondió el sistema de SUNAT, corrige el **RUC**, la **Razón social o nombre**, la **Dirección** o el **Correo de facturación** y pulsa **Reenviar al OSE**. Una factura necesita un RUC válido. El comprobante conserva su número y queda **Pendiente** hasta la respuesta; con **Actualizar** ves cuando pasa a **Aceptado**.
+
+**Pestaña Datos fiscales.** Aquí están el **RUC del emisor**, la **Razón social** y el **Domicilio fiscal**; las series de facturas (F001), boletas (B001) y notas de crédito (FC01 y BC01); el **Proveedor** que envía los comprobantes a SUNAT y el **Ambiente** (pruebas o producción). Las credenciales del proveedor no se escriben aquí: las configura el equipo técnico. Sin el RUC del emisor, los comprobantes quedan pendientes. La **Detracción** dice «Por validar con el contador»: déjala desactivada hasta que el contador confirme la tasa y el umbral. Pulsa **Guardar los datos fiscales**.
+
+Hoy los comprobantes se emiten en un **ambiente de pruebas** que no los envía a SUNAT y no tienen valor tributario, hasta que se elija el proveedor. Todo se usa con el teclado: las pestañas cambian con las flechas y los botones con Enter.
 
 ## 9. Preguntas frecuentes
 
@@ -1235,6 +1254,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.80 | 2026-11-17 | Facturación (8.44): los comprobantes de cada pago con su estado SUNAT, la descarga del PDF y el XML, «Corregir y reenviar» un observado y los datos fiscales con la detracción por validar con el contador. El pago ya envía el comprobante por correo (8.40). |
 | 0.79 | 2026-11-17 | Plan y suscripción (8.43): subir de plan pagando solo la diferencia por los días que faltan, bajar de plan desde la renovación, cancelar al fin del período sin devolución y «Seguir con mi plan». |
 | 0.78 | 2026-11-17 | Cápsulas del mes y cápsulas adicionales (8.42): el indicador en Proyectos, qué cuenta como cápsula, cuándo se renueva, el aviso al agotarse y la compra de 1 a 10 adicionales por el administrador. |
 | 0.77 | 2026-11-17 | Pagar en soles o en dólares (8.40): el selector de moneda y el pago con Stripe o Culqi. Pasarelas de pago (8.41): mostrar, nombrar, cambiar de modo y ordenar las pasarelas, reembolsar pagos aprobados sin cuenta y los precios en dólares de los planes. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.79 · actualizado con la sexta entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.80 · actualizado con la primera entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -580,7 +580,7 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Checkout en dólares:** `Plan` suma `precioMesUsd` y `precioAnualUsd` (enteros sin IGV), que pasan a la versión publicada. `/pago` muestra Soles/Dólares solo si el plan tiene USD y una pasarela de dólares está visible y activa; el resumen suma 18 % de IGV también en USD (SUP-295). Stripe crea la sesión con Idempotency-Key `checkout-<solicitud>` y vuelve a `/pago?plan=&checkout=`; Culqi devuelve un token que va a `POST /publico/checkout/{id}/token` y la API crea el cargo. La CSP de `/pago` admite los orígenes de Culqi (SUP-294).
 - **Webhook único (CP-144, CP-145):** `POST /webhooks/pago/{pruebas|stripe|culqi}` verifica la firma de cada pasarela (`X-Aptio-Firma`, `Stripe-Signature` con 5 minutos de tolerancia, `X-Culqi-Signature`); si no coincide, 401 sin cambios. Los eventos que no son de pago responden `ignorado: true`. Cada pago aprobado crea un `Cobro` (monto, moneda, referencia, 4 últimos dígitos, `eventoPagoId` único, sin datos de tarjeta, REQ-110) y encola «emitir-comprobante» en la cola `comprobantes` con jobId igual al id del cobro; el worker llega con la HU-1707. Monto o moneda distintos, correo con cuenta o solicitud ya cerrada dejan el cobro sin alta.
 - **Reembolso:** `POST /ventas/cobros/{id}/reembolsar` (SUPERADMIN) pasa el cobro sin alta a REEMBOLSADO de forma condicional y pide la devolución a la pasarela (Idempotency-Key `reembolso-<cobro>`); si falla, vuelve a APROBADO, responde 502 y audita COBRO_REEMBOLSO_FALLIDO.
-- **Fuera de alcance:** emisión SUNAT y notas de crédito (HU-1707), cuotas (HU-1705), cambio de plan y cancelación (HU-1706, sin devolución al cancelar). Culqi está sin probar en su sandbox (SUP-294).
+- **Fuera de alcance:** cuotas (HU-1705), cambio de plan y cancelación (HU-1706, sin devolución al cancelar). Culqi está sin probar en su sandbox (SUP-294).
 
 ### 3.36 Cuotas de cápsulas (HU-1705)
 
@@ -588,7 +588,7 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Consumo (CP-146):** la primera generación de un proyecto crea un `ConsumoCapsula` (`proyectoId` único, origen CUOTA o ADICIONAL) en la misma transacción que la generación, con la fila de `Suscripcion` bloqueada (`FOR UPDATE`): dos lanzamientos a la vez con una disponible consumen una y el otro recibe 402 CUOTA_AGOTADA, con la cuota en `detalles[0]`. Regenerar el mismo proyecto no consume (SUP-301).
 - **Adicionales:** `POST /organizacion/cuota/adicionales` (solo ADMINISTRADOR, de 1 a 10) crea una `CompraCapsulas` PENDIENTE al precio `capsulaAdicional` del plan con IGV de 18 % en la moneda de la suscripción (en dólares, proporcional, SUP-300) y cobra con la pasarela de la suscripción o la primera que cobre esa moneda (503 si ninguna). Stripe vuelve a `/?compra=<id>`. `pago-prueba`, `token` y `GET …/{id}` siguen el mismo camino que el checkout (SUP-303).
 - **Webhook:** el mismo `POST /webhooks/pago/{pasarela}` resuelve la compra si el evento no es de una solicitud: aprobada, suma las adicionales a la ventana vigente, crea el `Cobro` con `compraCapsulasId` y encola «emitir-comprobante» con jobId = cobro. Monto distinto o compra cerrada deja el cobro sin acreditar y reembolsable (SUP-304). Auditorías CAPSULAS_COMPRA_INICIADA, CAPSULAS_COMPRADAS y CAPSULAS_PAGO_RECHAZADO.
-- **Fuera de alcance:** qué pasa con la cuota de una suscripción vencida o suspendida (HU-1708, SUP-305) y la emisión del comprobante (HU-1707).
+- **Fuera de alcance:** qué pasa con la cuota de una suscripción vencida o suspendida (HU-1708, SUP-305).
 
 ### 3.37 Cambio de plan y cancelación (HU-1706)
 
@@ -598,7 +598,17 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Webhook:** el mismo `POST /webhooks/pago/{pasarela}` resuelve el cambio si el evento no es de una solicitud ni de una compra. Aprobado, con la `Suscripcion` bloqueada (`FOR UPDATE`) cambia el plan y el precio pactado de inmediato, quita la bajada programada, crea el `Cobro` con `cambioPlanId` y encola «emitir-comprobante» con jobId = cobro (PLAN_CAMBIADO). Monto o moneda distintos, cambio cerrado o plan ya cambiado (PLAN_YA_CAMBIO) dejan el cobro sin acreditar y reembolsable (SUP-311). `Cobro_origen_check` exige exactamente uno de los tres orígenes.
 - **Cancelación:** `POST …/cancelar` marca `cancelarAlFin` sin devolución (SUP-299) y programa en la cola `suscripciones` la tarea retrasada «suscripcion-vencer» (jobId `vencer-<suscripción>`) para `finPeriodo`; el worker pasa la suscripción a CANCELADA solo si la cancelación sigue pedida y el período terminó (SUSCRIPCION_CANCELADA). Si la tarea no corrió, la API ya la trata como cancelada (SUP-310). `POST …/reanudar` quita la cancelación y la bajada programada y retira la tarea (SUSCRIPCION_REANUDADA).
 - **Cuota de una suscripción cancelada:** 0; lanzar una cápsula nueva responde 402 SUSCRIPCION_CANCELADA y la compra de adicionales 422, pero regenerar un proyecto que ya consumió sigue permitido y lo exportado se descarga (SUP-312).
-- **Fuera de alcance:** aplicar la bajada en la renovación y cambiar de ciclo o moneda (HU-1708, SUP-307, SUP-308), la nota de crédito (HU-1707) y probar la subida con Culqi y Stripe en sus sandbox.
+- **Fuera de alcance:** aplicar la bajada en la renovación y cambiar de ciclo o moneda (HU-1708, SUP-307, SUP-308) y probar la subida con Culqi y Stripe en sus sandbox.
+
+### 3.38 Comprobantes electrónicos SUNAT (HU-1707)
+
+- **Emisión (REQ-087, CP-148):** cada cobro aprobado ya deja en la cola `comprobantes` la tarea «emitir-comprobante» (jobId = cobro). El worker crea el comprobante una vez por `(cobroId, tipo)`: factura si la solicitud pidió factura y el RUC tiene su dígito verificador; si no, boleta sin documento (RN-18-4, SUP-316, SUP-318). Toma el número de la serie con `SerieComprobante` bloqueada (`FOR UPDATE`, SUP-315), desglosa base e IGV de 18 % al céntimo (RN-18-5), arma el XML UBL 2.1 y el PDF, los guarda en S3 (`comprobantes/<id>/<RUC>-<tipo>-<serie>-<número>.xml|pdf`), los envía al OSE y, aceptado, los manda por correo a `correoFacturacion` con los dos adjuntos.
+- **OSE (DA-09, SUP-314):** el contrato común `ProveedorOse` recibe el XML y devuelve ACEPTADO, OBSERVADO, RECHAZADO o PENDIENTE con el motivo. Hoy solo existe el simulado (`pruebas`, con SITIO_ENTORNO=pruebas): acepta todo salvo el RUC 20999999990, que observa, y no envía nada a SUNAT. El XML sale sin firma. Sin RUC del emisor o sin el proveedor en el entorno, el comprobante queda PENDIENTE con el motivo.
+- **Detracción (RN-18-9, SUP-317):** desactivada por defecto; activa, la factura en soles desde el umbral lleva el monto, la leyenda 2006 y el tipo de operación 1001. Por validar con el contador.
+- **Consola (PNT-37):** `GET /ventas/comprobantes` (filtro por estado), `…/{id}/pdf` y `…/xml` desde S3, `POST …/{id}/reenviar` (CP-149: corrige el receptor de un observado o pendiente, lo deja PENDIENTE y lo reencola con el mismo número) y `GET`/`PUT /ventas/datos-fiscales`, solo SUPERADMIN. Auditorías COMPROBANTE_DESCARGADO, COMPROBANTE_REENVIADO y DATOS_FISCALES_ACTUALIZADOS.
+- **Webhook del OSE:** `POST /webhooks/ose/{proveedor}` sin sesión, con HMAC sobre el cuerpo crudo (`X-Aptio-Firma`, `OSE_PRUEBAS_SECRETO_WEBHOOK`); firma inválida, 401 sin cambios. Cada aviso se guarda en `EventoOse` (`<proveedor>:<id>`), así que un aviso repetido no cambia nada; un estado final no vuelve atrás. Aceptado sin correo, encola el envío (COMPROBANTE_ESTADO_OSE).
+- **Nota de crédito:** reembolsar un cobro encola la tarea con `tipo: NOTA_CREDITO` (jobId `nota-<cobro>`): FC01 o BC01 según el original, por el total, con su referencia y el motivo 06. Si el original aún no existe, la tarea reintenta.
+- **Fuera de alcance:** el proveedor OSE real y la firma del XML (DA-09), pedir el DNI en boletas desde S/ 700 (SUP-316), el portal de comprobantes de la organización (HU-1711) y las notas de crédito por otros motivos.
 
 ## 4. Datos
 
@@ -702,6 +712,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-200 a SUP-204:** la analítica se guarda pero se activa con el banner de cookies; el superadmin se reconoce por la cookie de sesión durante el mantenimiento (dominio de cookie compartido y CDN sin caché de respuestas privadas); el certificado lo emite la CDN; logo y favicon de hasta 200 KB.
 - **SUP-246 a SUP-250:** popups leídos en vivo (una versión anterior a la HU-1603 hay que republicarla una vez); frecuencia en `localStorage`; `/pago*` reservada para el S13; sin intención de salida en pantallas táctiles; contadores sin datos personales, con el límite de eventos en memoria; la CDN debe reenviar `POST /_popup` y `/api/v1/publico/leads` (HU-1405).
 - **SUP-251 a SUP-255:** calendario interno de Aptio con enlace fijo por asesor (Google Calendar, Outlook y WhatsApp después), Lima UTC−5 y todo en UTC, reagendar es cancelar y reservar; feriados calculados y revisados cada año; token de cancelación solo en el correo y la cola, guardado como SHA-256; el lead pasa a Demo al agendar (excepción a SUP-236); límites en memoria, `_agenda.json` 15 s en la CDN, que debe reenviar `/api/v1/publico/citas*` y `POST /s/_cita` (HU-1405).
+- **SUP-314 a SUP-318:** OSE simulado bajo DA-09 y XML sin firma; correlativo bajo bloqueo y número no reutilizado; boleta sin DNI desde S/ 700 por validar; detracción desactivada por validar con el contador; factura o boleta según la solicitud y el RUC.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -745,6 +756,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.80 | 2026-11-17 | Comprobantes electrónicos SUNAT (3.38): la emisión idempotente con el correlativo bajo bloqueo, el XML UBL 2.1 y el PDF en S3, el OSE simulado (DA-09), el correo con los adjuntos, la consola de Facturación, el webhook firmado del OSE y la nota de crédito al reembolsar. |
 | 0.79 | 2026-11-17 | Cambio de plan y cancelación (3.37): el prorrateo por día UTC, la vista previa, la subida pagada por el webhook único con su cobro y comprobante, la bajada programada, la cancelación al fin del período con su tarea retrasada y la cuota 0 de una suscripción cancelada. |
 | 0.78 | 2026-11-17 | Cuotas de cápsulas (3.36): la ventana mensual, el consumo transaccional con 402 CUOTA_AGOTADA, la compra de adicionales con la pasarela de la suscripción y su paso por el webhook único. |
 | 0.77 | 2026-11-17 | Pasarelas de pago y webhooks (3.35): Culqi, Stripe y la de pruebas con el mismo contrato, el checkout en dólares, el webhook único con firma por pasarela, el `Cobro` con su tarea de comprobante y el reembolso auditado; proveedores de pago en la sección 6. |
