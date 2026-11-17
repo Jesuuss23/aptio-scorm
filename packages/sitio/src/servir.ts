@@ -11,6 +11,7 @@ import { esArchivoBlog } from '@aptio/schema/sitio-blog';
 import { ARCHIVO_CAPTACION, RUTA_GRACIAS } from './captacion.js';
 import { ARCHIVO_POPUPS } from './popups.js';
 import { ARCHIVO_AGENDA } from './agenda.js';
+import { ARCHIVO_CHECKOUT } from './pago.js';
 import { ARCHIVO_CHAT } from './chat.js';
 import { ARCHIVO_VISITA } from './visitas.js';
 import { ARCHIVO_COOKIES } from './cookies.js';
@@ -45,6 +46,8 @@ export function resolverPedido(ruta: string): Pedido | null {
   if (limpia === `/${ARCHIVO_COOKIES}`) return { tipo: 'script', archivo: ARCHIVO_COOKIES };
   // HU-1605 · El agendador: solo existe si alguna página lo tiene.
   if (limpia === `/${ARCHIVO_AGENDA}`) return { tipo: 'script', archivo: ARCHIVO_AGENDA };
+  // HU-1703 · El checkout de /pago: solo existe si la versión publica un plan con precio.
+  if (limpia === `/${ARCHIVO_CHECKOUT}`) return { tipo: 'script', archivo: ARCHIVO_CHECKOUT };
   if (limpia === `/${RUTA_GRACIAS}` || limpia === `/en/${RUTA_GRACIAS}`) return { tipo: 'pagina', archivo: `${limpia.slice(1)}.html`, ruta: limpia };
   const partes = limpia.split('/').slice(1).filter((p) => p !== '');
   if (partes.length === 2 && partes[0] === CARPETA_FUENTES) return FUENTE.test(partes[1]!) ? { tipo: 'fuente', archivo: partes[1]! } : null;

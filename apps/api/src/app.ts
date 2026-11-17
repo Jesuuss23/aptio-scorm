@@ -3,12 +3,42 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { AppModule } from './app.module.js';
 import { BaseDatosService } from './base-datos/base-datos.service.js';
 import { AuditorAccesoCruzado } from './comun/acceso-cruzado.js';
 import { FiltroErrores } from './comun/filtro-errores.js';
 
 export const PREFIJO = 'api/v1';
+
+type Siguiente = (e?: unknown) => void;
+/** Lee el cuerpo entero como Buffer y marca la petición como leída (el parser de JSON la salta). */
+export const cuerpoCrudo = (limite: number) => (req: IncomingMessage & { body?: unknown; _body?: boolean }, res: ServerResponse, next: Siguiente) => {
+  if (req.method !== 'POST') return next();
+  const partes: Buffer[] = [];
+  let total = 0;
+  let cortado = false;
+  req.on('data', (c: Buffer) => {
+    total += c.length;
+    if (total > limite) {
+      if (!cortado) {
+        cortado = true;
+        res.statusCode = 413;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ codigo: 'DEMASIADO_GRANDE', mensaje: 'El evento es demasiado grande' }));
+      }
+      return;
+    }
+    partes.push(c);
+  });
+  req.on('end', () => {
+    if (cortado) return;
+    req.body = Buffer.concat(partes);
+    req._body = true;
+    next();
+  });
+  req.on('error', (e) => next(e));
+};
 
 /** Configuración común a la app real y a las pruebas: prefijo, validación, errores y OpenAPI. */
 export function configurarApp(app: INestApplication): INestApplication {
@@ -22,6 +52,9 @@ export function configurarApp(app: INestApplication): INestApplication {
     ],
   });
   app.use(cookieParser());
+  // HU-1703 · Los webhooks de pago llegan como el cuerpo crudo (Buffer): la firma HMAC se calcula sobre los bytes tal como
+  // llegaron, antes de que el parser de JSON los toque. Hasta 64 KB; más, 413.
+  app.use(`/${PREFIJO}/webhooks/pago`, cuerpoCrudo(64 * 1024));
   // HU-1509 · El logo y el favicon llegan como el archivo mismo (SVG o PNG), hasta 200 KB; más, 413 DEMASIADO_GRANDE.
   (app as NestExpressApplication).useBodyParser('raw', { type: ['image/svg+xml', 'image/png'], limit: '200kb' });
   app.enableCors({ origin: process.env.WEB_URL ?? 'http://localhost:5173', credentials: true });

@@ -75,6 +75,6 @@ export class PlanPublicoDto {
   @ApiProperty() textoBoton: string;
   @ApiProperty() destacado: boolean;
   @ApiProperty({ type: [String] }) caracteristicas: string[];
-  @ApiProperty({ example: '/agendar-demo?plan=productora', description: 'HU-1702 · Hasta la HU-1703, agendar con el plan elegido' }) enlace: string;
+  @ApiProperty({ example: '/pago?plan=productora', description: 'HU-1703 · El pago si tiene precio; agendar una demo con el plan si es a medida' }) enlace: string;
   @ApiProperty({ type: AjustesPlanesDto }) ajustes: AjustesPlanesDto;
 }

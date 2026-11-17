@@ -100,6 +100,28 @@ export class LeadsService {
     return { leadId: lead.id, nuevo };
   }
 
+  /**
+   * HU-1703 · El lead de una suscripción pagada, dentro de la transacción del alta (la organización, el administrador,
+   * la suscripción y el lead se crean juntos o no se crea nada). El aviso y el CRM van después, con `trasGuardar`.
+   */
+  async guardarEnTransaccion(tx: Prisma.TransactionClient, envio: EnvioLead, ahora: Date, etapa?: string): Promise<{ lead: FilaLead; nuevo: boolean }> {
+    const actual = await tx.lead.findUnique({ where: { correo: envio.correo } });
+    if (actual) {
+      const c = fusionarLead(actual, envio, ahora);
+      const lead = await tx.lead.update({ where: { id: actual.id }, data: { ...c, historialContactos: c.historialContactos as unknown as Prisma.InputJsonValue, ...(etapa ? { etapa } : {}) } });
+      return { lead, nuevo: false };
+    }
+    const d = leadNuevo(envio, ahora);
+    const lead = await tx.lead.create({ data: { ...d, historialContactos: d.historialContactos as unknown as Prisma.InputJsonValue, ...(etapa ? { etapa } : {}) } });
+    return { lead, nuevo: true };
+  }
+
+  /** El aviso al correo de leads y el envío al CRM de un lead ya guardado (no esperan; si fallan, se registra). */
+  trasGuardar(lead: FilaLead, nuevo: boolean, envio: EnvioLead): void {
+    this.ultimoAviso = this.avisar(lead, nuevo, envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
+    this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
+  }
+
   /** Un lead por correo: si dos envíos llegan juntos, el segundo se suma al primero en vez de fallar. */
   private async guardar(envio: EnvioLead, ahora: Date, intento = 0): Promise<{ lead: FilaLead; nuevo: boolean }> {
     const actual = await this.bd.lead.findUnique({ where: { correo: envio.correo } });

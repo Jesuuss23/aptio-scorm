@@ -48,7 +48,7 @@ describe('proyección pública (CP-142)', () => {
     const r = planesPublicos(p, AJUSTES_PLANES_POR_DEFECTO);
     expect(r.map((x) => x.slug)).toEqual(['empresa', 'productora']);
     expect(r[1]!.caracteristicas).not.toContain('Español e inglés');
-    expect(r[1]).toMatchObject({ precioMes: 1290, precioAnual: 12384, ahorroAnual: 3096, precioMesConIgv: 1522.2, destacado: true, enlace: '/agendar-demo?plan=productora' });
+    expect(r[1]).toMatchObject({ precioMes: 1290, precioAnual: 12384, ahorroAnual: 3096, precioMesConIgv: 1522.2, destacado: true, enlace: '/pago?plan=productora' });
     expect(r[0]).toMatchObject({ aMedida: true, precioMes: null, precioAnual: null, capsulaAdicional: null, textoBoton: 'Hablar con ventas' });
   });
 });

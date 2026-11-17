@@ -27,6 +27,9 @@ export const TABLAS_ORGANIZACION = [
   { tabla: 'ParametrosNegocio', opcional: true },
   { tabla: 'MedicionProceso', opcional: false },
   { tabla: 'Auditoria', opcional: true },
+  // HU-1703 · La suscripción de cada organización y el checkout (sin organización mientras no se paga).
+  { tabla: 'Suscripcion', opcional: false },
+  { tabla: 'SolicitudSuscripcion', opcional: true },
 ] as const;
 export type TablaOrganizacion = (typeof TABLAS_ORGANIZACION)[number]['tabla'];
 

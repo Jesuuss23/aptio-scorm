@@ -6768,6 +6768,180 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
+  /publico/checkout:
+    post:
+      tags:
+      - Sitio público
+      summary: Empezar el pago de una suscripción desde /pago (HU-1703, REQ-083, CP-143)
+      operationId: post_publico_checkout
+      security: []
+      description: |-
+        Sin sesión. Lo usa `_checkout.js` en el paso 3 de `/pago`. Los datos son del visitante (texto plano no confiable)
+        y se validan con `@aptio/schema/suscripciones`: razón social, RUC opcional de 11 dígitos con el dígito verificador
+        de SUNAT (con RUC, FACTURA; sin RUC, BOLETA), administrador, correo y `consentimiento: true` (Ley 29733). El plan y
+        su precio salen de la última versión publicada (RN-18-2): el mensual cobra `precioMes` y el anual el precio anual
+        efectivo, más IGV de 18 %. Crea la solicitud PENDIENTE con el resumen y la atribución del visitante (para el lead).
+
+        404 PLAN_NO_DISPONIBLE si el plan no se publica, está oculto, es ficticio en producción o es a medida; 422
+        NO_VALIDO con el campo de cada error (también si pide el anual y la página no lo ofrece); 409 CORREO_EN_USO si el
+        correo ya es de un usuario (inicia sesión); 503 PAGO_NO_DISPONIBLE si no hay pasarela en este entorno (producción
+        hasta la HU-1704: el sitio ofrece agendar una demo); 429 con más de 10 checkouts en 10 minutos desde la misma IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutEntrada'
+      responses:
+        '201':
+          description: Solicitud pendiente con el resumen y la pasarela que cobra
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutCreado'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: CORREO_EN_USO · el correo ya tiene una cuenta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+        '503':
+          description: PAGO_NO_DISPONIBLE · no hay pasarela en este entorno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /publico/checkout/{id}:
+    get:
+      tags:
+      - Sitio público
+      summary: El estado de un pago, para consultar hasta que la pasarela confirme (HU-1703)
+      operationId: get_publico_checkout_id
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoCheckout'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /publico/checkout/{id}/pago-prueba:
+    post:
+      tags:
+      - Sitio público
+      summary: Pagar con la pasarela de pruebas (HU-1703, solo con SITIO_ENTORNO=pruebas)
+      operationId: post_publico_checkout_id_pago_prueba
+      security: []
+      description: |-
+        Solo existe en el entorno de pruebas (en producción, 404). Con 4111 1111 1111 1111 aprueba y con 4000 0000 0000
+        0002 rechaza: arma el evento, lo firma con el secreto de la pasarela de pruebas y lo procesa por el mismo camino que
+        `POST /webhooks/pago/prueba`. Otra tarjeta, 422. Solo se guardan los 4 últimos dígitos.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagoPrueba'
+      responses:
+        '200':
+          description: El estado tras el pago
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoCheckout'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /webhooks/pago/{pasarela}:
+    post:
+      tags:
+      - Ventas
+      summary: Evento de una pasarela de pago (HU-1703, RN-18-3, CP-143)
+      operationId: post_webhooks_pago_pasarela
+      security: []
+      description: |-
+        Sin sesión; firmado. `X-Aptio-Firma` lleva `sha256=` y el HMAC-SHA256 en hexadecimal del cuerpo tal como llega
+        (hasta 64 KB), con el secreto de la pasarela; si no coincide, 401 FIRMA_NO_VALIDA y no cambia nada. HU-1703 solo
+        trae la pasarela `prueba` (con SITIO_ENTORNO=pruebas); las reales llegan con la HU-1704. Cuerpo de la de pruebas:
+        `{ id, tipo: pago.aprobado | pago.rechazado, solicitudId, ultimos4?, motivo? }`.
+
+        Idempotente (RN-18-3): un evento se procesa una sola vez (`eventoPagoId` único); si el evento ya se procesó o la
+        solicitud ya no está pendiente, responde 200 con `duplicado: true` sin crear nada. Pago rechazado: la solicitud
+        pasa a RECHAZADA con el motivo. Pago aprobado: en una sola transacción crea la organización vacía (nombre y RUC de
+        la solicitud), su ADMINISTRADOR sin clave, la suscripción ACTIVA con el precio pactado sin IGV y el fin del período
+        (un mes o un año), y el lead de origen «Suscripción» en etapa Ganado; después encola en `suscripciones` el correo
+        de bienvenida con el enlace para crear la clave (72 h, un solo uso) y avisa del lead. Auditoría SUSCRIPCION_CREADA,
+        PAGO_RECHAZADO y PAGO_FIRMA_NO_VALIDA.
+      parameters:
+      - name: pasarela
+        in: path
+        required: true
+        schema:
+          type: string
+          example: prueba
+      - name: X-Aptio-Firma
+        in: header
+        required: true
+        schema:
+          type: string
+          example: sha256=6b1c…
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Procesado, o repetido sin efecto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookRecibido'
+        '401':
+          description: FIRMA_NO_VALIDA
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '413':
+          description: DEMASIADO_GRANDE · más de 64 KB
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: EVENTO_NO_VALIDO · el evento no tiene la forma esperada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     cookieSesion:
@@ -14510,6 +14684,71 @@ components:
             type: string
             format: uuid
           description: Todos los planes, en el orden nuevo
+    CheckoutEntrada:
+      type: object
+      description: HU-1703 · Lo que envía `/pago`. Datos no confiables del visitante; la atribución es de mejor esfuerzo.
+      required: [plan, razonSocial, nombreAdmin, correoAdmin, consentimiento]
+      properties:
+        plan: { type: string, example: productora }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL], default: MENSUAL }
+        razonSocial: { type: string, maxLength: 150, example: Minera Andina SAC }
+        ruc: { type: string, example: '20131312955', description: 'Opcional. 11 dígitos (prefijo 10, 15, 16, 17 o 20) con el dígito verificador de SUNAT; admite espacios y guiones' }
+        nombreAdmin: { type: string, maxLength: 120, example: Ana Quispe }
+        correoAdmin: { type: string, format: email, maxLength: 160, example: ana@minera.pe }
+        consentimiento: { type: boolean, example: true }
+        paginaEntrada: { type: string, example: /precios }
+        referente: { type: string }
+        utm_source: { type: string }
+        utm_medium: { type: string }
+        utm_campaign: { type: string }
+        utm_term: { type: string }
+        utm_content: { type: string }
+        idioma: { type: string, enum: [es, en] }
+    ResumenCheckout:
+      type: object
+      required: [plan, nombrePlan, ciclo, subtotal, igv, total, moneda]
+      properties:
+        plan: { type: string, example: productora }
+        nombrePlan: { type: string, example: Productora }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL] }
+        subtotal: { type: number, example: 1290, description: Soles sin IGV por el ciclo (el precio pactado) }
+        igv: { type: number, example: 232.2, description: IGV de 18 % }
+        total: { type: number, example: 1522.2 }
+        moneda: { type: string, enum: [PEN] }
+    CheckoutCreado:
+      type: object
+      required: [id, estado, resumen, tipoComprobante, pasarela]
+      properties:
+        id: { type: string, format: uuid }
+        estado: { type: string, enum: [PENDIENTE] }
+        resumen: { $ref: '#/components/schemas/ResumenCheckout' }
+        tipoComprobante: { type: string, enum: [FACTURA, BOLETA] }
+        pasarela: { type: string, example: prueba }
+    EstadoCheckout:
+      type: object
+      required: [id, estado, plan, nombrePlan, ciclo, total, tipoComprobante, correoAdmin, motivoRechazo, finPeriodo]
+      properties:
+        id: { type: string, format: uuid }
+        estado: { type: string, enum: [PENDIENTE, APROBADA, RECHAZADA] }
+        plan: { type: string, example: productora }
+        nombrePlan: { type: string, example: Productora }
+        ciclo: { type: string, enum: [MENSUAL, ANUAL] }
+        total: { type: number, example: 1522.2 }
+        tipoComprobante: { type: string, enum: [FACTURA, BOLETA] }
+        correoAdmin: { type: string, format: email, description: Adónde llega la bienvenida }
+        motivoRechazo: { type: string, nullable: true }
+        finPeriodo: { type: string, format: date-time, nullable: true, description: 'Fin del período pagado, con la suscripción activa' }
+    PagoPrueba:
+      type: object
+      required: [tarjeta]
+      properties:
+        tarjeta: { type: string, example: 4111 1111 1111 1111 }
+    WebhookRecibido:
+      type: object
+      required: [recibido, duplicado]
+      properties:
+        recibido: { type: boolean, enum: [true] }
+        duplicado: { type: boolean, description: 'true si el evento ya se había procesado y no se creó nada' }
     PlanPublico:
       type: object
       description: HU-1702 · El plan publicado como lo ve el visitante y el resumen del pago (CP-141). Soles sin IGV salvo `precioMesConIgv`.
@@ -14562,7 +14801,7 @@ components:
           description: Solo las visibles
         enlace:
           type: string
-          example: /agendar-demo?plan=productora
-          description: Hasta la HU-1703 (pago), agendar una demo con el plan elegido
+          example: /pago?plan=productora
+          description: HU-1703 · El pago (`/pago?plan=`) si el plan tiene precio; agendar una demo con el plan elegido si es a medida
         ajustes:
           $ref: '#/components/schemas/AjustesPlanes'

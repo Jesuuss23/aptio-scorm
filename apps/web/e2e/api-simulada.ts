@@ -1,6 +1,6 @@
 import { type Coleccion, esColeccion, mezclarDatos, validarDatos } from '@aptio/schema/sitio-contenido';
 import { arbolNavegacion, esColumnaPie, esEnlaceExterno, navegacionPublica, validarRuta, validarTextoEnlace, validarUbicacion } from '@aptio/schema/sitio-navegacion';
-import { armarInstantanea, armarPagina, BLOQUES_DE_PLANES, ficticiosDeInstantanea, hayPendientes, type Instantanea } from '@aptio/schema/sitio-versiones';
+import { armarInstantanea, armarPagina, BLOQUES_DE_PLANES, ficticiosDeInstantanea, hayPendientes, type Instantanea, planesServidos } from '@aptio/schema/sitio-versiones';
 import { AJUSTES_POR_DEFECTO, type AjustesSitio, ajustesPublicados, aplicarCambiosAjustes, esPng, LIMITES_AJUSTES, nombreArchivoMarca } from '@aptio/schema/sitio-ajustes';
 import type { CookiesPublicadas } from '@aptio/schema/cookies';
 import { aplicarCambiosSector, type CambiosSector, faltantesParaPublicar, PLANTILLA_SECTOR, rutaSector } from '@aptio/schema/sitio-sectores';
@@ -34,6 +34,7 @@ import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from 
 import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
 import { crearPlanesSim, type PlanesSitioSim } from './planes-simulados';
+import { crearSuscripcionesSim } from './suscripciones-simuladas';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
 
@@ -586,6 +587,11 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   const guardarAjustesSim = (a: AjustesSitio) => { ajustesSim = a; ajustesEn = new Date().toISOString(); return ajustesDto(); };
   const filasElementos = () => elementosSim.map((e) => ({ ...e, ficticio: e.ficticio ?? false }));
   const instantaneaSim = () => armarInstantanea({ paginas: paginasSim.map((p) => ({ ...p, bloques: bloquesSim.filter((b) => b.paginaId === p.id) })), elementos: filasElementos(), enlaces: enlacesSim, ajustes: ajustesSim, redirecciones: redireccionesSim, robotsExtra: robotsSim, llmsTxt: llmsSim, rastreadoresBloqueados: bloqueadosSim, planes: planesSim.filas(), ajustesPlanes: planesSim.ajustes() }, entornoSitio);
+  // HU-1703 · El checkout de /pago: el plan sale de la última versión (como la API).
+  const suscripcionesSim = crearSuscripcionesSim({
+    planes: () => { const v = versionesSim.at(-1); return v ? planesServidos(v.instantanea, entornoSitio) : null; },
+    entorno: () => entornoSitio, correosEnUso: () => [USUARIO.email],
+  });
   const nuevaVersionSim = (origen: string, extra: { instantanea?: Instantanea; restauradaDe?: number; autor?: boolean } = {}) => {
     const v: VersionSim = {
       numero: versionesSim.length + 1, creadoEn: new Date(Date.UTC(2026, 10, 13, 15, versionesSim.length)).toISOString(), entorno: entornoSitio, origen,
@@ -1316,6 +1322,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
       // HU-1507 · Publicar una página, o retirar una publicada, crea una versión del sitio (origen «pagina»).
       const version = b.accion === 'publicar' || (estabaPublicada && b.accion) ? nuevaVersionSim('pagina').numero : undefined;
       return responder(200, { ...p, ...(ficticios.length ? { avisoFicticios: ficticios.length } : {}), ...(version ? { version } : {}), ...r301 });
+    }
+    if (ruta.startsWith('/publico/planes/') || ruta.startsWith('/publico/checkout')) {
+      const r = suscripcionesSim.publico(ruta, req.method(), (req.method() === 'POST' ? req.postDataJSON() ?? {} : {}) as Record<string, unknown>);
+      if (r) return responder(r.status, r.body);
     }
     // HU-1601 · La entrada pública de leads (popup, chatbot, agendador y suscripción) y Captación › Leads y CRM (PNT-34).
     if (ruta === '/publico/leads' && req.method() === 'POST') {
