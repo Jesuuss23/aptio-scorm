@@ -33,6 +33,8 @@ import { CLAVES_ETAPA, normalizarParametros, PARAMETROS_EJEMPLO } from '@aptio/s
 import { CONEXIONES, definicionConexion, mensajeLimiteGasto, tareaDeRuta } from '@aptio/schema/conexiones';
 import { type AgendaSitioSim, crearAgendaSim } from './agenda-simulada';
 import { type ChatbotSitioSim, crearChatbotSim } from './chatbot-simulado';
+import { fechaLima, horaLima } from '@aptio/schema/agenda';
+import { contarPorDia, conversionPaginas, esPeriodoResumen, indicador, repartoOrigen, serieDiaria, type Tramo, validarVisita, ventanaResumen } from '@aptio/schema/resumen-sitio';
 
 const VIDEO_60S = readFileSync(new URL('./fixtures/video-60s.webm', import.meta.url));
 /** HU-0206 · La propuesta de kit de IA-18 v2 del caso LOTO (CP-028). */
@@ -194,6 +196,8 @@ export interface OpcionesSimulacion {
   agendaSitio?: AgendaSitioSim;
   /** HU-1604 · Ajustes, respuestas rápidas, fuentes y conversaciones de Captación › Chatbot. */
   chatbotSitio?: ChatbotSitioSim;
+  /** HU-1607 · Visitas ya contadas, por día de Lima, ruta e idioma (Sitio web › Resumen). */
+  visitasSitio?: VisitaDiaSim[];
   /** HU-1303 · Mediciones ya registradas. */
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
@@ -436,6 +440,11 @@ export interface PopupSim extends DatosPopup {
   actualizadoEn: string;
 }
 
+/** HU-1607 · El contador anónimo de visitas por día de Lima, ruta e idioma. */
+export interface VisitaDiaSim { dia: string; ruta: string; idioma: 'es' | 'en'; visitas: number; paginasVistas: number }
+/** HU-1607 · Lo que el sitio mandó a `POST /s/_visita` (las pruebas lo leen). */
+export const visitasRecibidasSim: Record<string, unknown>[] = [];
+
 /** HU-1603 · Lo que el sitio mandó a `POST /s/_popup` (las pruebas lo leen). */
 export const eventosPopupSim: { popupId: string; evento: string }[] = [];
 
@@ -463,7 +472,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [] }: OpcionesSimulacion) {
   const enlacesSim = enlacesSitio.map((e) => ({ creadoEn: '2026-11-01T00:00:00.000Z', actualizadoEn: '2026-11-01T00:00:00.000Z', idioma: 'es' as 'es' | 'en', ...e }));
   let enlacesCreados = 0;
   const elementosSim: ElementoSitioSim[] = elementosSitio.map((e) => ({ ficticio: false, idioma: 'es', ...e, datos: { ...e.datos } }));
@@ -479,6 +488,7 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
   // HU-1601 · Los leads, con las mismas reglas que la API (un lead por correo, atribución del primer contacto).
   eventosPopupSim.length = 0;
   const leadsSim: LeadSim[] = leadsSitio.map((l) => ({ ...l }));
+  const visitasSim: VisitaDiaSim[] = visitasSitio.map((v) => ({ ...v }));
   // HU-1603 · Popups: el panel los edita y el sitio los lee en vivo (`/s/_popups.json`).
   let popupsSim: PopupSim[] = popupsSitio.map((x, orden) => ({ ...x, orden }));
   let popupsCreados = 0;
@@ -699,6 +709,20 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (route.request().method() === 'GET' && ruta === '/_agenda.json') {
       const datos = agendaSim.publica(new URL(route.request().url()).searchParams);
       return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=0, s-maxage=15' }, body: JSON.stringify(datos) });
+    }
+    // HU-1607 · La visita anónima: suma al día de Lima como la API (sin bots ni el superadmin, que aquí no aplican).
+    if (route.request().method() === 'POST' && ruta === '/_visita') {
+      const cuerpo = route.request().postDataJSON() as Record<string, unknown>;
+      visitasRecibidasSim.push(cuerpo);
+      const v = validarVisita(cuerpo);
+      if (v) {
+        const dia = fechaLima(new Date());
+        let f = visitasSim.find((x) => x.dia === dia && x.ruta === v.ruta && x.idioma === v.idioma);
+        if (!f) visitasSim.push(f = { dia, ruta: v.ruta, idioma: v.idioma, visitas: 0, paginasVistas: 0 });
+        f.paginasVistas += 1;
+        if (v.primeraPagina) f.visitas += 1;
+      }
+      return route.fulfill({ status: 204, headers: { 'Cache-Control': 'no-store' }, body: '' });
     }
     if (route.request().method() === 'POST' && ruta === '/_popup') {
       const { popupId, evento } = route.request().postDataJSON() as { popupId: string; evento: string };
@@ -938,6 +962,40 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
         return responder(200, blogDto());
       }
       return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'No existe' });
+    }
+    // HU-1607 · Sitio web › Resumen, con las mismas reglas que la API.
+    if (ruta === '/sitio/resumen' && req.method() === 'GET') {
+      if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });
+      const periodo = new URL(req.url()).searchParams.get('periodo') ?? '30d';
+      if (!esPeriodoResumen(periodo)) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'El período es 7d, 30d o 90d' });
+      const ahora = new Date();
+      const v = ventanaResumen(periodo, ahora);
+      const en = (t: Tramo, x: string) => x >= t.inicio.toISOString() && x < t.fin.toISOString();
+      const enDias = (t: Tramo) => visitasSim.filter((x) => x.dia >= t.desde && x.dia <= t.hasta);
+      const leads = leadsSim.filter((l) => en(v.actual, l.creadoEn));
+      const citas = agendaSim.citas.filter((c) => en(v.actual, c.creadoEn));
+      const porDia: Record<string, number> = {};
+      const porRuta = new Map<string, number>();
+      for (const x of enDias(v.actual)) { porDia[x.dia] = (porDia[x.dia] ?? 0) + x.visitas; porRuta.set(x.ruta, (porRuta.get(x.ruta) ?? 0) + x.visitas); }
+      const leadsRuta = new Map<string, number>();
+      for (const l of leads) leadsRuta.set(l.paginaEntrada, (leadsRuta.get(l.paginaEntrada) ?? 0) + 1);
+      const origenes: Record<string, number> = {};
+      for (const l of leads) origenes[l.origen] = (origenes[l.origen] ?? 0) + 1;
+      const suma = (xs: VisitaDiaSim[]) => xs.reduce((t, x) => t + x.visitas, 0);
+      return responder(200, {
+        periodo, desde: v.actual.desde, hasta: v.actual.hasta,
+        indicadores: {
+          visitas: indicador(suma(enDias(v.actual)), suma(enDias(v.anterior))),
+          leads: indicador(leads.length, leadsSim.filter((l) => en(v.anterior, l.creadoEn)).length),
+          demos: indicador(citas.length, agendaSim.citas.filter((c) => en(v.anterior, c.creadoEn)).length),
+          suscripciones: null,
+        },
+        serie: serieDiaria(v.actual, { visitas: porDia, leads: contarPorDia(leads.map((l) => l.creadoEn)), demos: contarPorDia(citas.map((c) => c.creadoEn)) }),
+        origenes: repartoOrigen(origenes),
+        paginas: conversionPaginas(porRuta, leadsRuta),
+        proximasDemos: agendaSim.citas.filter((c) => c.estado === 'confirmada' && Date.parse(c.inicio) >= ahora.getTime()).sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(0, 5)
+          .map((c) => ({ id: c.id, inicio: c.inicio, fecha: fechaLima(new Date(c.inicio)), hora: horaLima(new Date(c.inicio)), nombre: c.nombre, empresa: c.empresa, ...agendaSim.nombres(c), estado: c.estado })),
+      });
     }
     if (ruta === '/sitio/ajustes' || ruta.startsWith('/sitio/ajustes/')) {
       if (usuario.rol !== 'SUPERADMIN') return responder(403, { codigo: 'SIN_PERMISO', mensaje: 'Tu rol no permite esta acción' });

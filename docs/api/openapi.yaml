@@ -636,6 +636,43 @@ paths:
           $ref: '#/components/responses/Conflicto'
         '422':
           $ref: '#/components/responses/NoValido'
+  /sitio/resumen:
+    get:
+      tags:
+      - Sitio web
+      summary: Resumen del sitio comercial (HU-1607, PNT-24, CP-138)
+      operationId: get_sitio_resumen
+      description: |-
+        Solo SUPERADMIN. El período termina hoy en hora de Lima (UTC−5) e incluye hoy; el anterior tiene el mismo largo y
+        termina el día antes. `visitas` son las sesiones que empezaron en el sitio (`SitioVisitaDia.visitas`, del contador
+        anónimo de `POST /s/_visita`); `leads` son los leads creados en el período (tabla Lead, por `creadoEn`: un correo
+        que vuelve a escribir no suma otro) y `demos`, las citas creadas en el período con cualquier estado (tabla
+        AgendaCita). `suscripciones` es null hasta el S13. `variacion` es el % contra el período anterior con un decimal
+        (null si antes fue 0). `origenes` trae los 7 orígenes de lead, de más a menos, con porcentajes enteros que suman
+        100 por el método del mayor resto (0 sin leads). `paginas`: hasta 5, con leads de esa página de entrada entre las
+        visitas que empezaron en ella. `proximasDemos`: las 5 siguientes confirmadas.
+      parameters:
+      - name: periodo
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [7d, 30d, 90d]
+          default: 30d
+        description: 7 días, 30 días o trimestre (90 días)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenSitio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /sitio/ajustes:
     get:
       tags:
@@ -667,7 +704,7 @@ paths:
         dígitos (en mayúsculas), WhatsApp en E.164 (obligatorio si `visible`), correo de leads y aviso de mantenimiento
         de hasta 280 caracteres. Un texto vacío se guarda como null. Nombre, dominio, logo, favicon y WhatsApp llegan al
         sitio con «Publicar cambios» (entran en la instantánea); el correo de leads y el mantenimiento valen al instante.
-        Los IDs de analítica se guardan y se activan con el banner de cookies (SUP-200). 422 SIN_CAMBIOS si no trae nada y
+        Los IDs de analítica y el aviso de cookies también salen con «Publicar cambios» (HU-1606). 422 SIN_CAMBIOS si no trae nada y
         NO_VALIDO con `detalles` (campo y mensaje). Auditoría SITIO_AJUSTES_ACTUALIZADOS y, al cambiar el mantenimiento,
         SITIO_MANTENIMIENTO_ACTIVADO o SITIO_MANTENIMIENTO_DESACTIVADO.
       requestBody:
@@ -1750,6 +1787,10 @@ paths:
         categoría. El pie trae «Configurar cookies» (`#cookies` abre el diálogo modal). Solo entonces la
         `Content-Security-Policy` de las páginas suma a `script-src`, `connect-src` e `img-src` los orígenes de Google o
         de Meta de las etiquetas publicadas; sin etiquetas sigue `script-src 'self'`.
+
+        HU-1607 · Toda versión trae `_visita.js` y todas sus páginas publicadas lo cargan (no la 404 ni la de gracias;
+        diferido, del mismo origen, sin cookies ni cambios en la página). Manda una vez por página `POST /s/_visita` con
+        la ruta, el idioma, si es la primera página de la sesión (marca en `sessionStorage`) y el `utm_source` de la sesión.
       parameters:
       - name: ruta
         in: path
@@ -1841,6 +1882,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
+  /s/_visita:
+    post:
+      tags:
+      - Sitio público
+      summary: Contar la visita anónima de una página (HU-1607, REQ-080)
+      operationId: post_sitio_visita
+      security: []
+      servers:
+      - url: https://{entorno}.ejemplo.local
+        description: La API fuera del prefijo /api/v1 (en local, http://localhost:3000)
+        variables:
+          entorno:
+            default: pruebas
+      description: |-
+        Sin sesión y fuera del prefijo de la API. `_visita.js` lo manda una vez por página cargada (con `sendBeacon`, o
+        `fetch` con `keepalive`). Suma 1 a `paginasVistas` y, con `primeraPagina` true, 1 a `visitas` en la fila del día
+        de Lima, la ruta y el idioma (un `INSERT … ON CONFLICT` atómico). No guarda la IP, el agente ni cookies; `origen`
+        se valida y no se guarda. No cuentan los bots (por `User-Agent`), la sesión del superadmin ni un cuerpo que no
+        vale: responden el mismo 204. 429 DEMASIADAS_SOLICITUDES con más de 60 por minuto desde la misma IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VisitaSitio'
+      responses:
+        '204':
+          description: Contada (o ignorada)
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
   /s/_agenda.json:
@@ -7422,6 +7493,163 @@ components:
           enum:
           - image/svg+xml
           - image/png
+    ResumenSitio:
+      type: object
+      description: HU-1607 · Sitio web › Resumen (REQ-080, PNT-24, CP-138).
+      required: [periodo, desde, hasta, indicadores, serie, origenes, paginas, proximasDemos]
+      properties:
+        periodo:
+          type: string
+          enum: [7d, 30d, 90d]
+        desde:
+          type: string
+          format: date
+          description: Primer día del período (Lima)
+        hasta:
+          type: string
+          format: date
+          description: Último día, hoy (Lima)
+        indicadores:
+          type: object
+          required: [visitas, leads, demos, suscripciones]
+          properties:
+            visitas:
+              $ref: '#/components/schemas/IndicadorResumen'
+            leads:
+              $ref: '#/components/schemas/IndicadorResumen'
+            demos:
+              $ref: '#/components/schemas/IndicadorResumen'
+            suscripciones:
+              type: object
+              nullable: true
+              description: Llega con las suscripciones (S13); hoy siempre null. Tendrá la forma de IndicadorResumen
+              required: [actual, anterior, variacion]
+              properties:
+                actual:
+                  type: integer
+                anterior:
+                  type: integer
+                variacion:
+                  type: number
+                  nullable: true
+        serie:
+          type: array
+          description: Un punto por día del período, con 0 en los días sin datos
+          items:
+            type: object
+            required: [dia, visitas, leads, demos]
+            properties:
+              dia:
+                type: string
+                format: date
+              visitas:
+                type: integer
+              leads:
+                type: integer
+              demos:
+                type: integer
+        origenes:
+          type: array
+          items:
+            type: object
+            required: [origen, etiqueta, leads, porcentaje]
+            properties:
+              origen:
+                type: string
+                enum: [formulario, popup, chatbot, agendador, suscripcion, boletin, asistente_ia]
+              etiqueta:
+                type: string
+                example: Formulario
+              leads:
+                type: integer
+              porcentaje:
+                type: integer
+                description: La lista suma 100 (0 sin leads)
+        paginas:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            required: [ruta, visitas, leads, conversion]
+            properties:
+              ruta:
+                type: string
+                example: /precios
+              visitas:
+                type: integer
+              leads:
+                type: integer
+              conversion:
+                type: number
+                example: 7.5
+                description: leads / visitas en %, con un decimal
+        proximasDemos:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+            required: [id, inicio, fecha, hora, nombre, empresa, tipo, asesor, estado]
+            properties:
+              id:
+                type: string
+                format: uuid
+              inicio:
+                type: string
+                format: date-time
+              fecha:
+                type: string
+                format: date
+              hora:
+                type: string
+                example: '10:30'
+              nombre:
+                type: string
+              empresa:
+                type: string
+                nullable: true
+              tipo:
+                type: string
+              asesor:
+                type: string
+              estado:
+                type: string
+                enum: [confirmada]
+    IndicadorResumen:
+      type: object
+      required: [actual, anterior, variacion]
+      properties:
+        actual:
+          type: integer
+        anterior:
+          type: integer
+          description: El período anterior del mismo largo
+        variacion:
+          type: number
+          nullable: true
+          description: '% con un decimal; null si el período anterior fue 0'
+    VisitaSitio:
+      type: object
+      description: HU-1607 · La vista anónima de una página, sin datos personales.
+      required: [ruta, primeraPagina]
+      properties:
+        ruta:
+          type: string
+          maxLength: 300
+          example: /precios
+          description: Sin la base, la consulta ni el ancla
+        idioma:
+          type: string
+          enum: [es, en]
+          default: es
+        primeraPagina:
+          type: boolean
+          description: true en la primera página de la sesión del navegador
+        origen:
+          type: string
+          nullable: true
+          maxLength: 60
+          example: linkedin
+          description: El origen atribuido (`utm_source` de la sesión); se valida y no se guarda
     AjustesSitio:
       type: object
       description: HU-1509 · Ajustes del sitio (REQ-073, PNT-38).

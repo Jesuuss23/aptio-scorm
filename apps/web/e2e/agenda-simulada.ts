@@ -54,6 +54,8 @@ export function crearAgendaSim(
 
   return {
     citas,
+    /** HU-1607 · Los nombres del tipo y del asesor de una cita (para el Resumen). */
+    nombres: (c: CitaSim) => ({ tipo: tipos.find((t) => t.id === c.tipoId)?.nombreEs ?? '', asesor: asesores.find((x) => x.id === c.asesorId)?.nombre ?? '' }),
     /** `GET /s/_agenda.json`. */
     publica(q: URLSearchParams) {
       const idioma = q.get('idioma') === 'en' ? 'en' : 'es';

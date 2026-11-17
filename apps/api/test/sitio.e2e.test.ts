@@ -1070,3 +1070,4 @@ await import('./crm.casos.js');
 await import('./popups.casos.js');
 await import('./agenda.casos.js');
 await import('./chatbot.casos.js');
+await import('./sitio-resumen.casos.js');

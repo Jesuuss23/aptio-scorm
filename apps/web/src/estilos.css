@@ -3703,3 +3703,48 @@ ul.fila-chips {
 .chat-mensajes li.bot {
   border-left: 3px solid var(--color-cobalto);
 }
+
+/* HU-1607 · Sitio web › Resumen (PNT-24): indicadores, gráfico con tabla, origen de los leads, páginas y demos. */
+.res { display: flex; flex-direction: column; gap: 16px; margin-bottom: 16px; }
+.res-indicadores { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 0; }
+.res-indicadores > div { display: flex; flex-direction: column; gap: 4px; padding: 16px; border: 1px solid var(--color-borde); border-radius: 12px; background: var(--color-superficie, #fff); }
+.res-indicadores dt { font-size: var(--texto-sm); color: var(--color-texto-sec); }
+.res-indicadores dd { margin: 0; }
+.res-dato { font-family: var(--fuente-num); font-size: var(--dato); font-weight: 700; }
+.res-var { font-size: var(--texto-sm); color: var(--color-texto-sec); }
+.res-var.sube { color: var(--color-validado); }
+.res-var.baja { color: var(--color-error); }
+.res-fila { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.res-fila > .tarjeta { margin: 0; min-width: 0; }
+.res-titulo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.res-titulo h2 { margin: 0; }
+.res-grafico h2 { margin: 0 0 8px; }
+.res-grafico svg { display: block; width: 100%; height: 200px; }
+.res-grafico polyline { fill: none; stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.res-grafico polyline.visitas { stroke: var(--color-cobalto); }
+.res-grafico polyline.leads { stroke: var(--color-validado); }
+.res-grafico polyline.demos { stroke: var(--color-aviso); stroke-dasharray: 6 4; }
+.res-grafico .guia { stroke: var(--color-borde); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.res-grafico .eje { font-size: var(--texto-xs); fill: var(--color-texto-sec); font-family: var(--fuente-num); }
+.res-leyenda { display: flex; flex-wrap: wrap; gap: 16px; list-style: none; margin: 0 0 8px; padding: 0; font-size: var(--texto-sm); }
+.res-leyenda i { display: inline-block; width: 16px; height: 3px; margin-right: 6px; vertical-align: middle; background: var(--color-cobalto); }
+.res-leyenda i.leads { background: var(--color-validado); }
+.res-leyenda i.demos { background: var(--color-aviso); }
+.res-grafico details { margin-top: 8px; }
+.res-tabla { max-height: 320px; overflow: auto; }
+.res-origenes, .res-demos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.res-origenes li { display: grid; grid-template-columns: minmax(96px, 1fr) 2fr auto; grid-template-rows: auto auto; align-items: center; column-gap: 10px; font-size: var(--texto-base); }
+.res-origenes li .sec { grid-column: 1 / -1; font-size: var(--texto-sm); }
+.res-pista { position: relative; height: 10px; border-radius: 5px; background: var(--color-borde); }
+.res-pista i { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--color-cobalto); }
+.res-demos li { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; }
+.res-demos li > span:nth-child(2) { display: flex; flex-direction: column; min-width: 0; }
+.res-cuando { font-size: var(--texto-sm); color: var(--color-texto-sec); min-width: 56px; }
+@media (max-width: 900px) {
+  .res-fila { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .res-demos li { grid-template-columns: auto 1fr; }
+  .res-demos li .chip { grid-column: 2; justify-self: start; }
+}
+.res-nota { margin: 0; font-size: var(--texto-sm); color: var(--color-texto); }

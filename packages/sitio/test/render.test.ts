@@ -11,7 +11,7 @@ describe('sitio público pre-renderizado (HU-1508)', () => {
     const html = renderizarPagina(instantaneaDeEjemplo(), '/', 'es', op)!;
     expect(html.startsWith('<!doctype html><html lang="es">')).toBe(true);
     // HU-1603 y HU-1604 · Solo los scripts diferidos de popups y del chat, del mismo origen; la página no los necesita para nada más.
-    expect(sinJsonLd(html).match(/<script[^>]*>/g)).toEqual(['<script src="/s/_popups.js" defer="" data-base="/s">', '<script src="/s/_chat.js" defer="" data-base="/s">']);
+    expect(sinJsonLd(html).match(/<script[^>]*>/g)).toEqual(['<script src="/s/_popups.js" defer="" data-base="/s">', '<script src="/s/_chat.js" defer="" data-base="/s">', '<script src="/s/_visita.js" defer="" data-base="/s">']);
     expect(sinScriptsOpcionales(html)).not.toMatch(/<script|\son[a-z]+=/i);
     expect(html).toContain('<title>Aptio SCORM · Inicio</title>');
     expect(html).toMatch(/<meta name="description" content="[^"]{50,}"\/>/);
@@ -70,7 +70,7 @@ describe('sitio público pre-renderizado (HU-1508)', () => {
     expect(renderizarSitio(instantaneaDeEjemplo(), op).map((a) => a.archivo)).toEqual([
       'en/index.html', 'index.html', 'funcionalidades/personaje/index.html', 'sectores/banca-y-seguros/index.html',
       'sectores/educacion-superior/index.html', 'sectores/mineria-y-energia/index.html', 'sectores/retail-y-consumo/index.html',
-      '404.html', 'sitemap.xml', 'robots.txt', '_popups.js', '_chat.js',
+      '404.html', 'sitemap.xml', 'robots.txt', '_popups.js', '_chat.js', '_visita.js',
     ]);
     expect(sitemapXml(instantaneaDeEjemplo(), op.sitioUrl)).toContain('<loc>https://aptioscorm.com/en</loc>');
   });

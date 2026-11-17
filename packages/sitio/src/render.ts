@@ -22,6 +22,7 @@ import { CAMPO_TRAMPA, LIMITES_LEAD, PARAMETROS_UTM } from '@aptio/schema/leads'
 import { ARCHIVO_CAPTACION, RUTA_GRACIAS, RUTA_LEAD, SCRIPT_CAPTACION, TIPO_FORMULARIO } from './captacion.js';
 import { ARCHIVO_POPUPS, SCRIPT_POPUPS } from './popups.js';
 import { ARCHIVO_CHAT, SCRIPT_CHAT } from './chat.js';
+import { ARCHIVO_VISITA, SCRIPT_VISITA } from './visitas.js';
 import { ANCLA_COOKIES, ARCHIVO_COOKIES, ARCHIVO_COOKIES_JSON, atributosCookies, SCRIPT_COOKIES, TEXTOS_COOKIES } from './cookies.js';
 import { ARCHIVO_AGENDA, CSS_AGENDA, RUTA_CITA, SCRIPT_AGENDA, TEXTOS_AGENDA } from './agenda.js';
 
@@ -435,13 +436,13 @@ export function jsonLdSeguro(datos: unknown): string {
 export const sinJsonLd = (html: string): string => html.replace(/<script type="application\/ld\+json">[^<]*<\/script>/g, '');
 
 /**
- * HU-1603 · El HTML sin JSON-LD ni los scripts diferidos de popups, del chat (HU-1604) y de cookies (HU-1606), que solo agregan lo suyo y no
+ * HU-1603 · El HTML sin JSON-LD ni los scripts diferidos de popups, del chat (HU-1604), de cookies (HU-1606) y de visitas (HU-1607), que solo agregan lo suyo y no
  * hacen falta para leer ni enviar nada (para comprobar que la página no necesita JavaScript).
  */
-export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_(?:popups|chat)\.js" defer="" data-base="[^"]*"><\/script>/g, '')
+export const sinScriptsOpcionales = (html: string): string => sinJsonLd(html).replace(/<script src="[^"]*\/_(?:popups|chat|visita)\.js" defer="" data-base="[^"]*"><\/script>/g, '')
   .replace(/<script src="[^"]*\/_cookies\.js" defer=""(?: data-[a-z0-9]+="[^"]*")*><\/script>/g, '');
 
-function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, chat = false, agenda = false, cookies = null, children }: {
+function Documento({ titulo, descripcion, canonical, alternas = [], idioma, entorno, base, favicon, robots, cssExtra = '', og, jsonLd, captacion = false, popups = false, chat = false, agenda = false, cookies = null, visita = false, children }: {
   titulo: string; descripcion: string; canonical: string | null; alternas?: { hreflang: string; href: string }[]; idioma: Idioma; entorno: EntornoSitio; base: string; favicon: Marca['favicon']; robots?: string; cssExtra?: string;
   og?: OpenGraph; jsonLd?: unknown;
   /** HU-1601 · Carga el script propio de captación (primera visita y UTM); la CSP solo permite scripts del mismo origen. */
@@ -453,7 +454,9 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
   /** HU-1605 · Carga el agendador (`_agenda.js`): solo en las páginas con el bloque. */
   agenda?: boolean;
   /** HU-1606 · Los `data-*` de `_cookies.js` (las etiquetas publicadas); sin ellos, no se carga. */
-  cookies?: Record<string, string> | null; children?: ReactNode;
+  cookies?: Record<string, string> | null;
+  /** HU-1607 · Cuenta la visita (anónima) con `_visita.js`: solo en las páginas publicadas. */
+  visita?: boolean; children?: ReactNode;
 }) {
   const lista = fuentes();
   return h('html', { lang: idioma },
@@ -481,7 +484,8 @@ function Documento({ titulo, descripcion, canonical, alternas = [], idioma, ento
       popups ? h('script', { src: `${base}/${ARCHIVO_POPUPS}`, defer: true, 'data-base': base }) : null,
       chat ? h('script', { src: `${base}/${ARCHIVO_CHAT}`, defer: true, 'data-base': base }) : null,
       agenda ? h('script', { src: `${base}/${ARCHIVO_AGENDA}`, defer: true }) : null,
-      cookies ? h('script', { src: `${base}/${ARCHIVO_COOKIES}`, defer: true, ...cookies }) : null),
+      cookies ? h('script', { src: `${base}/${ARCHIVO_COOKIES}`, defer: true, ...cookies }) : null,
+      visita ? h('script', { src: `${base}/${ARCHIVO_VISITA}`, defer: true, 'data-base': base }) : null),
     h('body', null, children));
 }
 
@@ -546,6 +550,7 @@ export function renderizarPagina(inst: Instantanea, ruta: string, idioma: string
     captacion: tieneFormulario(inst) || tieneAgendador(inst),
     popups: true,
     chat: true,
+    visita: true,
     agenda: p.bloques.some((b) => b.tipo === 'agendador'),
     cookies: inst.sitio?.cookies ? atributosCookies(inst.sitio.cookies, privacidad ? `${op.base}${rutaPublica('/privacidad', p.idioma)}` : null) : null,
     og: { titulo, descripcion, url: canonical, sitio: marca.nombre, idioma: i },
@@ -759,6 +764,8 @@ export function renderizarSitio(inst: Instantanea, opciones: OpcionesRender): Ar
     { archivo: ARCHIVO_POPUPS, contenido: SCRIPT_POPUPS, mime: 'text/javascript; charset=utf-8' },
     // HU-1604 · El chat también va en toda versión: se enciende y se apaga en vivo.
     { archivo: ARCHIVO_CHAT, contenido: SCRIPT_CHAT, mime: 'text/javascript; charset=utf-8' },
+    // HU-1607 · Y el contador de visitas anónimas, en toda versión.
+    { archivo: ARCHIVO_VISITA, contenido: SCRIPT_VISITA, mime: 'text/javascript; charset=utf-8' },
     // HU-1606 · El consentimiento de cookies y lo publicado (para la CSP), solo si la versión tiene etiquetas.
     ...(inst.sitio?.cookies ? [
       { archivo: ARCHIVO_COOKIES, contenido: SCRIPT_COOKIES, mime: 'text/javascript; charset=utf-8' },

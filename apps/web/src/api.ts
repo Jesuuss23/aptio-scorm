@@ -869,6 +869,18 @@ export interface MedicionHoras {
 }
 export interface MedicionEntrada { proyectoRef?: string; proyectoId?: string; escenario: string; etapa: string; horas: number; notas?: string }
 
+/** HU-1607 · Resumen del sitio (REQ-080, PNT-24): las cifras de `GET /sitio/resumen`. */
+export type PeriodoResumen = '7d' | '30d' | '90d';
+export interface IndicadorResumen { actual: number; anterior: number; variacion: number | null }
+export interface ResumenSitio {
+  periodo: PeriodoResumen; desde: string; hasta: string;
+  indicadores: { visitas: IndicadorResumen; leads: IndicadorResumen; demos: IndicadorResumen; suscripciones: IndicadorResumen | null };
+  serie: { dia: string; visitas: number; leads: number; demos: number }[];
+  origenes: { origen: string; etiqueta: string; leads: number; porcentaje: number }[];
+  paginas: { ruta: string; visitas: number; leads: number; conversion: number }[];
+  proximasDemos: { id: string; inicio: string; fecha: string; hora: string; nombre: string; empresa: string | null; tipo: string; asesor: string; estado: string }[];
+}
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
   ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
@@ -895,6 +907,8 @@ export const api = {
   publicarSitio: () => pedir<VersionSitio>('/sitio/publicar', { method: 'POST' }),
   versionesSitio: () => pedir<VersionesSitio>('/sitio/versiones'),
   ajustesSitio: () => pedir<AjustesSitio>('/sitio/ajustes'),
+  /** HU-1607 · Sitio web › Resumen (PNT-24, CP-138). */
+  resumenSitio: (periodo: PeriodoResumen) => pedir<ResumenSitio>(`/sitio/resumen?periodo=${periodo}`),
   guardarAjustesSitio: (cambios: CambiosAjustesSitio) => pedir<AjustesSitio>('/sitio/ajustes', json(cambios, 'PATCH')),
   subirMarcaSitio: (tipo: 'logo' | 'favicon', archivo: File) => pedir<AjustesSitio>(`/sitio/ajustes/marca/${tipo}`, { method: 'PUT', body: archivo, headers: { 'Content-Type': archivo.type } }),
   quitarMarcaSitio: (tipo: 'logo' | 'favicon') => pedir<AjustesSitio>(`/sitio/ajustes/marca/${tipo}`, { method: 'DELETE' }),

@@ -12,6 +12,7 @@ import { ARCHIVO_CAPTACION, RUTA_GRACIAS } from './captacion.js';
 import { ARCHIVO_POPUPS } from './popups.js';
 import { ARCHIVO_AGENDA } from './agenda.js';
 import { ARCHIVO_CHAT } from './chat.js';
+import { ARCHIVO_VISITA } from './visitas.js';
 import { ARCHIVO_COOKIES } from './cookies.js';
 import { type CookiesPublicadas, dominiosCsp } from '@aptio/schema/cookies';
 import { ARCHIVO_LLMS, archivoDeRuta, CARPETA_BLOG, CARPETA_MARCA, type OpcionesRender } from './render.js';
@@ -39,6 +40,7 @@ export function resolverPedido(ruta: string): Pedido | null {
   if (limpia === `/${ARCHIVO_POPUPS}`) return { tipo: 'script', archivo: ARCHIVO_POPUPS };
   // HU-1604 · El chat (en toda versión desde esta historia).
   if (limpia === `/${ARCHIVO_CHAT}`) return { tipo: 'script', archivo: ARCHIVO_CHAT };
+  if (limpia === `/${ARCHIVO_VISITA}`) return { tipo: 'script', archivo: ARCHIVO_VISITA };
   // HU-1606 · El consentimiento de cookies: solo existe si la versión tiene etiquetas.
   if (limpia === `/${ARCHIVO_COOKIES}`) return { tipo: 'script', archivo: ARCHIVO_COOKIES };
   // HU-1605 · El agendador: solo existe si alguna página lo tiene.
