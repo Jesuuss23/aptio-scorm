@@ -7,6 +7,8 @@
  * falla si algún desplazamiento viene del bloque (el contenedor reserva su alto: el calendario no debe mover nada).
  * HU-1604 · Las dos páginas se miden con el chatbot activo (`_chatbot.json` de ejemplo): el botón del chat es fijo y
  * también falla la medición si algún desplazamiento viene de él.
+ * HU-1606 · El sitio de ejemplo trae etiquetas (IDs de ejemplo), así que las dos páginas se miden con el aviso de cookies
+ * visible (sin decisión guardada) y la CSP de esa versión; falla si algún desplazamiento viene del aviso.
  *
  * Sin `SITIO_LIGHTHOUSE_URL`, sirve en un puerto local el sitio de ejemplo de producción pre-renderizado con
  * `@aptio/sitio` y las mismas cabeceras que `GET /s/*`. Con `SITIO_LIGHTHOUSE_URL=http://localhost:3000/s/` mide el
@@ -37,7 +39,7 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
   const origen = `http://127.0.0.1:${(servidor.address() as AddressInfo).port}`;
   // El sitio vive bajo /s: el canonical y el sitemap apuntan ahí, como detrás de la CDN apuntarían a la raíz.
   const op = { entorno: 'produccion' as const, sitioUrl: `${origen}/s`, base: '/s' };
-  const inst = instantaneaDeEjemplo('produccion', { agenda: true });
+  const inst = instantaneaDeEjemplo('produccion', { agenda: true, cookies: true });
   const archivos = new Map(renderizarSitio(inst, op).map((a) => [a.archivo, a.contenido]));
   servidor.on('request', (req, res) => {
     const url = req.url ?? '/';
@@ -56,7 +58,7 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
       res.writeHead(404, cabecerasSitio('404', html)).end(html);
       return;
     }
-    const cab = cabecerasSitio(pedido.tipo, cuerpo);
+    const cab = cabecerasSitio(pedido.tipo, cuerpo, { cookies: inst.sitio?.cookies ?? null });
     if (noModificado(req.headers['if-none-match'], cab.ETag!)) return void res.writeHead(304, cab).end();
     res.writeHead(200, cab).end(cuerpo);
   });
@@ -66,8 +68,8 @@ async function servirEjemplo(): Promise<{ url: string; cerrar: () => void }> {
 const local = process.env.SITIO_LIGHTHOUSE_URL ? null : await servirEjemplo();
 const base = process.env.SITIO_LIGHTHOUSE_URL ?? local!.url;
 const PAGINAS = [
-  { nombre: 'inicio', ruta: '', bloque: 'el popup activo o el chat', propio: /\bpp-|data-popup|\bch-/ },
-  { nombre: 'agendar-demo', ruta: 'agendar-demo', bloque: 'el agendador o el chat', propio: /booker|\bag-|data-agenda|#agendar|\bch-/ },
+  { nombre: 'inicio', ruta: '', bloque: 'el popup activo, el chat o el aviso de cookies', propio: /\bpp-|data-popup|\bch-|\bck-/ },
+  { nombre: 'agendar-demo', ruta: 'agendar-demo', bloque: 'el agendador, el chat o el aviso de cookies', propio: /booker|\bag-|data-agenda|#agendar|\bch-|\bck-/ },
 ] as const;
 const ruta = rutaChrome();
 const chrome = await chromeLauncher.launch({ ...(ruta ? { chromePath: ruta } : {}), chromeFlags: ['--headless=new', '--no-sandbox', '--disable-gpu'] });

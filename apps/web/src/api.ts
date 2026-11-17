@@ -632,6 +632,8 @@ export interface AjustesSitio {
   logo: { archivo: string; mime: string } | null;
   favicon: { archivo: string; mime: string } | null;
   analitica: { ga4: string | null; gtm: string | null; metaPixel: string | null };
+  /** HU-1606 · El aviso de cookies y la versión de la política; salen al sitio al publicar. */
+  cookies: { visible: boolean; version: number };
   whatsapp: { visible: boolean; numero: string | null; mensaje: string | null };
   correoLeads: string | null;
   mantenimiento: { activo: boolean; mensaje: string | null; desde: string | null };
@@ -643,6 +645,7 @@ export interface CambiosAjustesSitio {
   dominio?: string | null;
   nombre?: string;
   analitica?: Partial<AjustesSitio['analitica']>;
+  cookies?: { visible?: boolean; subirVersion?: boolean };
   whatsapp?: Partial<AjustesSitio['whatsapp']>;
   correoLeads?: string | null;
   mantenimiento?: { activo?: boolean; mensaje?: string | null };

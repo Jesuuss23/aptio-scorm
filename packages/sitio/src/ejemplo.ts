@@ -10,6 +10,7 @@ import { type AgendaPublica, AJUSTES_AGENDA_POR_DEFECTO, deLima, fechaLima, fran
 import type { PopupPublico } from '@aptio/schema/popups';
 import { AJUSTES_CHATBOT_POR_DEFECTO, chatbotPublico, type ChatbotPublico } from '@aptio/schema/chatbot';
 import type { EntornoSitio } from '@aptio/schema/sitio-ficticios';
+import { AJUSTES_POR_DEFECTO } from '@aptio/schema/sitio-ajustes';
 import { armarInstantanea, type Instantanea } from '@aptio/schema/sitio-versiones';
 import { blogPublico, type BlogPublico, CONEXION_BLOG_POR_DEFECTO, type ConexionBlog, type FilaArticuloBlog, type FilaCategoriaBlog } from '@aptio/schema/sitio-blog';
 
@@ -30,7 +31,10 @@ const landing = (id: string, sector: string, titulo: string, texto: string, blog
 const enlace = (id: string, zona: string, texto: string, ruta: string | null, orden: number, padreId: string | null = null, idioma = 'es') => ({ id, zona, padreId, texto, ruta, orden, visible: true, idioma });
 
 /** HU-1605 · `agenda: true` suma la página «Agendar demo» con el agendador (para Lighthouse y Playwright). */
-export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra: { agenda?: boolean } = {}): Instantanea {
+/** HU-1606 · IDs de ejemplo (no son de una cuenta real) para medir el sitio con el aviso de cookies. */
+export const ETIQUETAS_DE_EJEMPLO = { ga4: 'G-AB12CD34EF', gtm: 'GTM-AB12CD3', metaPixel: '123456789012345' } as const;
+
+export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra: { agenda?: boolean; cookies?: boolean } = {}): Instantanea {
   n = 0;
   return armarInstantanea({
     paginas: [
@@ -78,6 +82,8 @@ export function instantaneaDeEjemplo(entorno: EntornoSitio = 'produccion', extra
       enlace('m1en', 'menu', 'Customer stories', '/en#testimonios', 0, null, 'en'), enlace('m2en', 'menu', 'Blog', 'https://blog.aptioscorm.com', 1, null, 'en'),
       enlace('c1en', 'pie', 'Company', null, 0, null, 'en'), enlace('l1en', 'pie', 'Privacy', '/en/privacidad', 0, 'c1en', 'en'),
     ],
+    // HU-1606 · Con etiquetas configuradas: el aviso de cookies y `_cookies.js` en cada página.
+    ...(extra.cookies ? { ajustes: { ...AJUSTES_POR_DEFECTO, analitica: { ...ETIQUETAS_DE_EJEMPLO } } } : {}),
   }, entorno);
 }
 

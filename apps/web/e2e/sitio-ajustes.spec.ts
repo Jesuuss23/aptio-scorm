@@ -1,6 +1,7 @@
 // HU-1509 · Configuración › Ajustes del sitio (PNT-38, REQ-073): dominio con «Comprobar», nombre, logo, WhatsApp,
 // correo de leads, analítica y modo mantenimiento. CP-121: con el mantenimiento activo el visitante recibe la página
 // «Volvemos pronto» con 503 y el superadmin sigue viendo el sitio. axe WCAG 2.2 A/AA a 390 y 1280 px.
+// HU-1606 · Tarjeta «Privacidad»: el aviso de cookies y la versión de la política, que salen al sitio al publicar.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { AVISO_MANTENIMIENTO, simularApi } from './api-simulada';
@@ -23,15 +24,16 @@ const sinViolaciones = async (page: Page, soloMain = true) => {
 };
 
 for (const ancho of [390, 1280]) {
-  test(`la vista Ajustes del sitio a ${ancho} px muestra sus cuatro tarjetas sin violaciones de axe`, async ({ page }) => {
+  test(`la vista Ajustes del sitio a ${ancho} px muestra sus tarjetas sin violaciones de axe`, async ({ page }) => {
     await page.setViewportSize({ width: ancho, height: 900 });
     await simularApi(page, SITIO);
     await page.goto('/sitio/ajustes');
     await expect(page.getByRole('heading', { level: 1, name: 'Ajustes del sitio' })).toBeVisible();
-    for (const t of ['Dominio e identidad', 'Contacto', 'Analítica', 'Mantenimiento']) await expect(tarjeta(page, t)).toBeVisible();
+    for (const t of ['Dominio e identidad', 'Contacto', 'Analítica', 'Privacidad', 'Mantenimiento']) await expect(tarjeta(page, t)).toBeVisible();
     await expect(tarjeta(page, 'Mantenimiento').getByText('Sitio en línea')).toBeVisible();
     await expect(tarjeta(page, 'Dominio e identidad').getByLabel('Nombre del sitio')).toHaveValue('Aptio SCORM');
-    await expect(tarjeta(page, 'Analítica')).toContainText('se activarán en el sitio con el banner de cookies');
+    await expect(tarjeta(page, 'Analítica')).toContainText('cada etiqueta solo se carga después de que el visitante acepte su categoría');
+    await expect(tarjeta(page, 'Privacidad')).toContainText('Versión de la política: 1');
     await sinViolaciones(page);
   });
 }
@@ -136,6 +138,46 @@ test('los identificadores de analítica se validan y se guardan en mayúsculas',
   await expect(analitica.getByRole('status')).toContainText('Se guardaron los identificadores.');
   await page.reload();
   await expect(tarjeta(page, 'Analítica').getByLabel('Google Analytics 4')).toHaveValue('G-AB12CD34EF');
+});
+
+test('HU-1606 · Privacidad: apagar el aviso y subir la versión de la política, con el teclado, y llega al sitio al publicar', async ({ page }) => {
+  await simularApi(page, { ...SITIO, ajustesSitio: { analitica: { ga4: 'G-AB12CD34EF', gtm: null, metaPixel: null } } });
+  await page.goto('/sitio/ajustes');
+  const privacidad = tarjeta(page, 'Privacidad');
+  const interruptor = privacidad.getByRole('switch', { name: 'Mostrar banner de cookies' });
+  await expect(interruptor).toHaveAttribute('aria-checked', 'true');
+  await expect(privacidad.getByText('Sin identificadores en Analítica')).toHaveCount(0);
+  await interruptor.focus();
+  await page.keyboard.press('Enter');
+  await expect(privacidad.getByRole('status')).toContainText('El aviso de cookies quedará oculto y el sitio no cargará ninguna etiqueta.');
+  await expect(interruptor).toHaveAttribute('aria-checked', 'false');
+  await expect(interruptor).toBeEnabled();
+  await interruptor.focus();
+  await page.keyboard.press('Space');
+  await expect(interruptor).toHaveAttribute('aria-checked', 'true');
+
+  await privacidad.getByRole('button', { name: 'Pedir de nuevo el consentimiento' }).click();
+  const confirmar = privacidad.getByRole('group', { name: 'Confirmar la nueva versión de la política' });
+  await expect(confirmar).toContainText('¿Subir la política a la versión 2?');
+  await confirmar.getByRole('button', { name: 'Sí, subir la versión' }).click();
+  await expect(privacidad.getByRole('status')).toContainText('La política quedó en la versión 2.');
+  await expect(privacidad).toContainText('Versión de la política: 2');
+  await sinViolaciones(page);
+  await page.reload();
+  await expect(tarjeta(page, 'Privacidad')).toContainText('Versión de la política: 2');
+
+  // Sale al sitio al publicar: el script lleva la versión nueva.
+  await page.goto('/sitio/paginas');
+  await page.getByRole('button', { name: 'Publicar cambios' }).click();
+  await expect(page.getByText('Sitio al día')).toBeVisible();
+  await page.goto('/s/');
+  await expect(page.locator('script[src="/s/_cookies.js"]')).toHaveAttribute('data-version', '2');
+});
+
+test('HU-1606 · sin identificadores, la tarjeta Privacidad avisa que no habrá aviso de cookies', async ({ page }) => {
+  await simularApi(page, SITIO);
+  await page.goto('/sitio/ajustes');
+  await expect(tarjeta(page, 'Privacidad').getByText('Sin identificadores en Analítica, el sitio no muestra el aviso de cookies.')).toBeVisible();
 });
 
 test('CP-121: con el mantenimiento activo el visitante ve «Volvemos pronto» (503) y el superadmin sigue viendo el sitio', async ({ page, browser }) => {

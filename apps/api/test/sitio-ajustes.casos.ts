@@ -8,7 +8,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Almacen, configDesdeEnv, prepararAlmacen } from '@aptio/almacen';
 import { hashearClave, prisma, Rol } from '@aptio/db';
-import { CLAVE_ACTUAL, claveVersion, fuentes, instantaneaDeEjemplo, renderizarSitio } from '@aptio/sitio';
+import { CLAVE_ACTUAL, claveVersion, fuentes, instantaneaDeEjemplo, POLITICA_CONTENIDO, renderizarSitio } from '@aptio/sitio';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
@@ -88,7 +88,7 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('ajustes del sitio (HU-
     const r = await s().get('/sitio/ajustes');
     expect(r.status).toBe(200);
     expect(r.body).toEqual({
-      dominio: null, nombre: 'Aptio SCORM', logo: null, favicon: null, analitica: { ga4: null, gtm: null, metaPixel: null },
+      dominio: null, nombre: 'Aptio SCORM', logo: null, favicon: null, analitica: { ga4: null, gtm: null, metaPixel: null }, cookies: { visible: true, version: 1 },
       whatsapp: { visible: false, numero: null, mensaje: null }, correoLeads: null, mantenimiento: { activo: false, mensaje: null, desde: null }, mostrarSelectorIdioma: true, actualizadoEn: null,
     });
     expect((await como('admin').get('/sitio/ajustes')).status).toBe(403);
@@ -117,18 +117,67 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('ajustes del sitio (HU-
     expect(aud?.datos).toEqual({ campos: ['dominio', 'nombre', 'analitica', 'whatsapp', 'correoLeads'], publicar: true });
   });
 
-  it('nombre, dominio y WhatsApp salen al sitio al publicar: el panel marca cambios pendientes', async () => {
+  it('nombre, dominio, WhatsApp y las etiquetas (HU-1606) salen al sitio al publicar: el panel marca cambios pendientes', async () => {
     const v = await s().post('/sitio/publicar');
     expect(v.status).toBe(201);
     expect((await s().get('/sitio/versiones')).body.pendientes).toBe(false);
     const fila = await prisma.sitioVersion.findUniqueOrThrow({ where: { numero: v.body.numero } });
     expect((fila.instantanea as { sitio: unknown }).sitio).toEqual({
       nombre: 'Aptio SCORM Perú', dominio: 'aptioscorm.com', logo: null, favicon: null, whatsapp: { numero: '+51987654321', mensaje: 'Hola, quiero una demo' },
+      // HU-1606 · Cierra SUP-200: el ID de GA4 y la versión de la política van en la versión.
+      cookies: { version: 1, etiquetas: { ga4: 'G-AB12CD34EF' } },
     });
-    await s().patch('/sitio/ajustes', { correoLeads: 'leads@aulas.pe', analitica: { gtm: 'GTM-AB12CD3' } });
+    await s().patch('/sitio/ajustes', { correoLeads: 'leads@aulas.pe' });
     expect((await s().get('/sitio/versiones')).body.pendientes).toBe(false);
+    await s().patch('/sitio/ajustes', { analitica: { gtm: 'GTM-AB12CD3' } });
+    expect((await s().get('/sitio/versiones')).body.pendientes).toBe(true);
+    await s().post('/sitio/publicar');
     await s().patch('/sitio/ajustes', { whatsapp: { visible: false } });
     expect((await s().get('/sitio/versiones')).body.pendientes).toBe(true);
+  });
+
+  it('HU-1606 · privacidad: apagar el aviso deja la versión sin etiquetas y subir la versión de la política pide de nuevo el consentimiento', async () => {
+    const r = await s().patch('/sitio/ajustes', { cookies: { subirVersion: true } });
+    expect(r.status).toBe(200);
+    expect(r.body.cookies).toEqual({ visible: true, version: 2 });
+    const aud = await prisma.auditoria.findFirst({ where: { accion: 'SITIO_AJUSTES_ACTUALIZADOS', usuario: { email: correoDe('super') } }, orderBy: { creadoEn: 'desc' } });
+    expect(aud?.datos).toEqual({ campos: ['cookies'], publicar: true });
+    expect((await s().get('/sitio/versiones')).body.pendientes).toBe(true);
+    const v2 = await s().post('/sitio/publicar');
+    const conEtiquetas = await prisma.sitioVersion.findUniqueOrThrow({ where: { numero: v2.body.numero } });
+    expect((conEtiquetas.instantanea as { sitio: { cookies?: unknown } }).sitio.cookies).toEqual({ version: 2, etiquetas: { ga4: 'G-AB12CD34EF', gtm: 'GTM-AB12CD3' } });
+
+    expect((await s().patch('/sitio/ajustes', { cookies: { visible: false } })).body.cookies).toEqual({ visible: false, version: 2 });
+    const v3 = await s().post('/sitio/publicar');
+    const sinEtiquetas = await prisma.sitioVersion.findUniqueOrThrow({ where: { numero: v3.body.numero } });
+    expect((sinEtiquetas.instantanea as { sitio: { cookies?: unknown } }).sitio.cookies).toBeUndefined();
+    expect((await s().patch('/sitio/ajustes', { cookies: { visible: 'no' } })).status).toBe(422);
+    await s().patch('/sitio/ajustes', { cookies: { visible: true } });
+  });
+
+  it('HU-1606 · la CSP de las páginas se abre solo a las etiquetas publicadas en su versión', async () => {
+    const op = { entorno: 'produccion' as const, sitioUrl: 'https://aptioscorm.com', base: '/s' };
+    const otra = VERSION + 1;
+    for (const a of renderizarSitio(instantaneaDeEjemplo('produccion', { cookies: true }), op)) await almacen.subir(claveVersion(otra, a.archivo), a.contenido, a.mime);
+    await almacen.subir(CLAVE_ACTUAL, JSON.stringify({ version: otra, generadoEn: new Date().toISOString() }), 'application/json');
+    publico.olvidar();
+    const con = await visitante('/s/');
+    expect(con.status).toBe(200);
+    expect(con.text).toContain('/s/_cookies.js');
+    expect(con.headers['content-security-policy']).toContain("script-src 'self' https://www.googletagmanager.com https://connect.facebook.net;");
+    expect(con.headers['content-security-policy']).toContain('https://www.google-analytics.com');
+    const js = await visitante('/s/_cookies.js');
+    expect(js.status).toBe(200);
+    expect(js.headers['content-type']).toBe('text/javascript; charset=utf-8');
+    expect((await visitante('/s/_cookies.json')).status).toBe(404);
+    // La 404 sigue cerrada aunque la versión tenga etiquetas.
+    expect((await visitante('/s/no-existe')).headers['content-security-policy']).toBe(POLITICA_CONTENIDO);
+
+    await almacen.subir(CLAVE_ACTUAL, JSON.stringify({ version: VERSION, generadoEn: new Date().toISOString() }), 'application/json');
+    publico.olvidar();
+    const sin = await visitante('/s/');
+    expect(sin.headers['content-security-policy']).toBe(POLITICA_CONTENIDO);
+    expect(sin.text).not.toContain('_cookies.js');
   });
 
   it('logo SVG saneado y favicon PNG con su hash en el nombre; se sirven en /s/_marca/ con caché de un año', async () => {

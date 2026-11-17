@@ -50,7 +50,8 @@ export class SitioPublicoController {
   }
 
   private enviar(req: Request, res: Response, r: Respuesta, privada = false): void {
-    const cab = cabecerasSitio(r.tipo, r.cuerpo, { archivo: r.archivo, privada });
+    // HU-1606 · La CSP de la página se abre solo a los orígenes de las etiquetas publicadas en su versión.
+    const cab = cabecerasSitio(r.tipo, r.cuerpo, { archivo: r.archivo, privada, cookies: r.cookies ?? null });
     res.set(cab);
     if (r.estado === 200 && noModificado(req.get('if-none-match'), cab.ETag!)) {
       res.status(304).end();
