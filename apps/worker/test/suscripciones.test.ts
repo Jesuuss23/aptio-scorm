@@ -1,11 +1,11 @@
 // HU-1703 · Cola `suscripciones` contra PostgreSQL y Redis reales, con el SMTP simulado (CP-143): la bienvenida sale con
 // el plan, el total con IGV, el comprobante y el enlace para crear la clave; una solicitud sin alta no recibe correo; si
 // el SMTP falla, la cola reintenta y el correo sale una sola vez.
-import { COLA_SUSCRIPCIONES, type DatosBienvenida, INTENTOS_SUSCRIPCIONES, opcionesRedis, opcionesTareaBienvenida } from '@aptio/colas';
+import { COLA_SUSCRIPCIONES, type DatosBienvenida, type DatosVencerSuscripcion, INTENTOS_SUSCRIPCIONES, opcionesRedis, opcionesTareaBienvenida, opcionesTareaVencer, TAREA_VENCER_SUSCRIPCION } from '@aptio/colas';
 import { prisma } from '@aptio/db';
 import { Queue, QueueEvents } from 'bullmq';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { crearTrabajadorSuscripciones, procesarBienvenida } from '../src/suscripciones.js';
+import { crearTrabajadorSuscripciones, procesarBienvenida, procesarVencimiento } from '../src/suscripciones.js';
 import type { Correo } from '../src/correo.js';
 
 const hayBase = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
@@ -107,5 +107,57 @@ describe.skipIf(!hayBase)('cola suscripciones (HU-1703)', () => {
       await cola.close();
       await eventos.close();
     }
+  });
+
+  describe('HU-1706 · vencer la suscripción cancelada al fin del período', () => {
+    const suscripcionDe = async (finPeriodo: Date, cancelarAlFin: boolean) => {
+      const s = await solicitud(true);
+      return prisma.suscripcion.update({ where: { solicitudId: s.id }, data: { finPeriodo, cancelarAlFin } });
+    };
+
+    it('el id es fijo por suscripción y espera hasta el fin', () => {
+      expect(opcionesTareaVencer('s1', 5_000)).toMatchObject({ jobId: 'vencer-s1', delay: 5_000 });
+      expect(opcionesTareaVencer('s1', -10).delay).toBe(0);
+    });
+
+    it('con el fin vencido pasa a CANCELADA una sola vez y lo audita', async () => {
+      const fin = new Date('2026-12-17T15:00:00Z');
+      const s = await suscripcionDe(fin, true);
+      expect(await procesarVencimiento(prisma, { suscripcionId: s.id }, new Date('2026-12-17T15:00:01Z'))).toEqual({ estado: 'cancelada' });
+      const tras = await prisma.suscripcion.findUniqueOrThrow({ where: { id: s.id } });
+      expect(tras).toMatchObject({ estado: 'CANCELADA', canceladaEn: fin });
+      expect(await prisma.auditoria.count({ where: { accion: 'SUSCRIPCION_CANCELADA', entidadId: s.id } })).toBe(1);
+      expect(await procesarVencimiento(prisma, { suscripcionId: s.id }, new Date('2026-12-18T00:00:00Z'))).toEqual({ estado: 'omitido', motivo: 'ya estaba cancelada' });
+      await prisma.auditoria.deleteMany({ where: { entidadId: s.id } });
+    });
+
+    it('si se reanudó o el período no terminó, no cambia nada', async () => {
+      const fin = new Date('2026-12-17T15:00:00Z');
+      const reanudada = await suscripcionDe(fin, false);
+      expect(await procesarVencimiento(prisma, { suscripcionId: reanudada.id }, new Date('2026-12-18T00:00:00Z'))).toEqual({ estado: 'omitido', motivo: 'se reanudó' });
+      await limpiar();
+      const temprana = await suscripcionDe(fin, true);
+      expect(await procesarVencimiento(prisma, { suscripcionId: temprana.id }, new Date('2026-12-10T00:00:00Z'))).toEqual({ estado: 'omitido', motivo: 'el período no terminó' });
+      expect((await prisma.suscripcion.findUniqueOrThrow({ where: { id: temprana.id } })).estado).toBe('ACTIVA');
+    });
+
+    it('la tarea retrasada de la cola la vence al llegar el fin', async () => {
+      const s = await suscripcionDe(new Date(Date.now() + 300), true);
+      const cola = new Queue<DatosVencerSuscripcion>(COLA_SUSCRIPCIONES, { connection: opcionesRedis(), prefix: PREFIJO });
+      const eventos = new QueueEvents(COLA_SUSCRIPCIONES, { connection: opcionesRedis(), prefix: PREFIJO });
+      const trabajador = crearTrabajadorSuscripciones(prisma, smtp().enviar, { connection: opcionesRedis(), prefix: PREFIJO });
+      try {
+        await eventos.waitUntilReady();
+        const job = await cola.add(TAREA_VENCER_SUSCRIPCION, { suscripcionId: s.id }, opcionesTareaVencer(s.id, 400));
+        expect(await job.waitUntilFinished(eventos, 10_000)).toEqual({ estado: 'cancelada' });
+        expect((await prisma.suscripcion.findUniqueOrThrow({ where: { id: s.id } })).estado).toBe('CANCELADA');
+      } finally {
+        await trabajador.close();
+        await cola.obliterate({ force: true });
+        await cola.close();
+        await eventos.close();
+        await prisma.auditoria.deleteMany({ where: { entidadId: s.id } });
+      }
+    });
   });
 });

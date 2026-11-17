@@ -131,7 +131,7 @@ describe.skipIf(!hayBase && !process.env.CI)('cuotas de cápsulas (HU-1705)', ()
     const v = ventanaMensual(inicio, new Date());
     expect(r.body).toEqual({
       ilimitada: false, ventanaInicio: v.inicio.toISOString(), ventanaFin: v.fin.toISOString(), incluidas: 20, adicionales: 0, usadas: 19, disponibles: 1,
-      oferta: { unitario: 69, igv: 12.42, total: 81.42, moneda: 'PEN', disponible: true }, puedeComprar: false, planes: '/s/precios',
+      oferta: { unitario: 69, igv: 12.42, total: 81.42, moneda: 'PEN', disponible: true }, puedeComprar: false, planes: '/s/precios', cancelada: false,
     });
     expect((await como('admin').get('/organizacion/cuota')).body.puedeComprar).toBe(true);
     expect((await como('productor').post('/organizacion/cuota/adicionales', { cantidad: 1 })).status).toBe(403);

@@ -6,7 +6,7 @@ import type { GrupoMenu } from '@aptio/ui';
  */
 export const MENU: GrupoMenu[] = [
   { nombre: 'Inicio', items: [{ ruta: '/', nombre: 'Proyectos' }, { ruta: '/nuevo', nombre: 'Nuevo SCORM' }] },
-  { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }, { ruta: '/conexiones-ia', nombre: 'Conexiones IA' }, { ruta: '/operacion', nombre: 'Operación' }] },
+  { nombre: 'Empresa', items: [{ ruta: '/clientes', nombre: 'Clientes y kits' }, { ruta: '/rentabilidad', nombre: 'Rentabilidad' }, { ruta: '/conexiones-ia', nombre: 'Conexiones IA' }, { ruta: '/operacion', nombre: 'Operación' }, { ruta: '/plan', nombre: 'Plan y suscripción' }] },
   // HU-1501 · Solo el superadmin (ADR-011). Páginas, Contenido y Blog (HU-1511); SEO se suma con su historia.
   { nombre: 'Sitio web', items: [{ ruta: '/sitio', nombre: 'Resumen' }, { ruta: '/sitio/paginas', nombre: 'Páginas' }, { ruta: '/sitio/contenido', nombre: 'Contenido' }, { ruta: '/sitio/blog', nombre: 'Blog' }, { ruta: '/sitio/seo', nombre: 'SEO' }, { ruta: '/sitio/seo-ia', nombre: 'SEO para IA' }] },
   // HU-1601 · Captación: Leads y CRM. HU-1603: Popups. HU-1604: Chatbot. HU-1605: Agendamiento.
@@ -62,6 +62,7 @@ export function resolverVista(camino: string): { grupo: string; nombre: string; 
   if (editorPagina) return { grupo: 'Sitio web', nombre: 'Editor de página', activo: '/sitio/paginas', id: editorPagina[1]!, sub: 'editor-pagina' };
   if (camino === '/conexiones-ia') return { grupo: 'Empresa', nombre: 'Conexiones IA', activo: '/conexiones-ia' };
   if (camino === '/operacion') return { grupo: 'Empresa', nombre: 'Operación', activo: '/operacion' };
+  if (camino === '/plan') return { grupo: 'Empresa', nombre: 'Plan y suscripción', activo: '/plan' };
   if (camino === '/rentabilidad') return { grupo: 'Empresa', nombre: 'Rentabilidad', activo: '/rentabilidad' };
   if (camino === '/clientes') return { grupo: 'Empresa', nombre: 'Clientes y kits', activo: '/clientes' };
   const cliente = camino.match(/^\/clientes\/([0-9a-f-]{36})$/i);

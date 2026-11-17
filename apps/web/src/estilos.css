@@ -3808,3 +3808,80 @@ ul.fila-chips {
 .cuota-agotada .campo {
   color: inherit;
 }
+
+/* HU-1706 · Plan y suscripción: cambio de plan con prorrateo y cancelación. */
+.plan-suscripcion {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+}
+.plan-suscripcion > .tarjeta,
+.plan-suscripcion > .cuota-capsulas {
+  margin: 0;
+}
+.plan-suscripcion .tarjeta > p {
+  margin: 0 0 8px;
+}
+.plan-suscripcion .nota.aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.plan-suscripcion .nota.aviso p {
+  margin: 0;
+}
+.planes-opciones {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.planes-opciones li {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--color-borde);
+  border-radius: 8px;
+}
+.planes-opciones li.actual {
+  border-width: 2px;
+  border-color: var(--color-cobalto);
+}
+.planes-opciones li > .boton,
+.planes-opciones li > .etiqueta {
+  justify-self: start;
+}
+@media (min-width: 720px) {
+  .planes-opciones li {
+    grid-template-columns: 1.2fr 1fr 1.6fr auto;
+    align-items: center;
+  }
+}
+.desglose {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+  max-width: 480px;
+}
+.desglose > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.desglose dt,
+.desglose dd {
+  margin: 0;
+}
+.desglose dd {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.desglose .total {
+  font-weight: 700;
+  border-top: 1px solid var(--color-borde);
+  padding-top: 4px;
+}

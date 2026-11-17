@@ -5,42 +5,16 @@
 import { LIMITES_ADICIONALES, precioAdicionales } from '@aptio/schema/cuotas';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { useEffect, useId, useRef, useState } from 'react';
-import { api, type CompraCapsulas, type CuotaCapsulas, ErrorApi, type PagoCompra } from '../api';
+import { api, type CompraCapsulas, type CuotaCapsulas, type PagoCompra } from '../api';
+import { cargarCulqi, fecha, mensajeDe } from './pagos';
 
-const SCRIPT_CULQI = 'https://checkout.culqi.com/js/v4';
 const CONSULTA_MS = 1500;
 const CONSULTAS = 20;
 
-interface CulqiCheckout {
-  publicKey: string;
-  settings: (o: Record<string, unknown>) => void;
-  open: () => void;
-  close?: () => void;
-  token?: { id: string };
-  error?: { user_message?: string };
-}
-declare global {
-  interface Window { Culqi?: CulqiCheckout; culqi?: () => void }
-}
-
-const fecha = (iso: string) => new Date(iso).toLocaleDateString('es-PE', { day: 'numeric', month: 'long', timeZone: 'America/Lima' });
 const capsulas = (n: number, adicional = false) => `${n} ${n === 1 ? `cápsula${adicional ? ' adicional' : ''}` : `cápsulas${adicional ? ' adicionales' : ''}`}`;
 /** «Listo: se sumó 1 cápsula adicional» o «se sumaron 3 cápsulas adicionales». */
 const listo = (n: number) => `Listo: ${n === 1 ? 'se sumó' : 'se sumaron'} ${capsulas(n, true)}. Ya puedes generar.`;
 const totalDe = (c: CuotaCapsulas) => (c.incluidas ?? 0) + c.adicionales;
-const mensajeDe = (e: unknown, otro: string) => (e instanceof ErrorApi ? e.message : otro);
-
-function cargarCulqi(): Promise<CulqiCheckout | null> {
-  if (window.Culqi) return Promise.resolve(window.Culqi);
-  return new Promise((resolver) => {
-    const s = document.createElement('script');
-    s.src = SCRIPT_CULQI;
-    s.async = true;
-    s.onload = () => resolver(window.Culqi ?? null);
-    s.onerror = () => resolver(null);
-    document.head.appendChild(s);
-  });
-}
 
 /** «Cápsulas del mes: 17 de 20», con la barra y cuándo se renueva. */
 export function IndicadorCuota({ cuota }: { cuota: CuotaCapsulas }) {
@@ -48,6 +22,13 @@ export function IndicadorCuota({ cuota }: { cuota: CuotaCapsulas }) {
     return (
       <section className="tarjeta cuota-capsulas" aria-label="Cuota de cápsulas">
         <p><b>Cápsulas del mes: {cuota.usadas}</b> · sin límite</p>
+      </section>
+    );
+  }
+  if (cuota.cancelada) {
+    return (
+      <section className="tarjeta cuota-capsulas" aria-label="Cuota de cápsulas">
+        <p><b>Tu suscripción terminó.</b> No puedes generar cápsulas nuevas; las cápsulas en revisión siguen editables y lo exportado se puede descargar.</p>
       </section>
     );
   }

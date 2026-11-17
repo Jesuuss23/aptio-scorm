@@ -184,7 +184,8 @@ const agenda = crearTrabajadorAgenda(prisma, correoDesdeEntorno(process.env), { 
 agenda.on('failed', (job, err) => console.error(`[${COLA_AGENDA}] el aviso ${job?.data.aviso} de la cita ${job?.data.citaId} no salió (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 // HU-1703 · El correo de bienvenida de una suscripción pagada, con reintentos si falla el SMTP (CP-143).
 const suscripciones = crearTrabajadorSuscripciones(prisma, correoDesdeEntorno(process.env), { connection: opcionesRedis(), prefix: prefijoColas() });
-suscripciones.on('failed', (job, err) => console.error(`[${COLA_SUSCRIPCIONES}] la bienvenida de la solicitud ${job?.data.solicitudId} no salió (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
+// HU-1706 · En la misma cola, el vencimiento de las suscripciones canceladas al fin del período.
+suscripciones.on('failed', (job, err) => console.error(`[${COLA_SUSCRIPCIONES}] ${job && 'suscripcionId' in job.data ? `el vencimiento de la suscripción ${job.data.suscripcionId}` : `la bienvenida de la solicitud ${job && 'solicitudId' in job.data ? job.data.solicitudId : '?'}`} falló (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 
 async function respaldar(datos: DatosRespaldo) {
   const r = await crearRespaldo({

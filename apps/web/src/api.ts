@@ -749,7 +749,7 @@ export interface PasarelaVenta {
 }
 /** HU-1704 · Un cobro aprobado (sin datos de tarjeta, REQ-110). */
 export interface CobroVenta {
-  id: string; solicitudId: string | null; compraCapsulasId: string | null; concepto: 'SUSCRIPCION' | 'CAPSULAS'; suscripcionId: string | null; razonSocial: string; correoAdmin: string; nombrePlan: string; monto: number; moneda: 'PEN' | 'USD'; pasarela: string;
+  id: string; solicitudId: string | null; compraCapsulasId: string | null; cambioPlanId: string | null; concepto: 'SUSCRIPCION' | 'CAPSULAS' | 'CAMBIO_PLAN'; suscripcionId: string | null; razonSocial: string; correoAdmin: string; nombrePlan: string; monto: number; moneda: 'PEN' | 'USD'; pasarela: string;
   ultimos4Digitos: string | null; estado: 'APROBADO' | 'REEMBOLSADO'; motivoSinAlta: string | null; reembolsable: boolean; reembolsoId: string | null; reembolsadoEn: string | null; creadoEn: string;
 }
 
@@ -758,6 +758,8 @@ export interface OfertaAdicional { unitario: number; igv: number; total: number;
 export interface CuotaCapsulas {
   ilimitada: boolean; ventanaInicio: string; ventanaFin: string; incluidas: number | null; adicionales: number; usadas: number; disponibles: number | null;
   oferta: OfertaAdicional | null; puedeComprar: boolean; planes: string;
+  /** HU-1706 · La suscripción terminó: cuota 0 y sin adicionales. */
+  cancelada: boolean;
 }
 export type PagoCompra =
   | { tipo: 'simulado' }
@@ -766,6 +768,19 @@ export type PagoCompra =
 export interface CompraCapsulas {
   id: string; estado: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'; cantidad: number; subtotal: number; igv: number; total: number; moneda: 'PEN' | 'USD'; pasarela: string;
   motivoRechazo: string | null; pago?: PagoCompra; cuota: CuotaCapsulas;
+}
+
+/** HU-1706 · La suscripción de la organización: cambio de plan con prorrateo y cancelación (REQ-086, CP-147). */
+export interface PlanBreve { slug: string; nombre: string; capsulasMes: number | null }
+export interface PlanOpcion extends PlanBreve { precioCiclo: number | null; actual: boolean; tipo: 'SUBIDA' | 'BAJADA' | null }
+export interface SuscripcionOrg {
+  plan: PlanBreve; ciclo: 'MENSUAL' | 'ANUAL'; precioPactadoSinIgv: number; moneda: 'PEN' | 'USD'; estado: 'ACTIVA' | 'CANCELADA'; inicioPeriodo: string; finPeriodo: string;
+  cancelarAlFin: boolean; canceladaEn: string | null; planProgramado: PlanBreve | null; planes: PlanOpcion[]; pagoDisponible: boolean;
+}
+export interface CambioPlan {
+  id: string | null; tipo: 'SUBIDA' | 'BAJADA'; estado: 'VISTA_PREVIA' | 'PROGRAMADO' | 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'; planOrigen: PlanBreve; planDestino: PlanBreve;
+  ciclo: 'MENSUAL' | 'ANUAL'; precioNuevoSinIgv: number; diasRestantes: number; diasPeriodo: number; diferenciaSinIgv: number; igv: number; total: number; moneda: 'PEN' | 'USD';
+  rigeDesde: string; pasarela: string | null; motivoRechazo: string | null; pago?: PagoCompra; suscripcion: SuscripcionOrg;
 }
 
 /** HU-1605 · Captación › Agendamiento (PNT-33). */
@@ -993,6 +1008,14 @@ export const api = {
   compraCapsulas: (id: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}`),
   pagarPruebaCompra: (id: string, tarjeta: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}/pago-prueba`, json({ tarjeta })),
   tokenCompra: (id: string, token: string) => pedir<CompraCapsulas>(`/organizacion/cuota/adicionales/${id}/token`, json({ token })),
+  // HU-1706 · Plan y suscripción
+  suscripcion: () => pedir<SuscripcionOrg>('/organizacion/suscripcion'),
+  cambiarDePlan: (plan: string, confirmar: boolean) => pedir<CambioPlan>('/organizacion/suscripcion/cambio', json({ plan, confirmar })),
+  cambioPlan: (id: string) => pedir<CambioPlan>(`/organizacion/suscripcion/cambios/${id}`),
+  pagarPruebaCambio: (id: string, tarjeta: string) => pedir<CambioPlan>(`/organizacion/suscripcion/cambios/${id}/pago-prueba`, json({ tarjeta })),
+  tokenCambio: (id: string, token: string) => pedir<CambioPlan>(`/organizacion/suscripcion/cambios/${id}/token`, json({ token })),
+  cancelarSuscripcion: () => pedir<SuscripcionOrg>('/organizacion/suscripcion/cancelar', { method: 'POST' }),
+  reanudarSuscripcion: () => pedir<SuscripcionOrg>('/organizacion/suscripcion/reanudar', { method: 'POST' }),
   // HU-1605 · Captación › Agendamiento (PNT-33).
   agenda: () => pedir<Agenda>('/captacion/agenda'),
   cambiarAjustesAgenda: (c: Partial<AjustesAgenda>) => pedir<AjustesAgenda>('/captacion/agenda', json(c, 'PATCH')),

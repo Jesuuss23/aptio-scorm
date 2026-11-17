@@ -50,6 +50,7 @@ model Organizacion {
   solicitudes       SolicitudSuscripcion[]
   consumosCapsulas  ConsumoCapsula[]
   comprasCapsulas   CompraCapsulas[]
+  cambiosPlan       CambioPlan[]
 }
 
 // ---------- Personas y acceso ----------
@@ -215,16 +216,16 @@ model Proyecto {
   creadoEn              DateTime       @default(now())
   actualizadoEn         DateTime       @updatedAt
 
-  cliente      Cliente           @relation(fields: [clienteId], references: [id])
-  creadoPor    Usuario           @relation("ProyectoCreador", fields: [creadoPorId], references: [id])
-  materiales   MaterialFuente[]
-  curso        Curso?
-  generaciones Generacion[]
+  cliente        Cliente           @relation(fields: [clienteId], references: [id])
+  creadoPor      Usuario           @relation("ProyectoCreador", fields: [creadoPorId], references: [id])
+  materiales     MaterialFuente[]
+  curso          Curso?
+  generaciones   Generacion[]
   consumoCapsula ConsumoCapsula?
-  trabajosIA   TrabajoIA[]
-  mediciones   MedicionProceso[]
-  recursos     Recurso[]
-  organizacion Organizacion      @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  trabajosIA     TrabajoIA[]
+  mediciones     MedicionProceso[]
+  recursos       Recurso[]
+  organizacion   Organizacion      @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
   @@index([clienteId, estado])
   @@index([organizacionId, estado])
@@ -1304,8 +1305,12 @@ model Plan {
   creadoEn         DateTime @default(now())
   actualizadoEn    DateTime @updatedAt
 
-  suscripciones Suscripcion[]
-  solicitudes   SolicitudSuscripcion[]
+  suscripciones  Suscripcion[]          @relation("PlanSuscripcion")
+  solicitudes    SolicitudSuscripcion[]
+  /// HU-1706 · Bajadas programadas y subidas de plan.
+  programadas    Suscripcion[]          @relation("PlanProgramado")
+  cambiosOrigen  CambioPlan[]           @relation("CambioPlanOrigen")
+  cambiosDestino CambioPlan[]           @relation("CambioPlanDestino")
 
   @@index([orden])
 }
@@ -1329,6 +1334,8 @@ enum CicloSuscripcion {
 
 enum EstadoSuscripcion {
   ACTIVA
+  /// HU-1706 · Cancelada al fin del período pagado (RN-18-7): sin cuota para cápsulas nuevas.
+  CANCELADA
 }
 
 enum TipoComprobante {
@@ -1348,7 +1355,7 @@ model Suscripcion {
   organizacionId      String                @unique @db.Uuid
   organizacion        Organizacion          @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
   planId              String                @db.Uuid
-  plan                Plan                  @relation(fields: [planId], references: [id])
+  plan                Plan                  @relation("PlanSuscripcion", fields: [planId], references: [id])
   ciclo               CicloSuscripcion
   /// Soles enteros sin IGV por ciclo (el mes o el año).
   precioPactadoSinIgv Int
@@ -1364,6 +1371,14 @@ model Suscripcion {
   cobros              Cobro[]
   consumosCapsulas    ConsumoCapsula[]
   comprasCapsulas     CompraCapsulas[]
+  /// HU-1706 · Cancelación al fin del período pagado (RN-18-7): marcada por el administrador, se puede reanudar antes.
+  cancelarAlFin       Boolean               @default(false)
+  /// Cuándo pasó a CANCELADA (el fin del período).
+  canceladaEn         DateTime?
+  /// HU-1706 · Bajada de plan programada: rige al renovar, sin cobro ni devolución.
+  planProgramadoId    String?               @db.Uuid
+  planProgramado      Plan?                 @relation("PlanProgramado", fields: [planProgramadoId], references: [id], onDelete: Restrict)
+  cambiosPlan         CambioPlan[]
   creadoEn            DateTime              @default(now())
   actualizadoEn       DateTime              @updatedAt
 }
@@ -1418,33 +1433,37 @@ enum ModoPasarela {
 /// sensible de la tarjeta: solo la referencia de la pasarela y los 4 últimos dígitos (REQ-110). Sin suscripción = pago
 /// aprobado sin alta (SUP-291), que el superadmin puede reembolsar.
 model Cobro {
-  id                     String               @id @default(uuid()) @db.Uuid
+  id                     String                @id @default(uuid()) @db.Uuid
   /// El alta que pagó este cobro; null si el cobro es de cápsulas adicionales (HU-1705).
   solicitudSuscripcionId String?               @db.Uuid
   solicitud              SolicitudSuscripcion? @relation(fields: [solicitudSuscripcionId], references: [id], onDelete: Restrict)
   /// HU-1705 · La compra de cápsulas adicionales que pagó este cobro.
   compraCapsulasId       String?               @db.Uuid
   compraCapsulas         CompraCapsulas?       @relation(fields: [compraCapsulasId], references: [id], onDelete: Restrict)
-  suscripcionId          String?              @db.Uuid
-  suscripcion            Suscripcion?         @relation(fields: [suscripcionId], references: [id], onDelete: SetNull)
+  /// HU-1706 · La subida de plan que pagó este cobro (la diferencia prorrateada).
+  cambioPlanId           String?               @db.Uuid
+  cambioPlan             CambioPlan?           @relation(fields: [cambioPlanId], references: [id], onDelete: Restrict)
+  suscripcionId          String?               @db.Uuid
+  suscripcion            Suscripcion?          @relation(fields: [suscripcionId], references: [id], onDelete: SetNull)
   /// El id del evento de la pasarela: un evento produce un solo cobro (RN-18-3, CP-144).
-  eventoPagoId           String               @unique
+  eventoPagoId           String                @unique
   /// Con IGV, en la moneda del cobro.
-  monto                  Decimal              @db.Decimal(10, 2)
+  monto                  Decimal               @db.Decimal(10, 2)
   moneda                 String
   pasarela               String
   /// Referencia de la transacción en la pasarela (Stripe: payment intent; Culqi: cargo), para reembolsar.
   tokenPago              String?
   ultimos4Digitos        String?
-  estado                 EstadoCobro          @default(APROBADO)
+  estado                 EstadoCobro           @default(APROBADO)
   reembolsoId            String?
   reembolsadoEn          DateTime?
-  creadoEn               DateTime             @default(now())
-  actualizadoEn          DateTime             @updatedAt
+  creadoEn               DateTime              @default(now())
+  actualizadoEn          DateTime              @updatedAt
 
   @@index([solicitudSuscripcionId])
   @@index([suscripcionId])
   @@index([compraCapsulasId])
+  @@index([cambioPlanId])
 }
 
 enum OrigenConsumo {
@@ -1502,6 +1521,46 @@ model CompraCapsulas {
   creadoEn         DateTime             @default(now())
   actualizadoEn    DateTime             @updatedAt
   cobros           Cobro[]
+
+  @@index([organizacionId, estado])
+}
+
+enum EstadoCambioPlan {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
+/// HU-1706 · Una subida de plan a mitad de período: la diferencia prorrateada por día (RN-18-7) y su pago.
+model CambioPlan {
+  id                String           @id @default(uuid()) @db.Uuid
+  organizacionId    String           @db.Uuid
+  organizacion      Organizacion     @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  suscripcionId     String           @db.Uuid
+  suscripcion       Suscripcion      @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  planOrigenId      String           @db.Uuid
+  planOrigen        Plan             @relation("CambioPlanOrigen", fields: [planOrigenId], references: [id], onDelete: Restrict)
+  planDestinoId     String           @db.Uuid
+  planDestino       Plan             @relation("CambioPlanDestino", fields: [planDestinoId], references: [id], onDelete: Restrict)
+  ciclo             CicloSuscripcion
+  /// El precio del plan nuevo por el ciclo, sin IGV, que pasa a ser el precio pactado al aprobarse.
+  precioNuevoSinIgv Int
+  diasRestantes     Int
+  diasPeriodo       Int
+  /// En la moneda de la suscripción, con dos decimales.
+  diferenciaSinIgv  Decimal          @db.Decimal(10, 2)
+  igv               Decimal          @db.Decimal(10, 2)
+  total             Decimal          @db.Decimal(10, 2)
+  moneda            String
+  pasarela          String
+  estado            EstadoCambioPlan @default(PENDIENTE)
+  /// El evento de la pasarela que lo resolvió (idempotencia, RN-18-3).
+  eventoPagoId      String?          @unique
+  motivoRechazo     String?
+  pedidoPorId       String           @db.Uuid
+  creadoEn          DateTime         @default(now())
+  actualizadoEn     DateTime         @updatedAt
+  cobros            Cobro[]
 
   @@index([organizacionId, estado])
 }
