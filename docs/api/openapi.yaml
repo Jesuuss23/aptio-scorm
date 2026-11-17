@@ -6587,7 +6587,10 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     NoEncontrado:
-      description: No existe
+      description: >-
+        No existe, o es de otra organización (HU-1701, RN-18-1): la respuesta es la misma en los dos casos y no confirma
+        que el id exista. Si algún id de la ruta es de otra organización, queda ACCESO_OTRA_ORGANIZACION en la auditoría
+        de plataforma (sin organización; la ve solo SUPERADMIN).
       content:
         application/json:
           schema:
@@ -9999,6 +10002,10 @@ components:
           format: date-time
     Error:
       type: object
+      description: >-
+        Error de la API. HU-1701 · Un recurso de otra organización responde 404 NO_ENCONTRADO, igual que uno que no
+        existe; el intento queda en la auditoría de plataforma con la acción ACCESO_OTRA_ORGANIZACION (usuario,
+        organización de origen, organización propietaria, método, ruta y recursos), que solo ve SUPERADMIN.
       required:
       - codigo
       - mensaje

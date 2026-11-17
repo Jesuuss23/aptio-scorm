@@ -6,7 +6,8 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
+import type { AuditorAccesoCruzado } from './acceso-cruzado.js';
 
 /** Forma de error de docs/api/openapi.yaml (components.schemas.Error). */
 export interface CuerpoError {
@@ -31,6 +32,9 @@ const CODIGOS: Partial<Record<number, string>> = {
 export class FiltroErrores implements ExceptionFilter {
   private readonly log = new Logger('Errores');
 
+  /** HU-1701 · Con el auditor, un 404 con ids de otra organización queda en la auditoría (después de responder). */
+  constructor(private readonly accesoCruzado?: AuditorAccesoCruzado) {}
+
   catch(error: unknown, host: ArgumentsHost): void {
     const res = host.switchToHttp().getResponse<Response>();
     const estado = error instanceof HttpException ? error.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
@@ -53,5 +57,6 @@ export class FiltroErrores implements ExceptionFilter {
       this.log.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
     }
     res.status(estado).json(cuerpo);
+    if (estado === HttpStatus.NOT_FOUND && this.accesoCruzado) this.accesoCruzado.despues(host.switchToHttp().getRequest<Request>());
   }
 }

@@ -6,7 +6,7 @@
 // «Cancelar», «Realizada» y «No asistió». axe WCAG 2.2 A/AA a 390 y 1280 px.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
-import { AJUSTES_AGENDA_POR_DEFECTO, fechaLima, franjasLibres } from '@aptio/schema/agenda';
+import { AJUSTES_AGENDA_POR_DEFECTO, deLima, fechaLima, franjasLibres } from '@aptio/schema/agenda';
 import { type AsesorSim, type CitaSim, reservasSim, type TipoSim } from './agenda-simulada';
 import { simularApi } from './api-simulada';
 
@@ -253,7 +253,11 @@ for (const ancho of [390, 1280]) {
 
 test('PNT-33 · las citas: filtro por estado, «Cancelar» con confirmación, y «Realizada» o «No asistió» solo para las que ya empezaron', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  const pasada = cita(1, new Date(Date.now() - 2 * 3_600_000).toISOString(), { nombre: 'Ana Pérez' });
+  // «Pasada» empezó hoy en Lima (el filtro por defecto es desde hoy): hace 2 h, o a mitad de camino desde la medianoche
+  // de Lima si todavía no pasaron 2 h del día.
+  const ahora = Date.now();
+  const inicioHoy = deLima(fechaLima(new Date(ahora)), '00:00').getTime();
+  const pasada = cita(1, new Date(Math.max(ahora - 2 * 3_600_000, inicioHoy + (ahora - inicioHoy) / 2)).toISOString(), { nombre: 'Ana Pérez' });
   const otraPasada = cita(2, new Date(Date.now() - 26 * 3_600_000).toISOString(), { nombre: 'Jorge Salas' });
   const futura = cita(3, franjas()[0]!.inicio, { nombre: 'Rosa Quispe' });
   const cancelada = cita(4, franjas()[1]!.inicio, { nombre: 'Pedro Ruiz', estado: 'cancelada', canceladaPor: 'visitante' });

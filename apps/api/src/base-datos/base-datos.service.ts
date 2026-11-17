@@ -5,6 +5,13 @@ import { prisma, type PrismaClient } from '@aptio/db';
 @Injectable()
 export class BaseDatosService implements OnModuleDestroy {
   readonly cliente: PrismaClient = prisma;
+  /** Escrituras que siguen después de responder (HU-1701, auditoría del acceso cruzado); se esperan al cerrar. */
+  private readonly pendientes = new Set<Promise<unknown>>();
+
+  enSegundoPlano(tarea: Promise<unknown>): void {
+    const p = tarea.catch(() => undefined).finally(() => this.pendientes.delete(p));
+    this.pendientes.add(p);
+  }
 
   /** true si la base responde a una consulta mínima. */
   async disponible(): Promise<boolean> {
@@ -17,6 +24,7 @@ export class BaseDatosService implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    await Promise.allSettled([...this.pendientes]);
     await this.cliente.$disconnect();
   }
 }

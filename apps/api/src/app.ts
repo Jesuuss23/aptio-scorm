@@ -4,6 +4,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
+import { BaseDatosService } from './base-datos/base-datos.service.js';
+import { AuditorAccesoCruzado } from './comun/acceso-cruzado.js';
 import { FiltroErrores } from './comun/filtro-errores.js';
 
 export const PREFIJO = 'api/v1';
@@ -32,7 +34,15 @@ export function configurarApp(app: INestApplication): INestApplication {
       errorHttpStatusCode: HttpStatus.UNPROCESSABLE_ENTITY,
     }),
   );
-  app.useGlobalFilters(new FiltroErrores());
+  // HU-1701 · El 404 de un recurso de otra organización queda en la auditoría de plataforma (CP-139).
+  // Una app de prueba sin base de datos (o con la base simulada) queda sin auditor.
+  let bd: BaseDatosService | undefined;
+  try {
+    bd = app.get(BaseDatosService, { strict: false });
+  } catch {
+    bd = undefined;
+  }
+  app.useGlobalFilters(new FiltroErrores(bd?.cliente && bd.enSegundoPlano ? new AuditorAccesoCruzado(bd.cliente, (t) => bd.enSegundoPlano(t)) : undefined));
 
   const config = new DocumentBuilder()
     .setTitle('Aptio SCORM · API')

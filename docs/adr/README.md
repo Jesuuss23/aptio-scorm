@@ -13,7 +13,7 @@
 | ADR-009 | Nube, ingreso con correo y clave (Google opcional) y documentos cifrados | Aceptada (proveedor de nube por confirmar) |
 | ADR-010 | Proveedores de IA solo con licencia comercial y planes de pago | Aceptada |
 | ADR-011 | Sitio comercial administrable desde un panel superadmin | Aceptada (2026-11-13) |
-| ADR-012 | Multi-organización, planes y facturación electrónica (reemplaza la decisión 13 de `CLAUDE.md`) | Propuesta (se decide antes del S13) |
+| ADR-012 | Multi-organización, planes y facturación electrónica (reemplaza la decisión 13 de `CLAUDE.md`) | Aceptada (2026-11-17) |
 
 ---
 
@@ -154,3 +154,4 @@
   - Módulo M18, épica E17, sprints S13 y S14.
   - Migración de todas las tablas con `organizacionId` (HU-1701), antes de cualquier venta.
   - La tasa y el umbral de detracción se validan con el contador antes de producción.
+- **Estado:** aceptada el 2026-11-17 para empezar el S13 con la HU-1701. Los datos ya vivían por organización desde el S0; la HU-1701 asegura la organización base AulasEducativas con una migración idempotente y audita el acceso cruzado. Los precios de los planes (DA-12) siguen como supuesto para la HU-1702 y la tasa y el umbral de detracción, para la HU-1707 (SUP-277).
