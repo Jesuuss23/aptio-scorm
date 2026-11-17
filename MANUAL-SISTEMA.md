@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.81 · actualizado con la segunda entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.82 · actualizado con la tercera entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -620,6 +620,15 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Consola:** `GET /organizacion/cobranza` da a todo usuario de la organización el estado para el aviso global (PNT-36). El ADMINISTRADOR paga con `POST /organizacion/suscripcion/renovacion/pago`, `…/pago-prueba` y `…/token` (RENOVACION_PAGO_INICIADO). El SUPERADMIN tiene `GET /ventas/suscripciones` (filtro por estado) y `POST /ventas/suscripciones/{id}/reintentar` (202, encola un intento fuera del calendario; RENOVACION_REINTENTO_PEDIDO).
 - **Fuera de alcance:** los medios de pago guardados de Stripe y Culqi (HU-1711), el aviso por WhatsApp (SUP-320) y el aviso de 30 días por cambio de precio (RN-18-2).
 
+### 3.40 Cupones y convenios (HU-1709)
+
+- **Cupón (REQ-089):** de campaña o convenio, con código único en mayúsculas, porcentaje de 1 a 100, pagos con descuento (contando el alta; vacío = permanente), vigencia por días de Lima, límite de usos, planes permitidos (vacío = todos con tarifa) y, en un convenio, dominios de correo (también subdominios). Ocultar (`visible: false`) lo retira del pago sin borrar sus usos; no hay DELETE.
+- **Aplicación (CP-151):** `aplicarCupon` de `@aptio/schema/cupones`, la misma en la vista previa (`POST /publico/checkout/cupon`), en el checkout (revalidado en el servidor) y en la simulación. Rechaza con su motivo (no existe, oculto, aún no vigente, vencido, agotado, no aplica al plan o a un plan a medida, correo fuera del convenio, ya usado por la empresa) y deja el total intacto. El descuento va al céntimo sobre el precio de lista sin IGV del ciclo y la moneda, y el IGV de 18 % sobre la base descontada. Un total de 0 no se cobra en línea (SUP-327).
+- **Uso (SUP-326):** al aprobarse el alta, el webhook bloquea la fila del cupón (`FOR UPDATE`), suma un uso (CUPON_USADO) y guarda en la suscripción el cupón, el porcentaje y las renovaciones con descuento que quedan. Un evento repetido no suma otra vez. Si dos pagos concurren en el último cupo se respetan los dos y queda CUPON_USO_SOBRE_LIMITE.
+- **Renovaciones (SUP-325):** la renovación cobra el precio vigente con el porcentaje mientras queden renovaciones con descuento (o siempre, si es permanente) y, al aprobarse, resta una; un rechazo no consume. La subida de plan prorratea sin descuento y conserva las que quedan (SUP-324).
+- **Consola:** `GET`, `POST` y `PATCH /ventas/cupones` solo para SUPERADMIN, auditados (CUPON_CREADO, CUPON_ACTUALIZADO con los cambios y su valor anterior). La pestaña Cupones de Ventas › Facturación (PNT-37) muestra el beneficio, los usos, la vigencia y el estado.
+- **Fuera de alcance:** descuentos de monto fijo, pruebas gratis, cupones en cápsulas adicionales y en cambios de plan.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -724,6 +733,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-251 a SUP-255:** calendario interno de Aptio con enlace fijo por asesor (Google Calendar, Outlook y WhatsApp después), Lima UTC−5 y todo en UTC, reagendar es cancelar y reservar; feriados calculados y revisados cada año; token de cancelación solo en el correo y la cola, guardado como SHA-256; el lead pasa a Demo al agendar (excepción a SUP-236); límites en memoria, `_agenda.json` 15 s en la CDN, que debe reenviar `/api/v1/publico/citas*` y `POST /s/_cita` (HU-1405).
 - **SUP-314 a SUP-318:** OSE simulado bajo DA-09 y XML sin firma; correlativo bajo bloqueo y número no reutilizado; boleta sin DNI desde S/ 700 por validar; detracción desactivada por validar con el contador; factura o boleta según la solicitud y el RUC.
 - **SUP-319 a SUP-323:** solo la pasarela de pruebas cobra sola la renovación (Stripe y Culqi envían el enlace por correo hasta la HU-1711); WhatsApp pendiente; aviso de 30 días por cambio de precio diferido; calendario en pasos de 24 h desde el fin del período; solo lectura con las excepciones de sesión, exportar y pagar.
+- **SUP-324 a SUP-328:** solo descuentos en porcentaje (sin monto fijo, prueba gratis, cápsulas adicionales ni cambios de plan); descuento al céntimo sobre la lista con IGV sobre la base y los ciclos contando el alta; usos al aprobarse con los dos pagos respetados en el último cupo; un cupón del 100 % no se paga en línea; «ya usado» por correo o RUC, vigencia por días de Lima y límite de la vista previa en memoria.
 - **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
 
 ---
@@ -767,6 +777,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.82 | 2026-11-17 | Cupones y convenios (3.40): el cupón de campaña o convenio, `aplicarCupon` en la vista previa y el checkout con el total intacto al rechazar, el uso al aprobarse con `FOR UPDATE` y la auditoría sobre el límite, el descuento en las renovaciones y la pestaña Cupones del superadmin. |
 | 0.81 | 2026-11-17 | Cobranza y suspensión (3.39): la tarea `renovar-suscripciones` con la renovación idempotente, los intentos de los días 0, 1, 3 y 7, la suspensión al día 10, el pago por el webhook único que reactiva y extiende el período, la guarda de solo lectura, el aviso global y Ventas › Suscripciones con «Reintentar ahora». |
 | 0.80 | 2026-11-17 | Comprobantes electrónicos SUNAT (3.38): la emisión idempotente con el correlativo bajo bloqueo, el XML UBL 2.1 y el PDF en S3, el OSE simulado (DA-09), el correo con los adjuntos, la consola de Facturación, el webhook firmado del OSE y la nota de crédito al reembolsar. |
 | 0.79 | 2026-11-17 | Cambio de plan y cancelación (3.37): el prorrateo por día UTC, la vista previa, la subida pagada por el webhook único con su cobro y comprobante, la bajada programada, la cancelación al fin del período con su tarea retrasada y la cuota 0 de una suscripción cancelada. |

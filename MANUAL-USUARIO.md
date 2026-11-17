@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.81 · actualizado con la segunda entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.82 · actualizado con la tercera entrega del Sprint 14 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1180,6 +1180,27 @@ En **Ventas › Suscripciones** ves el estado de cobro de cada organización: **
 
 **Reintentar ahora** cobra otra vez una renovación pendiente o vencida sin esperar el próximo intento: con la pasarela de pruebas cobra con la tarjeta guardada; con Stripe o Culqi le envía otra vez al administrador el correo con el enlace para pagar. Con **Actualizar** ves el resultado. El reintento queda registrado. Todo se usa con el teclado.
 
+### 8.47 Usar un cupón o un convenio al suscribirte
+
+Si tienes un cupón de una campaña o el código de un convenio, úsalo en el paso **Resumen de tu suscripción** de la página de pago:
+
+1. Escribe el código en **Código de cupón (opcional)**. Da igual si lo escribes en mayúsculas o minúsculas.
+2. Pulsa **Aplicar** (o la tecla Enter).
+3. Si el cupón vale, verás el mensaje «Cupón … aplicado» con el descuento y cuántos pagos lo llevan (por ejemplo, «−20 % en los primeros 3 pagos»). El resumen suma la fila **Descuento**, y el IGV y el total se calculan sobre el precio ya descontado.
+4. Si no vale, el mensaje explica por qué y el total no cambia: el cupón no existe, ya no está disponible, todavía no empieza o ya venció (con la fecha), se agotó, no aplica al plan elegido o tu empresa ya lo usó. Un convenio solo vale con el correo institucional de quien administrará la cuenta: si usaste otro correo, vuelve al paso **Empresa** y cámbialo.
+
+Pulsa **Quitar el cupón** si prefieres pagar sin él. El descuento se mantiene si cambias entre mensual y anual. Si el cupón da descuento en varios pagos, las renovaciones siguientes también lo llevan hasta completar esos pagos; si dice «en cada pago», lo lleva siempre. En **Plan y suscripción** ves el descuento que te queda. Un pago rechazado no gasta un pago con descuento. Al subir de plan, la diferencia se cobra sin descuento, y el descuento sigue en las renovaciones que te queden. Todo se usa con el teclado y el mensaje lo lee el lector de pantalla.
+
+### 8.48 Cupones y convenios (superadmin)
+
+En **Ventas › Facturación**, la pestaña **Cupones** lista los cupones de campaña y los convenios con su beneficio, cuántas veces se usó (y el límite), la vigencia y su estado: **Activo**, **Programado** (todavía no empieza), **Vencido**, **Agotado** u **Oculto**. Un uso cuenta cuando el pago del alta se aprueba.
+
+- **Nuevo cupón:** escribe el código (letras, números y guiones; se guarda en mayúsculas), el nombre, el tipo (**Campaña** o **Convenio**), el **Descuento (%)** de 1 a 100 y, si quieres, los **Pagos con descuento** (contando el primero; vacío es en cada pago), **Vigente desde** y **Vence** (vale todo ese día, hora de Lima), el **Límite de usos** y los **Planes** a los que aplica (vacío es todos los planes con precio). Un convenio pide los **Dominios de correo**, por ejemplo pucp.edu.pe; vale también un subdominio. Pulsa **Crear el cupón**; si falta algo, se indica qué corregir.
+- **Editar:** cambia lo que necesites y pulsa **Guardar el cupón**. Si ya se usó, los cambios rigen para los pagos nuevos: quienes ya lo usaron conservan su descuento.
+- **Ocultar** y **Activar:** ocultar no borra el cupón ni sus usos, solo deja de aceptarse en el pago. Activar lo devuelve al pago.
+
+Los descuentos son siempre en porcentaje: por ahora no hay descuentos por un monto fijo, ni pruebas gratis, ni cupones para cápsulas adicionales o cambios de plan. Un cupón del 100 % no se puede pagar en línea. Todo queda registrado y se usa con el teclado.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1271,6 +1292,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.82 | 2026-11-17 | Cupones y convenios: el «Código de cupón» con «Aplicar» y «Quitar el cupón» en el pago, con el descuento en el resumen y el motivo si no vale (8.47); la pestaña Cupones de Ventas › Facturación para crear, editar, ocultar y activar, con los usos y el estado (8.48). |
 | 0.81 | 2026-11-17 | Pago de la renovación (8.45): el aviso «Falta el pago de la renovación» con la fecha límite, la cuenta en solo lectura a los 10 días (ver y descargar, sin generar ni editar), «Cómo regularizar» y «Pagar ahora» en Plan y suscripción; Ventas › Suscripciones con el filtro y «Reintentar ahora» (8.46). |
 | 0.80 | 2026-11-17 | Facturación (8.44): los comprobantes de cada pago con su estado SUNAT, la descarga del PDF y el XML, «Corregir y reenviar» un observado y los datos fiscales con la detracción por validar con el contador. El pago ya envía el comprobante por correo (8.40). |
 | 0.79 | 2026-11-17 | Plan y suscripción (8.43): subir de plan pagando solo la diferencia por los días que faltan, bajar de plan desde la renovación, cancelar al fin del período sin devolución y «Seguir con mi plan». |
