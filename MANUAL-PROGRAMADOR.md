@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.76 · actualizado con la tercera entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.77 · actualizado con la cuarta entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -120,6 +120,13 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
   - **API:** `ResumenService` (`resumen()` con `Promise.all` sobre `SitioVisitaDia`, `Lead` y `AgendaCita`; `registrar()` con el límite por IP en memoria y un `INSERT … ON CONFLICT` con `$executeRaw`), `ResumenController` (`GET /sitio/resumen`, solo SUPERADMIN) y `VisitasPublicoController` (`POST /s/_visita`, excluido del prefijo en `app.ts`).
   - **Web:** `vistas/SitioResumen.tsx` en `/sitio`, `api.resumenSitio(periodo)` y la simulación de `/sitio/resumen` y `POST /s/_visita` en `e2e/api-simulada.ts` (`visitasSitio`, `visitasRecibidasSim`).
   - **Pruebas:** `packages/schema/test/resumen-sitio.test.ts`, `packages/sitio/test/visitas.test.ts`, `apps/api/test/sitio-resumen.casos.ts` y `apps/web/e2e/sitio-resumen.spec.ts`; `scripts/lighthouse.ts` responde 204 a la visita.
+- **Pasarelas (HU-1704, REQ-084, REQ-110, CP-144, CP-145):**
+  - **Modelo:** migración `20261117080000_pasarelas` con `Cobro` (`eventoPagoId` único, FK a la solicitud `RESTRICT` y a la suscripción `SET NULL`), `PasarelaConfig` y los precios USD de `Plan`. Una prueba que borra solicitudes tiene que borrar antes sus cobros.
+  - **Reglas:** `@aptio/schema/pasarelas` (`CATALOGO_PASARELAS`, `PASARELAS_POR_DEFECTO`, `validarCambioPasarela`, `validarOrdenPasarelas`, `completarPasarelas`, `elegirPasarela`, `monedasConPasarela`); `@aptio/schema/suscripciones` suma `MONEDAS`, `monedasDelPlan`, `monto2` y `centimos`, y `resumenCheckout` recibe la moneda; `PASARELA_PRUEBA` vale `'pruebas'`.
+  - **API:** `apps/api/src/ventas/pasarelas/` con el contrato (`contrato.ts`) y un adaptador por pasarela (`pruebas.ts`, `stripe.ts`, `culqi.ts`, con sus funciones puras de firma y lectura). `PasarelasService` las registra y elige; `reemplazar(adaptador)` permite simular una pasarela en las pruebas e2e. `CobrosService` lista y reembolsa. Para agregar una pasarela: su código en `CODIGOS_PASARELA` y `CATALOGO_PASARELAS`, un adaptador con el contrato y su registro en `PasarelasService`.
+  - **Colas:** `COLA_COMPROBANTES`, `TAREA_EMITIR_COMPROBANTE` y `opcionesTareaComprobante(cobroId)` en `@aptio/colas` (sin worker hasta la HU-1707).
+  - **Sitio y web:** `politicaContenido(cookies, { pago })` y `CSP_CULQI` en `packages/sitio/src/servir.ts`; `pago.ts` con el selector de moneda y el paso 3 por tipo de pago. La vista `VentasPasarelas.tsx`; simulación en `e2e/pasarelas-simuladas.ts`.
+  - **Pruebas:** `apps/api/test/pasarelas.test.ts` (firmas y lectura de las tres pasarelas), `apps/api/test/pasarelas.casos.ts` (al final de `sitio.e2e.test.ts`), `packages/schema/test/pasarelas.test.ts`, `apps/web/e2e/ventas-pasarelas.spec.ts` y los casos USD y Stripe de `suscripcion-pago.spec.ts`.
 - **Suscripciones (HU-1703, REQ-083, CP-143, RN-18-2, RN-18-3):**
   - **Modelo:** migración `20261117070000_suscripciones` con `Suscripcion` (`organizacionId` único, `precioPactadoSinIgv`, `solicitudId` único) y `SolicitudSuscripcion` (`eventoPagoId` único, montos `Decimal(10,2)`, `atribucion` JSON con el `EnvioLead`). Las FK a `Plan` son `RESTRICT`: una prueba que borra planes tiene que borrar antes sus solicitudes y suscripciones.
   - **Reglas:** `@aptio/schema/suscripciones` (`rucValido`, `validarEmpresa`, `tipoComprobanteDe`, `resumenCheckout`, `sumarMeses`, `finPeriodo`, `slugOrganizacion`, `leerEventoPrueba`, `soles2`, `TARJETAS_PRUEBA`, `PASARELA_PRUEBA`). `@aptio/schema/planes` suma `RUTA_PAGO` y `enlacePlan`.
@@ -451,6 +458,8 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `SITIO_URL` | api, worker | Dominio del sitio comercial para el canonical y el sitemap (por defecto `https://aptioscorm.com`, hasta la HU-1509) |
 | `SITIO_BASE` | api, worker | Base de las rutas del sitio pre-renderizado (por defecto `/s`; vacío en producción detrás de la CDN, HU-1508) |
 | `SITIO_ENTORNO` | api, worker | `pruebas` o `produccion` (por defecto). En producción, los datos ficticios visibles bloquean publicar (HU-1505) |
+| `STRIPE_LLAVE_SECRETA_PRUEBAS`, `STRIPE_SECRETO_WEBHOOK_PRUEBAS` (y `_PRODUCCION`) | api | Stripe (HU-1704), según el modo de la pasarela |
+| `CULQI_LLAVE_PUBLICA_PRUEBAS`, `CULQI_LLAVE_SECRETA_PRUEBAS`, `CULQI_SECRETO_WEBHOOK_PRUEBAS` (y `_PRODUCCION`) | api | Culqi (HU-1704), según el modo de la pasarela |
 | `PAGO_PRUEBA_SECRETO` | api | Secreto HMAC de la pasarela de pruebas (HU-1703); solo se usa con `SITIO_ENTORNO=pruebas` (sin la variable, un secreto local fijo) |
 | `PG_BIN_DIR` | worker, `respaldo:restaurar` | Carpeta de `pg_dump` y `pg_restore` de la versión del servidor (en CI, `/usr/lib/postgresql/16/bin`) |
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
@@ -519,6 +528,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.77 | 2026-11-17 | HU-1704: migración `20261117080000_pasarelas`, `@aptio/schema/pasarelas`, los adaptadores de pruebas, Culqi y Stripe con su contrato, el webhook único, `CobrosService` y el reembolso, la cola `comprobantes`, el selector de moneda de `/pago`, la vista Ventas › Pasarelas y las variables de Stripe y Culqi. |
 | 0.76 | 2026-11-17 | HU-1703: migración `20261117070000_suscripciones`, `@aptio/schema/suscripciones`, el checkout y el webhook firmado de la API con el cuerpo crudo, la cola `suscripciones` del worker, la página `/pago` con `_checkout.js` y sus pruebas, y la variable `PAGO_PRUEBA_SECRETO`. |
 | 0.75 | 2026-11-17 | HU-1702: migración `20261117060000_planes`, `@aptio/schema/planes`, el módulo `ventas` de la API, los bloques de planes del sitio, Ventas › Planes y sus pruebas. |
 | 0.74 | 2026-11-17 | HU-1701: migración `20261117050000_organizacion_base`, `@aptio/db/organizaciones` con `verificar-organizaciones`, `AuditorAccesoCruzado` en el filtro de errores y las pruebas CP-139 y CP-140. |

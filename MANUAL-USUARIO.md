@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.76 · actualizado con la tercera entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.77 · actualizado con la cuarta entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1089,14 +1089,32 @@ En **Ventas › Planes** decides qué planes ve el visitante en la página **Pre
 En **Precios**, el botón de un plan con precio (por ejemplo, **Suscribirme**) abre la página **Suscríbete a Aptio SCORM**, que se completa en tres pasos. Todo se puede hacer con el teclado y con un lector de pantalla; los errores se nombran arriba y junto a cada campo.
 
 1. **Empresa.** Escribe la razón social (o tu nombre), el RUC si quieres factura, el nombre y el correo de quien administrará la cuenta, y marca la casilla de los términos y del tratamiento de datos personales. Con RUC se emite **factura**; sin RUC, **boleta de venta**. Si el RUC no es válido, la página lo dice antes de seguir.
-2. **Resumen.** Elige **Mensual** o **Anual** (si la página de precios muestra la opción anual) y revisa el subtotal, el IGV de 18 %, el comprobante y el **Total a pagar**. Con **Volver** cambias los datos.
-3. **Pago.** Escribe la tarjeta y pulsa **Pagar**. Si el pago se rechaza, la página lo avisa y te deja intentarlo de nuevo desde el resumen.
+2. **Resumen.** Si el plan también se vende en dólares, elige **Soles (S/)** o **Dólares (US$)**; si no, el pago es en soles y no aparece la opción. Elige **Mensual** o **Anual** (si la página de precios muestra la opción anual) y revisa el subtotal, el IGV de 18 %, el comprobante y el **Total a pagar**. Con **Volver** cambias los datos.
+3. **Pago.** Según la pasarela que cobre esa moneda:
+   - **Pagar con Stripe** (dólares) te lleva a la página de pago segura de la pasarela; al pagar vuelves solo y la página espera la confirmación. Si cancelas allá, vuelves al pago con un aviso y puedes intentarlo de nuevo.
+   - **Pagar con Culqi** (soles) abre la ventana de pago de la pasarela sobre la página.
+   - En el sitio de pruebas, escribe la tarjeta y pulsa **Pagar**.
+
+   La tarjeta nunca se escribe en Aptio SCORM: la recibe la pasarela. Si el pago se rechaza, la página lo avisa y te deja intentarlo de nuevo desde el resumen.
 
 **Al terminar.** La página dice **Tu suscripción está activa**, con el plan, el total y hasta cuándo está pagado. Al correo del administrador llega la bienvenida con un enlace para crear su clave (vale 72 horas; si vence, usa **¿Olvidaste tu clave?** con el mismo correo). La cuenta de la empresa empieza vacía y esa persona es su administrador. En **Captación › Leads y CRM** aparece el contacto con origen **Suscripción** y en la etapa **Ganado**.
 
 **Si el correo ya tiene una cuenta,** la página pide iniciar sesión o usar otro correo. **Si el plan es a medida** o no está publicado, la página ofrece ver los planes o agendar una demo.
 
-**Mientras no haya pago en línea.** En el sitio de producción el pago con tarjeta todavía no está disponible: en el paso 3 la página lo dice y ofrece **Agendar una demo** con el plan elegido. En el sitio de pruebas hay una pasarela de pruebas que no cobra nada: la tarjeta 4111 1111 1111 1111 aprueba y la 4000 0000 0000 0002 rechaza. El comprobante electrónico todavía no se emite: llegará con la facturación.
+**Si no hay pago en línea.** Si ninguna pasarela está activa para esa moneda, en el paso 3 la página lo dice y ofrece **Agendar una demo** con el plan elegido. En el sitio de pruebas hay una pasarela de pruebas que no cobra nada: la tarjeta 4111 1111 1111 1111 aprueba y la 4000 0000 0000 0002 rechaza. El comprobante electrónico todavía no se emite: llegará con la facturación.
+
+### 8.41 Pasarelas de pago (superadmin)
+
+En **Ventas › Pasarelas** decides con qué se cobra en la página de pago. Hay tres: la **pasarela de pruebas** (solo en el sitio de pruebas, no cobra), **Culqi** (soles) y **Stripe** (dólares). En cada moneda cobra la primera pasarela que esté visible y activa, en el orden de la lista.
+
+- **Activa o Sin llaves.** Una pasarela está activa cuando el equipo técnico configuró sus llaves en el servidor. Las llaves nunca se escriben ni se ven aquí: si faltan, la tarjeta dice qué datos pedirle al equipo técnico.
+- **Mostrar en el pago.** El interruptor ofrece u oculta la pasarela en la página de pago al instante. Si ocultas la única que cobra en dólares, la página deja de ofrecer dólares.
+- **Nombre visible y Modo.** Cambia el nombre que ve el cliente y elige **Pruebas (sandbox)** o **Producción**; pulsa **Guardar**.
+- **Orden.** Con las flechas ↑ y ↓ cambias qué pasarela va primero.
+
+**Pagos aprobados sin cuenta.** Si la pasarela aprobó un pago pero no se pudo crear la cuenta (por ejemplo, el correo ya tenía cuenta o el monto no coincidía), el pago aparece en esta tabla con el motivo. Revísalo y pulsa **Reembolsar**, y confirma con **Sí, reembolsar**: la pasarela devuelve el dinero y el pago queda como reembolsado. Si la pasarela no responde, se avisa y el pago sigue sin reembolsar para que lo intentes de nuevo.
+
+**Precios en dólares.** En **Ventas › Planes** cada plan tiene **Precio al mes en dólares** y **Precio al año en dólares** (opcionales, sin IGV). Si el plan no tiene precio en dólares o Stripe no está activa, solo se cobra en soles.
 
 ## 9. Preguntas frecuentes
 
@@ -1189,6 +1207,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.77 | 2026-11-17 | Pagar en soles o en dólares (8.40): el selector de moneda y el pago con Stripe o Culqi. Pasarelas de pago (8.41): mostrar, nombrar, cambiar de modo y ordenar las pasarelas, reembolsar pagos aprobados sin cuenta y los precios en dólares de los planes. |
 | 0.76 | 2026-11-17 | Suscribirse a un plan (8.40): los tres pasos de la página de pago (empresa con RUC y factura o boleta, resumen mensual o anual con IGV y pago), la confirmación y el correo de bienvenida, y el aviso de agendar una demo mientras no haya pago en línea. |
 | 0.75 | 2026-11-17 | Planes y precios (8.39): una tarjeta por plan con «Mostrar plan», «Destacar como Más elegido», precios, características y orden; la página de precios con la opción anual, el descuento y el IGV; los cambios se ven al publicar. |
 | 0.74 | 2026-11-17 | Empresas separadas (sección 2): cada organización ve solo sus datos, un enlace de otra empresa da «no encontrado» y queda registrado, y lo anterior quedó en AulasEducativas. |

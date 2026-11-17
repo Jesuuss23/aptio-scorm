@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.76 · actualizado con la tercera entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.77 · actualizado con la cuarta entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -574,6 +574,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Pasarela de pruebas (SUP-288):** solo con `SITIO_ENTORNO=pruebas`. `POST /publico/checkout/{id}/pago-prueba` firma un evento con `PAGO_PRUEBA_SECRETO` y lo procesa como el webhook (4111 1111 1111 1111 aprueba; 4000 0000 0000 0002 rechaza). En producción no existe y el paso 3 ofrece agendar una demo hasta la HU-1704.
 - **Fuera de alcance:** pasarelas reales (HU-1704), emisión del comprobante SUNAT (HU-1707), cuotas (HU-1705) y la vista Ventas › Suscripciones. Un pago aprobado cuyo correo ya tenía cuenta queda sin alta, con SUSCRIPCION_SIN_ALTA, para resolverlo a mano (SUP-291).
 
+### 3.35 Pasarelas de pago y webhooks (HU-1704)
+
+- **Pasarelas (REQ-084):** `PasarelasService` registra tres adaptadores con el mismo contrato (`crearPago`, `verificarFirmaWebhook`, `leerEvento`, `reembolsar`): `pruebas` (PEN y USD, simulada, solo con `SITIO_ENTORNO=pruebas`), `culqi` (PEN, formulario incrustado Culqi Checkout) y `stripe` (USD, Stripe Checkout alojado). `PasarelaConfig` guarda solo nombre, visible, orden y modo (`pruebas` o `produccion`); las llaves viven en variables de entorno por modo y el panel solo muestra cuáles faltan. En cada moneda cobra la primera pasarela visible y activa.
+- **Checkout en dólares:** `Plan` suma `precioMesUsd` y `precioAnualUsd` (enteros sin IGV), que pasan a la versión publicada. `/pago` muestra Soles/Dólares solo si el plan tiene USD y una pasarela de dólares está visible y activa; el resumen suma 18 % de IGV también en USD (SUP-295). Stripe crea la sesión con Idempotency-Key `checkout-<solicitud>` y vuelve a `/pago?plan=&checkout=`; Culqi devuelve un token que va a `POST /publico/checkout/{id}/token` y la API crea el cargo. La CSP de `/pago` admite los orígenes de Culqi (SUP-294).
+- **Webhook único (CP-144, CP-145):** `POST /webhooks/pago/{pruebas|stripe|culqi}` verifica la firma de cada pasarela (`X-Aptio-Firma`, `Stripe-Signature` con 5 minutos de tolerancia, `X-Culqi-Signature`); si no coincide, 401 sin cambios. Los eventos que no son de pago responden `ignorado: true`. Cada pago aprobado crea un `Cobro` (monto, moneda, referencia, 4 últimos dígitos, `eventoPagoId` único, sin datos de tarjeta, REQ-110) y encola «emitir-comprobante» en la cola `comprobantes` con jobId igual al id del cobro; el worker llega con la HU-1707. Monto o moneda distintos, correo con cuenta o solicitud ya cerrada dejan el cobro sin alta.
+- **Reembolso:** `POST /ventas/cobros/{id}/reembolsar` (SUPERADMIN) pasa el cobro sin alta a REEMBOLSADO de forma condicional y pide la devolución a la pasarela (Idempotency-Key `reembolso-<cobro>`); si falla, vuelve a APROBADO, responde 502 y audita COBRO_REEMBOLSO_FALLIDO.
+- **Fuera de alcance:** emisión SUNAT y notas de crédito (HU-1707), cuotas (HU-1705), cancelación con devolución (HU-1706). Culqi está sin probar en su sandbox (SUP-294).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -620,6 +628,8 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | Boca (etapa 7) | Rhubarb Lip Sync 1.13 (MIT), local en el worker, con ffmpeg | Marcas por letras, sin costo | Integrado y probado en local con un MP3. Falta PT-01 con voz real e instalarlo en la imagen del worker (HU-1405). |
 | Voz (muestra y etapa 6) | Google Text-to-Speech (voces GA) | Silencio WAV de 65 ms por carácter, sin costo | Integrado. Sin probar con una clave real; tarifa supuesta de 16 USD por millón de caracteres (Neural2) y 30 USD (Chirp 3 HD), por confirmar (SUP-34). ElevenLabs desde HU-1304 (`eleven_multilingual_v2`), probado con `fetch` simulado y tarifa supuesta de 200 USD por millón de caracteres (SUP-147). Azure todavía no. |
 | Correo | SMTP (Mailpit en local) | — | Integrado. |
+| Pagos en dólares | Stripe Checkout y Refunds | Pasarela de pruebas (solo con `SITIO_ENTORNO=pruebas`) | Integrado con firma y reembolso; sin probar con llaves reales. |
+| Pagos en soles | Culqi Checkout, Charges y Refunds | Pasarela de pruebas | Integrado según la documentación pública; firma y eventos por confirmar en su sandbox (SUP-294). |
 
 Las licencias, el uso comercial y el tratamiento de datos de cada proveedor están en `docs/19-proveedores-y-licencias.md` (ADR-010). `PROVEEDORES_MODO` (`simulado` o `real`) elige el modo. En modo real sin clave, la transcripción falla con un motivo en vez de inventar texto.
 
@@ -717,6 +727,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.77 | 2026-11-17 | Pasarelas de pago y webhooks (3.35): Culqi, Stripe y la de pruebas con el mismo contrato, el checkout en dólares, el webhook único con firma por pasarela, el `Cobro` con su tarea de comprobante y el reembolso auditado; proveedores de pago en la sección 6. |
 | 0.76 | 2026-11-17 | Alta de suscripción (3.34): la página `/pago`, `POST /publico/checkout`, el webhook firmado e idempotente, la transacción del alta, la cola `suscripciones`, la pasarela de pruebas y las tablas `Suscripcion` y `SolicitudSuscripcion`. |
 | 0.75 | 2026-11-17 | Planes administrables (3.33): planes en la versión publicada, `GET /publico/planes/{slug}`, bloqueo por planes ficticios en producción y las tablas `Plan` y `PlanesAjustes`. |
 | 0.74 | 2026-11-17 | Organizaciones aisladas (3.32): 404 igual al de un id inexistente, `ACCESO_OTRA_ORGANIZACION` en la auditoría de plataforma, la migración de la organización base y `verificar-organizaciones`. |
