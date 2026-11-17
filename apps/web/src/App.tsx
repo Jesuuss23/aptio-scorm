@@ -27,6 +27,7 @@ import { SitioAjustes } from './vistas/SitioAjustes';
 import { SitioBlog } from './vistas/SitioBlog';
 import { SitioSeo } from './vistas/SitioSeo';
 import { SitioSeoIa } from './vistas/SitioSeoIa';
+import { CaptacionAgendamiento } from './vistas/CaptacionAgendamiento';
 import { CaptacionLeads } from './vistas/CaptacionLeads';
 import { CaptacionPopups } from './vistas/CaptacionPopups';
 import { SitioContenido } from './vistas/SitioContenido';
@@ -146,6 +147,8 @@ export function App() {
         <SitioSeoIa />
       ) : vista?.activo === '/captacion/popups' && veSitio ? (
         <CaptacionPopups />
+      ) : vista?.activo === '/captacion/agendamiento' && veSitio ? (
+        <CaptacionAgendamiento />
       ) : vista?.activo === '/captacion/leads' && veSitio ? (
         <CaptacionLeads />
       ) : vista?.activo === '/sitio/ajustes' && veSitio ? (

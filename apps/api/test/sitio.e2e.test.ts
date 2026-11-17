@@ -1068,3 +1068,4 @@ await import('./sitio-seo-ia.casos.js');
 await import('./leads.casos.js');
 await import('./crm.casos.js');
 await import('./popups.casos.js');
+await import('./agenda.casos.js');
