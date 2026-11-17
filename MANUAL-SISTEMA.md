@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.74 · actualizado con la primera entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.75 · actualizado con la segunda entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -559,6 +559,14 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Auditoría (CP-139):** después de responder un 404 a un usuario con organización, el filtro global de errores busca los UUID de la ruta en las tablas de las organizaciones. Si alguno es de otra, registra `ACCESO_OTRA_ORGANIZACION` en la auditoría de plataforma (`organizacionId` null, solo el superadmin) con el usuario, su rol, la organización de origen y la propietaria, el método, la ruta y los recursos. Se escribe después de responder para que el tiempo no delate el id; si falla, solo queda en el log (SUP-276, SUP-279).
 - **Migración (CP-140):** `20261117050000_organizacion_base` crea «AulasEducativas» si falta y no cambia nada si ya existe. Tras `migrate deploy`, `pnpm --filter @aptio/db verificar-organizaciones` cuenta las filas por organización y revisa huérfanas y cruces; sale con 0 si todo está íntegro, 1 si no y 2 si no llega a la base (SUP-275, SUP-280).
 
+### 3.33 Planes administrables (HU-1702)
+
+- **Planes (REQ-082, PNT-35):** el superadmin crea, edita, ordena, oculta y destaca los planes en Ventas › Planes (`/ventas/planes`). Los planes no se borran y su identificador no cambia; un solo plan destacado a la vez. Precios en soles enteros sin IGV; el precio anual es el propio o el mensual × 12 con el descuento anual; el IGV (18 %) se suma solo al mostrarlo si los ajustes lo piden (SUP-281, SUP-286).
+- **Publicación (CP-141, CP-142):** los planes visibles y los ajustes viajan en la versión publicada del sitio cuando alguna página publicada muestra un bloque de planes. /precios y `GET /api/v1/publico/planes/{slug}` leen esa versión: un cambio de precio se ve al publicar y un plan oculto da 404 (SUP-283, SUP-287).
+- **Ficticios:** en producción un plan ficticio visible bloquea publicar si una página publicada muestra los planes, y nunca sale al público; la semilla carga los 3 planes del prototipo como ficticios hasta validar los precios (DA-12).
+- **Sitio:** los bloques salen en HTML estático, sin JavaScript (CLS 0). El botón de cada plan lleva a `/agendar-demo?plan=` hasta el pago de la HU-1703 (SUP-284).
+- **Auditoría:** PLAN_CREADO, PLAN_EDITADO (con el precio al mes de antes y de después), PLAN_ORDEN_CAMBIADO y PLAN_AJUSTES_ACTUALIZADOS, en la auditoría de plataforma.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -566,6 +574,7 @@ El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/s
 | Entidad | Contenido |
 | --- | --- |
 | `Organizacion` | Inquilino: todo dato raíz lleva `organizacionId` (ADR-012) |
+| `Plan`, `PlanesAjustes` | Planes de la página de precios (slug fijo, precios en soles sin IGV, características, visible, destacado, orden, ficticio) y los ajustes de la página (opción anual, descuento, IGV); de plataforma, sin organización (HU-1702) |
 | `Usuario`, `TokenAcceso` | Personas, rol, clave (argon2id), versión de sesión, y tokens de invitación y recuperación (guardados como hash) |
 | `Cliente`, `KitMarca`, `PantallaModelo`, `GlosarioTermino`, `PronunciacionTermino` | Clientes y su identidad visual y de voz |
 | `Proyecto` | Un SCORM: cliente, estado, parámetros y datos técnicos opcionales |
@@ -700,6 +709,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.75 | 2026-11-17 | Planes administrables (3.33): planes en la versión publicada, `GET /publico/planes/{slug}`, bloqueo por planes ficticios en producción y las tablas `Plan` y `PlanesAjustes`. |
 | 0.74 | 2026-11-17 | Organizaciones aisladas (3.32): 404 igual al de un id inexistente, `ACCESO_OTRA_ORGANIZACION` en la auditoría de plataforma, la migración de la organización base y `verificar-organizaciones`. |
 | 0.73 | 2026-11-17 | Resumen del sitio (3.31): `SitioVisitaDia` y el contador anónimo `_visita.js` con `POST /s/_visita`, y `GET /sitio/resumen` con sus indicadores, serie, origen, páginas y demos. |
 | 0.72 | 2026-11-17 | Consentimiento de cookies (3.30): ajustes del aviso sin migración, `_cookies.js` con la decisión en `localStorage` por 12 meses, la CSP por etiquetas publicadas y el retiro del consentimiento. |

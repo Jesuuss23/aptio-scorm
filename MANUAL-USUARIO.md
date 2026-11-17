@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.74 · actualizado con la primera entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.75 · actualizado con la segunda entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1061,6 +1061,29 @@ Si la respuesta no está en la base, el asistente dice que no lo sabe y ofrece *
 
 **Lo que ve el visitante.** Un botón abajo a la derecha (encima del de WhatsApp) abre el chat, en todas las páginas menos las de pago. Puede escribir su pregunta o pulsar una respuesta rápida. Con **Agendar demo** elige un horario y deja sus datos sin salir del chat; la cita aparece en **Agendamiento** y el lead entra a **Leads y CRM** con vía «Chatbot» y en la etapa **Demo**. Con **Hablar con una persona**, dentro del horario ve el botón de WhatsApp y siempre puede dejar su correo y su pregunta; fuera del horario se le avisa que le responderán el siguiente día hábil. La conversación sigue si cambia de página, y se cierra con **Escape** o con el botón de cerrar. Todo funciona con el teclado.
 
+### 8.39 Planes y precios (solo superadmin)
+
+En **Ventas › Planes** decides qué planes ve el visitante en la página **Precios** del sitio, con qué precio y qué incluye cada uno.
+
+**Cada plan es una tarjeta.** Arriba, su nombre y unas etiquetas: **Más elegido**, **Ficticio** u **Oculto**. Debajo, una línea con el precio tal como lo verá el visitante (por ejemplo, «S/ 490 al mes + IGV · S/ 4,704 al año»). En la tarjeta:
+
+- **Mostrar plan** lo pone o lo quita de la página de precios. Los planes no se borran: si ya no lo ofreces, ocúltalo.
+- **Destacar como «Más elegido»** marca el plan recomendado. Solo puede haber uno: al destacar otro, el anterior deja de estarlo.
+- **Nombre**, **Descripción**, **Precio al mes**, **Precio al año**, **Cápsula adicional**, **Cápsulas al mes**, **Usuarios** y **Texto del botón**. Los precios van en soles, sin IGV y sin decimales. Si dejas vacío el precio al año, se calcula con el descuento anual de la página de precios.
+- **Precio a medida** quita el precio: el visitante ve «A medida» y el botón lo lleva a agendar con ventas.
+- **Características:** **Agregar característica**, el interruptor para mostrarla u ocultarla y **×** para quitarla.
+- **Dato ficticio** marca el plan como de ejemplo: en producción nunca se muestra.
+- **↑** y **↓** cambian el orden en la página.
+- **Guardar plan** guarda los campos de la tarjeta. Los interruptores se guardan al tocarlos.
+
+**Nuevo plan.** Escribe el nombre; el identificador se completa solo y va en el enlace del plan, así que después no cambia. El plan nace oculto y sin precio: complétalo y muéstralo cuando esté listo.
+
+**Página de precios.** **Mostrar opción anual** agrega a cada plan la línea «o S/ … al año (ahorras S/ …)». **Descuento anual (%)** vale para los planes sin precio al año propio. **Precios con IGV incluido** muestra los precios con el 18 % de IGV. Pulsa **Guardar ajustes**.
+
+**Publicar.** Lo que cambias aquí se ve en el sitio cuando pulsas **Publicar cambios** (arriba a la derecha). Hasta entonces, la página Precios sigue con lo de antes. Si un plan visible está marcado como ficticio, en producción no se puede publicar: el aviso lo nombra y te trae aquí para ocultarlo o desmarcarlo.
+
+**Lo que ve el visitante.** En **Precios** (y en el resumen de planes del inicio, si la página lo tiene), cada plan con su precio al mes o «A medida», la línea anual si la activaste, sus características visibles y la etiqueta **Más elegido** en el destacado. Por ahora el botón de cada plan lleva a **Agendar demo**; más adelante llevará al pago. Si cambias un precio, las suscripciones que ya existan conservarán el suyo.
+
 ## 9. Preguntas frecuentes
 
 **¿Qué ve el participante si cierra el curso a medias y vuelve?**
@@ -1152,6 +1175,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.75 | 2026-11-17 | Planes y precios (8.39): una tarjeta por plan con «Mostrar plan», «Destacar como Más elegido», precios, características y orden; la página de precios con la opción anual, el descuento y el IGV; los cambios se ven al publicar. |
 | 0.74 | 2026-11-17 | Empresas separadas (sección 2): cada organización ve solo sus datos, un enlace de otra empresa da «no encontrado» y queda registrado, y lo anterior quedó en AulasEducativas. |
 | 0.73 | 2026-11-17 | Resumen del sitio (8.28): período de 7 días, 30 días o trimestre, los cuatro indicadores con su variación, el gráfico de visitas y conversiones con su tabla, el origen de los leads, las páginas con más conversiones y las próximas demos. |
 | 0.72 | 2026-11-17 | Consentimiento de cookies (8.29): la tarjeta Privacidad con «Mostrar banner de cookies» y «Pedir de nuevo el consentimiento», la analítica que se activa solo con el permiso del visitante y lo que ve el visitante (aviso, preferencias y «Configurar cookies» en el pie). |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.74 · actualizado con la primera entrega del Sprint 13 (17 de noviembre de 2026)**
+**Versión 0.75 · actualizado con la segunda entrega del Sprint 13 (17 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -120,6 +120,13 @@ Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000
   - **API:** `ResumenService` (`resumen()` con `Promise.all` sobre `SitioVisitaDia`, `Lead` y `AgendaCita`; `registrar()` con el límite por IP en memoria y un `INSERT … ON CONFLICT` con `$executeRaw`), `ResumenController` (`GET /sitio/resumen`, solo SUPERADMIN) y `VisitasPublicoController` (`POST /s/_visita`, excluido del prefijo en `app.ts`).
   - **Web:** `vistas/SitioResumen.tsx` en `/sitio`, `api.resumenSitio(periodo)` y la simulación de `/sitio/resumen` y `POST /s/_visita` en `e2e/api-simulada.ts` (`visitasSitio`, `visitasRecibidasSim`).
   - **Pruebas:** `packages/schema/test/resumen-sitio.test.ts`, `packages/sitio/test/visitas.test.ts`, `apps/api/test/sitio-resumen.casos.ts` y `apps/web/e2e/sitio-resumen.spec.ts`; `scripts/lighthouse.ts` responde 204 a la visita.
+- **Planes (HU-1702, REQ-082, PNT-35, CP-141, CP-142):**
+  - **Modelo:** migración `20261117060000_planes` con `Plan` y `PlanesAjustes` (registro único `ID_PLANES_AJUSTES = 'planes'`, exportado por `@aptio/db`). La semilla hace upsert por slug de `PLANES_DE_EJEMPLO` con `ficticio: true`.
+  - **Reglas:** `@aptio/schema/planes` (`validarPlan(v, { parcial })`, `validarPlanCompleto`, `validarAjustesPlanes`, `precioAnualDe`, `ahorroAnualDe`, `conIgv`, `soles`, `planesPublicos`, `RUTA_AGENDAR_PLAN`). En `sitio-versiones`, `Instantanea.planes` lo arma `armarPlanes` solo si `muestraPlanes(paginas)`; `planesServidos(inst, entorno)` es lo que se sirve (sin ficticios en producción); `ficticiosDeInstantanea` suma los planes.
+  - **API:** `apps/api/src/ventas/` (`VentasModule`): `PlanesController` (`@Roles('SUPERADMIN')`) y `PlanesPublicoController` (`@Publico()`, `GET /publico/planes/:slug` desde `ultimaVersion`). `VersionesService.revisarFicticios` suma los planes ficticios visibles si hay bloques `planes` o `precios` visibles en páginas publicadas.
+  - **Sitio:** `packages/sitio/src/planes.ts` (`SeccionPlanes`, `CSS_PLANES`, `TEXTOS_PLANES`), con los casos `planes` y `precios` en `render.ts`; `instantaneaDeEjemplo(entorno, { planes: true })` suma /precios, que mide `scripts/lighthouse.ts`.
+  - **Web:** `vistas/VentasPlanes.tsx`, el grupo «Ventas» del menú (superadmin), `api.planes()`, `crearPlan`, `cambiarPlan`, `ordenarPlanes` y `guardarAjustesPlanes`; la simulación en `e2e/planes-simulados.ts` (`planesSitio` en `simularApi`).
+  - **Pruebas:** `packages/schema/test/planes.test.ts`, `packages/sitio/test/planes.test.ts`, `apps/api/test/planes.casos.ts` (cargado al final de `sitio.e2e.test.ts`; respalda y repone los planes, que son globales) y `apps/web/e2e/ventas-planes.spec.ts`.
 - **Organizaciones (HU-1701, REQ-081, CP-139, CP-140, ADR-012):**
   - **Modelo:** sin tablas nuevas. La migración `20261117050000_organizacion_base` es un `INSERT … ON CONFLICT ("slug") DO NOTHING` que crea «AulasEducativas» (`aulas-educativas`) si falta; es idempotente.
   - **`@aptio/db`:** `src/organizaciones.ts` exporta `TABLAS_ORGANIZACION` (13 tablas raíz y si su `organizacionId` es opcional), `verificarOrganizaciones(bd)` (`{ conteos, inconsistencias, integra }`) y `organizacionDeIds(bd, ids)` (entidad y organización de cada UUID, en raíces e hijas, con un `UNION ALL` por `id = ANY($1::uuid[])`). Todo el SQL usa nombres fijos; los ids van como parámetro.
@@ -503,6 +510,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.75 | 2026-11-17 | HU-1702: migración `20261117060000_planes`, `@aptio/schema/planes`, el módulo `ventas` de la API, los bloques de planes del sitio, Ventas › Planes y sus pruebas. |
 | 0.74 | 2026-11-17 | HU-1701: migración `20261117050000_organizacion_base`, `@aptio/db/organizaciones` con `verificar-organizaciones`, `AuditorAccesoCruzado` en el filtro de errores y las pruebas CP-139 y CP-140. |
 | 0.73 | 2026-11-17 | HU-1607: `SitioVisitaDia` con su migración, `@aptio/schema/resumen-sitio`, `_visita.js`, `POST /s/_visita`, `GET /sitio/resumen`, el Resumen nuevo y sus pruebas. |
 | 0.72 | 2026-11-17 | HU-1606: `@aptio/schema/cookies`, `cookies` en los ajustes y en la versión publicada, `_cookies.js` con el aviso y el diálogo, `politicaContenido` con la CSP por etiquetas, la tarjeta Privacidad y sus pruebas. |
