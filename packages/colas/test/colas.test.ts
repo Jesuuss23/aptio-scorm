@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLAS, esCola, leerEvento, opcionesRedis } from '../src/index.js';
+import { COLA_COMPROBANTES, COLAS, esCola, leerEvento, opcionesRedis, opcionesTareaComprobante } from '../src/index.js';
 
 describe('colas y eventos', () => {
   it('define las cuatro colas de la arquitectura', () => {
@@ -22,5 +22,11 @@ describe('colas y eventos', () => {
     expect(leerEvento('no es json')).toBeNull();
     expect(leerEvento(JSON.stringify({ ...evento, cola: 'otra' }))).toBeNull();
     expect(leerEvento(JSON.stringify({ cola: 'ia' }))).toBeNull();
+  });
+
+  it('HU-1704 · un trabajo «emitir comprobante» por cobro, fuera de las colas de IA', () => {
+    expect(COLA_COMPROBANTES).toBe('comprobantes');
+    expect(esCola(COLA_COMPROBANTES)).toBe(false);
+    expect(opcionesTareaComprobante('c1')).toMatchObject({ jobId: 'c1', attempts: 6, removeOnFail: false });
   });
 });

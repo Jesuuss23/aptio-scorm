@@ -162,7 +162,7 @@ describe.skipIf(!hayBase && !process.env.CI)('planes administrables (HU-1702)', 
     expect(r.status).toBe(200);
     expect(r.body).toEqual({
       slug: 'productora', nombre: 'Productora', descripcion: '', aMedida: false, precioMes: 1390, precioAnual: 13344, ahorroAnual: 3336, precioMesConIgv: 1640.2,
-      capsulasMes: null, usuarios: null, capsulaAdicional: 69, textoBoton: 'Suscribirme', destacado: true, caracteristicas: ['20 cápsulas al mes'],
+      precioMesUsd: null, precioAnualUsd: null, monedas: ['PEN'], capsulasMes: null, usuarios: null, capsulaAdicional: 69, textoBoton: 'Suscribirme', destacado: true, caracteristicas: ['20 cápsulas al mes'],
       enlace: '/pago?plan=productora', ajustes: { mostrarAnual: true, descuentoAnual: 20, conIgv: false },
     });
     expect(r.body).not.toHaveProperty('ficticio');

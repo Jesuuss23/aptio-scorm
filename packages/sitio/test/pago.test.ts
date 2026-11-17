@@ -5,9 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { PLANES_DE_EJEMPLO } from '@aptio/schema/planes';
 import { armarPlanes } from '@aptio/schema/sitio-versiones';
 import { instantaneaDeEjemplo } from '../src/ejemplo.js';
-import { ARCHIVO_CHECKOUT, CSS_PAGO, SCRIPT_CHECKOUT, TEXTOS_PAGO } from '../src/pago.js';
+import { ARCHIVO_CHECKOUT, CSS_PAGO, SCRIPT_CHECKOUT, SCRIPT_CULQI, TEXTOS_PAGO } from '../src/pago.js';
 import { renderizarPago, renderizarSitio, tienePago } from '../src/render.js';
-import { resolverPedido } from '../src/servir.js';
+import { cabecerasSitio, CSP_CULQI, esArchivoPago, POLITICA_CONTENIDO, politicaContenido, resolverPedido } from '../src/servir.js';
 
 const op = { base: '/s', sitioUrl: 'https://aptioscorm.com', entorno: 'produccion' as const };
 
@@ -41,10 +41,30 @@ describe('página /pago', () => {
     expect(renderizarPago(instantaneaDeEjemplo('produccion', { planes: true }), op, 'en')).toContain('<html lang="en">');
   });
 
-  it('el script no usa innerHTML ni eval y habla solo con la API del mismo origen', () => {
+  it('el script no usa innerHTML ni eval y habla solo con la API del mismo origen (y, si se elige Culqi, carga su Checkout)', () => {
     expect(SCRIPT_CHECKOUT).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|eval\(|new Function/);
     expect(SCRIPT_CHECKOUT).toContain('"/api/v1/publico/checkout"');
     expect(SCRIPT_CHECKOUT).toContain("credentials:'omit'");
+    expect(SCRIPT_CHECKOUT.match(/https:\/\/[^"'\s)]+/g)).toEqual([SCRIPT_CULQI]);
     expect(() => new Function(SCRIPT_CHECKOUT)).not.toThrow();
+  });
+
+  it('HU-1704 · moneda, página alojada y regreso: los textos existen en los dos idiomas y el script los usa', () => {
+    expect(Object.keys(TEXTOS_PAGO.en).sort()).toEqual(Object.keys(TEXTOS_PAGO.es).sort());
+    for (const t of ['moneda:S.moneda', "q.get('checkout')", "q.get('cancelado')", "pg.tipo==='redireccion'", "pg.tipo==='formulario'", "/token'", 'precioMesUsd']) expect(SCRIPT_CHECKOUT).toContain(t);
+    expect(TEXTOS_PAGO.es.redireccion).toContain('Tu tarjeta no pasa por Aptio SCORM');
+  });
+
+  it('HU-1704 · la CSP de /pago suma solo los orígenes de Culqi Checkout; las demás páginas siguen igual', () => {
+    expect(esArchivoPago('pago/index.html')).toBe(true);
+    expect(esArchivoPago('en/pago/index.html')).toBe(true);
+    expect(esArchivoPago('precios/index.html')).toBe(false);
+    const csp = cabecerasSitio('pagina', 'x', { archivo: 'pago/index.html' })['Content-Security-Policy']!;
+    expect(csp).toContain(`script-src 'self' ${CSP_CULQI.script.join(' ')};`);
+    expect(csp).toContain(`frame-src ${CSP_CULQI.frame.join(' ')};`);
+    expect(csp).toContain("form-action 'self'");
+    expect(csp).not.toMatch(/unsafe-eval|script-src[^;]*unsafe-inline/);
+    expect(cabecerasSitio('pagina', 'x', { archivo: 'precios/index.html' })['Content-Security-Policy']).toBe(POLITICA_CONTENIDO);
+    expect(politicaContenido({ version: 1, etiquetas: { ga4: 'G-AB12CD34EF' } }, { pago: true })).toMatch(/script-src 'self' [^;]*googletagmanager[^;]*checkout\.culqi\.com/);
   });
 });

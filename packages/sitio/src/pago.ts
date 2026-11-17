@@ -5,8 +5,11 @@
  * 1. Empresa: razón social, RUC opcional (con el dígito verificador de SUNAT: con RUC, factura; sin RUC, boleta),
  *    administrador, correo y consentimiento;
  * 2. Resumen: mensual o anual (si la página lo ofrece), subtotal, IGV de 18 % y total, con el precio del plan publicado;
- * 3. Pago: la pasarela de pruebas (solo en el entorno de pruebas) o, si no hay pasarela, el aviso con «Agendar demo»;
- * y la confirmación en `role="status"`. El precio y la validación finales los pone la API (`POST /api/v1/publico/checkout`).
+ * 3. Pago: la pasarela de pruebas (solo en el entorno de pruebas), la página alojada de la pasarela (Stripe Checkout,
+ *    HU-1704) o su formulario incrustado (Culqi Checkout); la tarjeta nunca pasa por Aptio SCORM (PCI SAQ A). Si no hay
+ *    pasarela, el aviso con «Agendar demo»;
+ * y la confirmación en `role="status"`. HU-1704: si el plan se cobra en dólares (precio en USD y una pasarela que cobre
+ * en dólares), el paso 2 ofrece la moneda. Al volver de la página alojada (`?checkout={id}`), espera la confirmación. El precio y la validación finales los pone la API (`POST /api/v1/publico/checkout`).
  * Sin JavaScript, el `<noscript>` lleva a agendar una demo. Los textos van con `textContent`, nunca como HTML.
  */
 import { CLAVE_SESION } from './captacion.js';
@@ -16,6 +19,8 @@ export const ARCHIVO_CHECKOUT = '_checkout.js';
 export const RUTA_PAGO_SITIO = '/pago';
 export const RUTA_CHECKOUT_API = '/api/v1/publico/checkout';
 export const RUTA_PLANES_API = '/api/v1/publico/planes';
+/** HU-1704 · El script de Culqi Checkout (se carga solo al elegir pagar con Culqi; origen permitido en la CSP de `/pago`, SUP-294). */
+export const SCRIPT_CULQI = 'https://checkout.culqi.com/js/v4';
 
 export const TEXTOS_PAGO = {
   es: {
@@ -37,6 +42,9 @@ export const TEXTOS_PAGO = {
     demasiados: 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo.', fallo: 'No pudimos procesar el pago. Intenta de nuevo en unos minutos.',
     rechazado: 'El pago fue rechazado', reintentarTexto: 'Revisa el resumen y vuelve a intentarlo.', esperando: 'Esperando la confirmación de la pasarela…',
     listo: 'Tu suscripción está activa', correoEnviado: 'Te enviamos un correo a {correo} con el enlace para crear tu clave (vale 72 horas).', hasta: 'Pagado hasta', inicio: 'Volver al inicio',
+    moneda: 'Moneda', soles: 'Soles (S/)', dolares: 'Dólares (US$)', pagarCon: 'Pagar con',
+    redireccion: 'Te llevaremos a la página segura de {p} para pagar. Tu tarjeta no pasa por Aptio SCORM.', formulario: 'Escribirás tu tarjeta en la ventana segura de {p}. Tu tarjeta no pasa por Aptio SCORM.',
+    cancelado: 'Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.', abriendo: 'Abriendo la ventana de pago…',
   },
   en: {
     titulo: 'Subscribe to Aptio SCORM', descripcion: 'Get your plan in three steps: your company details, the summary with IGV tax, and the payment.',
@@ -57,6 +65,9 @@ export const TEXTOS_PAGO = {
     demasiados: 'We received several requests in a row: wait a few minutes and try again.', fallo: "We couldn't process the payment. Try again in a few minutes.",
     rechazado: 'The payment was declined', reintentarTexto: 'Check the summary and try again.', esperando: 'Waiting for the gateway confirmation…',
     listo: 'Your subscription is active', correoEnviado: 'We emailed {correo} with the link to create your password (valid for 72 hours).', hasta: 'Paid until', inicio: 'Back to home',
+    moneda: 'Currency', soles: 'Peruvian soles (S/)', dolares: 'US dollars (US$)', pagarCon: 'Pay with',
+    redireccion: "We'll take you to {p}'s secure page to pay. Your card never goes through Aptio SCORM.", formulario: "You'll enter your card in {p}'s secure window. Your card never goes through Aptio SCORM.",
+    cancelado: 'You cancelled the payment. You can try again whenever you want.', abriendo: 'Opening the payment window…',
   },
 } as const;
 
@@ -98,18 +109,24 @@ export const SCRIPT_CHECKOUT = `(function(){try{
 var raiz=document.querySelector('[data-checkout]');if(!raiz)return;
 var b=raiz.getAttribute('data-base')||'',L=document.documentElement.lang==='en'?'en':'es',T=${JSON.stringify(TEXTOS_PAGO)}[L],API=${JSON.stringify(RUTA_CHECKOUT_API)},PL=${JSON.stringify(RUTA_PLANES_API)};
 var q=new URLSearchParams(location.search),slug=(q.get('plan')||'').slice(0,60);
-var S={paso:1,plan:null,ajustes:null,ciclo:'MENSUAL',d:{razonSocial:'',ruc:'',nombreAdmin:'',correoAdmin:'',consentimiento:false},err:{},aviso:null,co:null,res:null,sinPasarela:false,ocupado:false};
+var S={paso:1,plan:null,ajustes:null,ciclo:'MENSUAL',moneda:'PEN',monedas:['PEN'],d:{razonSocial:'',ruc:'',nombreAdmin:'',correoAdmin:'',consentimiento:false},err:{},aviso:null,co:null,res:null,sinPasarela:false,ocupado:false,volviendo:false};
+var NOMBRES={stripe:'Stripe',culqi:'Culqi'},CULQI=${JSON.stringify(SCRIPT_CULQI)};
 var CAMPOS=['razonSocial','ruc','nombreAdmin','correoAdmin','consentimiento'];
 function el(t,a,h){var e=document.createElement(t);if(a)for(var k in a){var v=a[k];if(v===null||v===undefined||v===false)continue;if(k==='text')e.textContent=v;else if(k.indexOf('on')===0)e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?'':v)}if(h)for(var i=0;i<h.length;i++)if(h[i])e.appendChild(typeof h[i]==='string'?document.createTextNode(h[i]):h[i]);return e}
 function soles(n){return'S/ '+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function dinero(n,m){return(m==='USD'?'US$ ':'S/ ')+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function fmt(n){return dinero(n,S.moneda)}
+function mes(){return S.moneda==='USD'?S.plan.precioMesUsd:S.plan.precioMes}
+function anualP(){var a=S.moneda==='USD'?S.plan.precioAnualUsd:S.plan.precioAnual;return a===undefined?null:a}
+function ahorro(){return S.moneda==='USD'?Math.max(0,mes()*12-anualP()):S.plan.ahorroAnual}
 function r2(n){return Math.round(n*100)/100}
 function igv(n){return r2(n*0.18)}
 function conIgv(n){return r2(n+n*0.18)}
 function rucOk(r){if(!/^(10|15|16|17|20)\\d{9}$/.test(r))return false;var p=[5,4,3,2,7,6,5,4,3,2],s=0;for(var i=0;i<10;i++)s+=p[i]*(+r[i]);var d=11-s%11;return(d===10?0:d===11?1:d)===+r[10]}
 function rutaL(r){return b+(L==='en'?'/en'+(r==='/'?'':r):r)}
 function agendar(){return rutaL('/agendar-demo')+(slug?'?plan='+encodeURIComponent(slug):'')}
-function anualDisponible(){return!!(S.ajustes&&S.ajustes.mostrarAnual&&S.plan&&S.plan.precioAnual!==null)}
-function subtotal(){return S.ciclo==='ANUAL'?S.plan.precioAnual:S.plan.precioMes}
+function anualDisponible(){return!!(S.ajustes&&S.ajustes.mostrarAnual&&S.plan&&anualP()!==null)}
+function subtotal(){return S.ciclo==='ANUAL'?anualP():mes()}
 function sesion(){try{return JSON.parse(sessionStorage.getItem(${JSON.stringify(CLAVE_SESION)})||'null')||{}}catch(e){return{}}}
 function json(r){return r.json().catch(function(){return{}}).then(function(d){return{s:r.status,d:d}})}
 function pasos(){return el('ol',{'class':'pg-pasos','aria-label':T.paso+' '+Math.min(S.paso,3)+' '+T.de+' 3'},T.pasos.map(function(n,i){var a=S.paso===i+1;return el('li',{'aria-current':a?'step':null,'class':S.paso>i+1?'hecho':null},[n])}))}
@@ -137,15 +154,18 @@ if(k.length){S.aviso={texto:T.revisa,lista:k.map(function(n){return S.err[n]})};
 S.aviso=null;ir(2)}
 function ir(p){S.paso=p;pintar();var h=raiz.querySelector('h2');if(h)h.focus()}
 function fila(dt,dd,t){return[el('dt',{'class':t?'t':null,text:dt}),el('dd',{'class':t?'t':null,text:dd})]}
+function radios(nombre,leyenda,op,actual,cambiar){return el('fieldset',null,[el('legend',{text:leyenda})].concat(op.map(function(o){var id='pg-'+nombre+'-'+o[0].toLowerCase();return el('div',{'class':'pg-ciclo'},[el('input',{id:id,type:'radio',name:nombre,value:o[0],checked:actual===o[0],onchange:function(){cambiar(o[0]);S.aviso=null;pintar();var x=raiz.querySelector('#'+id);if(x)x.focus()}}),el('label',{'for':id,text:o[1]})])})))}
 function pasoResumen(){var s=subtotal(),r=S.d.ruc.replace(/[\\s-]/g,''),hijos=[el('h2',{tabindex:'-1',text:T.resumen}),aviso()];
-if(anualDisponible()){var op=[['MENSUAL',T.mensual+' · '+soles(S.plan.precioMes)+' '+T.alMes],['ANUAL',T.anual+' · '+soles(S.plan.precioAnual)+' '+T.alAnio+(S.plan.ahorroAnual?' ('+T.ahorras+' '+soles(S.plan.ahorroAnual)+')':'')]];
-hijos.push(el('fieldset',null,[el('legend',{text:T.ciclo})].concat(op.map(function(o){var id='pg-ciclo-'+o[0].toLowerCase();return el('div',{'class':'pg-ciclo'},[el('input',{id:id,type:'radio',name:'ciclo',value:o[0],checked:S.ciclo===o[0],onchange:function(){S.ciclo=o[0];S.aviso=null;pintar();var x=raiz.querySelector('#'+id);if(x)x.focus()}}),el('label',{'for':id,text:o[1]})])}))))}
-var dl=el('dl',null,[].concat(fila(T.planElegido,S.plan.nombre+' · '+(S.ciclo==='ANUAL'?T.anual:T.mensual)),fila(T.subtotal,soles(s)),fila(T.igv,soles(igv(s))),fila(T.comprobante,r?T.factura+' '+r:T.boleta),fila(T.total,soles(conIgv(s)),true)));
+if(S.monedas.length>1)hijos.push(radios('moneda',T.moneda,[['PEN',T.soles],['USD',T.dolares]],S.moneda,function(m){S.moneda=m;if(!anualDisponible())S.ciclo='MENSUAL'}));
+s=subtotal();
+if(anualDisponible()){var ah=ahorro(),op=[['MENSUAL',T.mensual+' · '+fmt(mes())+' '+T.alMes],['ANUAL',T.anual+' · '+fmt(anualP())+' '+T.alAnio+(ah?' ('+T.ahorras+' '+fmt(ah)+')':'')]];
+hijos.push(radios('ciclo',T.ciclo,op,S.ciclo,function(c){S.ciclo=c}))}
+var dl=el('dl',null,[].concat(fila(T.planElegido,S.plan.nombre+' · '+(S.ciclo==='ANUAL'?T.anual:T.mensual)),fila(T.subtotal,fmt(s)),fila(T.igv,fmt(igv(s))),fila(T.comprobante,r?T.factura+' '+r:T.boleta),fila(T.total,fmt(conIgv(s)),true)));
 hijos.push(dl);
 hijos.push(el('div',{'class':'pg-acciones'},[el('button',{'class':'btn',type:'button',text:T.volver,onclick:function(){S.aviso=null;ir(1)}}),el('button',{'class':'btn primary',type:'button',id:'pg-a-pagar',disabled:S.ocupado,text:S.ocupado?T.enviando:T.aPagar,onclick:crear})]));
 return hijos}
 function crear(){if(S.ocupado)return;S.ocupado=true;S.aviso=null;pintar();
-var c={plan:slug,ciclo:S.ciclo,razonSocial:S.d.razonSocial,ruc:S.d.ruc,nombreAdmin:S.d.nombreAdmin,correoAdmin:S.d.correoAdmin,consentimiento:S.d.consentimiento,idioma:L,paginaFormulario:location.pathname};
+var c={plan:slug,ciclo:S.ciclo,moneda:S.moneda,razonSocial:S.d.razonSocial,ruc:S.d.ruc,nombreAdmin:S.d.nombreAdmin,correoAdmin:S.d.correoAdmin,consentimiento:S.d.consentimiento,idioma:L,paginaFormulario:location.pathname};
 var s=sesion();for(var k in s)if(typeof s[k]==='string'&&!(k in c))c[k]=s[k];if(!c.paginaEntrada)c.paginaEntrada=location.pathname;
 fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(c),credentials:'omit'}).then(json).then(function(r){S.ocupado=false;
 if(r.s===201){S.co=r.d;S.sinPasarela=false;return ir(3)}
@@ -156,10 +176,26 @@ if(Object.keys(e).length){S.err=e;ir(1);var y=raiz.querySelector('#pg-'+Object.k
 if(r.s===404){S.aviso={texto:T.noPlan,enlace:{href:agendar(),texto:T.agendar}};pintar();return foco()}
 S.aviso={texto:r.s===429?T.demasiados:T.fallo};pintar();foco()}).catch(function(){S.ocupado=false;S.aviso={texto:T.fallo};pintar();foco()})}
 function pasoPago(){if(S.sinPasarela)return[el('h2',{tabindex:'-1',text:T.pago}),el('p',{'class':'pg-msg',text:T.noDisponible}),el('div',{'class':'pg-acciones'},[el('button',{'class':'btn',type:'button',text:T.volver,onclick:function(){ir(2)}}),el('a',{'class':'btn primary',href:agendar(),text:T.agendar})])];
+if(S.volviendo)return[el('h2',{tabindex:'-1',text:T.pago}),aviso(),el('p',{'class':'pg-nota',role:'status',text:T.esperando})];
+var pg=S.co.pago||{tipo:'simulado'},tot=dinero(S.co.resumen.total,S.co.resumen.moneda),nom=NOMBRES[S.co.pasarela]||S.co.pasarela,
+atras=el('button',{'class':'btn',type:'button',text:T.volver,onclick:function(){S.co=null;S.aviso=null;ir(2)}});
+if(pg.tipo==='redireccion')return[el('h2',{tabindex:'-1',text:T.pago}),aviso(),el('p',{'class':'pg-nota',id:'pg-nota',text:T.redireccion.replace('{p}',nom)}),el('dl',null,fila(T.total,tot,true)),
+el('div',{'class':'pg-acciones'},[atras,el('a',{'class':'btn primary',id:'pg-pagar',href:pg.url,'aria-describedby':'pg-nota',text:T.pagarCon+' '+nom+' · '+tot})])];
+if(pg.tipo==='formulario')return[el('h2',{tabindex:'-1',text:T.pago}),aviso(),el('p',{'class':'pg-nota',id:'pg-nota',text:T.formulario.replace('{p}',nom)}),el('dl',null,fila(T.total,tot,true)),
+el('div',{'class':'pg-acciones'},[atras,el('button',{'class':'btn primary',type:'button',id:'pg-pagar','aria-describedby':'pg-nota',disabled:S.ocupado,text:S.ocupado?T.abriendo:T.pagarCon+' '+nom+' · '+tot,onclick:culqi})])];
 var e=S.err.tarjeta;
-return[el('h2',{tabindex:'-1',text:T.pago}),aviso(),S.co.pasarela==='prueba'?el('p',{'class':'pg-nota',id:'pg-nota',text:T.pruebas}):null,el('dl',null,fila(T.total,soles(S.co.resumen.total),true)),
-el('form',{novalidate:true,onsubmit:pagar},[el('p',null,[el('label',{'for':'pg-tarjeta',text:T.tarjeta}),el('input',{id:'pg-tarjeta',name:'tarjeta',type:'text',inputmode:'numeric',autocomplete:'cc-number',maxlength:'23',required:true,'aria-invalid':e?'true':null,'aria-describedby':(S.co.pasarela==='prueba'?'pg-nota':'')+(e?' pg-tarjeta-e':'')||null}),e?el('span',{id:'pg-tarjeta-e','class':'pg-error',text:e}):null]),
-el('div',{'class':'pg-acciones'},[el('button',{'class':'btn',type:'button',text:T.volver,onclick:function(){S.co=null;S.aviso=null;ir(2)}}),el('button',{'class':'btn primary',type:'submit',disabled:S.ocupado,text:S.ocupado?T.pagando:T.pagar+' '+soles(S.co.resumen.total)})])])]}
+return[el('h2',{tabindex:'-1',text:T.pago}),aviso(),el('p',{'class':'pg-nota',id:'pg-nota',text:T.pruebas}),el('dl',null,fila(T.total,tot,true)),
+el('form',{novalidate:true,onsubmit:pagar},[el('p',null,[el('label',{'for':'pg-tarjeta',text:T.tarjeta}),el('input',{id:'pg-tarjeta',name:'tarjeta',type:'text',inputmode:'numeric',autocomplete:'cc-number',maxlength:'23',required:true,'aria-invalid':e?'true':null,'aria-describedby':'pg-nota'+(e?' pg-tarjeta-e':'')}),e?el('span',{id:'pg-tarjeta-e','class':'pg-error',text:e}):null]),
+el('div',{'class':'pg-acciones'},[atras,el('button',{'class':'btn primary',type:'submit',disabled:S.ocupado,text:S.ocupado?T.pagando:T.pagar+' '+tot})])])]}
+function cargarCulqi(fn){if(window.Culqi)return fn(true);var x=document.createElement('script');x.src=CULQI;x.async=true;x.onload=function(){fn(true)};x.onerror=function(){fn(false)};document.head.appendChild(x)}
+function fallo(t){S.ocupado=false;S.aviso={texto:t||T.fallo};pintar();foco()}
+function culqi(){if(S.ocupado)return;S.ocupado=true;S.aviso=null;pintar();var pg=S.co.pago;
+cargarCulqi(function(ok){var C=window.Culqi;if(!ok||!C)return fallo();
+try{C.publicKey=pg.llavePublica;C.settings({title:'Aptio SCORM',currency:pg.moneda,amount:pg.montoCentimos,description:pg.descripcion});if(C.options)C.options({lang:L});
+window.culqi=function(){if(C.token&&C.token.id){var t=C.token.id;if(C.close)C.close();enviarToken(t)}else if(C.error)fallo(C.error.user_message)};C.open()}catch(e){fallo()}})}
+function enviarToken(t){fetch(API+'/'+encodeURIComponent(S.co.id)+'/token',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:t}),credentials:'omit'}).then(json).then(function(r){
+if(r.s===202)return resultado(r.d,0);fallo(r.d&&typeof r.d.mensaje==='string'?r.d.mensaje:null)}).catch(function(){fallo()})}
+function volver(id){S.co={id:id};S.volviendo=true;S.ocupado=true;S.paso=3;pintar();resultado({estado:'PENDIENTE'},0)}
 function pagar(ev){ev.preventDefault();if(S.ocupado)return;var t=ev.target.elements.namedItem('tarjeta').value;if(!t.replace(/\\D/g,'')){S.err={tarjeta:T.eTarjeta};pintar();var x=raiz.querySelector('#pg-tarjeta');if(x)x.focus();return}
 S.err={};S.ocupado=true;S.aviso=null;pintar();
 fetch(API+'/'+encodeURIComponent(S.co.id)+'/pago-prueba',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tarjeta:t}),credentials:'omit'}).then(json).then(function(r){
@@ -168,17 +204,18 @@ if(r.s!==200){S.ocupado=false;S.aviso={texto:T.fallo};pintar();return foco()}
 resultado(r.d,0)}).catch(function(){S.ocupado=false;S.aviso={texto:T.fallo};pintar();foco()})}
 function resultado(d,n){if(d.estado==='PENDIENTE'){if(n>=20){S.ocupado=false;S.aviso={texto:T.esperando};pintar();return foco()}
 return setTimeout(function(){fetch(API+'/'+encodeURIComponent(S.co.id),{credentials:'omit'}).then(json).then(function(r){resultado(r.s===200?r.d:{estado:'PENDIENTE'},n+1)}).catch(function(){resultado({estado:'PENDIENTE'},n+1)})},1500)}
-S.ocupado=false;if(d.estado==='APROBADA'){S.res=d;S.paso=4;pintar();var h=raiz.querySelector('h2');if(h)h.focus();return}
-S.co=null;S.aviso={texto:T.rechazado+(d.motivoRechazo?': '+d.motivoRechazo:'')+'. '+T.reintentarTexto};S.paso=2;pintar();foco()}
+S.ocupado=false;var v=S.volviendo;S.volviendo=false;if(d.estado==='APROBADA'){S.res=d;S.paso=4;pintar();var h=raiz.querySelector('h2');if(h)h.focus();return}
+S.co=null;S.aviso={texto:T.rechazado+(d.motivoRechazo?': '+d.motivoRechazo:'')+'. '+T.reintentarTexto};S.paso=v?1:2;pintar();foco()}
 function fecha(iso){try{return new Intl.DateTimeFormat(L==='en'?'en-US':'es-PE',{day:'numeric',month:'long',year:'numeric',timeZone:'America/Lima'}).format(new Date(iso))}catch(e){return iso.slice(0,10)}}
 function listo(){var d=S.res;return[el('div',{role:'status',style:'display:grid;gap:16px'},[el('h2',{tabindex:'-1',text:T.listo}),el('p',{style:'margin:0',text:T.correoEnviado.replace('{correo}',d.correoAdmin)}),
-el('dl',null,[].concat(fila(T.planElegido,d.nombrePlan+' · '+(d.ciclo==='ANUAL'?T.anual:T.mensual)),d.finPeriodo?fila(T.hasta,fecha(d.finPeriodo)):[],fila(T.comprobante,d.tipoComprobante==='FACTURA'?T.factura:T.boleta),fila(T.total,soles(d.total),true)))]),
+el('dl',null,[].concat(fila(T.planElegido,d.nombrePlan+' · '+(d.ciclo==='ANUAL'?T.anual:T.mensual)),d.finPeriodo?fila(T.hasta,fecha(d.finPeriodo)):[],fila(T.comprobante,d.tipoComprobante==='FACTURA'?T.factura:T.boleta),fila(T.total,dinero(d.total,d.moneda),true)))]),
 el('div',{'class':'pg-acciones'},[el('a',{'class':'btn',href:rutaL('/'),text:T.inicio})])]}
 function sinPlan(t){raiz.textContent='';raiz.setAttribute('aria-busy','false');[el('p',{'class':'pg-msg',text:t}),el('div',{'class':'pg-acciones'},[el('a',{'class':'btn',href:rutaL('/precios'),text:T.precios}),el('a',{'class':'btn primary',href:agendar(),text:T.agendar})])].forEach(function(x){raiz.appendChild(x)})}
 function foco(){var a=raiz.querySelector('.pg-msg');if(a)a.focus()}
 function pintar(){raiz.textContent='';raiz.setAttribute('aria-busy','false');var h=S.paso===4?listo():[pasos()].concat(S.paso===1?pasoEmpresa():S.paso===2?pasoResumen():pasoPago());h.forEach(function(x){if(x)raiz.appendChild(x)})}
 if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)){sinPlan(T.noPlan);return}
 fetch(PL+'/'+encodeURIComponent(slug),{credentials:'omit'}).then(json).then(function(r){if(r.s!==200||r.d.aMedida||r.d.precioMes===null){sinPlan(T.noPlan);return}
-S.plan=r.d;S.ajustes=r.d.ajustes||null;if(q.get('ciclo')==='anual'&&anualDisponible())S.ciclo='ANUAL';pintar()}).catch(function(){sinPlan(T.caido)});
+S.plan=r.d;S.ajustes=r.d.ajustes||null;S.monedas=r.d.monedas&&r.d.monedas.length?r.d.monedas:['PEN'];if(q.get('moneda')==='usd'&&S.monedas.indexOf('USD')>=0)S.moneda='USD';if(q.get('ciclo')==='anual'&&anualDisponible())S.ciclo='ANUAL';
+var vuelta=q.get('checkout')||'';if(/^[0-9a-f-]{36}$/i.test(vuelta))return volver(vuelta);if(q.get('cancelado'))S.aviso={texto:T.cancelado};pintar()}).catch(function(){sinPlan(T.caido)});
 }catch(e){}})();
 `;

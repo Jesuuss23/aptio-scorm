@@ -3,7 +3,8 @@
 // checkout toma el precio del plan publicado (404 si es a medida, oculto o ficticio en producción; 409 si el correo ya
 // es de un usuario); el webhook firmado aprueba y crea en una transacción la organización vacía, su administrador, la
 // suscripción activa y el lead «Suscripción», y encola la bienvenida; un evento repetido no crea nada; una firma errada da
-// 401; un pago rechazado no provisiona nada; en producción no hay pasarela (503) hasta la HU-1704.
+// 401; un pago rechazado no provisiona nada; en producción la pasarela de pruebas no existe y, sin otra activa, 503.
+// HU-1704: la pasarela de pruebas se llama `pruebas` y cada pago aprobado deja su cobro.
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -43,7 +44,7 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
   const checkout = (cuerpo: Record<string, unknown>) => { sinLimite(); return request(servidor).post('/api/v1/publico/checkout').send(cuerpo); };
   const estado = (id: string) => { sinLimite(); return request(servidor).get(`/api/v1/publico/checkout/${id}`); };
   const evento = (d: { id: string; tipo: string; solicitudId: string; ultimos4?: string; motivo?: string }) => Buffer.from(JSON.stringify(d));
-  const webhook = (cuerpo: Buffer, firma: string | null = firmar(SECRETO, cuerpo), pasarela = 'prueba') => {
+  const webhook = (cuerpo: Buffer, firma: string | null = firmar(SECRETO, cuerpo), pasarela = 'pruebas') => {
     const r = request(servidor).post(`/api/v1/webhooks/pago/${pasarela}`).set('Content-Type', 'application/json');
     return (firma ? r.set('X-Aptio-Firma', firma) : r).send(cuerpo.toString('utf8'));
   };
@@ -95,6 +96,7 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
     const ids = solicitudes.map((s) => s.id);
     const orgs = solicitudes.map((s) => s.organizacionId).filter((x): x is string => !!x);
     await prisma.auditoria.deleteMany({ where: { OR: [{ entidadId: { in: ids } }, { organizacionId: { in: orgs } }] } });
+    await prisma.cobro.deleteMany({ where: { solicitudSuscripcionId: { in: ids } } });
     await prisma.suscripcion.deleteMany({ where: { solicitudId: { in: ids } } });
     await prisma.solicitudSuscripcion.deleteMany({ where: { id: { in: ids } } });
     await prisma.organizacion.deleteMany({ where: { id: { in: orgs } } });
@@ -133,7 +135,7 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
 
     const anual = await checkout(empresa(correoDe('anual'), { ciclo: 'ANUAL', ruc: '' }));
     expect(anual.status).toBe(201);
-    expect(anual.body).toMatchObject({ estado: 'PENDIENTE', tipoComprobante: 'BOLETA', pasarela: 'prueba', resumen: { ciclo: 'ANUAL', subtotal: 12384, igv: 2229.12, total: 14613.12, moneda: 'PEN' } });
+    expect(anual.body).toMatchObject({ estado: 'PENDIENTE', tipoComprobante: 'BOLETA', pasarela: 'pruebas', pago: { tipo: 'simulado' }, resumen: { ciclo: 'ANUAL', subtotal: 12384, igv: 2229.12, total: 14613.12, moneda: 'PEN' } });
   });
 
   it('409 CORREO_EN_USO si el correo ya es de un usuario', async () => {
@@ -162,7 +164,8 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
     expect([s.organizacion!.proyectos, s.organizacion!.clientes, s.organizacion!.cursos]).toEqual([[], [], []]);
     expect(s.organizacion!.usuarios).toHaveLength(1);
     expect(s.organizacion!.usuarios[0]).toMatchObject({ email: correo, nombre: 'Ana Quispe', rol: 'ADMINISTRADOR', hashClave: null, activo: true });
-    expect(s.suscripcion).toMatchObject({ estado: 'ACTIVA', ciclo: 'MENSUAL', precioPactadoSinIgv: 1290, moneda: 'PEN', pasarela: 'prueba', ultimos4Digitos: '4242' });
+    expect(s.suscripcion).toMatchObject({ estado: 'ACTIVA', ciclo: 'MENSUAL', precioPactadoSinIgv: 1290, moneda: 'PEN', pasarela: 'pruebas', ultimos4Digitos: '4242' });
+    expect(await prisma.cobro.findMany({ where: { solicitudSuscripcionId: c.body.id } })).toMatchObject([{ suscripcionId: s.suscripcion!.id, eventoPagoId: `evt_${sufijo}_ok`, moneda: 'PEN', pasarela: 'pruebas', ultimos4Digitos: '4242', estado: 'APROBADO' }]);
     const inicio = s.suscripcion!.inicioPeriodo;
     expect(inicio.getTime()).toBeGreaterThanOrEqual(antes - 1000);
     expect(s.suscripcion!.finPeriodo.toISOString()).toBe(finPeriodo(inicio, 'MENSUAL').toISOString());
@@ -183,7 +186,7 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
     expect((await request(servidor).post('/api/v1/auth/ingresar').send({ email: correo, clave: 'una-clave-nueva-123' })).status).toBe(200);
 
     const e = await estado(c.body.id);
-    expect(e.body).toMatchObject({ estado: 'APROBADA', nombrePlan: 'Productora', total: 1522.2, motivoRechazo: null });
+    expect(e.body).toMatchObject({ estado: 'APROBADA', nombrePlan: 'Productora', total: 1522.2, moneda: 'PEN', motivoRechazo: null });
     expect(e.body.finPeriodo).toBe(s.suscripcion!.finPeriodo.toISOString());
   });
 
@@ -236,7 +239,7 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
     expect((await prisma.suscripcion.findUnique({ where: { solicitudId: otro.body.id } }))?.ultimos4Digitos).toBe('1111');
   });
 
-  it('en producción no hay pasarela hasta la HU-1704: 503 PAGO_NO_DISPONIBLE y la de pruebas no existe', async () => {
+  it('en producción la pasarela de pruebas no existe: sin otra activa, 503 PAGO_NO_DISPONIBLE', async () => {
     const c = await checkout(empresa(correoDe('pendiente-prod')));
     process.env.SITIO_ENTORNO = 'produccion';
     const r = await checkout(empresa(correoDe('prod')));

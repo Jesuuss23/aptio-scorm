@@ -2,8 +2,9 @@
 // como Más elegido», sus campos, el orden y sus características (agregar, ocultar, quitar); y la tarjeta «Página de
 // precios» con la opción anual, el descuento y el IGV. Los planes no se borran: se ocultan. Lo que ve el visitante
 // en /precios sale de la versión publicada: los cambios se ven al publicar. Solo el superadmin (ADR-011).
-// Los indicadores de ingresos llegan con las suscripciones (HU-1710).
-import { type AjustesPlanes, type Caracteristica, conIgv, LIMITES_PLAN, SLUG_PLAN, soles, validarAjustesPlanes, validarPlan, validarPlanCompleto, type DatosPlan } from '@aptio/schema/planes';
+// Los indicadores de ingresos llegan con las suscripciones (HU-1710). HU-1704: precios opcionales en dólares (para
+// cobrar con Stripe a clientes del exterior, RN-18-9).
+import { type AjustesPlanes, type Caracteristica, conIgv, dolares, LIMITES_PLAN, SLUG_PLAN, soles, validarAjustesPlanes, validarPlan, validarPlanCompleto, type DatosPlan } from '@aptio/schema/planes';
 import { Cabecera } from '@aptio/ui';
 import { useEffect, useRef, useState } from 'react';
 import { api, ErrorApi, type EntradaPlan, type PlanVenta } from '../api';
@@ -19,7 +20,8 @@ function resumenPrecio(p: PlanVenta, a: AjustesPlanes): string {
   if (p.precioMes === null) return 'A medida: el botón lleva a agendar con ventas';
   const precio = (n: number) => soles(a.conIgv ? conIgv(n) : n);
   const mes = `${precio(p.precioMes)} al mes ${a.conIgv ? 'con IGV' : '+ IGV'}`;
-  return a.mostrarAnual && p.precioAnualEfectivo !== null ? `${mes} · ${precio(p.precioAnualEfectivo)} al año` : mes;
+  const pen = a.mostrarAnual && p.precioAnualEfectivo !== null ? `${mes} · ${precio(p.precioAnualEfectivo)} al año` : mes;
+  return p.precioMesUsd === null ? pen : `${pen} · ${dolares(p.precioMesUsd)} al mes en dólares`;
 }
 
 export function VentasPlanes() {
@@ -97,16 +99,17 @@ export function VentasPlanes() {
   );
 }
 
-type Borrador = { nombre: string; descripcion: string; aMedida: boolean; precioMes: string; precioAnual: string; capsulasMes: string; usuarios: string; capsulaAdicional: string; textoBoton: string; ficticio: boolean; caracteristicas: Caracteristica[] };
+type Borrador = { nombre: string; descripcion: string; aMedida: boolean; precioMes: string; precioAnual: string; precioMesUsd: string; precioAnualUsd: string; capsulasMes: string; usuarios: string; capsulaAdicional: string; textoBoton: string; ficticio: boolean; caracteristicas: Caracteristica[] };
 const txt = (n: number | null) => (n === null ? '' : String(n));
 const num = (s: string) => (s.trim() === '' ? null : Number(s));
 const aBorrador = (p: PlanVenta): Borrador => ({
-  nombre: p.nombre, descripcion: p.descripcion, aMedida: p.precioMes === null, precioMes: txt(p.precioMes), precioAnual: txt(p.precioAnual), capsulasMes: txt(p.capsulasMes), usuarios: txt(p.usuarios),
+  nombre: p.nombre, descripcion: p.descripcion, aMedida: p.precioMes === null, precioMes: txt(p.precioMes), precioAnual: txt(p.precioAnual), precioMesUsd: txt(p.precioMesUsd), precioAnualUsd: txt(p.precioAnualUsd), capsulasMes: txt(p.capsulasMes), usuarios: txt(p.usuarios),
   capsulaAdicional: txt(p.capsulaAdicional), textoBoton: p.textoBoton, ficticio: p.ficticio, caracteristicas: p.caracteristicas.map((c) => ({ ...c })),
 });
 const aDatos = (b: Borrador): Omit<DatosPlan, 'slug' | 'destacado' | 'visible'> => ({
   nombre: b.nombre, descripcion: b.descripcion, textoBoton: b.textoBoton, capsulasMes: num(b.capsulasMes), usuarios: num(b.usuarios),
   precioMes: b.aMedida ? null : num(b.precioMes), precioAnual: b.aMedida ? null : num(b.precioAnual), capsulaAdicional: b.aMedida ? null : num(b.capsulaAdicional),
+  precioMesUsd: b.aMedida ? null : num(b.precioMesUsd), precioAnualUsd: b.aMedida ? null : num(b.precioAnualUsd),
   caracteristicas: b.caracteristicas.filter((c) => c.texto.trim() !== ''),
 });
 
@@ -138,7 +141,7 @@ function TarjetaPlan({ plan: p, ajustes, ocupado, primero, ultimo, alMover, alCa
 
   function guardar() {
     const datos = aDatos(b);
-    const numeros = (['precioMes', 'precioAnual', 'capsulasMes', 'usuarios', 'capsulaAdicional'] as const).filter((k) => datos[k] !== null && !Number.isInteger(datos[k]));
+    const numeros = (['precioMes', 'precioAnual', 'precioMesUsd', 'precioAnualUsd', 'capsulasMes', 'usuarios', 'capsulaAdicional'] as const).filter((k) => datos[k] !== null && !Number.isInteger(datos[k]));
     const e = [
       ...numeros.map(() => 'Los precios y cantidades van en números enteros'),
       ...validarPlan(datos, { parcial: true }).map((x) => x.mensaje),
@@ -178,6 +181,15 @@ function TarjetaPlan({ plan: p, ajustes, ocupado, primero, ultimo, alMover, alCa
                 <label htmlFor={`${id}-anual`}>Precio al año (S/)</label>
                 <input id={`${id}-anual`} type="number" inputMode="numeric" min={1} value={b.precioAnual} placeholder={p.precioAnual === null && p.precioAnualEfectivo !== null ? String(p.precioAnualEfectivo) : ''} aria-describedby={`${id}-anual-ayuda`} onChange={(e) => cambiar('precioAnual', e.target.value)} />
                 <span id={`${id}-anual-ayuda`} className="sec">Vacío: el mensual × 12 con el {ajustes.descuentoAnual} % de descuento.</span>
+              </p>
+              <p className="campo">
+                <label htmlFor={`${id}-mes-usd`}>Precio al mes en dólares (US$, opcional)</label>
+                <input id={`${id}-mes-usd`} type="number" inputMode="numeric" min={1} value={b.precioMesUsd} aria-describedby={`${id}-usd-ayuda`} onChange={(e) => cambiar('precioMesUsd', e.target.value)} />
+                <span id={`${id}-usd-ayuda`} className="sec">Vacío: el plan se cobra solo en soles. En dólares cobra Stripe, si está visible y activa en Pasarelas.</span>
+              </p>
+              <p className="campo">
+                <label htmlFor={`${id}-anual-usd`}>Precio al año en dólares (US$)</label>
+                <input id={`${id}-anual-usd`} type="number" inputMode="numeric" min={1} value={b.precioAnualUsd} placeholder={p.precioAnualUsd === null && p.precioAnualUsdEfectivo !== null ? String(p.precioAnualUsdEfectivo) : ''} onChange={(e) => cambiar('precioAnualUsd', e.target.value)} />
               </p>
               <p className="campo"><label htmlFor={`${id}-extra`}>Cápsula adicional (S/)</label><input id={`${id}-extra`} type="number" inputMode="numeric" min={1} value={b.capsulaAdicional} onChange={(e) => cambiar('capsulaAdicional', e.target.value)} /></p>
             </>

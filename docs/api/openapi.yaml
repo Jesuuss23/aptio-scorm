@@ -6596,7 +6596,8 @@ paths:
       operationId: post_ventas_planes
       description: |-
         Solo SUPERADMIN. Faltan solo `slug` y `nombre`; lo demás toma los valores de un plan nuevo: oculto, sin destacar,
-        sin precio (a medida) y con el botón «Suscribirme». Va al final del orden. Si llega destacado, los demás dejan de
+        sin precio (a medida) y con el botón «Suscribirme». Va al final del orden. HU-1704: `precioMesUsd` y
+        `precioAnualUsd` opcionales (dólares enteros sin IGV); el anual en USD requiere el mensual en USD. Si llega destacado, los demás dejan de
         estarlo en la misma transacción. Un plan a medida (`precioMes` null) no lleva `precioAnual` ni `capsulaAdicional`.
         409 SLUG_EN_USO si el identificador ya existe. Los planes no se borran: se ocultan. Auditoría PLAN_CREADO (de
         plataforma, sin organización).
@@ -6738,6 +6739,191 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /ventas/pasarelas:
+    get:
+      tags:
+      - Ventas
+      summary: Pasarelas de pago (HU-1704, REQ-084, PNT-35)
+      operationId: get_ventas_pasarelas
+      description: |-
+        Solo SUPERADMIN. Pruebas, Culqi y Stripe en su orden, con si están activas (sus variables de entorno del modo
+        están y, la de pruebas, solo con SITIO_ENTORNO=pruebas) y los nombres de las variables que faltan. Nunca devuelve
+        llaves ni secretos: viven en el entorno del servidor.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPasarelas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /ventas/pasarelas/orden:
+    put:
+      tags:
+      - Ventas
+      summary: Ordenar las pasarelas (HU-1704)
+      operationId: put_ventas_pasarelas_orden
+      description: Solo SUPERADMIN. En cada moneda cobra la primera visible y activa. Lleva todas una vez cada una; si no, 422 ORDEN_INCOMPLETO. Auditoría PASARELAS_ORDEN_CAMBIADO.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrdenPasarelas'
+      responses:
+        '200':
+          description: Las pasarelas en el orden nuevo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPasarelas'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/pasarelas/{codigo}:
+    patch:
+      tags:
+      - Ventas
+      summary: Mostrar u ocultar una pasarela, su nombre y su modo (HU-1704)
+      operationId: patch_ventas_pasarelas_codigo
+      description: |-
+        Solo SUPERADMIN. Cambia solo lo que llega. La de pruebas no admite el modo producción (422 NO_VALIDO). Ocultar
+        una pasarela deja de ofrecerla en el pago al instante; si una moneda queda sin pasarela, el selector de /pago la
+        oculta. Auditoría PASARELA_EDITADA con los valores de antes y de después.
+      parameters:
+      - name: codigo
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [pruebas, culqi, stripe]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CambioPasarela'
+      responses:
+        '200':
+          description: Guardada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pasarela'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /ventas/cobros:
+    get:
+      tags:
+      - Ventas
+      summary: Cobros aprobados (HU-1704, REQ-110)
+      operationId: get_ventas_cobros
+      description: Solo SUPERADMIN. Los 200 más recientes. Con `sinAlta=true`, solo los pagos aprobados que no crearon la cuenta.
+      parameters:
+      - name: estado
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: [APROBADO, REEMBOLSADO]
+      - name: sinAlta
+        in: query
+        required: false
+        schema:
+          type: string
+          enum: ['true', 'false']
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaCobros'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /ventas/cobros/{id}:
+    get:
+      tags:
+      - Ventas
+      summary: Un cobro (HU-1704)
+      operationId: get_ventas_cobros_id
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cobro'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+  /ventas/cobros/{id}/reembolsar:
+    post:
+      tags:
+      - Ventas
+      summary: Reembolsar un pago aprobado sin cuenta (HU-1704, SUP-291)
+      operationId: post_ventas_cobros_id_reembolsar
+      description: |-
+        Solo SUPERADMIN. Solo cobros APROBADO sin suscripción (el de una suscripción se devuelve al cancelarla, HU-1706).
+        Pasa a REEMBOLSADO y pide la devolución a la pasarela (Idempotency-Key `reembolso-<id>`); si la pasarela falla,
+        vuelve a APROBADO y responde 502. Auditoría COBRO_REEMBOLSADO o COBRO_REEMBOLSO_FALLIDO. La nota de crédito llega
+        con la HU-1707.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Reembolsado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cobro'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: COBRO_CON_SUSCRIPCION o COBRO_YA_REEMBOLSADO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: PASARELA_NO_RESPONDE · el cobro sigue APROBADO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /publico/planes/{slug}:
     get:
       tags:
@@ -6782,10 +6968,17 @@ paths:
         su precio salen de la última versión publicada (RN-18-2): el mensual cobra `precioMes` y el anual el precio anual
         efectivo, más IGV de 18 %. Crea la solicitud PENDIENTE con el resumen y la atribución del visitante (para el lead).
 
+        HU-1704 · `moneda` USD cobra `precioMesUsd` (o el anual efectivo en USD) más 18 % (SUP-295) con la primera
+        pasarela visible y activa que cobre en dólares (Stripe); en soles, con la primera que cobre en soles (pruebas o
+        Culqi). `pago` dice cómo sigue: la URL de Stripe Checkout (Idempotency-Key `checkout-<id>`), la configuración de
+        Culqi Checkout o el formulario simulado.
+
         404 PLAN_NO_DISPONIBLE si el plan no se publica, está oculto, es ficticio en producción o es a medida; 422
         NO_VALIDO con el campo de cada error (también si pide el anual y la página no lo ofrece); 409 CORREO_EN_USO si el
-        correo ya es de un usuario (inicia sesión); 503 PAGO_NO_DISPONIBLE si no hay pasarela en este entorno (producción
-        hasta la HU-1704: el sitio ofrece agendar una demo); 429 con más de 10 checkouts en 10 minutos desde la misma IP.
+        correo ya es de un usuario (inicia sesión); 422 NO_VALIDO en `moneda` si el plan no se cobra en dólares; 503
+        PAGO_NO_DISPONIBLE si ninguna pasarela visible y activa cobra esa moneda (el sitio ofrece agendar una demo); 502
+        PASARELA_NO_RESPONDE si la pasarela no creó el pago (la solicitud queda RECHAZADA); 429 con más de 10 checkouts en
+        10 minutos desde la misma IP.
       requestBody:
         required: true
         content:
@@ -6811,8 +7004,14 @@ paths:
           $ref: '#/components/responses/NoValido'
         '429':
           $ref: '#/components/responses/DemasiadasSolicitudes'
+        '502':
+          description: PASARELA_NO_RESPONDE · la pasarela no creó el pago
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '503':
-          description: PAGO_NO_DISPONIBLE · no hay pasarela en este entorno
+          description: PAGO_NO_DISPONIBLE · ninguna pasarela visible y activa cobra esa moneda
           content:
             application/json:
               schema:
@@ -6850,7 +7049,7 @@ paths:
       description: |-
         Solo existe en el entorno de pruebas (en producción, 404). Con 4111 1111 1111 1111 aprueba y con 4000 0000 0000
         0002 rechaza: arma el evento, lo firma con el secreto de la pasarela de pruebas y lo procesa por el mismo camino que
-        `POST /webhooks/pago/prueba`. Otra tarjeta, 422. Solo se guardan los 4 últimos dígitos.
+        `POST /webhooks/pago/pruebas`. Otra tarjeta, 422. Solo se guardan los 4 últimos dígitos.
       parameters:
       - name: id
         in: path
@@ -6875,18 +7074,76 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /publico/checkout/{id}/token:
+    post:
+      tags:
+      - Sitio público
+      summary: Enviar el token de Culqi Checkout para crear el cargo (HU-1704)
+      operationId: post_publico_checkout_id_token
+      security: []
+      description: |-
+        Sin sesión. El formulario incrustado de Culqi devuelve un token de un solo uso; con él la API crea el cargo en
+        Culqi (POST /v2/charges con la llave secreta del servidor). El pago sigue PENDIENTE hasta el webhook firmado: la
+        respuesta solo confirma que se envió. 404 si la solicitud no existe o no es de Culqi; 409 si ya no está pendiente;
+        402 PAGO_RECHAZADO si Culqi rechaza la tarjeta (la solicitud pasa a RECHAZADA); 502 PASARELA_NO_RESPONDE.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenPago'
+      responses:
+        '202':
+          description: Cargo enviado; el estado sigue pendiente hasta el webhook
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoCheckout'
+        '402':
+          description: PAGO_RECHAZADO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          description: La solicitud ya no está pendiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '502':
+          description: PASARELA_NO_RESPONDE
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /webhooks/pago/{pasarela}:
     post:
       tags:
       - Ventas
-      summary: Evento de una pasarela de pago (HU-1703, RN-18-3, CP-143)
+      summary: Evento de una pasarela de pago (HU-1703, HU-1704, RN-18-3, CP-143, CP-144, CP-145)
       operationId: post_webhooks_pago_pasarela
       security: []
       description: |-
-        Sin sesión; firmado. `X-Aptio-Firma` lleva `sha256=` y el HMAC-SHA256 en hexadecimal del cuerpo tal como llega
-        (hasta 64 KB), con el secreto de la pasarela; si no coincide, 401 FIRMA_NO_VALIDA y no cambia nada. HU-1703 solo
-        trae la pasarela `prueba` (con SITIO_ENTORNO=pruebas); las reales llegan con la HU-1704. Cuerpo de la de pruebas:
-        `{ id, tipo: pago.aprobado | pago.rechazado, solicitudId, ultimos4?, motivo? }`.
+        Sin sesión; firmado con el secreto de webhook de la pasarela y su modo, sobre el cuerpo tal como llega (hasta
+        64 KB). Si la firma no coincide, 401 FIRMA_NO_VALIDA y no cambia nada (CP-145, auditoría PAGO_FIRMA_NO_VALIDA).
+        `pasarela` es `pruebas` (solo con SITIO_ENTORNO=pruebas; `X-Aptio-Firma: sha256=<hex>`; cuerpo `{ id, tipo:
+        pago.aprobado | pago.rechazado, solicitudId, ultimos4?, motivo?, monto?, moneda? }`), `stripe` (`Stripe-Signature`
+        `t=,v1=` con 5 minutos de tolerancia; checkout.session.completed y async_payment_succeeded aprueban si está
+        pagado, async_payment_failed y expired rechazan) o `culqi` (`X-Culqi-Signature`, supuesto SUP-294;
+        charge.creation.succeeded y failed). Los demás tipos responden 200 con `ignorado: true`. 404 si la pasarela no
+        existe o no está activa.
 
         Idempotente (RN-18-3): un evento se procesa una sola vez (`eventoPagoId` único); si el evento ya se procesó o la
         solicitud ya no está pendiente, responde 200 con `duplicado: true` sin crear nada. Pago rechazado: la solicitud
@@ -6895,19 +7152,39 @@ paths:
         (un mes o un año), y el lead de origen «Suscripción» en etapa Ganado; después encola en `suscripciones` el correo
         de bienvenida con el enlace para crear la clave (72 h, un solo uso) y avisa del lead. Auditoría SUSCRIPCION_CREADA,
         PAGO_RECHAZADO y PAGO_FIRMA_NO_VALIDA.
+
+        HU-1704 · Cada pago aprobado guarda un Cobro (monto con IGV, moneda, pasarela, referencia y 4 últimos dígitos,
+        `eventoPagoId` único) y encola en `comprobantes` la tarea «emitir-comprobante» con jobId = id del cobro (CP-144;
+        la emite la HU-1707). Si el monto o la moneda no coinciden con la solicitud (PAGO_MONTO_NO_COINCIDE), el correo ya
+        tiene cuenta (SUSCRIPCION_SIN_ALTA) o la solicitud ya no estaba pendiente (PAGO_SIN_SOLICITUD_PENDIENTE), el
+        cobro queda sin alta para que el superadmin lo reembolse.
       parameters:
       - name: pasarela
         in: path
         required: true
         schema:
           type: string
-          example: prueba
+          enum: [pruebas, culqi, stripe]
+          example: pruebas
       - name: X-Aptio-Firma
         in: header
-        required: true
+        required: false
+        description: 'pruebas: `sha256=` y el HMAC-SHA256 en hexadecimal del cuerpo'
         schema:
           type: string
           example: sha256=6b1c…
+      - name: Stripe-Signature
+        in: header
+        required: false
+        description: 'stripe: `t=<segundos>,v1=<HMAC-SHA256 de "t.cuerpo">`'
+        schema:
+          type: string
+      - name: X-Culqi-Signature
+        in: header
+        required: false
+        description: 'culqi: HMAC-SHA256 en hexadecimal del cuerpo (supuesto SUP-294)'
+        schema:
+          type: string
       requestBody:
         required: true
         content:
@@ -14567,6 +14844,17 @@ components:
           nullable: true
           minimum: 1
           description: Precio anual propio; null = el mensual × 12 con el descuento anual
+        precioMesUsd:
+          type: integer
+          nullable: true
+          minimum: 1
+          example: 349
+          description: HU-1704 · Dólares enteros sin IGV; null = no se cobra en dólares. Un plan a medida no lleva precio en USD
+        precioAnualUsd:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: HU-1704 · Anual propio en USD; requiere precioMesUsd
         capsulasMes:
           type: integer
           nullable: true
@@ -14597,7 +14885,7 @@ components:
           type: boolean
     Plan:
       type: object
-      required: [id, slug, nombre, descripcion, precioMes, precioAnual, precioAnualEfectivo, capsulasMes, usuarios, capsulaAdicional, textoBoton, destacado, visible, caracteristicas, orden, ficticio, actualizadoEn]
+      required: [id, slug, nombre, descripcion, precioMes, precioAnual, precioAnualEfectivo, precioMesUsd, precioAnualUsd, precioAnualUsdEfectivo, capsulasMes, usuarios, capsulaAdicional, textoBoton, destacado, visible, caracteristicas, orden, ficticio, actualizadoEn]
       properties:
         id:
           type: string
@@ -14622,6 +14910,20 @@ components:
           nullable: true
           example: 12384
           description: El precio anual propio o el mensual × 12 con el descuento; null si es a medida
+        precioMesUsd:
+          type: integer
+          nullable: true
+          example: 349
+          description: HU-1704 · Dólares enteros sin IGV; null = el plan no se cobra en dólares
+        precioAnualUsd:
+          type: integer
+          nullable: true
+          description: HU-1704 · Anual propio en USD; null = precioMesUsd × 12 con el descuento anual
+        precioAnualUsdEfectivo:
+          type: integer
+          nullable: true
+          example: 3350
+          description: HU-1704 · El anual en USD que se cobra; null si no hay precio en dólares
         capsulasMes:
           type: integer
           nullable: true
@@ -14691,6 +14993,7 @@ components:
       properties:
         plan: { type: string, example: productora }
         ciclo: { type: string, enum: [MENSUAL, ANUAL], default: MENSUAL }
+        moneda: { type: string, enum: [PEN, USD], default: PEN, description: 'HU-1704 · Dólares solo si el plan tiene precio en USD y una pasarela visible y activa cobra en dólares' }
         razonSocial: { type: string, maxLength: 150, example: Minera Andina SAC }
         ruc: { type: string, example: '20131312955', description: 'Opcional. 11 dígitos (prefijo 10, 15, 16, 17 o 20) con el dígito verificador de SUNAT; admite espacios y guiones' }
         nombreAdmin: { type: string, maxLength: 120, example: Ana Quispe }
@@ -14711,22 +15014,38 @@ components:
         plan: { type: string, example: productora }
         nombrePlan: { type: string, example: Productora }
         ciclo: { type: string, enum: [MENSUAL, ANUAL] }
-        subtotal: { type: number, example: 1290, description: Soles sin IGV por el ciclo (el precio pactado) }
-        igv: { type: number, example: 232.2, description: IGV de 18 % }
+        subtotal: { type: number, example: 1290, description: 'Sin IGV por el ciclo, en la moneda del cobro (el precio pactado)' }
+        igv: { type: number, example: 232.2, description: 'IGV de 18 %, también en dólares (supuesto SUP-295)' }
         total: { type: number, example: 1522.2 }
-        moneda: { type: string, enum: [PEN] }
+        moneda: { type: string, enum: [PEN, USD] }
+    PagoCheckout:
+      type: object
+      description: |-
+        HU-1704 · Cómo sigue el pago según la pasarela: `simulado` (formulario de tarjetas de prueba), `redireccion` (la
+        página alojada de Stripe Checkout en `url`) o `formulario` (Culqi Checkout incrustado, con la llave pública y el
+        monto en céntimos). La tarjeta nunca pasa por Aptio SCORM.
+      required: [tipo]
+      properties:
+        tipo: { type: string, enum: [simulado, redireccion, formulario] }
+        url: { type: string, example: 'https://checkout.stripe.com/c/pay/cs_test_…' }
+        referencia: { type: string, example: cs_test_…, description: La sesión o el cargo en la pasarela }
+        llavePublica: { type: string, example: pk_test_…, description: Llave pública (nunca la secreta) }
+        montoCentimos: { type: integer, example: 152220 }
+        moneda: { type: string, enum: [PEN, USD] }
+        descripcion: { type: string, example: Aptio SCORM · Plan Productora (mensual) }
     CheckoutCreado:
       type: object
-      required: [id, estado, resumen, tipoComprobante, pasarela]
+      required: [id, estado, resumen, tipoComprobante, pasarela, pago]
       properties:
         id: { type: string, format: uuid }
         estado: { type: string, enum: [PENDIENTE] }
         resumen: { $ref: '#/components/schemas/ResumenCheckout' }
         tipoComprobante: { type: string, enum: [FACTURA, BOLETA] }
-        pasarela: { type: string, example: prueba }
+        pasarela: { type: string, enum: [pruebas, culqi, stripe], example: pruebas, description: 'La pasarela que cobra esa moneda (HU-1704)' }
+        pago: { $ref: '#/components/schemas/PagoCheckout' }
     EstadoCheckout:
       type: object
-      required: [id, estado, plan, nombrePlan, ciclo, total, tipoComprobante, correoAdmin, motivoRechazo, finPeriodo]
+      required: [id, estado, plan, nombrePlan, ciclo, total, moneda, tipoComprobante, correoAdmin, motivoRechazo, finPeriodo]
       properties:
         id: { type: string, format: uuid }
         estado: { type: string, enum: [PENDIENTE, APROBADA, RECHAZADA] }
@@ -14734,6 +15053,7 @@ components:
         nombrePlan: { type: string, example: Productora }
         ciclo: { type: string, enum: [MENSUAL, ANUAL] }
         total: { type: number, example: 1522.2 }
+        moneda: { type: string, enum: [PEN, USD] }
         tipoComprobante: { type: string, enum: [FACTURA, BOLETA] }
         correoAdmin: { type: string, format: email, description: Adónde llega la bienvenida }
         motivoRechazo: { type: string, nullable: true }
@@ -14749,10 +15069,74 @@ components:
       properties:
         recibido: { type: boolean, enum: [true] }
         duplicado: { type: boolean, description: 'true si el evento ya se había procesado y no se creó nada' }
+        ignorado: { type: boolean, description: 'HU-1704 · true si el evento no es de pago (la pasarela manda otros tipos): no se creó nada' }
+    TokenPago:
+      type: object
+      required: [token]
+      properties:
+        token: { type: string, example: tkn_test_…, description: 'El token de un solo uso del formulario incrustado (Culqi Checkout)' }
+    Pasarela:
+      type: object
+      description: HU-1704 · Una pasarela como la ve el superadmin. Nunca lleva llaves ni secretos, solo los nombres de las variables que faltan.
+      required: [codigo, nombre, visible, orden, modo, monedas, flujo, simulada, activa, variablesFaltantes]
+      properties:
+        codigo: { type: string, enum: [pruebas, culqi, stripe] }
+        nombre: { type: string, maxLength: 40, example: Culqi }
+        visible: { type: boolean, description: Se ofrece en el pago (si además está activa) }
+        orden: { type: integer }
+        modo: { type: string, enum: [pruebas, produccion], description: 'Qué juego de llaves usa (variables *_PRUEBAS o *_PRODUCCION)' }
+        monedas: { type: array, items: { type: string, enum: [PEN, USD] }, example: [PEN] }
+        flujo: { type: string, enum: [simulado, redireccion, formulario] }
+        simulada: { type: boolean, description: 'La de pruebas: solo existe con SITIO_ENTORNO=pruebas' }
+        activa: { type: boolean, description: Sus variables de entorno del modo están y el entorno la admite }
+        variablesFaltantes: { type: array, items: { type: string }, example: [STRIPE_LLAVE_SECRETA_PRUEBAS] }
+    ListaPasarelas:
+      type: object
+      required: [pasarelas]
+      properties:
+        pasarelas: { type: array, items: { $ref: '#/components/schemas/Pasarela' } }
+    CambioPasarela:
+      type: object
+      description: Solo lo que cambia
+      properties:
+        nombre: { type: string, maxLength: 40 }
+        visible: { type: boolean }
+        modo: { type: string, enum: [pruebas, produccion] }
+    OrdenPasarelas:
+      type: object
+      required: [codigos]
+      properties:
+        codigos: { type: array, maxItems: 10, items: { type: string, enum: [pruebas, culqi, stripe] }, description: 'Todas las pasarelas, en el orden nuevo' }
+    Cobro:
+      type: object
+      description: HU-1704 · Un cobro aprobado. Sin datos de tarjeta, solo la referencia y los 4 últimos dígitos (REQ-110).
+      required: [id, solicitudId, suscripcionId, razonSocial, correoAdmin, nombrePlan, monto, moneda, pasarela, ultimos4Digitos, estado, motivoSinAlta, reembolsable, reembolsoId, reembolsadoEn, creadoEn]
+      properties:
+        id: { type: string, format: uuid }
+        solicitudId: { type: string, format: uuid }
+        suscripcionId: { type: string, format: uuid, nullable: true, description: 'null = pago aprobado sin alta (SUP-291)' }
+        razonSocial: { type: string, example: Minera Andina SAC }
+        correoAdmin: { type: string, format: email }
+        nombrePlan: { type: string, example: Productora }
+        monto: { type: number, example: 1522.2, description: Con IGV }
+        moneda: { type: string, enum: [PEN, USD] }
+        pasarela: { type: string, example: stripe }
+        ultimos4Digitos: { type: string, nullable: true, example: '4242' }
+        estado: { type: string, enum: [APROBADO, REEMBOLSADO] }
+        motivoSinAlta: { type: string, nullable: true, description: 'Por qué el pago no creó la cuenta (correo en uso, monto distinto…)' }
+        reembolsable: { type: boolean, description: Aprobado y sin alta }
+        reembolsoId: { type: string, nullable: true }
+        reembolsadoEn: { type: string, format: date-time, nullable: true }
+        creadoEn: { type: string, format: date-time }
+    ListaCobros:
+      type: object
+      required: [cobros]
+      properties:
+        cobros: { type: array, items: { $ref: '#/components/schemas/Cobro' } }
     PlanPublico:
       type: object
       description: HU-1702 · El plan publicado como lo ve el visitante y el resumen del pago (CP-141). Soles sin IGV salvo `precioMesConIgv`.
-      required: [slug, nombre, descripcion, aMedida, precioMes, precioAnual, ahorroAnual, precioMesConIgv, capsulasMes, usuarios, capsulaAdicional, textoBoton, destacado, caracteristicas, enlace, ajustes]
+      required: [slug, nombre, descripcion, aMedida, precioMes, precioAnual, ahorroAnual, precioMesConIgv, precioMesUsd, precioAnualUsd, monedas, capsulasMes, usuarios, capsulaAdicional, textoBoton, destacado, caracteristicas, enlace, ajustes]
       properties:
         slug:
           type: string
@@ -14781,6 +15165,23 @@ components:
           type: number
           nullable: true
           example: 1640.2
+        precioMesUsd:
+          type: integer
+          nullable: true
+          example: 349
+          description: HU-1704 · Al mes en USD sin IGV; solo si hoy se puede pagar en dólares (el plan lo tiene y Stripe está visible y activa)
+        precioAnualUsd:
+          type: integer
+          nullable: true
+          example: 3350
+          description: HU-1704 · El anual efectivo en USD sin IGV; mismo criterio
+        monedas:
+          type: array
+          items:
+            type: string
+            enum: [PEN, USD]
+          example: [PEN, USD]
+          description: HU-1704 · Las monedas en que se puede pagar ahora; con una sola, /pago no muestra el selector
         capsulasMes:
           type: integer
           nullable: true

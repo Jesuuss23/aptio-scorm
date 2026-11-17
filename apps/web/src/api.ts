@@ -10,6 +10,7 @@ import type { DatosTecnicos, EstadoProyecto, PerfilLms } from '@aptio/schema/pro
 import type { ParametrosNegocio } from '@aptio/schema/rentabilidad';
 import type { Operacion } from '@aptio/schema/operacion';
 import type { AjustesPlanes, DatosPlan } from '@aptio/schema/planes';
+import type { CodigoPasarela, ModoPasarela } from '@aptio/schema/pasarelas';
 import type { DatosPopup } from '@aptio/schema/popups';
 import type { AjustesAgenda, EstadoCita, Feriado } from '@aptio/schema/agenda';
 import type { AccionRapida, ObjetivoChatbot, ResultadoConversacion, TonoChatbot } from '@aptio/schema/chatbot';
@@ -735,9 +736,22 @@ export interface PlanVenta extends DatosPlan {
   orden: number;
   ficticio: boolean;
   precioAnualEfectivo: number | null;
+  /** HU-1704 · El anual en USD que se cobra (el propio o con el descuento); null sin precio en dólares. */
+  precioAnualUsdEfectivo: number | null;
   actualizadoEn: string;
 }
 export type EntradaPlan = Partial<DatosPlan> & { ficticio?: boolean };
+
+/** HU-1704 · Ventas › Pasarelas (PNT-37): sin llaves ni secretos, solo los nombres de las variables que faltan. */
+export interface PasarelaVenta {
+  codigo: CodigoPasarela; nombre: string; visible: boolean; orden: number; modo: ModoPasarela; monedas: ('PEN' | 'USD')[];
+  flujo: 'simulado' | 'redireccion' | 'formulario'; simulada: boolean; activa: boolean; variablesFaltantes: string[];
+}
+/** HU-1704 · Un cobro aprobado (sin datos de tarjeta, REQ-110). */
+export interface CobroVenta {
+  id: string; solicitudId: string; suscripcionId: string | null; razonSocial: string; correoAdmin: string; nombrePlan: string; monto: number; moneda: 'PEN' | 'USD'; pasarela: string;
+  ultimos4Digitos: string | null; estado: 'APROBADO' | 'REEMBOLSADO'; motivoSinAlta: string | null; reembolsable: boolean; reembolsoId: string | null; reembolsadoEn: string | null; creadoEn: string;
+}
 
 /** HU-1605 · Captación › Agendamiento (PNT-33). */
 export interface TipoReunion { id: string; nombreEs: string; nombreEn: string; minutos: number; asesorIds: string[]; visible: boolean; orden: number; ficticio: boolean }
@@ -953,6 +967,12 @@ export const api = {
   cambiarPlan: (id: string, d: EntradaPlan) => pedir<PlanVenta>(`/ventas/planes/${id}`, json(d, 'PATCH')),
   ordenarPlanes: (ids: string[]) => pedir<{ planes: PlanVenta[]; ajustes: AjustesPlanes }>('/ventas/planes/orden', json({ ids }, 'PUT')),
   guardarAjustesPlanes: (a: AjustesPlanes) => pedir<AjustesPlanes>('/ventas/planes/ajustes', json(a, 'PUT')),
+  // HU-1704 · Ventas › Pasarelas y cobros
+  pasarelas: () => pedir<{ pasarelas: PasarelaVenta[] }>('/ventas/pasarelas'),
+  cambiarPasarela: (codigo: CodigoPasarela, d: Partial<Pick<PasarelaVenta, 'nombre' | 'visible' | 'modo'>>) => pedir<PasarelaVenta>(`/ventas/pasarelas/${codigo}`, json(d, 'PATCH')),
+  ordenarPasarelas: (codigos: CodigoPasarela[]) => pedir<{ pasarelas: PasarelaVenta[] }>('/ventas/pasarelas/orden', json({ codigos }, 'PUT')),
+  cobros: (sinAlta?: boolean) => pedir<{ cobros: CobroVenta[] }>(`/ventas/cobros${sinAlta === undefined ? '' : `?sinAlta=${sinAlta}`}`),
+  reembolsarCobro: (id: string) => pedir<CobroVenta>(`/ventas/cobros/${id}/reembolsar`, { method: 'POST' }),
   // HU-1605 · Captación › Agendamiento (PNT-33).
   agenda: () => pedir<Agenda>('/captacion/agenda'),
   cambiarAjustesAgenda: (c: Partial<AjustesAgenda>) => pedir<AjustesAgenda>('/captacion/agenda', json(c, 'PATCH')),
