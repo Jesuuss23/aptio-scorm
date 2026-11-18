@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.84 · actualizado con la quinta entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.85 · actualizado con el entorno de pruebas en la nube, la historia 110 de 110 (18 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -49,6 +49,8 @@ packages/
   ui/         tokens visuales, estilos base y estructura de la interfaz (@aptio/ui)
   player/     reproductor único del curso: vista previa y paquete, con las 8 interacciones (@aptio/player)
   sitio/      HTML pre-renderizado del sitio comercial, fuentes, cabeceras y Lighthouse (@aptio/sitio)
+infra/        AWS CDK del entorno de pruebas en sa-east-1, con sus pruebas (@aptio/infra, HU-1405)
+docker/       imágenes de la API, el worker y la web, y el punto de entrada
 docs/         especificación: módulos, historias, API, ADR, diseño, ESTADO.md
 ```
 
@@ -490,8 +492,19 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
   - Vitest, `ia:casos` y lint de OpenAPI.
 - **Flujos de la web:** Playwright con Chromium.
 - **Sitio público (Lighthouse):** `pnpm sitio:lighthouse` con el Google Chrome del runner; sube el informe como artefacto.
+- **Imágenes Docker:** construye `docker/api.Dockerfile`, `docker/worker.Dockerfile` y `docker/web.Dockerfile` sin publicarlas y revisa que la API y el worker corran con el uid 10001 y que el worker tenga ffmpeg, Rhubarb, `pg_dump` 16 y fuentes (HU-1405).
 
-Para que un PR en rojo no se pueda fusionar, el administrador del repositorio debe exigir los tres controles en la protección de `main`.
+`.github/workflows/deploy-pruebas.yml` («Despliegue a pruebas») corre cuando el CI termina bien en un push a `main`, o a mano. Usa el entorno `pruebas` de GitHub y su variable `AWS_ROLE_ARN`; sin ella se salta con un aviso. Pasos: OIDC, imágenes a ECR con el SHA del commit, `infra/scripts/migrar.sh` (tarea efímera con `pnpm db:deploy` y `verificar-organizaciones`), `cdk deploy` de `AptioPruebas`, la web al bucket con invalidación de `/index.html` y la comprobación de `/api/v1/salud` por HTTPS. La primera vez crea la pila con `-c replicas=0`, migra y luego sube a 1. Detalle en `docs/24-puesta-en-marcha-aws.md`.
+
+### Infraestructura (`infra/`)
+
+- `pnpm --filter @aptio/infra test` corre las pruebas de la plantilla con `aws-cdk-lib/assertions` (HTTPS, buckets privados con KMS, cero secretos en las tareas, comportamientos de CloudFront, tamaño y OIDC). Entran en `pnpm test` y `pnpm typecheck` del CI.
+- `pnpm --filter @aptio/infra exec cdk synth` arma las plantillas; necesita credenciales de la cuenta para resolver la lista de prefijos de CloudFront y las zonas.
+- Parámetros por contexto (`-c` o `infra/cdk.json`): `entorno`, `etiquetaImagen`, `dominio` con `certificadoCloudFrontArn` (us-east-1), `dominioOrigen` con `certificadoAlbArn` (sa-east-1), `modoProveedores`, `replicas`, `repositorioGithub` y `proteccionBorrado`.
+- Una variable nueva de la app que sea secreta se agrega a `LLAVES_APLICACION` (`infra/src/config.ts`); una que no lo sea, a `entornoComun` (`infra/src/entorno.ts`). Las pruebas fallan si una variable de entorno de las tareas parece un secreto.
+- Las imágenes se construyen desde la raíz: `docker build -f docker/worker.Dockerfile -t aptio-worker .` y la web como archivos con `docker build -f docker/web.Dockerfile --target exportar --output type=local,dest=web-dist .`.
+
+Para que un PR en rojo no se pueda fusionar, el administrador del repositorio debe exigir esos controles en la protección de `main` (desde HU-1405, también los tres de imágenes).
 
 ## 10. Variables de entorno principales
 
@@ -499,6 +512,9 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | --- | --- | --- |
 | `DATABASE_URL` | db, api, worker | PostgreSQL |
 | `REDIS_HOST`, `REDIS_PORT`, `COLAS_PREFIJO` | api, worker | Colas y eventos (el prefijo debe coincidir en ambos) |
+| `REDIS_TLS`, `REDIS_PASSWORD` | api, worker | `true` y la clave AUTH de ElastiCache en la nube (HU-1405); vacías en local |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | imágenes de api y worker | Partes de la conexión que ECS entrega desde Secrets Manager; `docker/entrada.sh` arma `DATABASE_URL` si no viene definida |
+| `TRUST_PROXY` | api | Proxies delante de la API (0 a 5): 2 en la nube (CloudFront y el balanceador), para que `req.ip` sea el visitante (HU-1405) |
 | `SESSION_SECRET`, `SESSION_TTL_HOURS` | api | Firma y vigencia de la cookie de sesión (obligatorio en producción) |
 | `AWS_*`, `S3_BUCKET_NAME`, `KMS_KEY_ID` | api, worker | Almacenamiento cifrado |
 | `SMTP_URL`, `CORREO_REMITENTE` | api, worker | Invitaciones, recuperación de clave, aviso de comentario nuevo (api) y aviso del límite de gasto (worker) |
@@ -535,6 +551,8 @@ Ninguna clave real va al repositorio.
 | `Custom Id cannot contain :` al encolar | Un id de trabajo con «:» | Usa «-» como separador |
 | `openapi:lint` con más de 7 avisos | Un componente sin usar o `nullable` sin `type` | Usa el componente o agrega `type` |
 | oxlint «solo exportar componentes» | Una función auxiliar en un `.tsx` | Muévela a `formato.ts` |
+| El despliegue a pruebas termina con «Despliegue omitido» | El entorno `pruebas` de GitHub no tiene `AWS_ROLE_ARN` | Sigue `docs/24-puesta-en-marcha-aws.md`, pasos 1 a 3 |
+| La tarea de migraciones termina con código distinto de 0 | Una migración falló o `verificar-organizaciones` encontró filas huérfanas | Lee el final del registro del despliegue o `/aptio/pruebas/migracion` en CloudWatch; los servicios no se tocaron |
 
 ---
 
@@ -577,6 +595,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.85 | 2026-11-18 | HU-1405: `docker/` (imágenes de la API, el worker y la web, punto de entrada), `infra/` (`@aptio/infra` con CDK y sus pruebas), el workflow «Despliegue a pruebas» con OIDC y `infra/scripts/migrar.sh`, el job de imágenes del CI y las variables `REDIS_TLS`, `REDIS_PASSWORD`, `DB_*` y `TRUST_PROXY`. |
 | 0.84 | 2026-11-17 | HU-1711: migración `DatosFacturacionOrg`, `@aptio/schema/facturacion-org`, el receptor del worker, `FacturacionOrgService` y `FacturacionOrgController` (`/organizacion/facturacion` y descargas), `FacturacionOrg.tsx` en `/facturacion` y la simulación `facturacion-org-simulada.ts`. |
 | 0.83 | 2026-11-17 | HU-1710: `@aptio/schema/ingresos`, `IngresosService` e `IngresosController` (`GET /ventas/ingresos`), `VentasIngresos.tsx` en Ventas › Planes y la simulación `ingresos-simulados.ts`. |
 | 0.82 | 2026-11-17 | HU-1709: migración `20261117130000_cupones`, `@aptio/schema/cupones`, el descuento en `montoRenovacion`, `CuponesService` y `CuponesController`, `POST /publico/checkout/cupon`, `usarEnAlta` en el webhook, el campo de cupón de `pago.ts`, la vista `VentasCupones.tsx` y la simulación `cupones-simulados.ts`. |

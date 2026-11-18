@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.84 · actualizado con la quinta entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.85 · actualizado con el entorno de pruebas en la nube, la historia 110 de 110 (18 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1314,6 +1314,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.85 | 2026-11-18 | Se prepara el enlace estable de pruebas para revisar la demo de cada sprint; estará disponible cuando se active en la nube. Sin cambios en las formas de uso. |
 | 0.84 | 2026-11-17 | Facturación de la organización (8.50): plan y consumo, descarga del PDF y el XML de tus comprobantes, cambio de la tarjeta de prueba y edición de los datos de facturación (factura o boleta). |
 | 0.83 | 2026-11-17 | Ingresos del mes en Ventas › Planes (8.49): ingreso mensual recurrente con los dólares aparte y el ingreso en riesgo, suscripciones activas, cancelación mensual con la variación y el ingreso promedio por cliente, con «Mes anterior» y «Mes siguiente». |
 | 0.82 | 2026-11-17 | Cupones y convenios: el «Código de cupón» con «Aplicar» y «Quitar el cupón» en el pago, con el descuento en el resumen y el motivo si no vale (8.47); la pestaña Cupones de Ventas › Facturación para crear, editar, ocultar y activar, con los usos y el estado (8.48). |

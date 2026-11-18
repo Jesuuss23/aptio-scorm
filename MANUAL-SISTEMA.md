@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.84 · actualizado con la quinta entrega del Sprint 14 (17 de noviembre de 2026)**
+**Versión 0.85 · actualizado con el entorno de pruebas en la nube, la historia 110 de 110 (18 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -645,6 +645,15 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Consola:** `GET /organizacion/facturacion`, `PUT /organizacion/facturacion/datos`, `POST /organizacion/facturacion/medio-pago` y `GET /organizacion/comprobantes/{id}/pdf|xml`; la vista «Facturación» (PNT-40) en el menú Empresa del administrador.
 - **Fuera de alcance:** reenviar el correo desde el portal, filtros por fecha, exportación masiva y medios de pago reales guardados en Stripe o Culqi.
 
+### 3.43 Entorno de pruebas en la nube (HU-1405)
+
+- **Dónde (ADR-009, CP-105):** AWS en sa-east-1. La infraestructura está como código en `infra/` (AWS CDK) y las imágenes en `docker/`. La guía de la primera puesta en marcha es `docs/24-puesta-en-marcha-aws.md`. **Aún no se ha desplegado en una cuenta real** (SUP-340).
+- **Piezas:** CloudFront (HTTPS, HTTP redirige con 301) sirve la web estática desde un bucket privado y lleva `/api/*` y `/s/*` a un balanceador que solo atiende a CloudFront (SUP-334). Detrás, ECS Fargate con 1 réplica de la API y 1 del worker en subredes privadas, y PostgreSQL 16 (RDS) y Redis 7 (ElastiCache, con TLS y clave) de una instancia en subredes aisladas.
+- **Datos y cifrado:** buckets de web, material y respaldos (`aptio-pruebas-<uso>-<cuenta>`), cifrados con KMS, sin acceso público y solo por HTTPS; solo el de material tiene CORS, limitado a la dirección de la web (SUP-342). La base y Redis también cifran con la clave de datos.
+- **Secretos:** solo en Secrets Manager (`aptio-pruebas-postgres`, `-redis`, `-aplicacion` y `-origen-cloudfront`). Las tareas los reciben al arrancar; ninguna variable de las tareas ni del repositorio lleva un valor secreto. Las llaves de proveedores se cargan en `aptio-pruebas-aplicacion` (SUP-338).
+- **Despliegue continuo:** tras cada CI exitoso de `main`, el workflow «Despliegue a pruebas» entra con OIDC, publica las imágenes en ECR, migra la base con una tarea efímera (`migrate deploy` y `verificar-organizaciones`), actualiza los servicios (vuelven atrás solos si no quedan sanos), sube la web y comprueba `/api/v1/salud` por HTTPS (SUP-337). Producción queda fuera.
+- **Modo de pruebas:** proveedores simulados hasta cargar las llaves y `SITIO_ENTORNO=pruebas` (aviso de datos ficticios, pasarela de pruebas y OSE simulado).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -680,7 +689,8 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | **Archivos** | Cifrados con KMS y bucket no público. Solo se accede con URLs firmadas de 15 minutos. El tipo real se verifica por contenido (un .exe renombrado se rechaza) y el SVG se sanea con una lista cerrada. |
 | **Retención** | Los documentos del cliente se borran a la fecha de entrega más los días de retención del cliente (180 por defecto). El worker los borra cada día a las 3:00 (Lima), incluido el texto extraído y las transcripciones, y lo registra en auditoría. |
 | **Inyección en la IA** | El material del cliente va escapado y delimitado en `<material_cliente>`. Lo que parece una orden se marca y nunca se obedece (HU-1402). |
-| **Secretos** | Solo en variables de entorno. Ninguna clave real va al repositorio. |
+| **Secretos** | En local, variables de entorno. En la nube, solo en Secrets Manager y cifrados con KMS; ECS los entrega a cada tarea al arrancar (3.43). Ninguna clave real va al repositorio, y GitHub despliega con OIDC, sin llaves de AWS. |
+| **Entrada en la nube** | Solo HTTPS hacia el visitante (TLS 1.2 como mínimo, HSTS de un año). El balanceador solo acepta a CloudFront, y la API toma la IP real del visitante para sus límites (`TRUST_PROXY`, SUP-336). |
 
 ## 6. Proveedores externos
 
@@ -688,7 +698,7 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | --- | --- | --- | --- |
 | Texto (etapas 1 a 3) | Anthropic Claude (`claude-opus-5-5` por defecto, SUP-23) | Salidas grabadas del caso LOTO | Integrado. Los prompts v2 de IA-04 e IA-05 todavía no se han evaluado con la clave real. |
 | Transcripción | Google Speech-to-Text v1 (`latest_long`) | Fragmentos de relleno cada 10 s, sin costo | Integrado. Sin probar con una clave real, y tarifa por minuto sin verificar (SUP-28). |
-| Boca (etapa 7) | Rhubarb Lip Sync 1.13 (MIT), local en el worker, con ffmpeg | Marcas por letras, sin costo | Integrado y probado en local con un MP3. Falta PT-01 con voz real e instalarlo en la imagen del worker (HU-1405). |
+| Boca (etapa 7) | Rhubarb Lip Sync 1.13 (MIT), local en el worker, con ffmpeg | Marcas por letras, sin costo | Integrado y probado en local con un MP3; instalado en la imagen del worker (HU-1405). Falta PT-01 con voz real. |
 | Voz (muestra y etapa 6) | Google Text-to-Speech (voces GA) | Silencio WAV de 65 ms por carácter, sin costo | Integrado. Sin probar con una clave real; tarifa supuesta de 16 USD por millón de caracteres (Neural2) y 30 USD (Chirp 3 HD), por confirmar (SUP-34). ElevenLabs desde HU-1304 (`eleven_multilingual_v2`), probado con `fetch` simulado y tarifa supuesta de 200 USD por millón de caracteres (SUP-147). Azure todavía no. |
 | Correo | SMTP (Mailpit en local) | — | Integrado. |
 | Pagos en dólares | Stripe Checkout y Refunds | Pasarela de pruebas (solo con `SITIO_ENTORNO=pruebas`) | Integrado con firma y reembolso; sin probar con llaves reales. |
@@ -698,8 +708,8 @@ Las licencias, el uso comercial y el tratamiento de datos de cada proveedor est�
 
 ## 7. Configuración y despliegue
 
-- **Entornos:** desarrollo local (docker compose), pruebas y producción en la nube (ADR-009). La infraestructura de la nube (clave KMS, bucket con bloqueo público y CORS solo para la web) es un pendiente de HU-1405.
-- **Requisitos de la imagen del worker:** Node.js 24, ffmpeg y ffprobe (transcripción) y los datos de idioma de Tesseract (vienen por npm, sin red).
+- **Entornos:** desarrollo local (docker compose), pruebas y producción en la nube (ADR-009). El de pruebas está definido como código (3.43, `infra/`) y se despliega solo tras cada CI exitoso de `main`; falta el primer despliegue en la cuenta AWS (`docs/24-puesta-en-marcha-aws.md`). Producción se arma igual, con otro nombre de entorno.
+- **Imágenes (`docker/`):** la API y el worker sobre Ubuntu 24.04 con Node 22, como el usuario sin privilegios `aptio`. El worker trae ffmpeg y ffprobe, Rhubarb Lip Sync 1.13.0, `pg_dump` 16 y las fuentes DejaVu y Liberation; los datos de idioma de Tesseract vienen por npm, sin red (SUP-333). La web se publica como archivos estáticos en el bucket de CloudFront.
 - **Variables:** la lista completa está en el manual del programador, §10, y en los `.env.example` de `apps/api`, `apps/worker` y `packages/db`.
 - **Escalado:** API y worker no guardan estado propio. El worker se escala con más instancias o con `WORKER_CONCURRENCIA`, y los eventos llegan a todas las instancias de la API por Redis.
 
@@ -752,7 +762,8 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 - **SUP-324 a SUP-328:** solo descuentos en porcentaje (sin monto fijo, prueba gratis, cápsulas adicionales ni cambios de plan); descuento al céntimo sobre la lista con IGV sobre la base y los ciclos contando el alta; usos al aprobarse con los dos pagos respetados en el último cupo; un cupón del 100 % no se paga en línea; «ya usado» por correo o RUC, vigencia por días de Lima y límite de la vista previa en memoria.
 - **SUP-329 y SUP-330:** soles y dólares por separado sin tipo de cambio; MRR neto sin IGV de las vigentes (activas y con pago pendiente), anual entre 12, con el cupón vigente y el ingreso en riesgo aparte; cancelación sobre las vigentes al empezar el mes; los meses pasados con el estado de hoy.
 - **SUP-331 y SUP-332:** el cambio de tarjeta del portal solo con la pasarela de pruebas, guardando los 4 últimos dígitos y nunca el CVV; los datos de facturación editados rigen solo para los comprobantes nuevos.
-- **Protección de `main`:** exigir los tres controles de CI es una configuración del repositorio que hace su administrador.
+- **SUP-333 a SUP-342:** el entorno de pruebas en la nube está definido y probado como código, pero aún no se desplegó en la cuenta AWS real: el HTTPS real, la copia contra S3 y PostgreSQL de la nube y Lighthouse detrás de CloudFront se verifican en el primer despliegue. Sin dominio propio, el tramo CloudFront → balanceador va por HTTP dentro de AWS, limitado a CloudFront con una cabecera secreta. Las imágenes llevan las dependencias de desarrollo (1,9 GB y 2,9 GB). Los límites por IP siguen en memoria con 1 réplica.
+- **Protección de `main`:** exigir los controles de CI (lint, tipos y pruebas; flujos; Lighthouse; imágenes) es una configuración del repositorio que hace su administrador.
 
 ---
 
@@ -795,6 +806,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.85 | 2026-11-18 | Entorno de pruebas en la nube (3.43): AWS en sa-east-1 con CloudFront, ECS Fargate, RDS, ElastiCache, buckets con KMS y Secrets Manager; imágenes Docker, despliegue continuo con OIDC y la guía de puesta en marcha. Seguridad y configuración al día. Falta el primer despliegue en la cuenta real. |
 | 0.84 | 2026-11-17 | Portal de facturación de la organización (3.42): datos de facturación por organización para los comprobantes nuevos, descarga aislada del PDF y el XML, cambio de la tarjeta de prueba y la vista «Facturación» del administrador. |
 | 0.83 | 2026-11-17 | Panel de ingresos (3.41): MRR neto por moneda con el ingreso en riesgo, activas, cancelación mensual con su variación y ARPU por mes de Lima, en `GET /ventas/ingresos` y arriba de Ventas › Planes. |
 | 0.82 | 2026-11-17 | Cupones y convenios (3.40): el cupón de campaña o convenio, `aplicarCupon` en la vista previa y el checkout con el total intacto al rechazar, el uso al aprobarse con `FOR UPDATE` y la auditoría sobre el límite, el descuento en las renovaciones y la pestaña Cupones del superadmin. |
