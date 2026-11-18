@@ -27,7 +27,15 @@ export interface ConfigEntorno {
   correoRemitente?: string;
   /** Réplicas de la API y del worker: 1; 0 solo en el primer despliegue, antes de migrar la base vacía. */
   replicas: 0 | 1;
+  /**
+   * HU-1712 · URL del servicio de Mifact (`MIFACT_URL`, no es secreto). Fuera de producción, la demo por defecto; en
+   * producción se indica con `-c mifactUrl=…` (la que entregue Mifact). Sin ella, Mifact no está disponible.
+   */
+  mifactUrl?: string;
 }
+
+/** HU-1712 · La demo de Mifact (ambiente de pruebas, sin valor tributario). */
+export const MIFACT_URL_DEMO = 'https://demo.mifact.net.pe/api/invoiceService.svc';
 
 type LeerContexto = (clave: string) => unknown;
 
@@ -60,6 +68,8 @@ export function leerConfig(leer: LeerContexto): ConfigEntorno {
   if (certificadoAlbArn && !certificadoAlbArn.startsWith(`arn:aws:acm:${REGION}:`)) {
     throw new Error(`certificadoAlbArn debe ser un certificado de ACM en ${REGION}`);
   }
+  const mifactUrl = texto(leer, 'mifactUrl') ?? (entorno === 'produccion' ? undefined : MIFACT_URL_DEMO);
+  if (mifactUrl && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(mifactUrl)) throw new Error(`mifactUrl no válida: «${mifactUrl}» (una URL https)`);
   return {
     entorno,
     etiquetaImagen: texto(leer, 'etiquetaImagen') ?? 'inicial',
@@ -70,6 +80,7 @@ export function leerConfig(leer: LeerContexto): ConfigEntorno {
     proteccionBorrado: texto(leer, 'proteccionBorrado') !== 'false',
     replicas: replicas(texto(leer, 'replicas')),
     ...(texto(leer, 'correoRemitente') ? { correoRemitente: texto(leer, 'correoRemitente')! } : {}),
+    ...(mifactUrl ? { mifactUrl } : {}),
   };
 }
 
@@ -100,6 +111,12 @@ export function llavesAplicacion(entorno: string): string[] {
   const soloPruebas = entorno === 'produccion' ? [] : ['PAGO_PRUEBA_SECRETO', 'OSE_PRUEBAS_SECRETO_WEBHOOK'];
   return [...LLAVES_COMUNES, ...pasarelas, ...soloPruebas];
 }
+
+/**
+ * HU-1712 · Llaves que solo recibe el worker (también viven en el secreto `aptio-<entorno>-aplicacion`): el token de
+ * Mifact, que es de un RUC emisor y rota cada 6 meses aprox. La API no emite: solo necesita `MIFACT_URL`.
+ */
+export const LLAVES_SOLO_WORKER = ['MIFACT_TOKEN'] as const;
 
 /** Nombre único de un bucket del entorno: la cuenta lo vuelve irrepetible en todo S3. */
 export function nombreBucket(entorno: string, uso: 'web' | 'material' | 'respaldos', cuenta: string): string {

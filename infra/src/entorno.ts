@@ -18,7 +18,7 @@ import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
-import { type ConfigEntorno, llavesAplicacion, nombreBucket } from './config';
+import { type ConfigEntorno, LLAVES_SOLO_WORKER, llavesAplicacion, nombreBucket } from './config';
 
 export interface EntornoProps extends StackProps {
   config: ConfigEntorno;
@@ -136,7 +136,7 @@ export class EntornoStack extends Stack {
       description: 'Llaves de la aplicación (vacías al crear; ver docs/24-puesta-en-marcha-aws.md)',
       encryptionKey: claveDatos,
       generateSecretString: {
-        secretStringTemplate: JSON.stringify(Object.fromEntries(llavesAplicacion(c.entorno).map((k) => [k, '']))),
+        secretStringTemplate: JSON.stringify(Object.fromEntries([...llavesAplicacion(c.entorno), ...LLAVES_SOLO_WORKER].map((k) => [k, '']))),
         generateStringKey: 'SESSION_SECRET',
         passwordLength: 64,
         excludePunctuation: true,
@@ -367,6 +367,8 @@ export class EntornoStack extends Stack {
       WEB_URL: urlWeb,
       SITIO_URL: `${urlWeb}/s`,
       ...(c.correoRemitente ? { CORREO_REMITENTE: c.correoRemitente } : {}),
+      // HU-1712 · La URL de Mifact no es secreta: la API marca el proveedor como disponible y el worker emite con ella.
+      ...(c.mifactUrl ? { MIFACT_URL: c.mifactUrl } : {}),
     };
     // Credenciales: solo referencias a Secrets Manager; ECS las inyecta al arrancar la tarea.
     const secretosComunes: Record<string, ecs.Secret> = {
@@ -445,7 +447,8 @@ export class EntornoStack extends Stack {
     tareaWorker.addContainer('worker', {
       image: imagen('worker'),
       environment: { ...entornoComun, WORKER_CONCURRENCIA: '2' },
-      secrets: secretosComunes,
+      // HU-1712 · Solo el worker emite comprobantes: el token de Mifact no llega a la API.
+      secrets: { ...secretosComunes, ...Object.fromEntries(LLAVES_SOLO_WORKER.map((k) => [k, ecs.Secret.fromSecretsManager(secretoApp, k)])) },
       logging: registros('worker'),
     });
     permisosDatos(tareaWorker);

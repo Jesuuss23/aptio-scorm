@@ -84,6 +84,8 @@ shred -u /tmp/llaves.json
 
 Luego se cambia el modo a real con un despliegue que lleve `-c modoProveedores=real` (o se cambia ese valor en `infra/cdk.json` con un PR). ECS lee los secretos al arrancar cada tarea: tras editar el secreto, basta forzar un despliegue nuevo de los servicios (`aws ecs update-service --cluster aptio-pruebas-cluster --service aptio-pruebas-api --force-new-deployment`, y lo mismo con `aptio-pruebas-worker`).
 
+**Facturación con Mifact (HU-1712).** El token `MIFACT_TOKEN` va en el mismo secreto `aptio-<entorno>-aplicacion`, pero la infraestructura se lo pasa **solo al worker**: la API nunca lo recibe. El RUC del emisor en Ventas › Facturación › Datos fiscales debe ser el del token. La URL no es secreta y se pasa como contexto: fuera de producción, si no se indica, se usa la demo (`https://demo.mifact.net.pe/api/invoiceService.svc`); en producción es obligatorio indicarla con `-c mifactUrl=https://…` (debe ser HTTPS). Tras cambiar el token, basta forzar un despliegue nuevo del worker.
+
 ## 6. Crear el primer usuario y verificar CP-105
 
 1. Sembrar los datos iniciales con una tarea efímera sobre la imagen de la API (comando `pnpm db:seed`, con `SEED_CLAVE` definida solo en esa ejecución) o invitar al primer administrador según `MANUAL-SISTEMA.md`.

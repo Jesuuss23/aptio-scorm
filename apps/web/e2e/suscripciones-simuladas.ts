@@ -8,6 +8,7 @@
 import type { PlanPublico } from '@aptio/schema/planes';
 import type { ResumenConDescuento } from '@aptio/schema/cupones';
 import type { CodigoPasarela } from '@aptio/schema/pasarelas';
+import { errorDni, exigeDni } from '@aptio/schema/comprobantes';
 import { esCiclo, esMoneda, finPeriodo, type Moneda, monedasDelPlan, resumenCheckout, type ResumenCheckout, TARJETAS_PRUEBA, type TipoComprobante, validarEmpresa } from '@aptio/schema/suscripciones';
 
 import type { CuponesSim } from './cupones-simulados';
@@ -70,6 +71,8 @@ export function crearSuscripcionesSim(d: {
         if (!a.ok) return { status: 422, body: { codigo: 'NO_VALIDO', mensaje: a.mensaje, detalles: [{ campo: 'cupon', mensaje: a.mensaje, motivo: a.codigo }] } };
         resumen = a.resumen;
       }
+      // HU-1712 · La boleta de más de S/ 700 (o US$ 200) lleva el DNI.
+      if (empresa.tipoComprobante === 'BOLETA' && exigeDni('BOLETA', resumen.total, moneda) && !empresa.datos.dni) return { status: 422, body: { codigo: 'NO_VALIDO', detalles: [errorDni(empresa.datos.dni, true)] } };
       if (d.correosEnUso().includes(empresa.datos.correoAdmin)) return { status: 409, body: { codigo: 'CORREO_EN_USO', mensaje: 'Ese correo ya tiene una cuenta' } };
       const pasarela = d.pasarelas.elegir(moneda);
       if (!pasarela) return { status: 503, body: { codigo: 'PAGO_NO_DISPONIBLE', mensaje: 'El pago en línea todavía no está disponible' } };

@@ -7,6 +7,7 @@ import { PermitidoSuspendida, Roles, type UsuarioSesion } from '../comun/roles.j
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { DatosFacturacionDto, DatosFacturacionEntradaDto, FacturacionOrgDto, MedioPagoDto, MedioPagoEntradaDto } from './facturacion-org.dto.js';
 import { FacturacionOrgService } from './facturacion-org.service.js';
+import type { FormatoComprobante } from './comprobantes.service.js';
 
 /**
  * HU-1711 · Portal de facturación de la organización (REQ-091, CP-153, PNT-40). Solo el administrador y solo lo de su
@@ -58,13 +59,21 @@ export class FacturacionOrgController {
 
   @Get('comprobantes/:id/xml')
   @ApiProduces('application/xml')
-  @ApiOkResponse({ description: 'CP-153 · El XML UBL 2.1. Auditoría COMPROBANTE_DESCARGADO' })
+  @ApiOkResponse({ description: 'CP-153 · El XML UBL 2.1 (con Mifact, el firmado). Auditoría COMPROBANTE_DESCARGADO' })
   @ApiNotFoundResponse({ description: 'El comprobante no existe o es de otra organización, o ARCHIVO_PENDIENTE' })
   xml(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
     return this.descargar(u, id, 'xml', res);
   }
 
-  private async descargar(u: UsuarioSesion, id: string, formato: 'pdf' | 'xml', res: Response): Promise<StreamableFile> {
+  @Get('comprobantes/:id/cdr')
+  @ApiProduces('application/xml')
+  @ApiOkResponse({ description: 'HU-1712 · La constancia de recepción de SUNAT (CDR). Auditoría COMPROBANTE_DESCARGADO' })
+  @ApiNotFoundResponse({ description: 'El comprobante no existe o es de otra organización, o ARCHIVO_PENDIENTE' })
+  cdr(@UsuarioActual() u: UsuarioSesion, @Param('id', ParseUUIDPipe) id: string, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
+    return this.descargar(u, id, 'cdr', res);
+  }
+
+  private async descargar(u: UsuarioSesion, id: string, formato: FormatoComprobante, res: Response): Promise<StreamableFile> {
     const a = await this.facturacion.archivo(u, id, formato);
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Disposition', `attachment; filename="${a.nombre.replace(/[^\w.-]/g, '_')}"`);

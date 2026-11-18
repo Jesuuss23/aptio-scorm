@@ -34,6 +34,8 @@ const titulo = (page: Page, nombre: string) => page.getByRole('heading', { level
 
 const empresa = async (page: Page, correo: string) => {
   await escribir(page, page.getByLabel('Razón social o nombre', { exact: true }), 'Minera Andina SAC');
+  // HU-1712 · Sin RUC es boleta y pasa de S/ 700: lleva el DNI.
+  await escribir(page, page.getByLabel('DNI (para la boleta)', { exact: true }), '40506089');
   await escribir(page, page.getByLabel('Nombre de quien administrará la cuenta', { exact: true }), 'Ana Quispe');
   await escribir(page, page.getByLabel('Correo de quien administrará la cuenta', { exact: true }), correo);
   await page.getByLabel(/Acepto los términos/).focus();

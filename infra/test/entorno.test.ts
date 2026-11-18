@@ -5,7 +5,7 @@ import { App } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { BaseStack } from '../src/base';
-import { type ConfigEntorno, leerConfig, llavesAplicacion, REGION } from '../src/config';
+import { type ConfigEntorno, leerConfig, llavesAplicacion, MIFACT_URL_DEMO, REGION } from '../src/config';
 import { CABECERA_ORIGEN, EntornoStack } from '../src/entorno';
 
 const CUENTA = '123456789012';
@@ -41,6 +41,13 @@ describe('HU-1405 · configuración del entorno', () => {
     expect(() => leerConfig((k) => ({ entorno: 'Pruebas Nube' })[k])).toThrow('entorno no válido');
     expect(() => leerConfig((k) => ({ modoProveedores: 'gratis' })[k])).toThrow('modoProveedores');
     expect(() => leerConfig((k) => ({ replicas: '3' })[k])).toThrow('replicas');
+    expect(() => leerConfig((k) => ({ mifactUrl: 'http://mifact.pe' })[k])).toThrow('mifactUrl');
+  });
+
+  it('HU-1712 · fuera de producción usa la demo de Mifact; en producción solo con mifactUrl', () => {
+    expect(leerConfig(() => undefined).mifactUrl).toBe(MIFACT_URL_DEMO);
+    expect(leerConfig((k) => ({ entorno: 'produccion' })[k]).mifactUrl).toBeUndefined();
+    expect(leerConfig((k) => ({ entorno: 'produccion', mifactUrl: 'https://www.mifact.net.pe/api/invoiceService.svc' })[k]).mifactUrl).toBe('https://www.mifact.net.pe/api/invoiceService.svc');
   });
 });
 
@@ -172,6 +179,13 @@ describe('HU-1405 · cero secretos en texto plano', () => {
     expect(totp.Properties.GenerateSecretString).toMatchObject({ PasswordLength: 64, ExcludePunctuation: true });
     expect(totp.DeletionPolicy).toBe('Retain');
     expect(JSON.stringify((api.Secrets as any[]).find((s) => s.Name === 'TOTP_CLAVE_CIFRADO').ValueFrom)).toContain('SecretoTotp');
+    // HU-1712 · El token de Mifact (en el secreto de la aplicación) solo llega al worker; la URL, que no es secreta, a los dos.
+    expect((worker.Secrets as any[]).map((s) => s.Name)).toContain('MIFACT_TOKEN');
+    expect((api.Secrets as any[]).map((s) => s.Name)).not.toContain('MIFACT_TOKEN');
+    expect(JSON.stringify((worker.Secrets as any[]).find((s) => s.Name === 'MIFACT_TOKEN').ValueFrom)).toContain('SecretoAplicacion');
+    const app = recursos(t, 'AWS::SecretsManager::Secret').find((s) => s.Properties.Name === 'aptio-pruebas-aplicacion')!;
+    expect(JSON.parse(app.Properties.GenerateSecretString.SecretStringTemplate)).toMatchObject({ MIFACT_TOKEN: '' });
+    for (const c of [api, worker]) expect(c.Environment).toEqual(expect.arrayContaining([{ Name: 'MIFACT_URL', Value: MIFACT_URL_DEMO }]));
     // La API confía en 2 proxies (CloudFront y el balanceador) para leer la IP del visitante (SUP-169).
     expect(api.Environment).toEqual(expect.arrayContaining([{ Name: 'TRUST_PROXY', Value: '2' }, { Name: 'REDIS_TLS', Value: 'true' }, { Name: 'SITIO_ENTORNO', Value: 'pruebas' }]));
   });
@@ -213,7 +227,9 @@ describe('Producción · llaves del entorno', () => {
     expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['STRIPE_LLAVE_SECRETA_PRODUCCION', 'CULQI_SECRETO_WEBHOOK_PRODUCCION']));
     expect((api.Secrets as any[]).map((s) => s.Name)).not.toContain('PAGO_PRUEBA_SECRETO');
     const app = recursos(t, 'AWS::SecretsManager::Secret').find((s) => s.Properties.Name === 'aptio-produccion-aplicacion')!;
-    expect(Object.keys(JSON.parse(app.Properties.GenerateSecretString.SecretStringTemplate))).toContain('STRIPE_LLAVE_SECRETA_PRODUCCION');
+    expect(Object.keys(JSON.parse(app.Properties.GenerateSecretString.SecretStringTemplate))).toEqual(expect.arrayContaining(['STRIPE_LLAVE_SECRETA_PRODUCCION', 'MIFACT_TOKEN']));
+    // Sin mifactUrl, producción no apunta a la demo de Mifact.
+    expect((api.Environment as any[]).map((e) => e.Name)).not.toContain('MIFACT_URL');
   });
 });
 

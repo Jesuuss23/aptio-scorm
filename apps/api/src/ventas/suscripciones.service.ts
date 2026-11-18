@@ -6,6 +6,7 @@ import {
   TAREA_EMITIR_COMPROBANTE,
 } from '@aptio/colas';
 import { Prisma, resolverPagoRenovacion, ultimaVersion } from '@aptio/db';
+import { errorDni, exigeDni } from '@aptio/schema/comprobantes';
 import { ciclosRestantesTrasAlta, type ResumenConDescuento, sinDescuento } from '@aptio/schema/cupones';
 import { CATALOGO_PASARELAS, esCodigoPasarela } from '@aptio/schema/pasarelas';
 import { CAMPO_TRAMPA, type EnvioLead, validarEnvioLead } from '@aptio/schema/leads';
@@ -185,6 +186,10 @@ export class SuscripcionesService implements OnModuleDestroy {
       resumen = a.resultado.resumen;
       cuponId = a.cuponId;
     }
+    // HU-1712 · La boleta de más de S/ 700 (o su equivalente en dólares) identifica al comprador con su DNI.
+    if (empresa.tipoComprobante === 'BOLETA' && exigeDni('BOLETA', resumen.total, moneda) && !datos.dni) {
+      throw noValido([errorDni(datos.dni, true)!]);
+    }
     if (await this.bd.usuario.findUnique({ where: { email: datos.correoAdmin } })) {
       throw new ConflictException({ codigo: 'CORREO_EN_USO', mensaje: 'Ese correo ya tiene una cuenta: inicia sesión en la plataforma o usa otro correo' });
     }
@@ -197,7 +202,7 @@ export class SuscripcionesService implements OnModuleDestroy {
     const atribucion: EnvioLead | null = lead.ok && !lead.trampa ? { ...lead.envio, mensaje: `Suscripción al plan ${publico.nombre} (${ciclo === 'ANUAL' ? 'anual' : 'mensual'})` } : null;
     const s = await this.bd.solicitudSuscripcion.create({
       data: {
-        planId: plan.id, ciclo, razonSocial: datos.razonSocial, ruc: datos.ruc, tipoComprobante: empresa.tipoComprobante, nombreAdmin: datos.nombreAdmin, correoAdmin: datos.correoAdmin,
+        planId: plan.id, ciclo, razonSocial: datos.razonSocial, ruc: datos.ruc, dniReceptor: empresa.tipoComprobante === 'BOLETA' ? datos.dni : null, tipoComprobante: empresa.tipoComprobante, nombreAdmin: datos.nombreAdmin, correoAdmin: datos.correoAdmin,
         subtotal: resumen.base, igv: resumen.igv, total: resumen.total, moneda, pasarela: config.codigo, atribucion: (atribucion ?? {}) as unknown as Prisma.InputJsonValue,
         ...(cuponId ? { cuponId, subtotalListaSinIgv: resumen.subtotal, descuentoSinIgv: resumen.descuento, porcentajeDescuento: resumen.cupon!.porcentaje } : {}),
       },

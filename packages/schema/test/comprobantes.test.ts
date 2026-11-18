@@ -1,8 +1,9 @@
 // HU-1707 · Reglas de los comprobantes SUNAT: tipo por RUC, desglose con IGV, detracción, numeración y XML UBL 2.1.
 import { describe, expect, it } from 'vitest';
 import {
-  desglosar, detraccionDe, esCodigoOse, leerEventoOse, montoEnLetras, nombreArchivo, numeroCompleto, rucValido, SERIES_POR_DEFECTO, serieDe, tipoPara,
+  dniValido, errorDni, exigeDni, desglosar, detraccionDe, esCodigoOse, leerEventoOse, montoEnLetras, nombreArchivo, numeroCompleto, rucValido, SERIES_POR_DEFECTO, serieDe, tipoPara,
   validarDatosFiscales, validarReceptor, xmlUbl, type DatosXml,
+  RUC_DEMO_MIFACT,
 } from '../src/comprobantes.js';
 
 /** Comprueba que el XML esté bien formado: cada etiqueta abierta se cierra en orden. */
@@ -121,7 +122,7 @@ describe('XML UBL 2.1', () => {
 });
 
 describe('validaciones', () => {
-  const fiscales = { rucEmisor: '20000000001', razonSocialEmisor: 'Grupo SAC', direccionEmisor: 'Lima', ...SERIES_POR_DEFECTO, proveedor: 'pruebas', ambiente: 'pruebas', detraccionActiva: false, detraccionTasa: 12, detraccionUmbralPen: 700 };
+  const fiscales = { rucEmisor: '20000000001', razonSocialEmisor: 'Grupo SAC', direccionEmisor: 'Lima', ...SERIES_POR_DEFECTO, proveedor: 'pruebas', ambiente: 'pruebas', detraccionActiva: false, detraccionTasa: 12, detraccionUmbralPen: 700, ubigeoEmisor: '', codigoAnexo: '0000', cuentaDetraccion: '', codigoDetraccion: '' };
   it('datos fiscales: series con su letra, distintas, proveedor conocido y detracción con números válidos', () => {
     expect(validarDatosFiscales(fiscales, ['pruebas'])).toEqual([]);
     expect(validarDatosFiscales({ ...fiscales, rucEmisor: null }, ['pruebas'])).toEqual([]);
@@ -132,6 +133,36 @@ describe('validaciones', () => {
     expect(validarReceptor({ ruc: '20000000001', razonSocial: 'Minera', direccion: null, correoFacturacion: 'pagos@minera.pe' }, 'FACTURA')).toEqual([]);
     expect(validarReceptor({ ruc: null, razonSocial: 'Ana', direccion: null, correoFacturacion: 'ana@correo.pe' }, 'BOLETA')).toEqual([]);
     expect(validarReceptor({ ruc: '', razonSocial: '', correoFacturacion: 'no' }, 'FACTURA').map((x) => x.campo)).toEqual(['ruc', 'razonSocial', 'correoFacturacion']);
+  });
+  it('HU-1712 · con Mifact pide el ubigeo; con la detracción, la cuenta y el código SPOT; el anexo siempre tiene 4 dígitos', () => {
+    const mifact = { ...fiscales, proveedor: 'mifact', ubigeoEmisor: '150101' };
+    expect(validarDatosFiscales(mifact, ['pruebas', 'mifact'])).toEqual([]);
+    expect(validarDatosFiscales({ ...mifact, ubigeoEmisor: '' }, ['mifact']).map((x) => x.campo)).toEqual(['ubigeoEmisor']);
+    expect(validarDatosFiscales({ ...mifact, ubigeoEmisor: '15010' }, ['mifact']).map((x) => x.campo)).toEqual(['ubigeoEmisor']);
+    expect(validarDatosFiscales({ ...mifact, codigoAnexo: '0' }, ['mifact']).map((x) => x.campo)).toEqual(['codigoAnexo']);
+    expect(validarDatosFiscales({ ...mifact, detraccionActiva: true }, ['mifact']).map((x) => x.campo)).toEqual(['cuentaDetraccion', 'codigoDetraccion']);
+    expect(validarDatosFiscales({ ...mifact, detraccionActiva: true, cuentaDetraccion: '00-123-456789', codigoDetraccion: '037' }, ['mifact'])).toEqual([]);
+    expect(validarDatosFiscales({ ...mifact, cuentaDetraccion: 'abc', codigoDetraccion: '37' }, ['mifact']).map((x) => x.campo)).toEqual(['cuentaDetraccion', 'codigoDetraccion']);
+    // El simulado no exige el ubigeo.
+    expect(validarDatosFiscales(fiscales, ['pruebas'])).toEqual([]);
+  });
+  it('HU-1712 · el RUC de la demo de Mifact solo se admite como emisor en el ambiente de pruebas', () => {
+    expect(validarDatosFiscales({ ...fiscales, rucEmisor: RUC_DEMO_MIFACT, proveedor: 'mifact', ubigeoEmisor: '150101' }, ['pruebas', 'mifact'])).toEqual([]);
+    expect(validarDatosFiscales({ ...fiscales, rucEmisor: RUC_DEMO_MIFACT, proveedor: 'mifact', ubigeoEmisor: '150101', ambiente: 'produccion' }, ['mifact']).map((x) => x.campo)).toEqual(['rucEmisor']);
+  });
+
+  it('HU-1712 · DNI de la boleta: obligatorio sobre S/ 700 (o US$ 200), 8 dígitos y nunca en la factura', () => {
+    expect(exigeDni('BOLETA', 700, 'PEN')).toBe(false);
+    expect(exigeDni('BOLETA', 700.01, 'PEN')).toBe(true);
+    expect(exigeDni('BOLETA', 200.01, 'USD')).toBe(true);
+    expect(exigeDni('FACTURA', 5000, 'PEN')).toBe(false);
+    expect(errorDni('', true)?.campo).toBe('dni');
+    expect(errorDni('', false)).toBeNull();
+    expect(errorDni('4567 8912', true)).toBeNull();
+    expect(errorDni('1234567', false)?.mensaje).toBe('El DNI tiene 8 dígitos');
+    expect(dniValido('12345678')).toBe(true);
+    expect(validarReceptor({ ruc: null, razonSocial: 'Ana', direccion: null, correoFacturacion: 'ana@correo.pe' }, 'BOLETA', { total: 1522.2, moneda: 'PEN' }).map((x) => x.campo)).toEqual(['dni']);
+    expect(validarReceptor({ ruc: null, dni: '45678912', razonSocial: 'Ana', direccion: null, correoFacturacion: 'ana@correo.pe' }, 'BOLETA', { total: 1522.2, moneda: 'PEN' })).toEqual([]);
   });
 });
 

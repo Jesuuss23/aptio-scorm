@@ -133,12 +133,12 @@ describe.skipIf(!hayBase && !process.env.CI)('portal de facturación de la organ
     expect(r.body.plan).toMatchObject({ nombre: 'Productora', ciclo: 'MENSUAL', precioPactadoSinIgv: 1290, moneda: 'PEN', estado: 'ACTIVA' });
     expect(r.body.consumo).toBeTruthy();
     expect(r.body.medioPago).toEqual({ pasarela: 'pruebas', ultimos4Digitos: '1111', editable: true, aviso: null });
-    expect(r.body.datos).toEqual({ razonSocial: 'Minera Andina SAC', ruc: '20999999990', direccion: null, correoFacturacion: correoDe('pagos'), tipoComprobantePreferido: 'FACTURA', origen: 'ALTA' });
+    expect(r.body.datos).toEqual({ razonSocial: 'Minera Andina SAC', ruc: '20999999990', direccion: null, correoFacturacion: correoDe('pagos'), tipoComprobantePreferido: 'FACTURA', dni: null, origen: 'ALTA' });
     const tipos = r.body.comprobantes.map((c: { tipo: string }) => c.tipo).sort();
     expect(tipos).toEqual(['BOLETA', 'FACTURA', 'NOTA_CREDITO']);
     expect(r.body.comprobantes.map((c: { id: string }) => c.id)).not.toContain(ajeno);
     const nota = r.body.comprobantes.find((c: { tipo: string }) => c.tipo === 'NOTA_CREDITO');
-    expect(nota).toMatchObject({ referencia: expect.stringMatching(new RegExp(`^F${letras}-`)), estado: 'ACEPTADO', total: 1522.2, conPdf: true, conXml: true });
+    expect(nota).toMatchObject({ referencia: expect.stringMatching(new RegExp(`^F${letras}-`)), estado: 'ACEPTADO', total: 1522.2, conPdf: true, conXml: true, conCdr: false });
     if (!hayS3) return;
     for (const c of r.body.comprobantes as { id: string }[]) {
       const pdf = await como('admin').get(`/organizacion/comprobantes/${c.id}/pdf`).buffer(true);
@@ -180,10 +180,16 @@ describe.skipIf(!hayBase && !process.env.CI)('portal de facturación de la organ
 
     const ok = await como('admin').put('/organizacion/facturacion/datos', { razonSocial: '  Minera Andina SAC  ', ruc: '20100070970', direccion: 'Av. Javier Prado 123, Lima', correoFacturacion: 'Pagos@Minera.pe', tipoComprobantePreferido: 'FACTURA' });
     expect(ok.status).toBe(200);
-    expect(ok.body).toEqual({ razonSocial: 'Minera Andina SAC', ruc: '20100070970', direccion: 'Av. Javier Prado 123, Lima', correoFacturacion: 'pagos@minera.pe', tipoComprobantePreferido: 'FACTURA', origen: 'PORTAL' });
-    const boleta = await como('admin').put('/organizacion/facturacion/datos', { razonSocial: 'Ana Pérez', ruc: '', correoFacturacion: 'ana@minera.pe', tipoComprobantePreferido: 'BOLETA' });
+    expect(ok.body).toEqual({ razonSocial: 'Minera Andina SAC', ruc: '20100070970', direccion: 'Av. Javier Prado 123, Lima', correoFacturacion: 'pagos@minera.pe', tipoComprobantePreferido: 'FACTURA', dni: null, origen: 'PORTAL' });
+    // HU-1712 · El plan cuesta S/ 1.522,20 con IGV: la boleta exige el DNI del comprador.
+    const sinDni = await como('admin').put('/organizacion/facturacion/datos', { razonSocial: 'Ana Pérez', ruc: '', correoFacturacion: 'ana@minera.pe', tipoComprobantePreferido: 'BOLETA' });
+    expect(sinDni.status).toBe(422);
+    expect(sinDni.body.detalles).toEqual([{ campo: 'dni', mensaje: 'Las boletas de más de S/ 700 necesitan el DNI del comprador' }]);
+    expect((await como('admin').put('/organizacion/facturacion/datos', { razonSocial: 'Ana Pérez', correoFacturacion: 'ana@minera.pe', tipoComprobantePreferido: 'BOLETA', dni: '1234' })).body.detalles).toEqual([{ campo: 'dni', mensaje: 'El DNI tiene 8 dígitos' }]);
+    const boleta = await como('admin').put('/organizacion/facturacion/datos', { razonSocial: 'Ana Pérez', ruc: '', correoFacturacion: 'ana@minera.pe', tipoComprobantePreferido: 'BOLETA', dni: '40506089' });
     expect(boleta.status).toBe(200);
-    expect(boleta.body).toMatchObject({ ruc: null, direccion: null, tipoComprobantePreferido: 'BOLETA' });
+    expect(boleta.body).toMatchObject({ ruc: null, direccion: null, tipoComprobantePreferido: 'BOLETA', dni: '40506089' });
+    expect(await prisma.datosFacturacionOrg.findUniqueOrThrow({ where: { organizacionId: orgs[0]! } })).toMatchObject({ dniReceptor: '40506089' });
     expect((await como('admin').get('/organizacion/facturacion')).body.datos).toMatchObject({ razonSocial: 'Ana Pérez', origen: 'PORTAL' });
 
     const a = await prisma.auditoria.findMany({ where: { organizacionId: orgs[0]!, accion: 'DATOS_FACTURACION_ACTUALIZADOS' }, orderBy: { creadoEn: 'asc' } });

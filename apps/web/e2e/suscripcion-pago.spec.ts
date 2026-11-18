@@ -139,6 +139,7 @@ test('en producción no hay pago en línea: el paso 3 ofrece agendar una demo co
   await simularApi(page, SITIO);
   await page.goto('/s/pago?plan=productora');
   await escribir(page, 'Razón social o nombre', 'Minera Andina SAC');
+  await escribir(page, 'DNI (para la boleta)', '40506089');
   await escribir(page, 'Nombre de quien administrará la cuenta', 'Ana Quispe');
   await escribir(page, 'Correo de quien administrará la cuenta', 'ana@minera.pe');
   await page.getByLabel(/Acepto los términos/).check();
@@ -179,6 +180,8 @@ test('sin JavaScript, /pago lleva a agendar una demo', async ({ browser }) => {
 const SITIO_USD = { ...SITIO, planesSitio: { ejemplo: true, usd: { productora: 349 } } };
 const empresaPorTeclado = async (page: Page) => {
   await escribir(page, 'Razón social o nombre', 'Global Learning LLC');
+  // HU-1712 · Sin RUC es boleta y pasa de US$ 200: lleva el DNI.
+  await escribir(page, 'DNI (para la boleta)', '40506089');
   await escribir(page, 'Nombre de quien administrará la cuenta', 'Sam Lee');
   await escribir(page, 'Correo de quien administrará la cuenta', 'sam@global.example');
   await page.getByLabel(/Acepto los términos/).focus();

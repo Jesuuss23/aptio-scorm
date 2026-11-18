@@ -418,12 +418,16 @@ export interface TrabajoEstado {
 
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
 /** HU-1711 · Facturación de la organización (REQ-091, CP-153, PNT-40). */
-export interface DatosFacturacionEntrada { razonSocial: string; ruc: string | null; direccion: string | null; correoFacturacion: string; tipoComprobantePreferido: 'FACTURA' | 'BOLETA' }
+export interface DatosFacturacionEntrada {
+  razonSocial: string; ruc: string | null; direccion: string | null; correoFacturacion: string; tipoComprobantePreferido: 'FACTURA' | 'BOLETA';
+  /** HU-1712 · DNI del comprador para la boleta. */
+  dni: string | null;
+}
 export interface DatosFacturacionOrg extends DatosFacturacionEntrada { origen: 'PORTAL' | 'ALTA' }
 export interface MedioPagoOrg { pasarela: string; ultimos4Digitos: string | null; editable: boolean; aviso: string | null }
 export interface ComprobanteOrg {
   id: string; tipo: 'FACTURA' | 'BOLETA' | 'NOTA_CREDITO'; numeroCompleto: string; referencia: string | null; emitidoEn: string; moneda: 'PEN' | 'USD'; total: number;
-  estado: EstadoComprobante; conPdf: boolean; conXml: boolean;
+  estado: EstadoComprobante; conPdf: boolean; conXml: boolean; conCdr: boolean;
 }
 export interface FacturacionOrg {
   plan: { nombre: string; ciclo: 'MENSUAL' | 'ANUAL'; precioPactadoSinIgv: number; moneda: 'PEN' | 'USD'; estado: EstadoSuscripcion; finPeriodo: string } | null;
@@ -770,15 +774,17 @@ export interface CobroVenta {
 export type EstadoComprobante = 'PENDIENTE' | 'ACEPTADO' | 'OBSERVADO' | 'RECHAZADO';
 export interface ComprobanteVenta {
   id: string; tipo: 'FACTURA' | 'BOLETA' | 'NOTA_CREDITO'; serie: string; numero: number; numeroCompleto: string; cobroId: string; referencia: string | null;
-  ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string; moneda: 'PEN' | 'USD'; baseSinIgv: number; igv: number; total: number;
-  detraccion: number | null; estado: EstadoComprobante; motivo: string | null; proveedor: string; ambiente: string; conArchivos: boolean; reenviable: boolean;
+  ruc: string | null; dni: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string; moneda: 'PEN' | 'USD'; baseSinIgv: number; igv: number; total: number;
+  detraccion: number | null; estado: EstadoComprobante; motivo: string | null; proveedor: string; ambiente: string; conArchivos: boolean; conCdr: boolean; reenviable: boolean;
   intentos: number; emitidoEn: string; correoEnviadoEn: string | null;
 }
-export interface ReceptorComprobante { ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string }
+export interface ReceptorComprobante { ruc: string | null; dni?: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string }
 /** HU-1707 · Los datos fiscales del emisor. Los secretos del OSE viven en variables de entorno, nunca aquí. */
 export interface DatosFiscalesVenta {
   rucEmisor: string | null; razonSocialEmisor: string; direccionEmisor: string; serieFactura: string; serieBoleta: string; serieNotaFactura: string; serieNotaBoleta: string;
   proveedor: string; ambiente: 'pruebas' | 'produccion'; detraccionActiva: boolean; detraccionTasa: number; detraccionUmbralPen: number;
+  /** HU-1712 · Ubigeo y anexo del emisor; cuenta de detracciones y código SPOT (los pide Mifact). */
+  ubigeoEmisor: string; codigoAnexo: string; cuentaDetraccion: string; codigoDetraccion: string;
 }
 export interface DatosFiscalesConProveedores extends DatosFiscalesVenta {
   proveedores: { codigo: string; nombre: string; disponible: boolean }[]; actualizadoEn: string;
@@ -996,8 +1002,9 @@ export interface ResumenSitio {
   proximasDemos: { id: string; inicio: string; fecha: string; hora: string; nombre: string; empresa: string | null; tipo: string; asesor: string; estado: string }[];
 }
 
-/** El PDF o el XML de un comprobante como archivo (con la sesión): el nombre viene de Content-Disposition. */
-async function archivo(ruta: string, formato: 'pdf' | 'xml'): Promise<{ archivo: Blob; nombre: string }> {
+/** El PDF, el XML o el CDR de un comprobante como archivo (con la sesión): el nombre viene de Content-Disposition. */
+export type FormatoComprobante = 'pdf' | 'xml' | 'cdr';
+async function archivo(ruta: string, formato: FormatoComprobante): Promise<{ archivo: Blob; nombre: string }> {
   let res: Response;
   try {
     res = await fetch(`/api/v1${ruta}`, { credentials: 'same-origin' });
@@ -1008,7 +1015,7 @@ async function archivo(ruta: string, formato: 'pdf' | 'xml'): Promise<{ archivo:
     const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string };
     throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'No se pudo descargar el archivo');
   }
-  const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `comprobante.${formato}`;
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `comprobante.${formato === 'pdf' ? 'pdf' : 'xml'}`;
   return { archivo: await res.blob(), nombre };
 }
 
@@ -1101,12 +1108,12 @@ export const api = {
   comprobantes: (estado?: EstadoComprobante) => pedir<{ comprobantes: ComprobanteVenta[] }>(`/ventas/comprobantes${estado ? `?estado=${estado}` : ''}`),
   reenviarComprobante: (id: string, r: ReceptorComprobante) => pedir<ComprobanteVenta>(`/ventas/comprobantes/${id}/reenviar`, json(r)),
   /** El PDF o el XML como archivo (con la sesión): el nombre viene de Content-Disposition. */
-  archivoComprobante: (id: string, formato: 'pdf' | 'xml') => archivo(`/ventas/comprobantes/${id}/${formato}`, formato),
+  archivoComprobante: (id: string, formato: FormatoComprobante) => archivo(`/ventas/comprobantes/${id}/${formato}`, formato),
   // HU-1711 · Facturación de la organización (PNT-40), solo el administrador.
   facturacionOrg: () => pedir<FacturacionOrg>('/organizacion/facturacion'),
   guardarDatosFacturacion: (d: DatosFacturacionEntrada) => pedir<DatosFacturacionOrg>('/organizacion/facturacion/datos', json(d, 'PUT')),
   cambiarMedioPago: (tarjeta: string) => pedir<MedioPagoOrg>('/organizacion/facturacion/medio-pago', json({ tarjeta })),
-  archivoComprobanteOrg: (id: string, formato: 'pdf' | 'xml') => archivo(`/organizacion/comprobantes/${id}/${formato}`, formato),
+  archivoComprobanteOrg: (id: string, formato: FormatoComprobante) => archivo(`/organizacion/comprobantes/${id}/${formato}`, formato),
   datosFiscales: () => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales'),
   guardarDatosFiscales: (d: DatosFiscalesVenta) => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales', json(d, 'PUT')),
   cupones: () => pedir<{ cupones: CuponVenta[] }>('/ventas/cupones'),

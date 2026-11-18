@@ -7,8 +7,19 @@ const campos = (r: ReturnType<typeof validarDatosFacturacion>) => (r.ok ? [] : r
 describe('HU-1711 · datos de facturación', () => {
   it('factura con RUC válido: recorta y normaliza', () => {
     expect(validarDatosFacturacion({ ...base, ruc: '2013-1312 955' })).toEqual({
-      ok: true, datos: { razonSocial: 'Minera Andina SAC', ruc: '20131312955', direccion: 'Av. Arequipa 123, Lima', correoFacturacion: 'pagos@minera.pe', tipoComprobantePreferido: 'FACTURA' },
+      ok: true, datos: { razonSocial: 'Minera Andina SAC', ruc: '20131312955', direccion: 'Av. Arequipa 123, Lima', correoFacturacion: 'pagos@minera.pe', tipoComprobantePreferido: 'FACTURA', dni: null },
     });
+  });
+
+  it('HU-1712 · la boleta pide el DNI cuando el plan supera S/ 700, y la factura lo ignora', () => {
+    const boleta = { ...base, tipoComprobantePreferido: 'BOLETA', ruc: '' };
+    expect(campos(validarDatosFacturacion(boleta, { total: 1522.2, moneda: 'PEN' }))).toEqual(['dni']);
+    expect(validarDatosFacturacion(boleta, { total: 590, moneda: 'PEN' }).ok).toBe(true);
+    const con = validarDatosFacturacion({ ...boleta, dni: '4567-8912' }, { total: 1522.2, moneda: 'PEN' });
+    expect(con.ok && con.datos.dni).toBe('45678912');
+    expect(campos(validarDatosFacturacion({ ...boleta, dni: '123' }))).toEqual(['dni']);
+    const f = validarDatosFacturacion({ ...base, ruc: '20131312955', dni: '45678912' }, { total: 1522.2, moneda: 'PEN' });
+    expect(f.ok && f.datos.dni).toBeNull();
   });
 
   it('la factura exige el RUC con su dígito verificador', () => {

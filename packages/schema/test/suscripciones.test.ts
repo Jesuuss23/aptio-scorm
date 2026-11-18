@@ -26,7 +26,15 @@ describe('RUC', () => {
 describe('validarEmpresa', () => {
   it('recorta los textos, pasa el correo a minúsculas y emite factura con RUC', () => {
     const r = validarEmpresa(empresa);
-    expect(r).toEqual({ ok: true, datos: { razonSocial: 'Minera Andina SAC', ruc: '20131312955', nombreAdmin: 'Ana Quispe', correoAdmin: 'ana@minera.pe' }, tipoComprobante: 'FACTURA' });
+    expect(r).toEqual({ ok: true, datos: { razonSocial: 'Minera Andina SAC', ruc: '20131312955', nombreAdmin: 'Ana Quispe', correoAdmin: 'ana@minera.pe', dni: null }, tipoComprobante: 'FACTURA' });
+  });
+  it('HU-1712 · sin RUC acepta un DNI de 8 dígitos y rechaza otro formato; con RUC lo ignora', () => {
+    const b = validarEmpresa({ ...empresa, ruc: '', dni: '45 678 912' });
+    expect(b.ok && b.datos.dni).toBe('45678912');
+    const mal = validarEmpresa({ ...empresa, ruc: '', dni: '12ab' });
+    expect(!mal.ok && mal.errores.map((x) => x.campo)).toEqual(['dni']);
+    const f = validarEmpresa({ ...empresa, dni: '45678912' });
+    expect(f.ok && f.datos.dni).toBeNull();
   });
   it('sin RUC emite boleta; acepta el RUC con espacios o guiones', () => {
     const sin = validarEmpresa({ ...empresa, ruc: '' });

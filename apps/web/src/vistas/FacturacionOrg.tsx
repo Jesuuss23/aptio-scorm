@@ -4,12 +4,14 @@
 // 3. «Medio de pago»: la pasarela y los 4 últimos dígitos; con la pasarela de pruebas se cambia la tarjeta (sin CVV, solo
 //    se guardan los 4 últimos dígitos, SUP-331); con Stripe o Culqi, el aviso del cobro por enlace (SUP-319);
 // 4. «Datos de facturación»: razón social, factura o boleta, RUC, dirección y correo, validados con las mismas reglas que
-//    la API. Rigen para los comprobantes nuevos: los ya emitidos no cambian (SUP-318).
+//    la API. Rigen para los comprobantes nuevos: los ya emitidos no cambian (SUP-318). HU-1712: con boleta, el DNI del
+//    comprador, obligatorio si el plan supera S/ 700 con IGV; y la descarga del CDR de SUNAT cuando el OSE lo entrega.
 import { Cabecera } from '@aptio/ui';
 import { LIMITES_FACTURACION, validarDatosFacturacion } from '@aptio/schema/facturacion-org';
+import { conIgv } from '@aptio/schema/planes';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { useEffect, useId, useState } from 'react';
-import { api, type ComprobanteOrg, type DatosFacturacionOrg, ErrorApi, type EstadoComprobante, type EstadoSuscripcion, type FacturacionOrg as Resumen, type MedioPagoOrg } from '../api';
+import { api, type ComprobanteOrg, type FormatoComprobante, type DatosFacturacionOrg, ErrorApi, type EstadoComprobante, type EstadoSuscripcion, type FacturacionOrg as Resumen, type MedioPagoOrg } from '../api';
 import { navegar } from '../ruta';
 import { IndicadorCuota } from './CuotaCapsulas';
 
@@ -39,7 +41,7 @@ export function FacturacionOrg() {
           <PlanConsumo r={r} />
           <Comprobantes lista={r.comprobantes} />
           <MedioPago medio={r.medioPago} alCambiar={(medioPago) => setR({ ...r, medioPago })} />
-          <DatosFacturacion inicial={r.datos} alGuardar={(datos) => setR({ ...r, datos })} />
+          <DatosFacturacion inicial={r.datos} importe={r.plan ? { total: conIgv(r.plan.precioPactadoSinIgv), moneda: r.plan.moneda } : undefined} alGuardar={(datos) => setR({ ...r, datos })} />
         </div>
       )}
     </>
@@ -68,7 +70,7 @@ function PlanConsumo({ r }: { r: Resumen }) {
 function Comprobantes({ lista }: { lista: ComprobanteOrg[] }) {
   const [aviso, setAviso] = useState('');
 
-  async function descargar(c: ComprobanteOrg, formato: 'pdf' | 'xml') {
+  async function descargar(c: ComprobanteOrg, formato: FormatoComprobante) {
     setAviso('');
     try {
       const { archivo, nombre } = await api.archivoComprobanteOrg(c.id, formato);
@@ -102,6 +104,7 @@ function Comprobantes({ lista }: { lista: ComprobanteOrg[] }) {
                   <div className="popup-acciones">
                     <button type="button" className="boton" disabled={!c.conPdf} aria-label={`PDF de ${c.numeroCompleto}`} onClick={() => void descargar(c, 'pdf')}>PDF</button>
                     <button type="button" className="boton" disabled={!c.conXml} aria-label={`XML de ${c.numeroCompleto}`} onClick={() => void descargar(c, 'xml')}>XML</button>
+                    {c.conCdr ? <button type="button" className="boton" aria-label={`CDR de SUNAT de ${c.numeroCompleto}`} onClick={() => void descargar(c, 'cdr')}>CDR</button> : null}
                   </div>
                   {!c.conPdf || !c.conXml ? <span className="sec">Archivos en preparación</span> : null}
                 </td>
@@ -165,20 +168,23 @@ function MedioPago({ medio, alCambiar }: { medio: MedioPagoOrg | null; alCambiar
   );
 }
 
-type Campo = 'razonSocial' | 'ruc' | 'direccion' | 'correoFacturacion' | 'tipoComprobantePreferido';
+type Campo = 'razonSocial' | 'ruc' | 'dni' | 'direccion' | 'correoFacturacion' | 'tipoComprobantePreferido';
+type Importe = { total: number; moneda: 'PEN' | 'USD' };
+const formulario = (d: DatosFacturacionOrg) => ({ razonSocial: d.razonSocial, ruc: d.ruc ?? '', dni: d.dni ?? '', direccion: d.direccion ?? '', correoFacturacion: d.correoFacturacion, tipoComprobantePreferido: d.tipoComprobantePreferido });
 
-function DatosFacturacion({ inicial, alGuardar }: { inicial: DatosFacturacionOrg; alGuardar: (d: DatosFacturacionOrg) => void }) {
+function DatosFacturacion({ inicial, importe, alGuardar }: { inicial: DatosFacturacionOrg; importe: Importe | undefined; alGuardar: (d: DatosFacturacionOrg) => void }) {
   const id = useId();
-  const [v, setV] = useState({ razonSocial: inicial.razonSocial, ruc: inicial.ruc ?? '', direccion: inicial.direccion ?? '', correoFacturacion: inicial.correoFacturacion, tipoComprobantePreferido: inicial.tipoComprobantePreferido });
+  const [v, setV] = useState(() => formulario(inicial));
   const [errores, setErrores] = useState<Partial<Record<Campo, string>>>({});
   const [listo, setListo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   const factura = v.tipoComprobantePreferido === 'FACTURA';
+  const exigeDni = !factura && !!importe && importe.total > (importe.moneda === 'USD' ? 200 : 700);
 
   async function guardar() {
     setListo('');
-    const entrada = { ...v, ruc: v.ruc.trim() || null, direccion: v.direccion.trim() || null };
-    const r = validarDatosFacturacion(entrada);
+    const entrada = { ...v, ruc: v.ruc.trim() || null, dni: factura ? null : v.dni.trim() || null, direccion: v.direccion.trim() || null };
+    const r = validarDatosFacturacion(entrada, importe);
     if (!r.ok) {
       setErrores(Object.fromEntries(r.errores.map((e) => [e.campo, e.mensaje])));
       document.getElementById(`${id}-${r.errores[0]!.campo}`)?.focus();
@@ -189,7 +195,7 @@ function DatosFacturacion({ inicial, alGuardar }: { inicial: DatosFacturacionOrg
     try {
       const d = await api.guardarDatosFacturacion(r.datos);
       alGuardar(d);
-      setV({ razonSocial: d.razonSocial, ruc: d.ruc ?? '', direccion: d.direccion ?? '', correoFacturacion: d.correoFacturacion, tipoComprobantePreferido: d.tipoComprobantePreferido });
+      setV(formulario(d));
       setListo('Se guardaron tus datos de facturación: rigen para los próximos comprobantes y los ya emitidos no cambian.');
     } catch (e) {
       if (e instanceof ErrorApi && e.detalles?.length) setErrores(Object.fromEntries(e.detalles.map((d) => [String(d.campo), String(d.mensaje)])));
@@ -232,6 +238,14 @@ function DatosFacturacion({ inicial, alGuardar }: { inicial: DatosFacturacionOrg
             <span id={`${id}-ruc-ayuda`} className="sec">{factura ? '11 dígitos: la factura lo exige.' : 'Con boleta puedes dejarlo vacío.'}</span>
             {errorDe('ruc')}
           </p>
+          {!factura ? (
+            <p className="campo">
+              <label htmlFor={`${id}-dni`}>DNI del comprador{exigeDni ? '' : ' (opcional)'}</label>
+              <input type="text" inputMode="numeric" autoComplete="off" maxLength={10} value={v.dni} onChange={(e) => setV({ ...v, dni: e.target.value })} aria-required={exigeDni ? 'true' : undefined} {...props('dni', true)} />
+              <span id={`${id}-dni-ayuda`} className="sec">{exigeDni ? 'Tu plan supera S/ 700 con IGV: SUNAT pide el DNI de 8 dígitos en la boleta.' : '8 dígitos. Las boletas de más de S/ 700 lo exigen.'}</span>
+              {errorDe('dni')}
+            </p>
+          ) : null}
           <p className="campo">
             <label htmlFor={`${id}-direccion`}>Dirección (opcional)</label>
             <input type="text" autoComplete="street-address" maxLength={LIMITES_FACTURACION.direccion} value={v.direccion} onChange={(e) => setV({ ...v, direccion: e.target.value })} {...props('direccion')} />
