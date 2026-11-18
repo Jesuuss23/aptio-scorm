@@ -1,0 +1,25 @@
+{
+  "name": "@aptio/infra",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "HU-1405 · Infraestructura del entorno de pruebas en AWS (CDK en TypeScript, sa-east-1).",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "vitest run",
+    "synth": "cdk synth",
+    "diff": "cdk diff",
+    "deploy": "cdk deploy"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.275.0",
+    "constructs": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "aws-cdk": "2.1147.0",
+    "tsx": "^4.23.15",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

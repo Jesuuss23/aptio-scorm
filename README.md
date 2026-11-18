@@ -49,6 +49,7 @@ Se actualizan al cerrar cada entrega.
 | 29 | `docs/21-arranque-s0.md` | Lista de arranque: personas, cuentas, nube, proveedores, insumos y contratos, con campos para completar. |
 | 30 | `docs/22-auditoria-prototipo.md` | Auditoría visual del prototipo: márgenes, escala tipográfica y orden, con el antes y el después y cómo repetirla en `apps/web`. |
 | 31 | `docs/23-sitio-comercial-y-facturacion.md` + `docs/diseno/sitio-comercial.html` | **Fase comercial:** sitio público, panel superadmin con todo administrable y mostrar/ocultar, captación y CRM, planes, suscripciones y facturación SUNAT; revisión de las pantallas de Stitch. |
+| 32 | `docs/24-puesta-en-marcha-aws.md` + `infra/` + `docker/` | **Entorno de pruebas en AWS (HU-1405):** imágenes, infraestructura en CDK (sa-east-1), despliegue continuo con OIDC y la guía de la primera puesta en marcha. |
 
 ## Cómo trabajar con Claude Code
 

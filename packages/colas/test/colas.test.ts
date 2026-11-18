@@ -11,6 +11,13 @@ describe('colas y eventos', () => {
   it('toma Redis de las variables de entorno', () => {
     expect(opcionesRedis({ REDIS_HOST: 'redis', REDIS_PORT: '6380' })).toMatchObject({ host: 'redis', port: 6380 });
     expect(opcionesRedis({})).toMatchObject({ host: 'localhost', port: 6379 });
+    expect(opcionesRedis({})).not.toHaveProperty('tls');
+    expect(opcionesRedis({})).not.toHaveProperty('password');
+  });
+
+  it('HU-1405 · en la nube usa TLS y la clave de ElastiCache', () => {
+    expect(opcionesRedis({ REDIS_HOST: 'cache.aws', REDIS_TLS: 'true', REDIS_PASSWORD: 'clave-de-prueba' })).toMatchObject({ host: 'cache.aws', tls: {}, password: 'clave-de-prueba' });
+    expect(opcionesRedis({ REDIS_TLS: 'false' })).not.toHaveProperty('tls');
   });
 
   it('lee un evento válido y descarta lo demás', () => {

@@ -1,0 +1,12 @@
+{
+  "app": "tsx bin/aptio.ts",
+  "context": {
+    "entorno": "pruebas",
+    "modoProveedores": "simulado",
+    "repositorioGithub": "jesuuss23/aptio-scorm",
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,
+    "@aws-cdk/aws-ecs:arnFormatIncludesClusterName": true
+  }
+}
