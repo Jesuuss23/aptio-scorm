@@ -21,6 +21,7 @@ import type { Fetch } from '../src/ventas/pasarelas/contrato.js';
 import { firmarStripe, PasarelaStripe } from '../src/ventas/pasarelas/stripe.js';
 import { PasarelasService } from '../src/ventas/pasarelas.service.js';
 import { firmar, SuscripcionesService } from '../src/ventas/suscripciones.service.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -89,8 +90,7 @@ describe.skipIf(!hayBase && !process.env.CI)('pasarelas de pago y webhooks (HU-1
     await app.init();
     servidor = app.getHttpServer();
     app.get(PasarelasService).reemplazar(new PasarelaStripe(process.env, http));
-    const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correoDe('super'), clave: CLAVE });
-    cookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    cookie = await ingresarCookie(servidor, correoDe('super'), CLAVE);
     const p = await panel('post', '/sitio/paginas').send({ ruta: RUTA, titulo: 'Precios' });
     paginaId = p.body.id;
     const b = await panel('post', `/sitio/paginas/${paginaId}/bloques`).send({ tipo: 'precios' });

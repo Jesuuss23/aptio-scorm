@@ -23,6 +23,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
 import { LimitePublicoService } from '../src/sitio/limite-publico.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -52,9 +53,7 @@ describe.skipIf(!hayBase && !process.env.CI)('sitio web solo para el superadmin 
     await app.init();
     servidor = app.getHttpServer();
     for (const n of [...ROLES_ORGANIZACION, 'SUPERADMIN']) {
-      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correo(n), clave: CLAVE });
-      if (res.status !== 200) throw new Error(`No pudo ingresar ${n}: ${res.status}`);
-      cookies[n] = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      cookies[n] = await ingresarCookie(servidor, correo(n), CLAVE);
     }
   });
 

@@ -85,7 +85,7 @@ export class GoogleService {
       await bd.usuario.update({ where: { id: u.id }, data: { googleSub: identidad.sub, emailVerificado: true } });
       await this.auth.auditar(u.id, u.organizacionId, 'GOOGLE_VINCULADA');
     }
-    return this.auth.abrirSesion({ ...u, googleSub: identidad.sub }, 'google');
+    return this.auth.continuarIngreso({ ...u, googleSub: identidad.sub }, 'google');
   }
 
   private async canjear(code: string, verificador: string): Promise<string> {

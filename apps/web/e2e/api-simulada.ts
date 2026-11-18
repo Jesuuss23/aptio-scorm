@@ -70,6 +70,11 @@ const PAUSAS_60S = {
   ],
   observaciones: ['El punto de 0:21 se cruza con el que ya tiene el video en 0:20.'],
 };
+// HU-1515 · Datos del segundo factor simulado.
+export const SECRETO_TOTP_SIM = 'JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP';
+export const CODIGOS_RECUPERACION_SIM = ['ABCDE-FGHJK', 'LMNPQ-RSTUV', 'WXYZ2-34567', 'A2B3C-D4E5F', 'G6H7J-K8L9M', 'NPQRS-TUVWX', 'YZ234-56789', 'ACEGJ-LNQSU', 'BDFHK-MPRTV', 'WY246-8XZ35'];
+const QR_SIM = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h29v29H0z"/><path stroke="#000000" d="M2 2.5h7m2 0h1M2 3.5h1m5 0h1"/></svg>';
+
 export const USUARIO = {
   id: '00000000-0000-4000-8000-000000000001',
   email: 'instruccional@aulaseducativas.test',
@@ -225,6 +230,8 @@ export interface OpcionesSimulacion {
   mediciones?: { proyectoRef: string; escenario: 'hoy' | 'generador'; etapa: string; horas: number }[];
   conSesion: boolean;
   rol?: string;
+  /** HU-1515 · Con `rol: 'SUPERADMIN'`, la clave lleva al segundo factor: por configurar o ya activo (por defecto). */
+  segundoFactor?: 'configurar' | 'verificar';
   /** El próximo PUT del kit responde 409, como si otra persona hubiera guardado antes (CP-022). */
   kitEnConflicto?: boolean;
   /** Proyectos de ejemplo: 3 de Minera Andina y 2 de la Municipalidad (CP-029). */
@@ -495,7 +502,7 @@ export interface EnlaceSitioSim {
 }
 const RUTA_SITIO_SIM = /^\/(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/;
 
-export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio, cobranzaSitio, ingresosSitio, facturacionOrgSitio }: OpcionesSimulacion) {
+export async function simularApi(page: Page, { conSesion, rol, segundoFactor = 'verificar', kitEnConflicto, conProyectos, generacion = 'normal', porRegenerar: desactualizadas = [], cascada = 'normal', propuestaFalla, retoquesP05, conVideo, cursoTraducido, sinIngles = [], navegacionCurso, conAudioCliente, mediciones: medicionesIniciales, comentarios = [], paginasSitio = [], bloquesSitio = [], elementosSitio = [], enlacesSitio = [], entornoSitio = 'produccion', versionSitio = false, prerenderSitio = 'listo', ajustesSitio, blogSitio, wordpress, redireccionesSitio = [], robotsSitio = '', seoIaSitio = {}, leadsSitio = [], crmSitio = {}, popupsSitio = [], agendaSitio = {}, chatbotSitio, visitasSitio = [], planesSitio, pasarelasSitio, facturacionSitio, cuotaSitio, cobranzaSitio, ingresosSitio, facturacionOrgSitio }: OpcionesSimulacion) {
   const planesSim = crearPlanesSim(planesSitio);
   const pasarelasSim = crearPasarelasSim(pasarelasSitio, () => entornoSitio);
   const comprobantesSim = crearComprobantesSim(facturacionSitio, () => entornoSitio);
@@ -846,6 +853,8 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     return route.fulfill({ status: 200, body: '' });
   });
   let sesion = conSesion;
+  let desafio = false;
+  let estadoFactor = segundoFactor;
   const negocio: { parametros: Record<string, unknown> | null; mediciones: Record<string, unknown>[] } = {
     parametros: null,
     mediciones: (medicionesIniciales ?? []).map((m, i) => ({ id: `00000000-0000-4000-8000-${String(800 + i).padStart(12, '0')}`, proyectoId: null, notas: null, registradoPor: 'Administración', creadoEn: '2026-11-10T10:00:00.000Z', ...m })),
@@ -944,6 +953,10 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (ruta === '/yo') return sesion ? responder(200, usuario) : responder(401, { codigo: 'NO_AUTENTICADO', mensaje: 'Inicia sesión' });
     if (ruta === '/auth/ingresar') {
       const { email, clave } = req.postDataJSON() as { email: string; clave: string };
+      if (email === USUARIO.email && clave === 'clave-correcta' && usuario.rol === 'SUPERADMIN') {
+        desafio = true;
+        return responder(200, { segundoFactor: estadoFactor, expira: new Date(Date.now() + 300_000).toISOString() });
+      }
       if (email === USUARIO.email && clave === 'clave-correcta') {
         sesion = true;
         return responder(200, { usuario: USUARIO, expira: new Date(Date.now() + 3_600_000).toISOString() });
@@ -953,6 +966,29 @@ export async function simularApi(page: Page, { conSesion, rol, kitEnConflicto, c
     if (ruta === '/auth/salir') {
       sesion = false;
       return responder(204);
+    }
+    // HU-1515 · Segundo factor del superadmin: el código de la aplicación es 123456 y hay un código de recuperación.
+    if (ruta.startsWith('/auth/segundo-factor')) {
+      if (!desafio) return responder(401, { codigo: 'DESAFIO_NO_VALIDO', mensaje: 'El paso del segundo factor venció. Vuelve a ingresar.' });
+      const cuerpo = (req.method() === 'POST' ? (req.postDataJSON() ?? {}) : {}) as { codigo?: string; codigoRecuperacion?: string };
+      const incorrecto = () => responder(401, { codigo: 'CODIGO_INCORRECTO', mensaje: 'Código incorrecto' });
+      const abrir = (extra: object = {}) => {
+        desafio = false;
+        sesion = true;
+        return responder(200, { usuario, expira: new Date(Date.now() + 3_600_000).toISOString(), ...extra });
+      };
+      if (ruta === '/auth/segundo-factor' && req.method() === 'GET') return responder(200, { segundoFactor: estadoFactor, email: USUARIO.email });
+      if (ruta === '/auth/segundo-factor/configurar') {
+        return responder(200, { secreto: SECRETO_TOTP_SIM, uri: `otpauth://totp/Aptio%20SCORM:${encodeURIComponent(USUARIO.email)}?secret=${SECRETO_TOTP_SIM}&issuer=Aptio+SCORM`, qrSvg: QR_SIM });
+      }
+      if (ruta === '/auth/segundo-factor/confirmar') {
+        if (cuerpo.codigo?.replace(/\s/g, '') !== '123456') return incorrecto();
+        estadoFactor = 'verificar';
+        return abrir({ codigosRecuperacion: CODIGOS_RECUPERACION_SIM });
+      }
+      if (cuerpo.codigo) return cuerpo.codigo.replace(/\s/g, '') === '123456' ? abrir() : incorrecto();
+      if (cuerpo.codigoRecuperacion?.toUpperCase().replace(/[^A-Z0-9]/g, '') === 'ABCDEFGHJK') return abrir({ codigosRestantes: 9 });
+      return incorrecto();
     }
     if (ruta === '/auth/clave/olvido') return responder(202);
     if (ruta === '/auth/clave/restablecer') {

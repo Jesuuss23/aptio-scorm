@@ -16,6 +16,7 @@ Las credenciales viven solo en Secrets Manager:
 | `aptio-pruebas-postgres` | Usuario, clave, host, puerto y base de PostgreSQL | RDS, al crear la base |
 | `aptio-pruebas-redis` | Clave de acceso (AUTH) de ElastiCache | CDK, al crear la pila |
 | `aptio-pruebas-aplicacion` | `SESSION_SECRET` (generado) y las llaves de proveedores, vacías al crear | El equipo (paso 5) |
+| `aptio-pruebas-totp-clave` | `TOTP_CLAVE_CIFRADO` (generada): cifra el segundo factor del superadmin; solo la recibe la API y se conserva al borrar la pila (HU-1515) | Nadie: no se toca |
 | `aptio-pruebas-origen-cloudfront` | Valor de la cabecera `X-Origen-Aptio` entre CloudFront y el balanceador | CDK, al crear la pila |
 
 ## Requisitos

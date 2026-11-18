@@ -1012,9 +1012,27 @@ async function archivo(ruta: string, formato: 'pdf' | 'xml'): Promise<{ archivo:
   return { archivo: await res.blob(), nombre };
 }
 
+/** HU-1515 · Respuesta de `ingresar` para el superadmin: falta el código de su aplicación autenticadora. */
+export interface Desafio {
+  segundoFactor: 'verificar' | 'configurar';
+  expira: string;
+}
+
+export interface ConfiguracionSegundoFactor {
+  secreto: string;
+  uri: string;
+  qrSvg: string;
+}
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
-  ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
+  ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string } | Desafio>('/auth/ingresar', json({ email, clave })),
+  // HU-1515 · Segundo factor del superadmin.
+  estadoSegundoFactor: () => pedir<{ segundoFactor: Desafio['segundoFactor']; email: string }>('/auth/segundo-factor'),
+  configurarSegundoFactor: () => pedir<ConfiguracionSegundoFactor>('/auth/segundo-factor/configurar', { method: 'POST' }),
+  confirmarSegundoFactor: (codigo: string) => pedir<{ usuario: Usuario; expira: string; codigosRecuperacion: string[] }>('/auth/segundo-factor/confirmar', json({ codigo })),
+  verificarSegundoFactor: (entrada: { codigo: string } | { codigoRecuperacion: string }) =>
+    pedir<{ usuario: Usuario; expira: string; codigosRestantes?: number }>('/auth/segundo-factor', json(entrada)),
   salir: () => pedir<void>('/auth/salir', { method: 'POST' }),
   pedirClave: (email: string) => pedir<void>('/auth/clave/olvido', json({ email })),
   crearClave: (token: string, clave: string) => pedir<void>('/auth/clave/restablecer', json({ token, clave })),

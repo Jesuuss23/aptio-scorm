@@ -17,6 +17,7 @@ import { CrmService } from '../src/captacion/crm.service.js';
 import { LeadsService } from '../src/captacion/leads.service.js';
 import { CorreoService } from '../src/correo/correo.service.js';
 import { LimitePublicoService } from '../src/sitio/limite-publico.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -65,8 +66,7 @@ describe.skipIf(!hayBase && !process.env.CI)('integración con CRM (HU-1602)', (
     };
     cola = new Queue<DatosEnvioCrm>(COLA_CRM, { connection: opcionesRedis(), prefix: PREFIJO });
     for (const quien of ['super', 'admin'] as const) {
-      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correoDe(quien), clave: CLAVE });
-      cookies[quien] = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      cookies[quien] = await ingresarCookie(servidor, correoDe(quien), CLAVE);
     }
   });
 

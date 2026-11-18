@@ -36,6 +36,7 @@ describe.skipIf(!hayBase && !process.env.CI)('ingresar con Google (HU-0108)', ()
     await prisma.usuario.create({ data: { nombre: 'Ana', email: correo('ana'), rol: Rol.DISENADOR_INSTRUCCIONAL, organizacionId: orgId } });
     await prisma.usuario.create({ data: { nombre: 'Revisora', email: correo('revisora'), rol: Rol.REVISOR_CLIENTE, organizacionId: orgId, clienteId } });
     await prisma.usuario.create({ data: { nombre: 'Baja', email: correo('baja'), rol: Rol.PRODUCTOR, organizacionId: orgId, activo: false } });
+    await prisma.usuario.create({ data: { nombre: 'Super', email: correo('super'), rol: Rol.SUPERADMIN } });
     const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = configurarApp(modulo.createNestApplication());
     await app.init();
@@ -57,6 +58,8 @@ describe.skipIf(!hayBase && !process.env.CI)('ingresar con Google (HU-0108)', ()
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
     await app?.close();
+    const sup = await prisma.usuario.findUnique({ where: { email: correo('super') } });
+    if (sup) await prisma.auditoria.deleteMany({ where: { usuarioId: sup.id } });
     await prisma.auditoria.deleteMany({ where: { OR: [{ organizacionId: orgId }, { accion: 'GOOGLE_RECHAZADO', datos: { path: ['email'], string_contains: sufijo } }] } });
     await prisma.usuario.deleteMany({ where: { email: { endsWith: `-${sufijo}@prueba.test` } } });
     await prisma.cliente.deleteMany({ where: { organizacionId: orgId } });
@@ -98,6 +101,17 @@ describe.skipIf(!hayBase && !process.env.CI)('ingresar con Google (HU-0108)', ()
     const otra = await ingresarConGoogle({ sub: 'google-ana', email: 'ana.nueva@gmail.com' });
     expect(otra.res.headers.location).toBe(`${WEB}/`);
     expect(await prisma.auditoria.count({ where: { usuarioId: fila.id, accion: 'GOOGLE_VINCULADA' } })).toBe(1);
+  });
+
+  it('HU-1515 · el superadmin no entra solo con Google: sigue al segundo factor sin sesión', async () => {
+    const { res, sesion } = await ingresarConGoogle({ sub: 'google-super', email: correo('super') });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe(`${WEB}/ingresar/segundo-factor`);
+    expect(sesion).toBeUndefined();
+    const desafio = ([] as string[]).concat(res.headers['set-cookie'] ?? []).find((c) => c.startsWith('segundo_factor='))!;
+    expect(desafio).toMatch(/Path=\/api\/v1\/auth\/segundo-factor/);
+    const estado = await request(servidor).get('/api/v1/auth/segundo-factor').set('Cookie', desafio.split(';')[0]!);
+    expect(estado.body).toEqual({ segundoFactor: 'configurar', email: correo('super') });
   });
 
   it('el revisor del cliente entra con su alcance', async () => {

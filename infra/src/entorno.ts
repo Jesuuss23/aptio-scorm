@@ -142,6 +142,15 @@ export class EntornoStack extends Stack {
         excludePunctuation: true,
       },
     });
+    // HU-1515 · Clave de cifrado de los secretos TOTP del superadmin: se genera y no se rota a mano (si se pierde, los
+    // superadmin restablecen su segundo factor desde la consola). Se conserva aunque se borre la pila.
+    const secretoTotp = new secretsmanager.Secret(this, 'SecretoTotp', {
+      secretName: nombre('totp-clave'),
+      description: 'TOTP_CLAVE_CIFRADO: cifra los secretos del segundo factor del superadmin (HU-1515)',
+      encryptionKey: claveDatos,
+      removalPolicy: RemovalPolicy.RETAIN,
+      generateSecretString: { passwordLength: 64, excludePunctuation: true },
+    });
     const secretoOrigen = new secretsmanager.Secret(this, 'SecretoOrigen', {
       secretName: nombre('origen-cloudfront'),
       description: `Valor de la cabecera ${CABECERA_ORIGEN} entre CloudFront y el balanceador`,
@@ -389,7 +398,8 @@ export class EntornoStack extends Stack {
       image: imagen('api'),
       // CloudFront y el balanceador: la API toma la IP del visitante para sus límites (SUP-169).
       environment: { ...entornoComun, PORT: String(PUERTO_API), TRUST_PROXY: '2' },
-      secrets: secretosComunes,
+      // Solo la API descifra el segundo factor: el worker no recibe la clave TOTP.
+      secrets: { ...secretosComunes, TOTP_CLAVE_CIFRADO: ecs.Secret.fromSecretsManager(secretoTotp) },
       portMappings: [{ containerPort: PUERTO_API }],
       logging: registros('api'),
       healthCheck: {

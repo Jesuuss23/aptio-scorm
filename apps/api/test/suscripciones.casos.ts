@@ -17,6 +17,7 @@ import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
 import { LimitePublicoService } from '../src/sitio/limite-publico.js';
 import { firmar, SuscripcionesService } from '../src/ventas/suscripciones.service.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -68,8 +69,7 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
     app = configurarApp(modulo.createNestApplication());
     await app.init();
     servidor = app.getHttpServer();
-    const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correoDe('super'), clave: CLAVE });
-    cookie = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    cookie = await ingresarCookie(servidor, correoDe('super'), CLAVE);
     // Una página publicada con el bloque de precios: la versión lleva los planes (en pruebas, también el ficticio).
     const p = await panel('post', '/sitio/paginas').send({ ruta: RUTA, titulo: 'Precios' });
     paginaId = p.body.id;

@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
 import { AlmacenService } from '../src/recursos/almacen.service.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 process.env.AWS_ENDPOINT ??= 'http://localhost:9000';
 process.env.AWS_ACCESS_KEY_ID ??= 'test';
@@ -94,8 +95,7 @@ describe.skipIf(!hayBase && !process.env.CI)('portal de facturación de la organ
     servidor = app.getHttpServer();
     if (hayS3) await prepararAlmacen(app.get(AlmacenService).almacen, ['http://localhost:5173']);
     for (const n of ['admin', 'productor', 'otra', 'super']) {
-      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correoDe(n), clave: CLAVE });
-      cookies[n] = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      cookies[n] = await ingresarCookie(servidor, correoDe(n), CLAVE);
     }
     const f = await comprobante(org.id, suscripcionId, 'FACTURA');
     const b = await comprobante(org.id, suscripcionId, 'BOLETA');
