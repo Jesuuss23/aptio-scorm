@@ -1,0 +1,178 @@
+# HU-1405 · Despliegue continuo al entorno de pruebas (sa-east-1). Corre cuando el CI termina bien en main y también a
+# mano. Entra a AWS con OIDC (sin llaves guardadas en GitHub), publica las imágenes en ECR, migra la base con una
+# tarea efímera, actualiza la API y el worker, sube la web y comprueba /api/v1/salud por HTTPS.
+# Mientras el entorno «pruebas» de GitHub no tenga la variable AWS_ROLE_ARN, el trabajo se salta con un aviso
+# (docs/24-puesta-en-marcha-aws.md). Producción queda fuera de este workflow.
+name: Despliegue a pruebas
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: despliegue-pruebas
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    name: Desplegar en pruebas
+    # Solo un CI exitoso de un push a main (no de un PR) o un lanzamiento manual desde main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-24.04
+    environment:
+      name: pruebas
+      url: ${{ steps.salidas.outputs.url }}
+    timeout-minutes: 60
+    env:
+      AWS_REGION: sa-east-1
+      ENTORNO: pruebas
+      PILA: AptioPruebas
+      ETIQUETA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Revisar la configuración del entorno
+        id: config
+        env:
+          ROL: ${{ vars.AWS_ROLE_ARN }}
+        run: |
+          if [ -z "$ROL" ]; then
+            echo "::notice title=Despliegue omitido::El entorno pruebas de GitHub aún no tiene AWS_ROLE_ARN (ver docs/24-puesta-en-marcha-aws.md)."
+            echo "listo=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "listo=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.listo == 'true'
+        with:
+          ref: ${{ env.ETIQUETA }}
+
+      - name: Entrar a AWS con OIDC
+        if: steps.config.outputs.listo == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: aptio-despliegue-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Entrar a ECR
+        if: steps.config.outputs.listo == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.config.outputs.listo == 'true'
+
+      - name: Imagen de la API
+        if: steps.config.outputs.listo == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/api.Dockerfile
+          push: true
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/aptio-${{ env.ENTORNO }}-api:${{ env.ETIQUETA }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+
+      - name: Imagen del worker
+        if: steps.config.outputs.listo == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/worker.Dockerfile
+          push: true
+          provenance: false
+          tags: ${{ steps.ecr.outputs.registry }}/aptio-${{ env.ENTORNO }}-worker:${{ env.ETIQUETA }}
+          cache-from: type=gha,scope=worker
+          cache-to: type=gha,scope=worker,mode=max
+
+      - name: Web estática
+        if: steps.config.outputs.listo == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/web.Dockerfile
+          target: exportar
+          outputs: type=local,dest=web-dist
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - uses: pnpm/action-setup@v4
+        if: steps.config.outputs.listo == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.config.outputs.listo == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Dependencias de la infraestructura
+        if: steps.config.outputs.listo == 'true'
+        run: pnpm install --frozen-lockfile --filter @aptio/infra
+
+      # La primera vez la pila nace con 0 réplicas: la API no puede arrancar sobre una base sin migrar.
+      - name: Primer despliegue de la pila (si no existe)
+        if: steps.config.outputs.listo == 'true'
+        working-directory: infra
+        run: |
+          if aws cloudformation describe-stacks --stack-name "$PILA" > /dev/null 2>&1; then
+            echo "La pila $PILA ya existe."
+          else
+            pnpm exec cdk deploy "$PILA" --require-approval never -c "entorno=$ENTORNO" -c "etiquetaImagen=$ETIQUETA" -c replicas=0
+          fi
+
+      - name: Migrar la base (tarea efímera)
+        if: steps.config.outputs.listo == 'true'
+        run: infra/scripts/migrar.sh "$PILA" "${{ steps.ecr.outputs.registry }}/aptio-${ENTORNO}-api:${ETIQUETA}"
+
+      - name: Actualizar la API y el worker
+        if: steps.config.outputs.listo == 'true'
+        working-directory: infra
+        run: pnpm exec cdk deploy "$PILA" --require-approval never -c "entorno=$ENTORNO" -c "etiquetaImagen=$ETIQUETA" --outputs-file ../salidas.json
+
+      - name: Leer las salidas de la pila
+        if: steps.config.outputs.listo == 'true'
+        id: salidas
+        run: |
+          {
+            echo "url=$(jq -r ".${PILA}.UrlWeb" salidas.json)"
+            echo "bucket=$(jq -r ".${PILA}.BucketWebNombre" salidas.json)"
+            echo "distribucion=$(jq -r ".${PILA}.DistribucionId" salidas.json)"
+          } >> "$GITHUB_OUTPUT"
+
+      # Los archivos con hash son inmutables y se conservan (una pestaña abierta puede pedir los anteriores);
+      # index.html no se guarda en caché y se invalida.
+      - name: Subir la web
+        if: steps.config.outputs.listo == 'true'
+        env:
+          BUCKET: ${{ steps.salidas.outputs.bucket }}
+          DISTRIBUCION: ${{ steps.salidas.outputs.distribucion }}
+        run: |
+          aws s3 sync web-dist/assets "s3://$BUCKET/assets" --cache-control "public, max-age=31536000, immutable"
+          aws s3 sync web-dist "s3://$BUCKET" --exclude "assets/*" --exclude index.html --cache-control "public, max-age=3600"
+          aws s3 cp web-dist/index.html "s3://$BUCKET/index.html" --cache-control "no-cache"
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUCION" --paths /index.html / > /dev/null
+
+      - name: Comprobar el entorno por HTTPS
+        if: steps.config.outputs.listo == 'true'
+        env:
+          URL: ${{ steps.salidas.outputs.url }}
+        run: |
+          for intento in $(seq 1 20); do
+            if curl -fsS --proto '=https' "$URL/api/v1/salud" -o salud.json && jq -e '.estado == "ok" and .baseDatos == "ok"' salud.json > /dev/null; then
+              cat salud.json; break
+            fi
+            echo "Intento $intento: la salud aún no responde ok"; sleep 15
+            [ "$intento" = 20 ] && exit 1
+          done
+          curl -fsS --proto '=https' -o /dev/null -w 'Web: %{http_code}\n' "$URL/"
+          # HTTP no sirve contenido: CloudFront redirige a HTTPS.
+          test "$(curl -s -o /dev/null -w '%{http_code}' "http://${URL#https://}/")" = 301
+          echo "### Entorno de pruebas actualizado: $URL (imagen $ETIQUETA)" >> "$GITHUB_STEP_SUMMARY"

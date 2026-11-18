@@ -1,0 +1,125 @@
+# 24 · Puesta en marcha del entorno de pruebas en AWS (HU-1405)
+
+Guía para dejar funcionando, por primera vez, el entorno de pruebas en una cuenta de AWS y cerrar la verificación de CP-105. La infraestructura está en `infra/` (AWS CDK en TypeScript), las imágenes en `docker/` y el despliegue continuo en `.github/workflows/deploy-pruebas.yml`. Todo va en **sa-east-1** (ADR-009). Producción queda fuera: se arma igual, con otro nombre de entorno, en una historia propia.
+
+## Qué se crea
+
+| Pila | Quién la despliega | Contenido |
+| --- | --- | --- |
+| `AptioBase-pruebas` | Un administrador, una vez, desde su equipo | Repositorios ECR `aptio-pruebas-api` y `aptio-pruebas-worker` (etiquetas inmutables, cifrado KMS, escaneo al subir) y el rol `aptio-pruebas-despliegue-github`, que GitHub Actions asume con OIDC. |
+| `AptioPruebas` | El workflow, en cada CI exitoso de `main` | Red con subredes públicas (balanceador y NAT), privadas (tareas) y aisladas (datos); PostgreSQL 16 (RDS, `db.t4g.micro`) y Redis 7 (ElastiCache, `cache.t4g.micro`), una instancia cada uno; buckets de web, material y respaldos cifrados con KMS y sin acceso público; ECS Fargate con 1 réplica de la API y 1 del worker; balanceador y CloudFront. |
+
+Las credenciales viven solo en Secrets Manager:
+
+| Secreto | Contenido | Quién lo llena |
+| --- | --- | --- |
+| `aptio-pruebas-postgres` | Usuario, clave, host, puerto y base de PostgreSQL | RDS, al crear la base |
+| `aptio-pruebas-redis` | Clave de acceso (AUTH) de ElastiCache | CDK, al crear la pila |
+| `aptio-pruebas-aplicacion` | `SESSION_SECRET` (generado) y las llaves de proveedores, vacías al crear | El equipo (paso 5) |
+| `aptio-pruebas-origen-cloudfront` | Valor de la cabecera `X-Origen-Aptio` entre CloudFront y el balanceador | CDK, al crear la pila |
+
+## Requisitos
+
+- Una cuenta de AWS con acceso de administrador para los pasos 1 a 3 (después, el despliegue usa solo el rol de OIDC).
+- En el equipo del administrador: Node 22, pnpm 10, AWS CLI v2 con un perfil de esa cuenta (`aws sts get-caller-identity` debe responder) y Docker para el paso 4.
+- Permiso de administración del repositorio en GitHub para crear el entorno `pruebas`.
+
+## 1. Preparar CDK en la cuenta (bootstrap)
+
+```bash
+pnpm install
+export AWS_PROFILE=<perfil-de-la-cuenta>
+export CDK_DEFAULT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+pnpm --filter @aptio/infra exec cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/sa-east-1
+```
+
+Crea los roles `cdk-*` y el bucket de recursos de CDK. Si se usará un dominio propio, el certificado de CloudFront va en us-east-1 (paso 7), pero no hace falta bootstrap allí.
+
+## 2. Crear la pila base (ECR y rol de GitHub con OIDC)
+
+```bash
+pnpm --filter @aptio/infra exec cdk deploy AptioBase-pruebas
+```
+
+Si la cuenta ya tiene el proveedor OIDC de GitHub (solo puede haber uno por cuenta), se pasa su ARN para no crear otro: `-c proveedorOidcArn=arn:aws:iam::<cuenta>:oidc-provider/token.actions.githubusercontent.com`.
+
+La salida `RolDespliegueArn` es el ARN del rol. El rol solo lo puede asumir un trabajo del repositorio `jesuuss23/aptio-scorm` que use el entorno de GitHub `pruebas` (otro repositorio se indica con `-c repositorioGithub=dueño/nombre`).
+
+## 3. Configurar el entorno `pruebas` en GitHub
+
+En el repositorio: **Settings › Environments › New environment › `pruebas`**.
+
+1. En **Deployment branches and tags**, elegir *Selected branches* y agregar `main`.
+2. En **Environment variables**, crear `AWS_ROLE_ARN` con el valor de `RolDespliegueArn`. No es un secreto: el rol solo se asume con el token OIDC de este repositorio y este entorno. No se guarda ninguna llave de AWS en GitHub.
+
+Mientras la variable no exista, el workflow «Despliegue a pruebas» termina con el aviso «Despliegue omitido» y no falla.
+
+## 4. Primer despliegue
+
+Desde **Actions › Despliegue a pruebas › Run workflow** (rama `main`), o con el siguiente push a `main` cuando el CI pase. El workflow:
+
+1. Entra a AWS con OIDC y a ECR.
+2. Construye y publica `api` y `worker` con la etiqueta del commit, y construye la web estática.
+3. Como la pila `AptioPruebas` aún no existe, la crea con **0 réplicas** (`-c replicas=0`): la API no puede arrancar sobre una base sin migrar. RDS y CloudFront tardan entre 15 y 30 minutos la primera vez.
+4. Corre la tarea efímera de base de datos (`infra/scripts/migrar.sh`): `pnpm db:deploy` (`prisma migrate deploy`) y `pnpm --filter @aptio/db verificar-organizaciones`. Si termina con un código distinto de 0, el despliegue se detiene y deja en el registro las últimas líneas de la tarea.
+5. Actualiza la pila con 1 réplica de la API y 1 del worker. ECS reemplaza las tareas sin cortar el servicio y vuelve atrás solo si las nuevas no quedan sanas.
+6. Sube la web al bucket (los archivos con hash como inmutables, `index.html` sin caché) e invalida `/index.html`.
+7. Comprueba por HTTPS que `/api/v1/salud` responde `estado: ok` con `baseDatos: ok`, que la web responde 200 y que HTTP redirige a HTTPS.
+
+La dirección del entorno queda en el resumen del trabajo y en la salida `UrlWeb` de la pila (por ejemplo `https://d1234abcd.cloudfront.net`).
+
+> Para desplegar a mano desde el equipo del administrador, se usan los mismos comandos del workflow: publicar las imágenes en ECR con la etiqueta elegida, `infra/scripts/migrar.sh AptioPruebas <imagen-api>` y `pnpm --filter @aptio/infra exec cdk deploy AptioPruebas -c etiquetaImagen=<etiqueta>`.
+
+## 5. Cargar las llaves de los proveedores
+
+La pila arranca con `PROVEEDORES_MODO=simulado`: funciona sin costo de IA. Para usar los proveedores reales, cargar las llaves en el secreto `aptio-pruebas-aplicacion` (consola de Secrets Manager › *Retrieve secret value* › *Edit*, o con la CLI). Las claves que no se usen quedan vacías.
+
+```bash
+aws secretsmanager get-secret-value --secret-id aptio-pruebas-aplicacion --query SecretString --output text > /tmp/llaves.json
+# Editar /tmp/llaves.json: ANTHROPIC_API_KEY, GOOGLE_TTS_API_KEY, SMTP_URL, … (no tocar SESSION_SECRET)
+aws secretsmanager put-secret-value --secret-id aptio-pruebas-aplicacion --secret-string file:///tmp/llaves.json
+shred -u /tmp/llaves.json
+```
+
+Luego se cambia el modo a real con un despliegue que lleve `-c modoProveedores=real` (o se cambia ese valor en `infra/cdk.json` con un PR). ECS lee los secretos al arrancar cada tarea: tras editar el secreto, basta forzar un despliegue nuevo de los servicios (`aws ecs update-service --cluster aptio-pruebas-cluster --service aptio-pruebas-api --force-new-deployment`, y lo mismo con `aptio-pruebas-worker`).
+
+## 6. Crear el primer usuario y verificar CP-105
+
+1. Sembrar los datos iniciales con una tarea efímera sobre la imagen de la API (comando `pnpm db:seed`, con `SEED_CLAVE` definida solo en esa ejecución) o invitar al primer administrador según `MANUAL-SISTEMA.md`.
+2. Completar CP-105 en el entorno, y anotar el resultado en `docs/ESTADO.md`:
+   - `GET https://<UrlWeb>/api/v1/salud` responde 200 con `baseDatos: ok`.
+   - `http://<UrlWeb>/` responde 301 hacia HTTPS.
+   - Entrar, crear un proyecto, subir un documento (va al bucket de material cifrado con la clave `alias/aptio-pruebas-datos`) y exportar LOTO en SCORM 1.2.
+   - En Operación, «Respaldar ahora» deja la copia en el bucket de respaldos (SUP-157) y `pnpm respaldo:restaurar` la recupera en una base de prueba.
+   - Publicar el sitio y medir Lighthouse detrás de CloudFront: `SITIO_LIGHTHOUSE_URL=https://<UrlWeb>/s pnpm sitio:lighthouse` (SUP-199).
+   - Los registros de cada servicio están en CloudWatch, en `/aptio/pruebas/api`, `/aptio/pruebas/worker` y `/aptio/pruebas/migracion`.
+
+## 7. Dominio propio (opcional)
+
+Sin dominio, el entorno usa la URL HTTPS de CloudFront. Para un dominio como `pruebas.aptioscorm.pe`:
+
+1. Pedir en ACM, **en us-east-1**, el certificado del dominio de la web, y en **sa-east-1** el de un nombre para el balanceador (por ejemplo `origen-pruebas.aptioscorm.pe`). Validarlos por DNS.
+2. Desplegar con los cuatro valores (en `infra/cdk.json` o con `-c`):
+   `dominio`, `certificadoCloudFrontArn`, `dominioOrigen` y `certificadoAlbArn`.
+3. En el DNS: `pruebas.aptioscorm.pe` como CNAME (o alias de Route 53) de la distribución, y `origen-pruebas.aptioscorm.pe` como CNAME del balanceador.
+
+Con el certificado del balanceador, CloudFront llega a él solo por HTTPS (TLS 1.2) y el puerto 80 deja de existir. Sin él, el tramo CloudFront → balanceador va por HTTP dentro de la red de AWS, y el balanceador solo acepta la lista de prefijos `com.amazonaws.global.cloudfront.origin-facing` con la cabecera secreta; cualquier otra petición recibe 403.
+
+## Caché y cabeceras de CloudFront
+
+| Ruta | Origen | Caché | Notas |
+| --- | --- | --- | --- |
+| `/` y rutas de la aplicación | Bucket web (OAC) | Optimizada | Una función cambia toda ruta sin extensión por `/index.html`; los errores de la API no se reemplazan. |
+| `/assets/*` | Bucket web (OAC) | Optimizada | Archivos con hash, inmutables. |
+| `/api/*` | Balanceador | Sin caché | Todos los métodos, cookies, consulta y cabeceras del visitante (salvo `Host`). Incluye `/api/v1/publico/leads` y `/api/v1/publico/citas*` (SUP-250, SUP-255). |
+| `/s` y `/s/*` | Balanceador | La decide el origen con `Cache-Control` (SUP-197) | Sin cookies ni consulta (SUP-238). Deja pasar `POST /s/_lead`, `_popup`, `_cita` y `_visita` (SUP-238, SUP-250, SUP-255, SUP-274). |
+
+Todas las respuestas llevan HSTS de un año y `X-Content-Type-Options: nosniff`. En `/s/*` CloudFront no agrega ni reemplaza la CSP: la arma cada versión del sitio (SUP-266).
+
+## Costos y tamaño
+
+Dimensionamiento mínimo: 1 tarea de la API (0,5 vCPU, 1 GB), 1 del worker (1 vCPU, 2 GB), RDS `db.t4g.micro` con 20 GB (crece hasta 100 GB), ElastiCache `cache.t4g.micro`, 1 NAT y 1 balanceador. El NAT y el balanceador son los costos fijos más altos. El costo real se confirma en la factura del primer mes; esta guía no lo estima.
+
+## Borrar el entorno
+
+`cdk destroy AptioPruebas` borra el cómputo, la red y la web. La base tiene protección contra borrado (se quita con `-c proteccionBorrado=false` y un despliegue) y deja una instantánea; los buckets de material y respaldos, la clave de datos y los repositorios ECR se conservan a propósito y se borran a mano.

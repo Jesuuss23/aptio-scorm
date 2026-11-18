@@ -40,6 +40,15 @@ export const cuerpoCrudo = (limite: number) => (req: IncomingMessage & { body?: 
   req.on('error', (e) => next(e));
 };
 
+/**
+ * HU-1405 · Cuántos proxies hay delante de la API (`TRUST_PROXY`): en la nube son 2, CloudFront y el balanceador. Con
+ * eso Express toma de `X-Forwarded-For` la IP del visitante para los límites por IP (SUP-169); sin la variable, 0.
+ */
+export function saltosProxy(env: NodeJS.ProcessEnv = process.env): number {
+  const n = Number(env.TRUST_PROXY ?? 0);
+  return Number.isInteger(n) && n >= 0 && n <= 5 ? n : 0;
+}
+
 /** Configuración común a la app real y a las pruebas: prefijo, validación, errores y OpenAPI. */
 export function configurarApp(app: INestApplication): INestApplication {
   // HU-1508 · El sitio público pre-renderizado queda fuera del prefijo de la API.
@@ -52,6 +61,8 @@ export function configurarApp(app: INestApplication): INestApplication {
     ],
   });
   app.use(cookieParser());
+  const saltos = saltosProxy();
+  if (saltos > 0) (app as NestExpressApplication).set('trust proxy', saltos);
   // HU-1703 · Los webhooks de pago llegan como el cuerpo crudo (Buffer): la firma HMAC se calcula sobre los bytes tal como
   // llegaron, antes de que el parser de JSON los toque. Hasta 64 KB; más, 413.
   app.use(`/${PREFIJO}/webhooks/pago`, cuerpoCrudo(64 * 1024));

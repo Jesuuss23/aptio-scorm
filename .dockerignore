@@ -1,0 +1,24 @@
+# HU-1405 · Contexto mínimo para las imágenes de docker/: sin dependencias instaladas, salidas, secretos ni documentación.
+**/node_modules
+**/dist
+**/build
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+**/coverage
+**/.vite
+.git
+.github
+.env
+.env.*
+**/.env
+**/.env.*
+!**/.env.example
+*.log
+dump.rdb
+docs
+jira
+infra/cdk.out
+MANUAL-*.md
+TRASPASO-FASE-COMERCIAL.md
+docker-compose.yml

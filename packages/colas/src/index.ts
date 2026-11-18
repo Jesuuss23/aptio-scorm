@@ -203,6 +203,9 @@ export function opcionesRedis(env: NodeJS.ProcessEnv = process.env): ConnectionO
   return {
     host: env.REDIS_HOST ?? 'localhost',
     port: Number(env.REDIS_PORT ?? 6379),
+    // HU-1405 · En la nube (ElastiCache) el tráfico va cifrado y con clave de acceso, leída de Secrets Manager.
+    ...(env.REDIS_TLS === 'true' ? { tls: {} } : {}),
+    ...(env.REDIS_PASSWORD ? { password: env.REDIS_PASSWORD } : {}),
     // BullMQ lo exige en los workers; en la API evita que un comando espere para siempre.
     maxRetriesPerRequest: null,
   };

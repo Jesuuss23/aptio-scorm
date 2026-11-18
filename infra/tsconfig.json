@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // Los tipos de aws-cdk-lib no están escritos para esta opción (propiedades opcionales como `string | undefined`).
+    "exactOptionalPropertyTypes": false,
+    "types": ["node"]
+  },
+  "include": ["bin", "src", "test"]
+}

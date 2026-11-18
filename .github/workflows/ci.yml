@@ -137,3 +137,32 @@ jobs:
           name: lighthouse
           path: packages/sitio/lighthouse
           retention-days: 7
+
+  imagenes:
+    name: Imágenes Docker (${{ matrix.servicio }})
+    # HU-1405 · Las imágenes del despliegue construyen limpias en cada cambio (sin publicarlas).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        servicio: [api, worker, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Construir
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.servicio }}.Dockerfile
+          push: false
+          load: ${{ matrix.servicio != 'web' }}
+          tags: aptio-${{ matrix.servicio }}:ci
+          cache-from: type=gha,scope=${{ matrix.servicio }}
+          cache-to: type=gha,scope=${{ matrix.servicio }},mode=max
+      - name: Comprobar las herramientas del worker
+        if: matrix.servicio == 'worker'
+        run: docker run --rm aptio-worker:ci sh -c 'test "$(id -u)" = 10001 && ffmpeg -version | head -1 && "$RHUBARB_PATH" --version && "$PG_BIN_DIR/pg_dump" --version && fc-list | grep -q DejaVu'
+      - name: Comprobar que la API corre sin privilegios
+        if: matrix.servicio == 'api'
+        run: docker run --rm aptio-api:ci sh -c 'test "$(id -u)" = 10001 && node --version && pnpm --version'
