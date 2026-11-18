@@ -18,7 +18,7 @@ import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
-import { type ConfigEntorno, LLAVES_APLICACION, nombreBucket } from './config';
+import { type ConfigEntorno, llavesAplicacion, nombreBucket } from './config';
 
 export interface EntornoProps extends StackProps {
   config: ConfigEntorno;
@@ -136,7 +136,7 @@ export class EntornoStack extends Stack {
       description: 'Llaves de la aplicación (vacías al crear; ver docs/24-puesta-en-marcha-aws.md)',
       encryptionKey: claveDatos,
       generateSecretString: {
-        secretStringTemplate: JSON.stringify(Object.fromEntries(LLAVES_APLICACION.map((k) => [k, '']))),
+        secretStringTemplate: JSON.stringify(Object.fromEntries(llavesAplicacion(c.entorno).map((k) => [k, '']))),
         generateStringKey: 'SESSION_SECRET',
         passwordLength: 64,
         excludePunctuation: true,
@@ -357,6 +357,7 @@ export class EntornoStack extends Stack {
       SITIO_ENTORNO: c.entorno === 'produccion' ? 'produccion' : 'pruebas',
       WEB_URL: urlWeb,
       SITIO_URL: `${urlWeb}/s`,
+      ...(c.correoRemitente ? { CORREO_REMITENTE: c.correoRemitente } : {}),
     };
     // Credenciales: solo referencias a Secrets Manager; ECS las inyecta al arrancar la tarea.
     const secretosComunes: Record<string, ecs.Secret> = {
@@ -367,7 +368,7 @@ export class EntornoStack extends Stack {
       DB_PASSWORD: ecs.Secret.fromSecretsManager(secretoBd, 'password'),
       REDIS_PASSWORD: ecs.Secret.fromSecretsManager(secretoRedis),
       SESSION_SECRET: ecs.Secret.fromSecretsManager(secretoApp, 'SESSION_SECRET'),
-      ...Object.fromEntries(LLAVES_APLICACION.map((k) => [k, ecs.Secret.fromSecretsManager(secretoApp, k)])),
+      ...Object.fromEntries(llavesAplicacion(c.entorno).map((k) => [k, ecs.Secret.fromSecretsManager(secretoApp, k)])),
     };
 
     const registros = (servicio: string) => ecs.LogDrivers.awsLogs({

@@ -23,6 +23,8 @@ export interface ConfigEntorno {
   repositorioGithub: string;
   /** Impide borrar la base de datos por error (activado por defecto). */
   proteccionBorrado: boolean;
+  /** Remitente de los correos (`CORREO_REMITENTE`), p. ej. `Aptio SCORM <no-responder@aptioscorm.pe>`. No es secreto. */
+  correoRemitente?: string;
   /** Réplicas de la API y del worker: 1; 0 solo en el primer despliegue, antes de migrar la base vacía. */
   replicas: 0 | 1;
 }
@@ -67,11 +69,12 @@ export function leerConfig(leer: LeerContexto): ConfigEntorno {
     repositorioGithub: texto(leer, 'repositorioGithub') ?? 'jesuuss23/aptio-scorm',
     proteccionBorrado: texto(leer, 'proteccionBorrado') !== 'false',
     replicas: replicas(texto(leer, 'replicas')),
+    ...(texto(leer, 'correoRemitente') ? { correoRemitente: texto(leer, 'correoRemitente')! } : {}),
   };
 }
 
-/** Llaves de la aplicación que el equipo carga en Secrets Manager después del primer despliegue (vacías al crear). */
-export const LLAVES_APLICACION = [
+/** Llaves comunes a todo entorno: proveedores de IA y voz, ingreso con Google, correo y CRM (ver apiskey.md). */
+const LLAVES_COMUNES = [
   'ANTHROPIC_API_KEY',
   'GOOGLE_TTS_API_KEY',
   'GOOGLE_STT_API_KEY',
@@ -79,17 +82,24 @@ export const LLAVES_APLICACION = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
   'SMTP_URL',
-  'PAGO_PRUEBA_SECRETO',
-  'OSE_PRUEBAS_SECRETO_WEBHOOK',
-  'STRIPE_LLAVE_SECRETA_PRUEBAS',
-  'STRIPE_SECRETO_WEBHOOK_PRUEBAS',
-  'CULQI_LLAVE_PUBLICA_PRUEBAS',
-  'CULQI_LLAVE_SECRETA_PRUEBAS',
-  'CULQI_SECRETO_WEBHOOK_PRUEBAS',
+  'HUBSPOT_TOKEN',
+  'PIPEDRIVE_TOKEN',
   'ZOHO_CLIENT_ID',
   'ZOHO_CLIENT_SECRET',
   'ZOHO_REFRESH_TOKEN',
 ] as const;
+
+/**
+ * Llaves de la aplicación que el equipo carga en Secrets Manager después del primer despliegue (vacías al crear).
+ * Las pasarelas usan el juego del modo del entorno (`*_PRODUCCION` en producción, `*_PRUEBAS` en los demás); la
+ * pasarela de pruebas y el OSE simulado solo existen fuera de producción.
+ */
+export function llavesAplicacion(entorno: string): string[] {
+  const s = entorno === 'produccion' ? 'PRODUCCION' : 'PRUEBAS';
+  const pasarelas = [`STRIPE_LLAVE_SECRETA_${s}`, `STRIPE_SECRETO_WEBHOOK_${s}`, `CULQI_LLAVE_PUBLICA_${s}`, `CULQI_LLAVE_SECRETA_${s}`, `CULQI_SECRETO_WEBHOOK_${s}`];
+  const soloPruebas = entorno === 'produccion' ? [] : ['PAGO_PRUEBA_SECRETO', 'OSE_PRUEBAS_SECRETO_WEBHOOK'];
+  return [...LLAVES_COMUNES, ...pasarelas, ...soloPruebas];
+}
 
 /** Nombre único de un bucket del entorno: la cuenta lo vuelve irrepetible en todo S3. */
 export function nombreBucket(entorno: string, uso: 'web' | 'material' | 'respaldos', cuenta: string): string {
