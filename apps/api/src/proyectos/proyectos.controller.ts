@@ -1,12 +1,12 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiCookieAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiConflictResponse, ApiCookieAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { EQUIPO } from '../comun/organizacion.js';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
 import { MaterialDto, MaterialEntradaDto } from './material.dto.js';
 import { MaterialesService } from './materiales.service.js';
-import { CursoDto, FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
+import { CursoDto, EntregaProyectoDto, FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
 import { ProyectosService } from './proyectos.service.js';
 
 /** docs/14-modulos.md: crean y editan proyectos administración, diseño instruccional y producción. */
@@ -54,6 +54,15 @@ export class ProyectosController {
   @ApiNoContentResponse({ description: 'Pasa a ARCHIVADO; no borra' })
   archivar(@UsuarioActual() u: UsuarioSesion, @Param('proyectoId', ParseUUIDPipe) id: string): Promise<void> {
     return this.proyectos.archivar(u, id);
+  }
+
+  @Post(':proyectoId/entregar')
+  @Roles(...CREAN)
+  @HttpCode(200)
+  @ApiOkResponse({ type: EntregaProyectoDto, description: 'Pasa a ENTREGADO y programa el borrado de los documentos del cliente (HU-1404, CP-104)' })
+  @ApiConflictResponse({ description: 'YA_ENTREGADO, ESTADO_NO_VALIDO (no está en revisión) o SIN_EXPORTACION (aún no hay un paquete exportado)' })
+  entregar(@UsuarioActual() u: UsuarioSesion, @Param('proyectoId', ParseUUIDPipe) id: string): Promise<EntregaProyectoDto> {
+    return this.proyectos.entregar(u, id);
   }
 
   @Get(':proyectoId/curso')

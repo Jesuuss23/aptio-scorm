@@ -7,6 +7,8 @@
 // HU-0804 · Idioma «ES + EN en el mismo paquete»: sin todo el inglés no se exporta; los desbordes y la voz solo advierten.
 // HU-1205 · CP-095 · «Kit de gamificación para el LMS»: empieza en el LMS del cliente, «Exportar kit» lo pide con el LMS y
 // el idioma elegidos, el historial muestra su avance y se descarga el ZIP real del kit; axe WCAG 2.2 A/AA sin violaciones.
+// ADR-009 · «Marcar como entregado»: con un paquete listo se confirma, el proyecto queda entregado y se avisa cuándo se
+// borran los documentos del cliente; sin paquete el botón queda deshabilitado.
 import AxeBuilder from '@axe-core/playwright';
 import { codigoReproductor, construirKitGamificacion, construirScorm12 } from '@aptio/exporters';
 import { expect, type Page, test } from '@playwright/test';
@@ -203,6 +205,50 @@ test('si la exportación falla, el historial muestra el motivo y no ofrece Desca
   await expect(fila.getByRole('button', { name: /Descargar/ })).toHaveCount(0);
 });
 
+test('marcar como entregado confirma, cierra el proyecto y avisa cuándo se borran los documentos del cliente', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  await simularExportaciones(page, zip);
+  const entregas: string[] = [];
+  page.on('request', (r) => { if (r.method() === 'POST' && r.url().endsWith(`/proyectos/${PROYECTO}/entregar`)) entregas.push(r.url()); });
+  await page.goto(URL_ENTREGA);
+  const seccion = page.getByRole('region', { name: 'Entrega al cliente' });
+  const marcar = seccion.getByRole('button', { name: 'Marcar como entregado' });
+  await expect(marcar).toBeEnabled();
+
+  // Cancelar no entrega.
+  await marcar.click();
+  const dialogo = page.getByRole('dialog', { name: '¿Marcar el proyecto como entregado?' });
+  await expect(dialogo).toContainText('los documentos que subió el cliente se borrarán');
+  await expect(dialogo.getByRole('button', { name: 'Cancelar' })).toBeFocused();
+  await expect(new AxeBuilder({ page }).include('dialog[open]').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze().then((r) => r.violations)).resolves.toEqual([]);
+  await dialogo.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(dialogo).toBeHidden();
+  expect(entregas).toEqual([]);
+
+  // Con teclado: confirmar marca el proyecto como entregado.
+  await marcar.focus();
+  await page.keyboard.press('Enter');
+  await dialogo.getByRole('button', { name: 'Marcar como entregado' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Proyecto entregado. Los 2 documentos que subió el cliente se borran el' })).toContainText('(180 días de retención)');
+  await expect(seccion.getByText('Proyecto entregado. Los documentos que subió el cliente se borran al cumplirse su retención')).toBeVisible();
+  await expect(seccion.getByRole('button', { name: 'Marcar como entregado' })).toHaveCount(0);
+  expect(entregas).toHaveLength(1);
+
+  // Al volver, la entrega sigue marcada.
+  await page.reload();
+  await expect(page.getByRole('region', { name: 'Entrega al cliente' }).getByText(/^Proyecto entregado\./)).toBeVisible();
+});
+
+test('sin un paquete listo, «Marcar como entregado» queda deshabilitado', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true });
+  await simularExportaciones(page, zip, { falla: true });
+  await page.route(`**/api/v1/cursos/${CURSO}/exportaciones`, (r) => r.request().method() === 'GET' ? r.fulfill({ json: [] }) : r.fallback());
+  await page.goto(URL_ENTREGA);
+  const seccion = page.getByRole('region', { name: 'Entrega al cliente' });
+  await expect(seccion.getByText('Exporta un paquete antes de marcar el proyecto como entregado.')).toBeVisible();
+  await expect(seccion.getByRole('button', { name: 'Marcar como entregado' })).toBeDisabled();
+});
+
 test('el revisor del cliente ve la entrega sin el botón Exportar', async ({ page }) => {
   await simularApi(page, { conSesion: true, conProyectos: true, rol: 'REVISOR_CLIENTE' });
   await simularExportaciones(page, zip);
@@ -213,6 +259,7 @@ test('el revisor del cliente ve la entrega sin el botón Exportar', async ({ pag
   await expect(page.getByText('El historial y la descarga son del equipo de producción.')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Verificación automática' })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Kit de gamificación para el LMS' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Entrega al cliente' })).toHaveCount(0);
   await page.goto(`/proyectos/${PROYECTO}`);
   await expect(page.getByRole('link', { name: 'Revisión' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Exportar SCORM' })).toHaveCount(0);

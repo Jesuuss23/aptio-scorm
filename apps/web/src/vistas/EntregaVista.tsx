@@ -9,6 +9,8 @@
 // HU-0804 · «Idioma»: español o ES + EN en el mismo paquete. En el bilingüe la verificación cuenta los textos en inglés
 // (sin todos, no se exporta) y avisa de los desbordes y de la falta de voz en inglés, que no bloquean.
 // HU-1205 · «Kit de gamificación para el LMS» (PNT-16): se pide aparte y aparece en el mismo historial.
+// ADR-009 · «Entrega al cliente»: con un paquete listo, «Marcar como entregado» cierra el proyecto y programa el borrado de
+// los documentos que subió el cliente según su retención; el curso y los paquetes se conservan.
 import { Cabecera } from '@aptio/ui';
 import { perfilPropuesto } from '@aptio/schema/proyecto';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
@@ -41,6 +43,8 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   /** La última validación y para qué formato y LMS fue: si no coincide con lo elegido, se está validando de nuevo. */
   const [validada, setValidada] = useState<{ clave: string; v: Validacion } | null>(null);
   const confirmar = useRef<HTMLDialogElement>(null);
+  const confirmarEntrega = useRef<HTMLDialogElement>(null);
+  const [entregando, setEntregando] = useState(false);
   const puedeExportar = EXPORTAN.includes(rol);
   // El historial es del equipo: el revisor del cliente no lo ve (la API responde 403).
   const veHistorial = rol !== 'REVISOR_CLIENTE';
@@ -131,6 +135,25 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
     }
   }
 
+  async function entregar() {
+    confirmarEntrega.current?.close();
+    setEntregando(true);
+    setError('');
+    setAviso('');
+    try {
+      const r = await api.entregarProyecto(proyectoId);
+      setProyecto(r.proyecto);
+      const cuando = new Date(r.eliminarDocumentosEn).toLocaleDateString('es-PE', { dateStyle: 'long' });
+      setAviso(r.documentos
+        ? `Proyecto entregado. ${r.documentos === 1 ? 'El documento que subió el cliente se borra' : `Los ${r.documentos} documentos que subió el cliente se borran`} el ${cuando} (${r.retencionDias} días de retención).`
+        : 'Proyecto entregado. No había documentos del cliente por borrar.');
+    } catch (e) {
+      setError(e instanceof ErrorApi ? e.message : 'No se pudo marcar el proyecto como entregado');
+    } finally {
+      setEntregando(false);
+    }
+  }
+
   async function descargar(id: string) {
     setError('');
     try {
@@ -167,6 +190,7 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
   const bilingue = v?.modoIdioma === 'mismo-paquete' && v.textosIngles;
   const otrasAdvertencias = v?.advertencias.filter((a) => /^Falta/.test(a)) ?? [];
   const sinAlinear = v?.objetivosSinAlinear ?? 0;
+  const hayPaquete = lista.some((e) => e.estado === 'COMPLETADO' && e.formato !== 'KIT_GAMIFICACION');
   const irARevision = (
     <a href={`/proyectos/${proyectoId}/revision`} onClick={(e) => { e.preventDefault(); navegar(`/proyectos/${proyectoId}/revision`); }}>Ir a revisión</a>
   );
@@ -314,6 +338,31 @@ export function EntregaVista({ proyectoId, rol, alCargar }: { proyectoId: string
           ) : <p className="sec">Todavía no hay exportaciones de este curso.</p>}
         </section>
       </div>
+      {veHistorial ? (
+        <section className="tarjeta kit-bloque" aria-label="Entrega al cliente">
+          <h2>Entrega al cliente</h2>
+          {proyecto.estado === 'ENTREGADO' ? (
+            <p className="nota" data-estado="ENTREGADO">Proyecto entregado. Los documentos que subió el cliente se borran al cumplirse su retención; el curso y los paquetes se conservan.</p>
+          ) : puedeExportar ? (
+            <>
+              <p className="sec">
+                {proyecto.estado !== 'REVISION' ? 'Se marca como entregado cuando el proyecto está en revisión.' : !hayPaquete ? 'Exporta un paquete antes de marcar el proyecto como entregado.' : 'Cuando el cliente reciba el paquete, marca el proyecto como entregado: sus documentos se borrarán al cumplirse los días de retención del cliente.'}
+              </p>
+              <div className="acciones-form">
+                <button className="boton" type="button" disabled={entregando || proyecto.estado !== 'REVISION' || !hayPaquete} onClick={() => confirmarEntrega.current?.showModal()}>{entregando ? 'Marcando…' : 'Marcar como entregado'}</button>
+              </div>
+            </>
+          ) : null}
+          <dialog ref={confirmarEntrega} className="confirmar-exportar" aria-labelledby="confirmar-entrega-titulo" aria-describedby="confirmar-entrega-detalle">
+            <h2 id="confirmar-entrega-titulo">¿Marcar el proyecto como entregado?</h2>
+            <p id="confirmar-entrega-detalle">El proyecto se cierra y los documentos que subió el cliente se borrarán al cumplirse los días de retención del cliente. El curso, los recursos generados y los paquetes exportados se conservan.</p>
+            <div className="acciones-form">
+              <button className="boton" type="button" autoFocus onClick={() => confirmarEntrega.current?.close()}>Cancelar</button>
+              <button className="boton primario" type="button" onClick={() => void entregar()}>Marcar como entregado</button>
+            </div>
+          </dialog>
+        </section>
+      ) : null}
       {veHistorial ? (
         <KitGamificacion cursoId={curso.id} version={curso.version} perfilInicial={perfilPropuesto(proyecto.datosTecnicos).toLowerCase() as PerfilExportacion} puedeExportar={puedeExportar} alPedir={(e) => setLista((l) => [e, ...l])} />
       ) : null}

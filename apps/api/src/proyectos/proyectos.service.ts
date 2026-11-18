@@ -3,9 +3,10 @@ import type { Prisma } from '@aptio/db';
 import { avanceDe, type DatosTecnicos, perfilPropuesto } from '@aptio/schema/proyecto';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { AlmacenService } from '../recursos/almacen.service.js';
+import { RetencionService } from '../recursos/retencion.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
-import type { CursoDto, FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
+import type { CursoDto, EntregaProyectoDto, FiltroProyectosDto, ProyectoCambioDto, ProyectoDto, ProyectoEntradaDto } from './proyecto.dto.js';
 
 const NINGUNO = '00000000-0000-0000-0000-000000000000';
 const incluir = { cliente: { select: { nombre: true } }, curso: { select: { documento: true } } } as const;
@@ -33,6 +34,7 @@ export class ProyectosService {
   constructor(
     private readonly baseDatos: BaseDatosService,
     private readonly almacenes: AlmacenService,
+    private readonly retencion: RetencionService,
   ) {}
 
   private get bd() {
@@ -162,6 +164,41 @@ export class ProyectosService {
     await this.buscar(u, id);
     await this.bd.proyecto.update({ where: { id }, data: { estado: 'ARCHIVADO' } });
     await this.auditar(u, organizacionId, 'PROYECTO_ARCHIVADO', id, {});
+  }
+
+  /**
+   * M09 · HU-1404 (CP-104) · Marca el proyecto como entregado y, en la misma transacción, programa el borrado de los
+   * documentos del cliente: fecha de entrega más los días de retención del cliente. Solo desde REVISIÓN y con al menos
+   * un paquete exportado; no se vuelve a entregar (la fecha de borrado no se corre).
+   */
+  async entregar(u: UsuarioSesion, id: string): Promise<EntregaProyectoDto> {
+    const organizacionId = organizacionDe(u);
+    const actual = await this.buscar(u, id);
+    if (actual.estado === 'ENTREGADO') throw new ConflictException({ codigo: 'YA_ENTREGADO', mensaje: 'El proyecto ya está entregado' });
+    if (actual.estado !== 'REVISION') {
+      throw new ConflictException({ codigo: 'ESTADO_NO_VALIDO', mensaje: 'Solo se entrega un proyecto en revisión: genera el SCORM y revisa sus pantallas primero' });
+    }
+    const exportado = await this.bd.exportacion.count({ where: { organizacionId, estado: 'COMPLETADO', formato: { not: 'KIT_GAMIFICACION' }, curso: { proyectoId: id } } });
+    if (!exportado) throw new ConflictException({ codigo: 'SIN_EXPORTACION', mensaje: 'Exporta el paquete antes de marcar el proyecto como entregado' });
+    const entregadoEn = new Date();
+    const r = await this.bd.$transaction(async (tx) => {
+      // Solo cambia si sigue en revisión: dos entregas a la vez no programan dos veces.
+      const { count } = await tx.proyecto.updateMany({ where: { id, organizacionId, estado: 'REVISION' }, data: { estado: 'ENTREGADO' } });
+      if (!count) throw new ConflictException({ codigo: 'YA_ENTREGADO', mensaje: 'El proyecto ya está entregado' });
+      const borrado = await this.retencion.programarBorrado(organizacionId, id, entregadoEn, tx);
+      await tx.auditoria.create({
+        data: { organizacionId, usuarioId: u.id, accion: 'PROYECTO_ENTREGADO', entidad: 'Proyecto', entidadId: id, datos: { eliminarEn: borrado.eliminarEn.toISOString(), documentos: borrado.documentos, retencionDias: borrado.retencionDias } },
+      });
+      return borrado;
+    });
+    const p = await this.buscar(u, id);
+    return {
+      proyecto: aDto(p, (await this.costos([id])).get(id) ?? 0),
+      entregadoEn: entregadoEn.toISOString(),
+      eliminarDocumentosEn: r.eliminarEn.toISOString(),
+      documentos: r.documentos,
+      retencionDias: r.retencionDias,
+    };
   }
 
   private async buscar(u: UsuarioSesion, id: string): Promise<ProyectoCompleto> {

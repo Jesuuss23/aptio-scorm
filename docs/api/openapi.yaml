@@ -4539,6 +4539,35 @@ paths:
           $ref: '#/components/responses/SinPermiso'
         '404':
           $ref: '#/components/responses/NoEncontrado'
+  /proyectos/{proyectoId}/entregar:
+    post:
+      tags:
+      - Proyectos
+      summary: Marcar proyecto como entregado
+      operationId: post_proyectos_proyectoId_entregar
+      description: Roles ADMINISTRADOR, DISENADOR_INSTRUCCIONAL y PRODUCTOR (ADR-009). Pasa de REVISION a ENTREGADO y, en la misma transacción, programa el borrado de los documentos de origen CLIENTE del proyecto (eliminarEn = entrega + retencionDocumentosDias del cliente) y registra PROYECTO_ENTREGADO en la auditoría. El curso, los recursos generados y los paquetes se conservan. 409 YA_ENTREGADO si ya está entregado, ESTADO_NO_VALIDO si no está en revisión, SIN_EXPORTACION si no tiene un paquete exportado (el kit de gamificación no cuenta).
+      parameters:
+      - name: proyectoId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntregaProyecto'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          $ref: '#/components/responses/NoEncontrado'
+        '409':
+          $ref: '#/components/responses/Conflicto'
   /recursos/subidas:
     post:
       tags:
@@ -13202,6 +13231,30 @@ components:
       - REVISION
       - ENTREGADO
       - ARCHIVADO
+    EntregaProyecto:
+      type: object
+      required:
+      - proyecto
+      - entregadoEn
+      - eliminarDocumentosEn
+      - documentos
+      - retencionDias
+      properties:
+        proyecto:
+          $ref: '#/components/schemas/Proyecto'
+        entregadoEn:
+          type: string
+          format: date-time
+        eliminarDocumentosEn:
+          type: string
+          format: date-time
+          description: Cuándo el worker borra los documentos que subió el cliente
+        documentos:
+          type: integer
+          description: Documentos de origen CLIENTE con borrado programado
+        retencionDias:
+          type: integer
+          description: Días de retención del cliente
     Proyecto:
       type: object
       required:

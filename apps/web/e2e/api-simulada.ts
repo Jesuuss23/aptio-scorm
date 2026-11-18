@@ -2315,6 +2315,17 @@ export async function simularApi(page: Page, { conSesion, rol, segundoFactor = '
       }
       return responder(200, { version: ++revision.version, regenerando: [], aprobadas, pendientes });
     }
+    // Marcar como entregado: solo desde revisión; programa el borrado de los documentos del cliente (180 días).
+    const deEntrega = ruta.match(/^\/proyectos\/([0-9a-f-]+)\/entregar$/);
+    if (deEntrega && req.method() === 'POST') {
+      const p = proyectos.find((x) => x.id === deEntrega[1]);
+      if (!p) return responder(404, { codigo: 'NO_ENCONTRADO', mensaje: 'Proyecto no encontrado' });
+      if (p.estado === 'ENTREGADO') return responder(409, { codigo: 'YA_ENTREGADO', mensaje: 'El proyecto ya está entregado' });
+      if (p.estado !== 'REVISION') return responder(409, { codigo: 'ESTADO_NO_VALIDO', mensaje: 'Solo se entrega un proyecto en revisión' });
+      p.estado = 'ENTREGADO';
+      const entregadoEn = new Date();
+      return responder(200, { proyecto: p, entregadoEn: entregadoEn.toISOString(), eliminarDocumentosEn: new Date(entregadoEn.getTime() + 180 * 86_400_000).toISOString(), documentos: 2, retencionDias: 180 });
+    }
     const unProyecto = ruta.match(/^\/proyectos\/([0-9a-f-]+)$/);
     if (unProyecto) {
       const i = proyectos.findIndex((p) => p.id === unProyecto[1]);
