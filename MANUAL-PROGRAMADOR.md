@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.87 · actualizado con el segundo factor del superadmin (18 de noviembre de 2026)**
+**Versión 0.88 · actualizado con la facturación electrónica real con Mifact (18 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -460,6 +460,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 - **Transcripción:** implementa `ProveedorTranscripcion` (`packages/ai/src/transcripcion.ts`) y elígelo en `transcriptorDesdeEntorno`. En modo real sin clave, el proveedor debe fallar con un motivo y no inventar texto.
 - **Voz:** agrega su función en `packages/ai/src/voz.ts` (como `sintetizarGoogle` y `sintetizarElevenLabs`, con `fetch` inyectable para probar), despáchala por `pedido.proveedor` en `sintetizadorDesdeEntorno`, súmala a `PROVEEDORES_VOZ` (`etapas/voz.ts`), su tarifa a `costoVoz` y su licencia a `licenciaVoz`.
 - **Conexiones IA (HU-1304):** la lista cerrada, las opciones, los modelos con tarifa y el costo estimado viven en `@aptio/schema/conexiones` (`CONEXIONES`); un proveedor nuevo se agrega ahí con su `variableClave`. El worker lee la conexión con `conexionDe` y revisa el límite con `vigilarLimite` (`apps/worker/src/conexiones.ts`) antes de cada llamada que cuesta; `conModeloDe` (`ia.ts`) aplica el modelo de la conexión. La API está en `apps/api/src/conexiones/`; la web en `ConexionesIA.tsx`, `MedidorCostoIA.tsx` y `conexiones-ia.ts`. Pruebas: `conexiones.test.ts` del worker, `conexiones.e2e.test.ts` y `conexiones.spec.ts`.
+- **OSE (HU-1712):** implementa `ProveedorOse` de `apps/worker/src/ose/contrato.ts` (`emitir`, y si el proveedor guarda sus archivos, `archivosPropios`, `consultar` y `obtenerArchivos`), como `proveedorMifact` en `ose/mifact.ts` con `fetch` inyectable, y regístralo en `proveedoresOseDesdeEntorno` y en `PROVEEDORES_OSE` (`@aptio/schema/comprobantes`). Un fallo de red debe lanzar (el worker deja `enviadoEn` y la consulta cada 10 minutos lo recoge); un error del proveedor devuelve PENDIENTE con el motivo. Las pruebas con base de datos del worker que tocan `datosFiscales 'principal'` van en un `.casos.ts` llamado desde `comprobantes.test.ts`, para que no corran en paralelo.
 - Registra la tarifa y la licencia (`docs/19-proveedores-y-licencias.md`, ADR-010). Si no está verificada, déjala como supuesto.
 - Todo recurso GENERADO pasa por `conProcedencia` (`apps/worker/src/procedencia.ts`) con el proveedor, el modelo que respondió y la licencia; sin alguno de los tres no se guarda (REQ-062). Lo que hace la plataforma sin IA usa `PROVEEDOR_APTIO` y no sale en los créditos.
 
@@ -528,6 +529,8 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `STRIPE_LLAVE_SECRETA_PRUEBAS`, `STRIPE_SECRETO_WEBHOOK_PRUEBAS` (y `_PRODUCCION`) | api | Stripe (HU-1704), según el modo de la pasarela |
 | `CULQI_LLAVE_PUBLICA_PRUEBAS`, `CULQI_LLAVE_SECRETA_PRUEBAS`, `CULQI_SECRETO_WEBHOOK_PRUEBAS` (y `_PRODUCCION`) | api | Culqi (HU-1704), según el modo de la pasarela |
 | `PAGO_PRUEBA_SECRETO` | api | Secreto HMAC de la pasarela de pruebas (HU-1703); solo se usa con `SITIO_ENTORNO=pruebas` (sin la variable, un secreto local fijo) |
+| `MIFACT_URL` | api, worker | HU-1712 · URL del servicio de Mifact (no es secreta). En la api solo dice si Mifact está disponible; en la nube llega por el contexto `mifactUrl` (la demo por defecto fuera de producción) |
+| `MIFACT_TOKEN` | worker | HU-1712 · Token de Mifact, uno por RUC emisor (rota cada 6 meses aprox.). Solo el worker lo recibe (`LLAVES_SOLO_WORKER`) |
 | `OSE_PRUEBAS_SECRETO_WEBHOOK` | api | Secreto HMAC del webhook del OSE simulado (HU-1707); solo con `SITIO_ENTORNO=pruebas` (sin la variable, un secreto local fijo) |
 | `PG_BIN_DIR` | worker, `respaldo:restaurar` | Carpeta de `pg_dump` y `pg_restore` de la versión del servidor (en CI, `/usr/lib/postgresql/16/bin`) |
 | `PROVEEDORES_MODO` | api, worker | `simulado` o `real` |
@@ -598,6 +601,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.88 | 2026-11-18 | HU-1712: migración `20261118150000_mifact`, el adaptador `apps/worker/src/ose/mifact.ts` con el contrato `ose/contrato.ts`, la tarea `consultar-comprobantes` cada 10 minutos, `MIFACT_URL` y `MIFACT_TOKEN` (solo worker), las pruebas `mifact.test.ts` (con `MIFACT_DEMO=1` opcional) y `comprobantes-mifact.casos.ts`, y cómo agregar otro OSE (7.2). |
 | 0.87 | 2026-11-18 | Segundo factor del superadmin (HU-1515): `TOTP_CLAVE_CIFRADO`, el comando `restablecer-segundo-factor`, el superadmin de la semilla configura su aplicación en el primer ingreso y las pruebas de la API lo ingresan con `test/ingreso-apoyo.ts`. |
 | 0.86 | 2026-11-18 | `apiskey.md` (llaves externas para producción) y `llavesAplicacion(entorno)` en `infra/`, con el contexto `correoRemitente`. |
 | 0.85 | 2026-11-18 | HU-1405: `docker/` (imágenes de la API, el worker y la web, punto de entrada), `infra/` (`@aptio/infra` con CDK y sus pruebas), el workflow «Despliegue a pruebas» con OIDC y `infra/scripts/migrar.sh`, el job de imágenes del CI y las variables `REDIS_TLS`, `REDIS_PASSWORD`, `DB_*` y `TRUST_PROXY`. |

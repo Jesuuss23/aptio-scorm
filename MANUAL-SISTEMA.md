@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.87 · actualizado con el segundo factor del superadmin (18 de noviembre de 2026)**
+**Versión 0.88 · actualizado con la facturación electrónica real con Mifact (18 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -665,6 +665,17 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Nube:** el secreto generado `aptio-<entorno>-totp-clave` llega como `TOTP_CLAVE_CIFRADO` solo a la tarea de la API y se conserva al borrar la pila.
 - **Auditoría:** `SEGUNDO_FACTOR_PEDIDO`, `SEGUNDO_FACTOR_FALLIDO`, `SEGUNDO_FACTOR_ACTIVADO`, `CODIGO_RECUPERACION_USADO` e `INGRESO` con `metodo: segundo_factor` (SUP-348).
 
+### 3.45 Facturación electrónica con Mifact (HU-1712)
+
+- **Proveedor (DA-09 resuelta, CP-162):** Mifact (PSE/OSE) por su API REST `invoiceService.svc`. El worker arma el JSON de `SendInvoice` desde los datos del comprobante (factura, boleta con DNI o sin documento, nota de crédito tipo 06 con su referencia y detracción), con `COD_FORM_IMPR` 001 (A4). Mifact firma el XML y lo envía a SUNAT.
+- **Estados (SUP-352):** 102 aceptado; 103 observado, ya válido en SUNAT, se envía por correo y no se reenvía (se corrige con nota de crédito); 104 rechazado; 101 y 108 en proceso. Un error de Mifact o un 4xx deja PENDIENTE con el mensaje y el reenvío conserva el número; un fallo de red, 30 s sin respuesta o un 5xx dejan PENDIENTE con `enviadoEn` para no emitir dos veces.
+- **Consulta (CP-163):** la tarea `consultar-comprobantes` de la cola de mantenimiento corre cada 10 minutos: consulta con `GetEstatusInvoice` los pendientes ya enviados y los válidos sin PDF, y al resolverse descarga los archivos con `GetInvoice` y envía el correo. Mifact no tiene webhook (404).
+- **Archivos (SUP-353):** el PDF oficial, el XML firmado y el CDR (`R-<archivo>.xml`, descomprimido si llega en zip) se guardan cifrados en S3 bajo `comprobantes/{id}/`; el hash y la cadena del QR, en la base. `GET /ventas/comprobantes/{id}/cdr` y `GET /organizacion/comprobantes/{id}/cdr` sirven el CDR.
+- **DNI (SUP-349):** las boletas piden DNI de 8 dígitos si el total con IGV pasa de S/ 700 o USD 200, en `/publico/checkout`, en los datos de facturación de la organización y al corregir y reenviar.
+- **Límites:** sin tipo de cambio, el USD queda PENDIENTE (SUP-350); sin ubigeo, o con detracción sin cuenta o código, también, sin llamar a Mifact. El RUC de demostración 20100100100 solo se admite en ambiente pruebas; no se probó contra la demo desde el contenedor de desarrollo (SUP-351).
+- **Configuración:** `MIFACT_URL` (api y worker; en la nube el contexto `mifactUrl`, la demo por defecto fuera de producción) y `MIFACT_TOKEN` (solo el worker, en `aptio-<entorno>-aplicacion`). En producción Mifact es el único proveedor; fuera de ella conviven el simulado y Mifact.
+- **Datos:** migración `20261118150000_mifact`: `dniReceptor`, `s3KeyCdr`, `hashCpe`, `cadenaQr` y los datos fiscales `ubigeoEmisor`, `codigoAnexo`, `cuentaDetraccion` y `codigoDetraccion`.
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -818,6 +829,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.88 | 2026-11-18 | Facturación electrónica con Mifact (3.45): emisión real, estados de SUNAT, consulta cada 10 minutos, PDF, XML y CDR en S3, DNI en boletas y `MIFACT_TOKEN` solo en el worker. |
 | 0.87 | 2026-11-18 | Segundo factor del superadmin (3.44): flujo de desafío, TOTP, códigos de recuperación, cifrado, restablecimiento por consola y secreto generado en la nube. |
 | 0.86 | 2026-11-18 | Producción (3.43): llaves por entorno, `apiskey.md` con cada llave externa y el aviso de lo que falta (OSE real, segundo factor del superadmin). |
 | 0.85 | 2026-11-18 | Entorno de pruebas en la nube (3.43): AWS en sa-east-1 con CloudFront, ECS Fargate, RDS, ElastiCache, buckets con KMS y Secrets Manager; imágenes Docker, despliegue continuo con OIDC y la guía de puesta en marcha. Seguridad y configuración al día. Falta el primer despliegue en la cuenta real. |

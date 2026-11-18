@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.87 · actualizado con el segundo factor del superadmin (18 de noviembre de 2026)**
+**Versión 0.88 · actualizado con la facturación electrónica real con Mifact (18 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -1106,7 +1106,7 @@ En **Ventas › Planes** decides qué planes ve el visitante en la página **Pre
 
 En **Precios**, el botón de un plan con precio (por ejemplo, **Suscribirme**) abre la página **Suscríbete a Aptio SCORM**, que se completa en tres pasos. Todo se puede hacer con el teclado y con un lector de pantalla; los errores se nombran arriba y junto a cada campo.
 
-1. **Empresa.** Escribe la razón social (o tu nombre), el RUC si quieres factura, el nombre y el correo de quien administrará la cuenta, y marca la casilla de los términos y del tratamiento de datos personales. Con RUC se emite **factura**; sin RUC, **boleta de venta**. Si el RUC no es válido, la página lo dice antes de seguir.
+1. **Empresa.** Escribe la razón social (o tu nombre), el RUC si quieres factura, el nombre y el correo de quien administrará la cuenta, y marca la casilla de los términos y del tratamiento de datos personales. Con RUC se emite **factura**; sin RUC, **boleta de venta**. Si el RUC no es válido, la página lo dice antes de seguir. Con boleta, escribe tu **DNI** (8 dígitos): es obligatorio si el total pasa de S/ 700 (o de US$ 200), y si falta la página te devuelve a este paso con el cursor en el campo.
 2. **Resumen.** Si el plan también se vende en dólares, elige **Soles (S/)** o **Dólares (US$)**; si no, el pago es en soles y no aparece la opción. Elige **Mensual** o **Anual** (si la página de precios muestra la opción anual) y revisa el subtotal, el IGV de 18 %, el comprobante y el **Total a pagar**. Con **Volver** cambias los datos.
 3. **Pago.** Según la pasarela que cobre esa moneda:
    - **Pagar con Stripe** (dólares) te lleva a la página de pago segura de la pasarela; al pagar vuelves solo y la página espera la confirmación. Si cancelas allá, vuelves al pago con un aviso y puedes intentarlo de nuevo.
@@ -1164,22 +1164,22 @@ Desde el aviso **Se agotaron las cápsulas de este mes**, el enlace **Ver planes
 
 ### 8.44 Facturación: comprobantes electrónicos (superadmin)
 
-En **Ventas › Facturación** están los comprobantes electrónicos de cada pago aprobado. Cada pago emite una **factura** si el cliente pidió factura y su RUC es válido, o una **boleta** si no. Cuando se reembolsa un pago en **Ventas › Pasarelas**, se emite una **nota de crédito** que corrige su comprobante. El cliente recibe por correo cada comprobante aceptado, con el PDF y el XML.
+En **Ventas › Facturación** están los comprobantes electrónicos de cada pago aprobado. Cada pago emite una **factura** si el cliente pidió factura y su RUC es válido, o una **boleta** si no. Cuando se reembolsa un pago en **Ventas › Pasarelas**, se emite una **nota de crédito** que corrige su comprobante. El cliente recibe por correo cada comprobante aceptado, con el PDF y el XML, y con el proveedor Mifact también la **constancia de SUNAT (CDR)**.
 
 **Pestaña Comprobantes.** La tabla muestra el número (por ejemplo F001-00000001), el cliente, el total con el IGV y el **Estado SUNAT**:
 
 - **Aceptado:** el comprobante es válido y ya se envió al cliente.
 - **Pendiente:** aún no hay respuesta, o faltan los datos fiscales del emisor; el motivo lo dice.
-- **Observado:** hay que corregir algo, por ejemplo el RUC del cliente; el motivo lo explica.
+- **Observado:** con el ambiente de pruebas, hay que corregir algo, por ejemplo el RUC del cliente; el motivo lo explica. Con Mifact, observado significa «aceptado con observaciones»: ya es válido, se envía al cliente y, si hay que cambiarlo, se emite una nota de crédito.
 - **Rechazado:** no vale; su número no se vuelve a usar.
 
-Usa **Estado SUNAT** para ver solo los de un estado y **Actualizar** para traer los cambios. Los botones **PDF** y **XML** descargan cada archivo.
+Usa **Estado SUNAT** para ver solo los de un estado y **Actualizar** para traer los cambios. Los botones **PDF**, **XML** y **CDR** descargan cada archivo (el CDR solo existe con Mifact). La columna del cliente muestra su RUC o, en una boleta, su DNI. Si SUNAT tarda en responder, el comprobante queda **Pendiente** con el aviso «En proceso en SUNAT» y el sistema lo vuelve a consultar solo cada 10 minutos.
 
-**Corregir y reenviar.** En un comprobante observado o pendiente, pulsa **Corregir y reenviar**. Revisa lo que respondió el sistema de SUNAT, corrige el **RUC**, la **Razón social o nombre**, la **Dirección** o el **Correo de facturación** y pulsa **Reenviar al OSE**. Una factura necesita un RUC válido. El comprobante conserva su número y queda **Pendiente** hasta la respuesta; con **Actualizar** ves cuando pasa a **Aceptado**.
+**Corregir y reenviar.** En un comprobante observado o pendiente, pulsa **Corregir y reenviar**. Revisa lo que respondió el sistema de SUNAT, corrige el **RUC**, el **DNI** (en una boleta, obligatorio desde S/ 700), la **Razón social o nombre**, la **Dirección** o el **Correo de facturación** y pulsa **Reenviar al OSE**. Una factura necesita un RUC válido. El comprobante conserva su número y queda **Pendiente** hasta la respuesta; con **Actualizar** ves cuando pasa a **Aceptado**.
 
-**Pestaña Datos fiscales.** Aquí están el **RUC del emisor**, la **Razón social** y el **Domicilio fiscal**; las series de facturas (F001), boletas (B001) y notas de crédito (FC01 y BC01); el **Proveedor** que envía los comprobantes a SUNAT y el **Ambiente** (pruebas o producción). Las credenciales del proveedor no se escriben aquí: las configura el equipo técnico. Sin el RUC del emisor, los comprobantes quedan pendientes. La **Detracción** dice «Por validar con el contador»: déjala desactivada hasta que el contador confirme la tasa y el umbral. Pulsa **Guardar los datos fiscales**.
+**Pestaña Datos fiscales.** Aquí están el **RUC del emisor**, la **Razón social** y el **Domicilio fiscal**; las series de facturas (F001), boletas (B001) y notas de crédito (FC01 y BC01); el **Proveedor** que envía los comprobantes a SUNAT y el **Ambiente** (pruebas o producción). Las credenciales del proveedor no se escriben aquí: las configura el equipo técnico. Sin el RUC del emisor, los comprobantes quedan pendientes. Con el proveedor **Mifact** completa también el **Ubigeo** del domicilio fiscal (6 dígitos), el **Código de anexo** (0000 si es el local principal) y, si activas la detracción, la **Cuenta de detracciones** del Banco de la Nación y el **Código del servicio** (SPOT). El RUC del emisor debe ser el mismo con el que se contrató Mifact. La **Detracción** dice «Por validar con el contador»: déjala desactivada hasta que el contador confirme la tasa y el umbral. Pulsa **Guardar los datos fiscales**.
 
-Hoy los comprobantes se emiten en un **ambiente de pruebas** que no los envía a SUNAT y no tienen valor tributario, hasta que se elija el proveedor. Todo se usa con el teclado: las pestañas cambian con las flechas y los botones con Enter.
+Con el proveedor **Mifact** los comprobantes se envían a SUNAT y tienen valor tributario (en su ambiente de pruebas, Mifact usa su demostración sin valor tributario). El proveedor **OSE de pruebas** solo existe en el sitio de pruebas y no envía nada a SUNAT. Por ahora, los cobros en dólares con Mifact quedan pendientes hasta definir el tipo de cambio. Todo se usa con el teclado: las pestañas cambian con las flechas y los botones con Enter.
 
 ### 8.45 Pago de la renovación y cuenta en solo lectura
 
@@ -1235,9 +1235,9 @@ Pulsa **Mes anterior** o **Mes siguiente** para ver otro mes (no se puede pasar 
 En el menú **Empresa**, **Facturación** reúne todo lo que tu organización paga. Solo la ve el administrador; también entra con la cuenta en solo lectura, para descargar sus comprobantes y corregir sus datos.
 
 - **Plan y consumo:** tu plan, su precio sin IGV, el estado y la fecha de la próxima renovación, con las cápsulas usadas en el mes. El enlace **Plan y suscripción** te lleva a cambiar de plan o cancelar.
-- **Comprobantes:** tus facturas, boletas y notas de crédito con su número, fecha, monto y estado ante SUNAT. Pulsa **PDF** o **XML** para descargarlos; si el comprobante aún se está generando, los botones quedan desactivados con el aviso «Archivos en preparación».
+- **Comprobantes:** tus facturas, boletas y notas de crédito con su número, fecha, monto y estado ante SUNAT. Pulsa **PDF**, **XML** o **CDR** (la constancia de SUNAT, cuando la hay) para descargarlos; si el comprobante aún se está generando, los botones quedan desactivados con el aviso «Archivos en preparación».
 - **Medio de pago:** la pasarela y la tarjeta (solo sus 4 últimos dígitos). En el entorno de pruebas puedes cambiarla con una tarjeta de prueba: 4111 1111 1111 1111 aprueba los cobros y 4000 0000 0000 0002 los rechaza. Nunca se pide el código de seguridad. Si pagas con Stripe o Culqi, la tarjeta no se guarda en Aptio SCORM: cada renovación te llega por correo con el enlace para pagar.
-- **Datos de facturación:** elige **Factura (con RUC)** o **Boleta** y escribe la razón social o el nombre, el RUC, la dirección (opcional) y el correo donde llegan el PDF y el XML. La factura exige un RUC de 11 dígitos válido; con boleta puedes dejarlo vacío. Mientras no los edites, se muestran los datos de tu alta. Al pulsar **Guardar los datos**, los cambios rigen para los próximos comprobantes; los ya emitidos no cambian.
+- **Datos de facturación:** elige **Factura (con RUC)** o **Boleta** y escribe la razón social o el nombre, el RUC, la dirección (opcional) y el correo donde llegan el PDF y el XML. La factura exige un RUC de 11 dígitos válido; con boleta puedes dejarlo vacío, y escribes el **DNI** (8 dígitos), obligatorio si tu plan pasa de S/ 700 (o US$ 200) con IGV. Mientras no los edites, se muestran los datos de tu alta. Al pulsar **Guardar los datos**, los cambios rigen para los próximos comprobantes; los ya emitidos no cambian.
 
 Todo se usa con el teclado: si falta un dato, el aviso dice cuántos campos revisar y el cursor va al primero.
 
@@ -1332,6 +1332,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.88 | 2026-11-18 | Facturación real con Mifact (8.40, 8.44 y 8.50): DNI en boletas desde S/ 700, botón CDR, observado con Mifact, consulta cada 10 minutos y los datos fiscales nuevos (ubigeo, anexo, cuenta y código de detracción). |
 | 0.87 | 2026-11-18 | Verificación en dos pasos del superadmin (3.3.1): activarla con el QR, ingresar con el código y usar los códigos de recuperación. |
 | 0.86 | 2026-11-18 | Sin cambios en las formas de uso: se preparó la lista de servicios externos para pasar a producción. |
 | 0.85 | 2026-11-18 | Se prepara el enlace estable de pruebas para revisar la demo de cada sprint; estará disponible cuando se active en la nube. Sin cambios en las formas de uso. |
