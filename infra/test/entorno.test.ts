@@ -5,7 +5,7 @@ import { App } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { BaseStack } from '../src/base';
-import { type ConfigEntorno, LLAVES_APLICACION, leerConfig, REGION } from '../src/config';
+import { type ConfigEntorno, leerConfig, llavesAplicacion, REGION } from '../src/config';
 import { CABECERA_ORIGEN, EntornoStack } from '../src/entorno';
 
 const CUENTA = '123456789012';
@@ -164,7 +164,7 @@ describe('HU-1405 · cero secretos en texto plano', () => {
       for (const s of c.Secrets as any[]) expect(JSON.stringify(s.ValueFrom)).toMatch(/Ref|Fn::Join|arn:aws:secretsmanager/);
     }
     const api = contenedores.find((c) => c.Name === 'api')!;
-    expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['SESSION_SECRET', 'REDIS_PASSWORD', ...LLAVES_APLICACION]));
+    expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['SESSION_SECRET', 'REDIS_PASSWORD', ...llavesAplicacion('pruebas')]));
     // La API confía en 2 proxies (CloudFront y el balanceador) para leer la IP del visitante (SUP-169).
     expect(api.Environment).toEqual(expect.arrayContaining([{ Name: 'TRUST_PROXY', Value: '2' }, { Name: 'REDIS_TLS', Value: 'true' }, { Name: 'SITIO_ENTORNO', Value: 'pruebas' }]));
   });
@@ -188,6 +188,25 @@ describe('HU-1405 · cero secretos en texto plano', () => {
   it('la tarea de migraciones corre prisma migrate deploy y la verificación de organizaciones', () => {
     const m = contenedores.find((c) => c.Name === 'migracion')!;
     expect(m.Command.join(' ')).toContain('pnpm db:deploy && pnpm --filter @aptio/db verificar-organizaciones');
+  });
+});
+
+describe('Producción · llaves del entorno', () => {
+  it('en producción las pasarelas usan *_PRODUCCION y no existen la pasarela de pruebas ni el OSE simulado', () => {
+    const llaves = llavesAplicacion('produccion');
+    expect(llaves).toEqual(expect.arrayContaining(['STRIPE_LLAVE_SECRETA_PRODUCCION', 'STRIPE_SECRETO_WEBHOOK_PRODUCCION', 'CULQI_LLAVE_PUBLICA_PRODUCCION', 'CULQI_LLAVE_SECRETA_PRODUCCION', 'CULQI_SECRETO_WEBHOOK_PRODUCCION', 'ANTHROPIC_API_KEY', 'SMTP_URL', 'HUBSPOT_TOKEN', 'PIPEDRIVE_TOKEN']));
+    expect(llaves.some((k) => k.endsWith('_PRUEBAS') || k.startsWith('PAGO_PRUEBA') || k.startsWith('OSE_PRUEBAS'))).toBe(false);
+    expect(llavesAplicacion('pruebas')).toEqual(expect.arrayContaining(['STRIPE_LLAVE_SECRETA_PRUEBAS', 'PAGO_PRUEBA_SECRETO', 'OSE_PRUEBAS_SECRETO_WEBHOOK']));
+  });
+
+  it('la pila de producción lleva sitio en producción, sus llaves y el remitente sin secretos en el entorno', () => {
+    const t = plantilla({ entorno: 'produccion', modoProveedores: 'real', correoRemitente: 'Aptio SCORM <no-responder@aptioscorm.pe>' });
+    const api = (recursos(t, 'AWS::ECS::TaskDefinition').flatMap((d) => d.Properties.ContainerDefinitions as any[])).find((c) => c.Name === 'api');
+    expect(api.Environment).toEqual(expect.arrayContaining([{ Name: 'SITIO_ENTORNO', Value: 'produccion' }, { Name: 'PROVEEDORES_MODO', Value: 'real' }, { Name: 'CORREO_REMITENTE', Value: 'Aptio SCORM <no-responder@aptioscorm.pe>' }]));
+    expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['STRIPE_LLAVE_SECRETA_PRODUCCION', 'CULQI_SECRETO_WEBHOOK_PRODUCCION']));
+    expect((api.Secrets as any[]).map((s) => s.Name)).not.toContain('PAGO_PRUEBA_SECRETO');
+    const app = recursos(t, 'AWS::SecretsManager::Secret').find((s) => s.Properties.Name === 'aptio-produccion-aplicacion')!;
+    expect(Object.keys(JSON.parse(app.Properties.GenerateSecretString.SecretStringTemplate))).toContain('STRIPE_LLAVE_SECRETA_PRODUCCION');
   });
 });
 
