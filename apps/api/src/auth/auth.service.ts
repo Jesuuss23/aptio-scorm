@@ -7,9 +7,22 @@ import { ConfigSesion } from './config-sesion.js';
 import { firmarSesion } from './sesion.js';
 import { TokensService } from './tokens.service.js';
 
+export const cuentaBloqueada = () =>
+  new HttpException(
+    { codigo: 'CUENTA_BLOQUEADA', mensaje: 'Cuenta bloqueada por intentos fallidos. Intenta de nuevo en 15 minutos.' },
+    HttpStatus.UNAUTHORIZED,
+  );
+
 export const INTENTOS_MAXIMOS = 5; // RN-01-1
 export const BLOQUEO_MS = 15 * 60 * 1000;
 export const PEDIDOS_CLAVE_POR_HORA = 3;
+/** HU-1515 · Tiempo para escribir el código del segundo factor después de la clave (o de Google). */
+export const DESAFIO_MS = 5 * 60 * 1000;
+
+export type Ingreso = { token: string; expira: Date; usuario: UsuarioDto };
+/** HU-1515 · El superadmin no recibe sesión con la clave: recibe un desafío y luego escribe su código. */
+export type Desafio = { segundoFactor: 'verificar' | 'configurar'; token: string; expira: Date };
+export type ResultadoIngreso = ({ tipo: 'sesion' } & Ingreso) | ({ tipo: 'desafio' } & Desafio);
 
 // Hash de relleno: se verifica cuando el correo no existe para que la respuesta tarde lo mismo.
 const HASH_RELLENO = hashearClave('clave-de-relleno-que-nunca-coincide');
@@ -27,17 +40,14 @@ export class AuthService {
     return this.baseDatos.cliente;
   }
 
-  /** CP-004 / CP-005. Devuelve la sesión firmada y el usuario. */
-  async ingresar(emailBruto: string, clave: string): Promise<{ token: string; expira: Date; usuario: UsuarioDto }> {
+  /** CP-004 / CP-005. Devuelve la sesión firmada y el usuario, o el desafío del segundo factor (CP-160). */
+  async ingresar(emailBruto: string, clave: string): Promise<ResultadoIngreso> {
     const email = emailBruto.trim().toLowerCase();
     const u = await this.bd.usuario.findUnique({ where: { email } });
     const ahora = new Date();
 
     if (u?.bloqueadoHasta && u.bloqueadoHasta > ahora) {
-      throw new HttpException(
-        { codigo: 'CUENTA_BLOQUEADA', mensaje: 'Cuenta bloqueada por intentos fallidos. Intenta de nuevo en 15 minutos.' },
-        HttpStatus.UNAUTHORIZED,
-      );
+      throw cuentaBloqueada();
     }
     const correcta = await verificarClave(u?.hashClave ?? (await HASH_RELLENO), clave);
     if (!u || !u.activo || !u.hashClave || !correcta) {
@@ -45,23 +55,35 @@ export class AuthService {
       throw new HttpException({ codigo: 'CREDENCIALES', mensaje: 'Correo o clave incorrectos' }, HttpStatus.UNAUTHORIZED);
     }
 
-    return this.abrirSesion(u, 'clave');
+    return this.continuarIngreso(u, 'clave');
+  }
+
+  /**
+   * HU-1515 · Tras la clave o Google: el superadmin pasa por el segundo factor (configurarlo si aún no lo tiene);
+   * los demás roles reciben la sesión. El contador de fallos no se reinicia hasta pasar el segundo factor.
+   */
+  async continuarIngreso(u: Usuario, metodo: 'clave' | 'google'): Promise<ResultadoIngreso> {
+    if (u.rol !== 'SUPERADMIN') return { tipo: 'sesion', ...(await this.abrirSesion(u, metodo)) };
+    const expira = new Date(Date.now() + DESAFIO_MS);
+    const token = firmarSesion({ u: u.id, v: u.versionSesion, exp: expira.getTime() }, this.config.secretoDesafio);
+    await this.auditar(u.id, u.organizacionId, 'SEGUNDO_FACTOR_PEDIDO', { metodo });
+    return { tipo: 'desafio', segundoFactor: u.totpSecretoCifrado ? 'verificar' : 'configurar', token, expira };
   }
 
   /** Firma la sesión de un usuario ya autenticado (con clave o con Google) y registra el ingreso. */
-  async abrirSesion(u: Usuario, metodo: 'clave' | 'google'): Promise<{ token: string; expira: Date; usuario: UsuarioDto }> {
+  async abrirSesion(u: Usuario, metodo: 'clave' | 'google' | 'segundo_factor'): Promise<Ingreso> {
     const ahora = new Date();
     await this.bd.usuario.update({
       where: { id: u.id },
       data: { intentosFallidos: 0, bloqueadoHasta: null, ultimoIngreso: ahora },
     });
-    await this.auditar(u.id, u.organizacionId, 'INGRESO', metodo === 'google' ? { metodo } : undefined);
+    await this.auditar(u.id, u.organizacionId, 'INGRESO', metodo === 'clave' ? undefined : { metodo });
     const expira = new Date(ahora.getTime() + this.config.ttlMs);
     const token = firmarSesion({ u: u.id, v: u.versionSesion, exp: expira.getTime() }, this.config.secreto);
     return { token, expira, usuario: aUsuarioDto(u) };
   }
 
-  private async registrarFallo(usuarioId: string, intentosPrevios: number): Promise<void> {
+  async registrarFallo(usuarioId: string, intentosPrevios: number): Promise<void> {
     const intentos = intentosPrevios + 1;
     const bloquear = intentos >= INTENTOS_MAXIMOS;
     await this.bd.usuario.update({

@@ -20,6 +20,7 @@ import { AppModule } from '../src/app.module.js';
 import { AlmacenService } from '../src/recursos/almacen.service.js';
 import { ComprobantesService } from '../src/ventas/comprobantes.service.js';
 import { firmar } from '../src/ventas/pasarelas/pruebas.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 process.env.AWS_ENDPOINT ??= 'http://localhost:9000';
 process.env.AWS_ACCESS_KEY_ID ??= 'test';
@@ -59,8 +60,7 @@ describe.skipIf(!hayBase && !process.env.CI)('comprobantes electrónicos (HU-170
     return r.set('X-Aptio-Firma', firma ?? firmar(SECRETO, cuerpo)).send(cuerpo);
   };
   const ingresar = async (email: string) => {
-    const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email, clave: CLAVE });
-    return ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+    return ingresarCookie(servidor, email, CLAVE);
   };
   /** Un cobro aprobado sin alta (de la pasarela de pruebas) con su comprobante ya emitido en el estado pedido. */
   const comprobante = async (estado: 'ACEPTADO' | 'OBSERVADO' | 'PENDIENTE' | 'RECHAZADO', extra: Record<string, unknown> = {}) => {

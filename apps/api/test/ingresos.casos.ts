@@ -14,6 +14,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
 import { AppModule } from '../src/app.module.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -60,8 +61,7 @@ describe.skipIf(!hayBase && !process.env.CI)('panel de ingresos (HU-1710)', () =
     await app.init();
     servidor = app.getHttpServer();
     for (const n of ['super', 'admin']) {
-      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correoDe(n), clave: CLAVE });
-      cookies[n] = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      cookies[n] = await ingresarCookie(servidor, correoDe(n), CLAVE);
     }
   });
 

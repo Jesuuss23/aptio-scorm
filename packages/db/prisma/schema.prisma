@@ -84,6 +84,11 @@ model Usuario {
   activo           Boolean   @default(true)
   creadoEn         DateTime  @default(now())
   ultimoIngreso    DateTime?
+  // HU-1515 · segundo factor TOTP (solo SUPERADMIN): secretos cifrados con AES-256-GCM y TOTP_CLAVE_CIFRADO
+  totpSecretoCifrado   String? // secreto activo; null = segundo factor sin configurar
+  totpPendienteCifrado String? // secreto en configuración, hasta confirmar el primer código
+  totpActivoDesde      DateTime?
+  totpUltimoPaso       Int? // último paso de 30 s aceptado: impide reutilizar un código
 
   cliente              Cliente?      @relation(fields: [clienteId], references: [id])
   proyectos            Proyecto[]    @relation("ProyectoCreador")
@@ -93,9 +98,23 @@ model Usuario {
   exportaciones        Exportacion[]
   auditoria            Auditoria[]
   tokens               TokenAcceso[]
+  codigosRecuperacion  CodigoRecuperacion[]
   organizacion         Organizacion? @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
 
   @@index([organizacionId])
+}
+
+// HU-1515 · códigos de recuperación de un solo uso del segundo factor (se guarda solo su HMAC-SHA256)
+model CodigoRecuperacion {
+  id        String    @id @default(uuid()) @db.Uuid
+  usuarioId String    @db.Uuid
+  hash      String    @unique
+  usadoEn   DateTime?
+  creadoEn  DateTime  @default(now())
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
 }
 
 // ---------- Clientes y kits de marca ----------

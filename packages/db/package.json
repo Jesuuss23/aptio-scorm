@@ -12,7 +12,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "seed": "prisma db seed",
     "test": "vitest run",
-    "verificar-organizaciones": "tsx prisma/verificar-organizaciones.ts"
+    "verificar-organizaciones": "tsx prisma/verificar-organizaciones.ts",
+    "restablecer-segundo-factor": "tsx prisma/restablecer-segundo-factor.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

@@ -1556,6 +1556,7 @@ Sitio público multipágina administrable por el superadmin: páginas por bloque
 | HU-1514 | Como superadmin, quiero crear landings por sector (minería, banca, retail, educación, sector público…) con su propia portada, testimonios del sector, preguntas y categoría inicial del blog, para hablarle a cada mercado con su lenguaje. | S11 | Alta | REQ-092 |
 | HU-1512 | Como superadmin, quiero editar meta título, descripción, URL, canonical, indexación y datos estructurados por página, y gestionar sitemap, robots y redirecciones 301, para posicionar el sitio. | S12 | Alta | REQ-071 |
 | HU-1513 | Como superadmin, quiero editar llms.txt, seguir preguntas objetivo por asistente de IA, permitir o bloquear rastreadores de IA y recibir propuestas de contenido, para que los asistentes citen el sitio. | S12 | Media | REQ-072 |
+| HU-1515 | Como superadmin, quiero que mi ingreso pida, además de la clave, un código de mi aplicación autenticadora, con códigos de recuperación de un solo uso, para que una clave filtrada no abra el panel de la plataforma. | Antes de producción (ADR-011, SUP-167) | Alta | REQ-064 |
 
 ### HU-1501 · Rol superadmin y menú del sitio
 
@@ -1796,6 +1797,34 @@ Entonces la sección Blog aparece filtrada por Estándares y puede cambiar a «T
 ```
 
 Subtareas sugeridas: Backend, Frontend, Pruebas.
+
+### HU-1515 · Segundo factor del superadmin
+
+Como superadmin, quiero que mi ingreso pida, además de la clave, un código de mi aplicación autenticadora, con códigos de recuperación de un solo uso, para que una clave filtrada no abra el panel de la plataforma.
+
+Reglas: solo el rol SUPERADMIN; TOTP de 6 dígitos cada 30 s (RFC 6238) con ±30 s de tolerancia y cada código usable una sola vez; 10 códigos de recuperación de un solo uso; los códigos equivocados cuentan para el bloqueo de 5 intentos y 15 minutos; vale también tras ingresar con Google; sin recuperación por correo: si se pierden el teléfono y los códigos, se restablece desde la consola.
+
+**CP-160 · Configurar el segundo factor**
+
+```gherkin
+Dado un superadmin sin segundo factor configurado
+Cuando ingresa con su correo y clave correctos
+Entonces no recibe la sesión: ve un código QR y el secreto para su aplicación autenticadora
+Y con un código equivocado ve «Código incorrecto» y cuenta un intento fallido
+Y con el código correcto se activa el segundo factor, ve 10 códigos de recuperación una sola vez y entra al panel
+```
+
+**CP-161 · Ingresar con el segundo factor**
+
+```gherkin
+Dado un superadmin con el segundo factor activo
+Cuando ingresa con su clave y el código de su aplicación
+Entonces entra al panel y ese mismo código ya no sirve para otro ingreso
+Y sin el teléfono entra con un código de recuperación, que se gasta y le indica cuántos le quedan
+Y cinco códigos equivocados bloquean la cuenta 15 minutos
+```
+
+Subtareas sugeridas: Backend, Frontend, Pruebas, Infraestructura.
 
 ### HU-1512 · SEO técnico
 
@@ -2256,7 +2285,7 @@ Subtareas sugeridas: Backend, Frontend.
 | REQ-105 | HU-0505, HU-1401 |
 | REQ-107 | HU-0104, HU-0109, HU-1402 |
 | REQ-108 | HU-0101 |
-| REQ-064 | HU-1501 |
+| REQ-064 | HU-1501, HU-1515 |
 | REQ-065 | HU-1502 |
 | REQ-066 | HU-1503, HU-1504, HU-1506 |
 | REQ-067 | HU-1505 |

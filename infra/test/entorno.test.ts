@@ -17,7 +17,7 @@ function plantilla(extra: Record<string, string> = {}): Template {
   return Template.fromStack(new EntornoStack(app, 'AptioPruebas', { env, config }));
 }
 
-type Recurso = { Type: string; Properties: Record<string, any> };
+type Recurso = { Type: string; Properties: Record<string, any>; DeletionPolicy?: string };
 const recursos = (t: Template, tipo: string) => Object.values(t.findResources(tipo)) as Recurso[];
 const comportamientos = (t: Template) => {
   const [d] = recursos(t, 'AWS::CloudFront::Distribution');
@@ -164,7 +164,14 @@ describe('HU-1405 · cero secretos en texto plano', () => {
       for (const s of c.Secrets as any[]) expect(JSON.stringify(s.ValueFrom)).toMatch(/Ref|Fn::Join|arn:aws:secretsmanager/);
     }
     const api = contenedores.find((c) => c.Name === 'api')!;
-    expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['SESSION_SECRET', 'REDIS_PASSWORD', ...llavesAplicacion('pruebas')]));
+    expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['SESSION_SECRET', 'REDIS_PASSWORD', 'TOTP_CLAVE_CIFRADO', ...llavesAplicacion('pruebas')]));
+    // HU-1515 · La clave TOTP es un secreto generado propio, solo para la API, y se conserva al borrar la pila.
+    const worker = contenedores.find((c) => c.Name === 'worker')!;
+    expect((worker.Secrets as any[]).map((s) => s.Name)).not.toContain('TOTP_CLAVE_CIFRADO');
+    const totp = recursos(t, 'AWS::SecretsManager::Secret').find((s) => s.Properties.Name === 'aptio-pruebas-totp-clave')!;
+    expect(totp.Properties.GenerateSecretString).toMatchObject({ PasswordLength: 64, ExcludePunctuation: true });
+    expect(totp.DeletionPolicy).toBe('Retain');
+    expect(JSON.stringify((api.Secrets as any[]).find((s) => s.Name === 'TOTP_CLAVE_CIFRADO').ValueFrom)).toContain('SecretoTotp');
     // La API confía en 2 proxies (CloudFront y el balanceador) para leer la IP del visitante (SUP-169).
     expect(api.Environment).toEqual(expect.arrayContaining([{ Name: 'TRUST_PROXY', Value: '2' }, { Name: 'REDIS_TLS', Value: 'true' }, { Name: 'SITIO_ENTORNO', Value: 'pruebas' }]));
   });

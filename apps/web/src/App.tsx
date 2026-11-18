@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, type Cobranza, type ConexionesIA as ResumenConexiones, CREAN_PROYECTOS, ErrorApi, NOMBRE_ROL, type Usuario, VEN_CONEXIONES, VEN_COSTOS, VEN_OPERACION, VEN_SITIO } from './api';
 import { GRUPOS_SUPERADMIN, MENU, resolverVista } from './menu';
 import { navegar, useRuta } from './ruta';
-import { Ingreso, NuevaClave, Olvido } from './vistas/Acceso';
+import { Ingreso, NuevaClave, Olvido, SegundoFactor } from './vistas/Acceso';
 import { ClienteDetalle } from './vistas/ClienteDetalle';
 import { Clientes } from './vistas/Clientes';
 import { EditorVista } from './vistas/EditorVista';
@@ -43,7 +43,7 @@ import { SitioContenido } from './vistas/SitioContenido';
 import { SitioPaginas } from './vistas/SitioPaginas';
 import { SitioResumen } from './vistas/SitioResumen';
 
-const PUBLICAS = ['/ingresar', '/olvido', '/clave'];
+const PUBLICAS = ['/ingresar', '/olvido', '/clave', '/ingresar/segundo-factor'];
 
 export function App() {
   const { camino, busqueda } = useRuta();
@@ -98,6 +98,8 @@ export function App() {
 
   if (camino === '/clave') return <NuevaClave token={new URLSearchParams(busqueda).get('token') ?? ''} />;
   if (camino === '/olvido') return <Olvido />;
+  // HU-1515 · Después de la clave (o de Google), el superadmin escribe el código de su aplicación.
+  if (camino === '/ingresar/segundo-factor') return <SegundoFactor alIngresar={setUsuario} />;
   if (usuario === undefined) return <p className="sr" role="status">Cargando…</p>;
   if (usuario === null || camino === '/ingresar') return <Ingreso alIngresar={setUsuario} />;
 

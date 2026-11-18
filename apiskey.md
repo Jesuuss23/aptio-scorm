@@ -13,7 +13,7 @@ Esto no se arregla con una llave. Conviene saberlo antes de comprar planes o con
 | Tema | Estado | Qué falta |
 | --- | --- | --- |
 | **Facturación electrónica SUNAT** | Solo existe el OSE **simulado**, que emite únicamente en el ambiente de pruebas. | Elegir el OSE o PSE real (DA-09) e integrarlo en una historia nueva. Sin eso, en producción **no se emiten comprobantes válidos ante SUNAT**. |
-| **Segundo factor del superadmin** | No existe todavía (SUP-167). | Una historia propia antes de abrir producción. |
+| **Segundo factor del superadmin** | Hecho (HU-1515): el superadmin entra con su clave y un código de su aplicación autenticadora. Su clave de cifrado, `TOTP_CLAVE_CIFRADO`, la genera la infraestructura (no hay que cargarla). | En el primer ingreso a producción, el superadmin escanea el QR y guarda sus 10 códigos de recuperación. |
 | **Imágenes con IA** | No hay un proveedor de imágenes conectado (DA-03). Las ilustraciones salen de la biblioteca y del kit. | No hace falta ninguna llave por ahora. |
 | **Pruebas con llaves reales** | Stripe, Culqi, Anthropic, Google, ElevenLabs y los CRM están integrados según su documentación, pero **no se han probado con llaves reales**. | Probarlos primero en el entorno de pruebas con sus llaves de prueba o sandbox. |
 
@@ -22,6 +22,7 @@ Esto no se arregla con una llave. Conviene saberlo antes de comprar planes o con
 | Variable | Qué es | Quién la crea |
 | --- | --- | --- |
 | `SESSION_SECRET` | Firma la cookie de sesión de los usuarios. | La infraestructura la genera al crear el secreto. No la cambies: si cambia, todos los usuarios deben volver a ingresar. |
+| `TOTP_CLAVE_CIFRADO` | Cifra el secreto del segundo factor del superadmin y sus códigos de recuperación (HU-1515). | La infraestructura la genera en su propio secreto, `aptio-<entorno>-totp-clave`. No la cambies: si cambia, cada superadmin debe restablecer su segundo factor desde la consola. |
 | `DATABASE_URL` (`DB_*`) | Conexión a PostgreSQL. | RDS crea el usuario y la clave en `aptio-<entorno>-postgres`. |
 | `REDIS_PASSWORD` | Clave de acceso a Redis (colas). | La infraestructura, en `aptio-<entorno>-redis`. |
 | `KMS_KEY_ID`, `S3_BUCKET_NAME`, `S3_BUCKET_RESPALDOS` | Cifrado y buckets de archivos y respaldos. | La infraestructura. En la nube no hacen falta llaves de AWS: las tareas usan su rol. |
@@ -116,7 +117,7 @@ El blog lee la API REST pública de WordPress. Solo hay que guardar la URL del s
 | **Imprescindibles** | `ANTHROPIC_API_KEY`, `GOOGLE_TTS_API_KEY`, `SMTP_URL` (+ `CORREO_REMITENTE`) y al menos una pasarela en modo producción (Stripe o Culqi, con su llave secreta y su secreto de webhook) |
 | **Recomendadas** | `GOOGLE_STT_API_KEY` (audio y video del cliente), `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (ingreso con Google) |
 | **Opcionales** | `ELEVENLABS_API_KEY`, la segunda pasarela y el token del CRM que use ventas |
-| **No las consigues tú** | `SESSION_SECRET`, la base, Redis, KMS y los buckets (las crea la infraestructura) |
+| **No las consigues tú** | `SESSION_SECRET`, `TOTP_CLAVE_CIFRADO`, la base, Redis, KMS y los buckets (las crea la infraestructura) |
 | **Solo para pruebas** | Las variantes `_PRUEBAS`, `PAGO_PRUEBA_SECRETO` y `OSE_PRUEBAS_SECRETO_WEBHOOK` |
 
 Después de cargar o cambiar una llave en Secrets Manager, fuerza un despliegue nuevo de la API y del worker para que la lean (`docs/24-puesta-en-marcha-aws.md`, paso 5).

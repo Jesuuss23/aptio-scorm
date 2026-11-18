@@ -3382,7 +3382,10 @@ paths:
       - Acceso
       summary: Iniciar sesión
       operationId: post_auth_ingresar
-      description: Cookie httpOnly; 5 intentos fallidos bloquean 15 min
+      description: >-
+        Cookie httpOnly; 5 intentos fallidos bloquean 15 min. HU-1515: al superadmin la clave correcta no le abre la
+        sesión: recibe la cookie httpOnly `segundo_factor` (5 minutos, solo para `/api/v1/auth/segundo-factor`) y la
+        respuesta `DesafioSegundoFactor`; el contador de intentos sigue hasta pasar el segundo factor.
       requestBody:
         required: true
         content:
@@ -3391,11 +3394,13 @@ paths:
               $ref: '#/components/schemas/Ingreso'
       responses:
         '200':
-          description: OK
+          description: Sesión abierta, o desafío del segundo factor si es superadmin
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Sesion'
+                oneOf:
+                - $ref: '#/components/schemas/Sesion'
+                - $ref: '#/components/schemas/DesafioSegundoFactor'
         '422':
           $ref: '#/components/responses/NoValido'
         '401':
@@ -3444,7 +3449,8 @@ paths:
         (CP-009). Busca al usuario por el identificador de Google o, la primera vez, por correo, y lo vincula (CP-007).
         Si sale bien crea la cookie de sesión y redirige a la web; si no, redirige a `/ingresar?error=<motivo>` con
         sin_acceso (correo no invitado, usuario desactivado o correo ya vinculado a otra cuenta de Google, CP-008),
-        correo_no_verificado, google_cancelado o google_fallo. Nunca crea cuentas.
+        correo_no_verificado, google_cancelado o google_fallo. Nunca crea cuentas. HU-1515: al superadmin no le abre la
+        sesión: crea la cookie `segundo_factor` y redirige a `/ingresar/segundo-factor`.
       parameters:
       - name: code
         in: query
@@ -3466,6 +3472,129 @@ paths:
         '302':
           description: Redirección a la web, con sesión o con `?error=<motivo>`
       security: []
+  /auth/segundo-factor:
+    get:
+      tags:
+      - Acceso
+      summary: Estado del segundo factor
+      operationId: get_auth_segundo_factor
+      description: >-
+        HU-1515. Con la cookie `segundo_factor`: `configurar` la primera vez o `verificar` si la aplicación ya está
+        activa.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoSegundoFactor'
+        '401':
+          $ref: '#/components/responses/DesafioNoValido'
+      security:
+      - cookieSegundoFactor: []
+    post:
+      tags:
+      - Acceso
+      summary: Verificar el segundo factor
+      operationId: post_auth_segundo_factor
+      description: >-
+        HU-1515 · CP-161. Código de 6 dígitos de la aplicación (TOTP, pasos de 30 s, se acepta ±1 paso y cada código
+        sirve una sola vez) o uno de los códigos de recuperación (un solo uso). Si es correcto crea la cookie `sesion` y
+        borra `segundo_factor`. Cada código equivocado cuenta como intento fallido: 5 bloquean la cuenta 15 minutos.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificacionSegundoFactor'
+      responses:
+        '200':
+          description: Sesión abierta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SesionRecuperacion'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '401':
+          description: CODIGO_INCORRECTO, CUENTA_BLOQUEADA o DESAFIO_NO_VALIDO (venció, o cambió la clave)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: SIN_SEGUNDO_FACTOR (falta configurarlo)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - cookieSegundoFactor: []
+  /auth/segundo-factor/configurar:
+    post:
+      tags:
+      - Acceso
+      summary: Configurar la aplicación autenticadora
+      operationId: post_auth_segundo_factor_configurar
+      description: >-
+        HU-1515 · CP-160. Genera un secreto nuevo (160 bits, guardado cifrado con AES-256-GCM y `TOTP_CLAVE_CIFRADO`
+        hasta confirmarlo) y devuelve el secreto, la URI otpauth y el código QR en SVG. Solo mientras el segundo factor
+        no está activo; respuesta con `Cache-Control: no-store`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfiguracionSegundoFactor'
+        '401':
+          $ref: '#/components/responses/DesafioNoValido'
+        '409':
+          description: SEGUNDO_FACTOR_ACTIVO (ya está configurado; se restablece solo desde la consola)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - cookieSegundoFactor: []
+  /auth/segundo-factor/confirmar:
+    post:
+      tags:
+      - Acceso
+      summary: Activar el segundo factor
+      operationId: post_auth_segundo_factor_confirmar
+      description: >-
+        HU-1515 · CP-160. El primer código correcto activa el segundo factor, crea la cookie `sesion` y devuelve los 10
+        códigos de recuperación, que no se vuelven a mostrar (se guarda solo su HMAC-SHA256).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodigoTotp'
+      responses:
+        '200':
+          description: Sesión abierta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SesionConCodigos'
+        '422':
+          $ref: '#/components/responses/NoValido'
+        '401':
+          description: CODIGO_INCORRECTO, CUENTA_BLOQUEADA o DESAFIO_NO_VALIDO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: SEGUNDO_FACTOR_ACTIVO o SIN_CONFIGURACION (falta pedir el QR)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+      - cookieSegundoFactor: []
   /auth/clave/olvido:
     post:
       tags:
@@ -8561,7 +8690,18 @@ components:
       type: apiKey
       in: cookie
       name: sesion
+    cookieSegundoFactor:
+      type: apiKey
+      in: cookie
+      name: segundo_factor
+      description: HU-1515 · Desafío del superadmin entre la clave y el código (5 minutos; no sirve como sesión).
   responses:
+    DesafioNoValido:
+      description: DESAFIO_NO_VALIDO (venció, falta, o la clave cambió) o CUENTA_BLOQUEADA
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     NoAutenticado:
       description: Sin sesión
       content:
@@ -12132,6 +12272,96 @@ components:
           type: string
           format: date-time
       description: La sesión viaja en una cookie httpOnly; esta respuesta solo informa.
+    DesafioSegundoFactor:
+      type: object
+      required:
+      - segundoFactor
+      - expira
+      properties:
+        segundoFactor:
+          type: string
+          enum:
+          - verificar
+          - configurar
+        expira:
+          type: string
+          format: date-time
+          description: Vence el paso del segundo factor (5 minutos)
+      description: HU-1515 · Respuesta de ingresar para el superadmin; todavía no hay sesión.
+    EstadoSegundoFactor:
+      type: object
+      required:
+      - segundoFactor
+      - email
+      properties:
+        segundoFactor:
+          type: string
+          enum:
+          - verificar
+          - configurar
+        email:
+          type: string
+          format: email
+    ConfiguracionSegundoFactor:
+      type: object
+      required:
+      - secreto
+      - uri
+      - qrSvg
+      properties:
+        secreto:
+          type: string
+          description: Secreto en base32, para escribirlo a mano si no se puede escanear
+        uri:
+          type: string
+          description: URI otpauth://totp/ (SHA1, 6 dígitos, 30 s)
+        qrSvg:
+          type: string
+          description: Código QR de la URI, en SVG
+    CodigoTotp:
+      type: object
+      required:
+      - codigo
+      properties:
+        codigo:
+          type: string
+          example: '123456'
+          description: 6 dígitos; se aceptan con un espacio al medio
+    VerificacionSegundoFactor:
+      type: object
+      properties:
+        codigo:
+          type: string
+          example: '123456'
+          description: Código de 6 dígitos de la aplicación
+        codigoRecuperacion:
+          type: string
+          example: ABCDE-FGHJK
+          description: Uno de los 10 códigos de recuperación (un solo uso; sin distinguir mayúsculas, espacios ni guiones)
+      description: Uno de los dos campos.
+    SesionConCodigos:
+      allOf:
+      - $ref: '#/components/schemas/Sesion'
+      - type: object
+        required:
+        - codigosRecuperacion
+        properties:
+          codigosRecuperacion:
+            type: array
+            minItems: 10
+            maxItems: 10
+            items:
+              type: string
+            description: Se muestran una sola vez
+    SesionRecuperacion:
+      allOf:
+      - $ref: '#/components/schemas/Sesion'
+      - type: object
+        properties:
+          codigosRestantes:
+            type: integer
+            minimum: 0
+            description: Códigos de recuperación sin usar, cuando se ingresó con uno
     Cliente:
       type: object
       required:

@@ -18,6 +18,7 @@ import { AppModule } from '../src/app.module.js';
 import { ColasService } from '../src/trabajos/colas.service.js';
 import { CobranzaService } from '../src/ventas/cobranza.service.js';
 import { SuscripcionesService } from '../src/ventas/suscripciones.service.js';
+import { ingresarCookie } from './ingreso-apoyo.js';
 
 const hayBase = Boolean(process.env.DATABASE_URL);
 const CLAVE = 'clave-de-prueba-123';
@@ -84,8 +85,7 @@ describe.skipIf(!hayBase && !process.env.CI)('cobranza y suspensión (HU-1708)',
     await app.init();
     servidor = app.getHttpServer();
     for (const n of ['admin', 'productor', 'otro-admin', 'super']) {
-      const res = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correoDe(n), clave: CLAVE });
-      cookies[n] = ([] as string[]).concat(res.headers['set-cookie'] ?? [])[0]!.split(';')[0]!;
+      cookies[n] = await ingresarCookie(servidor, correoDe(n), CLAVE);
     }
   });
 
