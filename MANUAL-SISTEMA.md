@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.88 · actualizado con la facturación electrónica real con Mifact (18 de noviembre de 2026)**
+**Versión 0.89 · actualizado con la revisión de seguridad para la nube (18 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -703,8 +703,8 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 
 | Tema | Cómo se resuelve |
 | --- | --- |
-| **Sesión** | Cookie `httpOnly` firmada con HMAC-SHA256 (`SESSION_SECRET`), de 12 h. Se invalida al cambiar la clave, el rol o desactivar al usuario. |
-| **Fuerza bruta** | 5 intentos fallidos (clave o código del segundo factor) bloquean la cuenta 15 minutos. Se permiten hasta 3 pedidos de recuperación por hora. |
+| **Sesión** | Cookie `httpOnly` firmada con HMAC-SHA256 (`SESSION_SECRET`), de 12 h. Se invalida al cambiar la clave, el rol, desactivar al usuario o cerrar sesión (que sube `versionSesion` y cierra también sus otros dispositivos, SUP-355). |
+| **Fuerza bruta** | 5 intentos fallidos (clave o código del segundo factor) bloquean la cuenta 15 minutos. Se permiten hasta 3 pedidos de recuperación por hora. Por IP, la API acepta 20 intentos de ingreso por minuto y 60 peticiones por minuto en `/publico/*` y los formularios del sitio; en la nube, AWS WAF suma 100 peticiones a `/api/v1/auth/` y 3000 a todo en 5 minutos, más las listas de reputación de IP y de entradas maliciosas de AWS (SUP-354). |
 | **Segundo factor** | TOTP obligatorio para el superadmin, con el secreto cifrado (AES-256-GCM, `TOTP_CLAVE_CIFRADO`), códigos de un solo uso y 10 códigos de recuperación guardados como HMAC. Se restablece solo desde la consola (3.44). |
 | **Google** | OpenID Connect con PKCE, `state` y `nonce`, y firma del id_token verificada. Solo entran correos invitados y nunca se crean cuentas. |
 | **Roles y alcance** | Una guarda global por rol. Toda consulta se limita a la organización de la sesión, y el revisor del cliente, a su cliente. |
@@ -713,7 +713,10 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | **Retención** | Los documentos del cliente se borran a la fecha de entrega más los días de retención del cliente (180 por defecto). El worker los borra cada día a las 3:00 (Lima), incluido el texto extraído y las transcripciones, y lo registra en auditoría. |
 | **Inyección en la IA** | El material del cliente va escapado y delimitado en `<material_cliente>`. Lo que parece una orden se marca y nunca se obedece (HU-1402). |
 | **Secretos** | En local, variables de entorno. En la nube, solo en Secrets Manager y cifrados con KMS; ECS los entrega a cada tarea al arrancar (3.43). Ninguna clave real va al repositorio, y GitHub despliega con OIDC, sin llaves de AWS. |
-| **Entrada en la nube** | Solo HTTPS hacia el visitante (TLS 1.2 como mínimo, HSTS de un año). El balanceador solo acepta a CloudFront, y la API toma la IP real del visitante para sus límites (`TRUST_PROXY`, SUP-336). |
+| **Entrada en la nube** | Solo HTTPS hacia el visitante (TLS 1.2 como mínimo, HSTS de un año). El balanceador solo acepta a CloudFront, y la API toma la IP real del visitante para sus límites (`TRUST_PROXY`, SUP-336). En producción CloudFront llega al balanceador solo por HTTPS (`dominioOrigen` y `certificadoAlbArn` obligatorios). |
+| **Cabeceras** | La web y la API salen con la CSP `CSP_WEB` (sin scripts en línea ni `eval`, SUP-356); el sitio, con la CSP de cada versión. Con `NODE_ENV=production` la API no publica `/api/v1/docs` ni la cabecera `X-Powered-By`. |
+| **Semilla** | Con `NODE_ENV=production` exige `SEED_CLAVE` de 16 caracteres o más, solo corre sobre una base vacía y nunca escribe la clave en el registro. |
+| **Dependencias** | `pnpm audit` sin vulnerabilidades en lo que corre en la API y el worker, salvo `deepmerge-ts` dentro de la CLI de Prisma, que solo corre al migrar (SUP-357). PDF.js 6 lee los PDF de los clientes. |
 
 ## 6. Proveedores externos
 
@@ -829,6 +832,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.89 | 2026-11-18 | Seguridad (5): sesión revocada al salir, límites por IP y AWS WAF, CSP de la web, HTTPS obligatorio hasta el balanceador en producción, documentación de la API cerrada en producción, semilla segura y dependencias. |
 | 0.88 | 2026-11-18 | Facturación electrónica con Mifact (3.45): emisión real, estados de SUNAT, consulta cada 10 minutos, PDF, XML y CDR en S3, DNI en boletas y `MIFACT_TOKEN` solo en el worker. |
 | 0.87 | 2026-11-18 | Segundo factor del superadmin (3.44): flujo de desafío, TOTP, códigos de recuperación, cifrado, restablecimiento por consola y secreto generado en la nube. |
 | 0.86 | 2026-11-18 | Producción (3.43): llaves por entorno, `apiskey.md` con cada llave externa y el aviso de lo que falta (OSE real, segundo factor del superadmin). |

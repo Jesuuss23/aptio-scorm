@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.88 · actualizado con la facturación electrónica real con Mifact (18 de noviembre de 2026)**
+**Versión 0.89 · actualizado con la revisión de seguridad para la nube (18 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -52,7 +52,9 @@ Si el enlace venció, pide a Administración que te invite de nuevo, o usa «¿O
 1. Entra a la dirección de Aptio SCORM que te dio tu equipo.
 2. Escribe tu correo y tu clave, y pulsa **Ingresar**.
 
-> **Por seguridad**, si te equivocas de clave cinco veces seguidas, tu cuenta se bloquea durante 15 minutos. Espera ese tiempo o recupera tu clave.
+> **Por seguridad**, si te equivocas de clave cinco veces seguidas, tu cuenta se bloquea durante 15 minutos. Espera ese tiempo o recupera tu clave. Si desde la misma red se hacen muchos intentos de ingreso en poco tiempo, verás «Demasiadas solicitudes»: espera un minuto e intenta de nuevo.
+>
+> **Al cerrar sesión** se cierra en todos tus dispositivos: si dejaste la sesión abierta en otro equipo, también se cierra allí.
 
 ### 3.3 Ingresar con Google
 
@@ -1332,6 +1334,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.89 | 2026-11-18 | Seguridad (3.2): el aviso «Demasiadas solicitudes» al ingresar y cerrar sesión cierra también los demás dispositivos. |
 | 0.88 | 2026-11-18 | Facturación real con Mifact (8.40, 8.44 y 8.50): DNI en boletas desde S/ 700, botón CDR, observado con Mifact, consulta cada 10 minutos y los datos fiscales nuevos (ubigeo, anexo, cuenta y código de detracción). |
 | 0.87 | 2026-11-18 | Verificación en dos pasos del superadmin (3.3.1): activarla con el QR, ingresar con el código y usar los códigos de recuperación. |
 | 0.86 | 2026-11-18 | Sin cambios en las formas de uso: se preparó la lista de servicios externos para pasar a producción. |

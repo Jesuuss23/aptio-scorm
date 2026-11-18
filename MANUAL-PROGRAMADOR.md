@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.88 · actualizado con la facturación electrónica real con Mifact (18 de noviembre de 2026)**
+**Versión 0.89 · actualizado con la revisión de seguridad para la nube (18 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -519,6 +519,8 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | imágenes de api y worker | Partes de la conexión que ECS entrega desde Secrets Manager; `docker/entrada.sh` arma `DATABASE_URL` si no viene definida |
 | `TRUST_PROXY` | api | Proxies delante de la API (0 a 5): 2 en la nube (CloudFront y el balanceador), para que `req.ip` sea el visitante (HU-1405) |
 | `SESSION_SECRET`, `SESSION_TTL_HOURS` | api | Firma y vigencia de la cookie de sesión (obligatorio en producción) |
+| `LIMITE_INGRESO_POR_MINUTO` | api | Intentos de ingreso por IP y por minuto (20 por defecto). Las pruebas de la API lo suben en `vitest.config.ts` porque ingresan muchas veces; el límite se prueba en `acceso.e2e.test.ts` |
+| `SEED_CLAVE` | db | Clave de los usuarios de ejemplo. Con `NODE_ENV=production` es obligatoria (16 caracteres o más) y la semilla solo corre sobre una base vacía (`src/semilla.ts`) |
 | `TOTP_CLAVE_CIFRADO` | api | Cifra el secreto TOTP del superadmin y firma sus códigos de recuperación (HU-1515). Obligatoria en producción; en local, un valor de desarrollo con aviso |
 | `AWS_*`, `S3_BUCKET_NAME`, `KMS_KEY_ID` | api, worker | Almacenamiento cifrado |
 | `SMTP_URL`, `CORREO_REMITENTE` | api, worker | Invitaciones, recuperación de clave, aviso de comentario nuevo (api) y aviso del límite de gasto (worker) |
@@ -601,6 +603,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.89 | 2026-11-18 | Revisión de seguridad: `LIMITE_INGRESO_POR_MINUTO`, reglas de `SEED_CLAVE` en producción, Vitest 4.1.12, `pdfjs-dist` 6.5 con `@napi-rs/canvas` 1.x (`fontExtraProperties` para el nombre de las fuentes) y la pila `AptioWaf-<entorno>` en us-east-1. |
 | 0.88 | 2026-11-18 | HU-1712: migración `20261118150000_mifact`, el adaptador `apps/worker/src/ose/mifact.ts` con el contrato `ose/contrato.ts`, la tarea `consultar-comprobantes` cada 10 minutos, `MIFACT_URL` y `MIFACT_TOKEN` (solo worker), las pruebas `mifact.test.ts` (con `MIFACT_DEMO=1` opcional) y `comprobantes-mifact.casos.ts`, y cómo agregar otro OSE (7.2). |
 | 0.87 | 2026-11-18 | Segundo factor del superadmin (HU-1515): `TOTP_CLAVE_CIFRADO`, el comando `restablecer-segundo-factor`, el superadmin de la semilla configura su aplicación en el primer ingreso y las pruebas de la API lo ingresan con `test/ingreso-apoyo.ts`. |
 | 0.86 | 2026-11-18 | `apiskey.md` (llaves externas para producción) y `llavesAplicacion(entorno)` en `infra/`, con el contexto `correoRemitente`. |
