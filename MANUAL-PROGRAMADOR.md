@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.86 · actualizado con la lista de llaves para producción (18 de noviembre de 2026)**
+**Versión 0.87 · actualizado con el segundo factor del superadmin (18 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -70,6 +70,7 @@ docs/         especificación: módulos, historias, API, ADR, diseño, ESTADO.md
 | `pnpm openapi:lint` | Lint del contrato `docs/api/openapi.yaml` (hoy: 0 errores y 7 avisos aceptados) |
 | `pnpm sitio:lighthouse` | Lighthouse de la portada pre-renderizada en celular: LCP < 2,5 s, SEO ≥ 90 y accesibilidad ≥ 90 (informe en `packages/sitio/lighthouse/`) |
 | `pnpm db:migrate` / `db:seed` / `db:generate` | Migraciones, datos de ejemplo y cliente de Prisma |
+| `pnpm --filter @aptio/db restablecer-segundo-factor -- <correo> "<motivo>"` | Borra el segundo factor de un superadmin y cierra sus sesiones (HU-1515); sale con 0 si lo hizo y con 1 si no |
 
 Para las pruebas de almacenamiento en local: `AWS_ENDPOINT=http://localhost:9000 AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test pnpm ci`.
 
@@ -477,6 +478,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 - Accesibilidad: `apps/web/e2e/accesibilidad.spec.ts` recorre el HTML exportado solo con teclado y corre axe (`@axe-core/playwright`, WCAG 2.2 A y AA) en cada pantalla. Antes de axe espera las animaciones, también las del Shadow DOM (`shadowRoot.getAnimations()`), porque a mitad del fundido el contraste baja. El curso con las 8 interacciones está en `packages/player/test/catalogo.ts`. Las pruebas de foco del reproductor usan happy-dom (`// @vitest-environment happy-dom`); ahí `URL` es la del navegador simulado, así que lee archivos con rutas, no con `new URL`.
 - Kit de gamificación (HU-1205): `packages/exporters/test/kit-gamificacion.test.ts` (CP-095 con el kit de Minera Andina), el caso KIT_GAMIFICACION de `apps/worker/test/exportar.test.ts` (PNG reales de 512 px), el de `apps/api/test/exportaciones.e2e.test.ts` y el de `apps/web/e2e/entrega.spec.ts` con axe.
 - Copias (HU-1403): `packages/respaldo/test` copia y purga contra PostgreSQL y LocalStack con buckets propios; `apps/api/test/respaldo.e2e.test.ts` (CP-108) restaura con `pnpm respaldo:restaurar` en una base nueva y levanta la API con `node --import @swc-node/register/esm-register src/main.ts` sobre ella.
+- Segundo factor (HU-1515): el superadmin no recibe sesión solo con la clave. En las pruebas de la API, `ingresarCookie(servidor, correo, clave)` de `apps/api/test/ingreso-apoyo.ts` completa el segundo factor (lo configura la primera vez) y devuelve la cookie `sesion`; en Playwright, `simularApi(page, { rol: 'SUPERADMIN', segundoFactor })` acepta el código `123456` y el de recuperación `ABCDE-FGHJK`. En local, el superadmin de la semilla configura su aplicación en el primer ingreso.
 - **Prohibido** saltarse, desactivar o poner en cuarentena una prueba para obtener verde.
 
 ## 9. Integración continua
@@ -516,6 +518,7 @@ Para que un PR en rojo no se pueda fusionar, el administrador del repositorio de
 | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | imágenes de api y worker | Partes de la conexión que ECS entrega desde Secrets Manager; `docker/entrada.sh` arma `DATABASE_URL` si no viene definida |
 | `TRUST_PROXY` | api | Proxies delante de la API (0 a 5): 2 en la nube (CloudFront y el balanceador), para que `req.ip` sea el visitante (HU-1405) |
 | `SESSION_SECRET`, `SESSION_TTL_HOURS` | api | Firma y vigencia de la cookie de sesión (obligatorio en producción) |
+| `TOTP_CLAVE_CIFRADO` | api | Cifra el secreto TOTP del superadmin y firma sus códigos de recuperación (HU-1515). Obligatoria en producción; en local, un valor de desarrollo con aviso |
 | `AWS_*`, `S3_BUCKET_NAME`, `KMS_KEY_ID` | api, worker | Almacenamiento cifrado |
 | `SMTP_URL`, `CORREO_REMITENTE` | api, worker | Invitaciones, recuperación de clave, aviso de comentario nuevo (api) y aviso del límite de gasto (worker) |
 | `S3_BUCKET_RESPALDOS` | worker, `respaldo:restaurar` | Bucket de las copias de seguridad (por defecto `aptio-scorm-respaldos`) |
@@ -595,6 +598,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.87 | 2026-11-18 | Segundo factor del superadmin (HU-1515): `TOTP_CLAVE_CIFRADO`, el comando `restablecer-segundo-factor`, el superadmin de la semilla configura su aplicación en el primer ingreso y las pruebas de la API lo ingresan con `test/ingreso-apoyo.ts`. |
 | 0.86 | 2026-11-18 | `apiskey.md` (llaves externas para producción) y `llavesAplicacion(entorno)` en `infra/`, con el contexto `correoRemitente`. |
 | 0.85 | 2026-11-18 | HU-1405: `docker/` (imágenes de la API, el worker y la web, punto de entrada), `infra/` (`@aptio/infra` con CDK y sus pruebas), el workflow «Despliegue a pruebas» con OIDC y `infra/scripts/migrar.sh`, el job de imágenes del CI y las variables `REDIS_TLS`, `REDIS_PASSWORD`, `DB_*` y `TRUST_PROXY`. |
 | 0.84 | 2026-11-17 | HU-1711: migración `DatosFacturacionOrg`, `@aptio/schema/facturacion-org`, el receptor del worker, `FacturacionOrgService` y `FacturacionOrgController` (`/organizacion/facturacion` y descargas), `FacturacionOrg.tsx` en `/facturacion` y la simulación `facturacion-org-simulada.ts`. |

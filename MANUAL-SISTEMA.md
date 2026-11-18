@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.86 · actualizado con la lista de llaves para producción (18 de noviembre de 2026)**
+**Versión 0.87 · actualizado con el segundo factor del superadmin (18 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -655,6 +655,16 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Modo de pruebas:** proveedores simulados hasta cargar las llaves y `SITIO_ENTORNO=pruebas` (aviso de datos ficticios, pasarela de pruebas y OSE simulado).
 - **Producción:** la misma infraestructura con el entorno `produccion`, desplegada a mano. Su secreto trae las llaves `*_PRODUCCION` de las pasarelas y no las de pruebas (SUP-343). La lista de llaves externas, dónde se obtienen y qué hace cada una está en `apiskey.md`. No emite comprobantes válidos ante SUNAT hasta integrar un OSE real (DA-09).
 
+### 3.44 Segundo factor del superadmin (HU-1515)
+
+- **Qué pide (ADR-011, CP-160, CP-161):** solo al rol `SUPERADMIN`, después de la clave o de Google, un código TOTP de una aplicación autenticadora (RFC 6238: SHA-1, 6 dígitos, 30 s, ±1 paso), o uno de sus 10 códigos de recuperación de un solo uso. El primer ingreso obliga a configurarlo. Los demás roles no cambian.
+- **Flujo:** `POST /auth/ingresar` (o la vuelta de Google, que redirige a `/ingresar/segundo-factor`) no abre la sesión del superadmin: crea la cookie `segundo_factor` (httpOnly, SameSite Strict, 5 minutos, solo para `/api/v1/auth/segundo-factor`, firmada con una clave derivada de `SESSION_SECRET`). Con ella: `GET /auth/segundo-factor` (configurar o verificar), `POST …/configurar` (secreto, URI otpauth y QR en SVG, sin caché), `POST …/confirmar` (activa, abre la sesión y entrega los códigos) y `POST /auth/segundo-factor` (código o código de recuperación). Recién ahí se crea la cookie `sesion` (SUP-345).
+- **Protecciones:** el secreto se guarda cifrado con AES-256-GCM (`TOTP_CLAVE_CIFRADO`); los códigos de recuperación, solo como HMAC-SHA256; el último paso aceptado (`totpUltimoPaso`) impide reutilizar un código; los códigos equivocados cuentan para el bloqueo de 5 intentos y 15 minutos; el desafío deja de valer si cambia la versión de sesión (SUP-344, SUP-346).
+- **Datos:** migración `20261118120000_segundo_factor`: columnas `totp*` en `Usuario` y tabla `CodigoRecuperacion`.
+- **Restablecer:** sin recuperación por correo. `pnpm --filter @aptio/db restablecer-segundo-factor -- <correo> "<motivo>"` borra el secreto y los códigos, cierra las sesiones y audita `SEGUNDO_FACTOR_RESTABLECIDO` (SUP-347).
+- **Nube:** el secreto generado `aptio-<entorno>-totp-clave` llega como `TOTP_CLAVE_CIFRADO` solo a la tarea de la API y se conserva al borrar la pila.
+- **Auditoría:** `SEGUNDO_FACTOR_PEDIDO`, `SEGUNDO_FACTOR_FALLIDO`, `SEGUNDO_FACTOR_ACTIVADO`, `CODIGO_RECUPERACION_USADO` e `INGRESO` con `metodo: segundo_factor` (SUP-348).
+
 ## 4. Datos
 
 El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/schema.prisma`. Las entidades usadas hasta el S2:
@@ -664,7 +674,7 @@ El modelo completo está en `docs/12-modelo-datos.md` y en `packages/db/prisma/s
 | `Organizacion` | Inquilino: todo dato raíz lleva `organizacionId` (ADR-012) |
 | `Plan`, `PlanesAjustes` | Planes de la página de precios (slug fijo, precios en soles sin IGV, características, visible, destacado, orden, ficticio) y los ajustes de la página (opción anual, descuento, IGV); de plataforma, sin organización (HU-1702) |
 | `Suscripcion`, `SolicitudSuscripcion` | La suscripción de cada organización (plan, ciclo, precio pactado sin IGV, estado, período, pasarela y 4 últimos dígitos) y el checkout de `/pago` (empresa, RUC, comprobante, montos con IGV, estado y el evento de pago que lo resolvió) (HU-1703) |
-| `Usuario`, `TokenAcceso` | Personas, rol, clave (argon2id), versión de sesión, y tokens de invitación y recuperación (guardados como hash) |
+| `Usuario`, `TokenAcceso`, `CodigoRecuperacion` | Personas, rol, clave (argon2id), versión de sesión, segundo factor del superadmin (secreto TOTP cifrado y último paso usado), tokens de invitación y recuperación (guardados como hash) y los códigos de recuperación del segundo factor (HMAC, un solo uso) |
 | `Cliente`, `KitMarca`, `PantallaModelo`, `GlosarioTermino`, `PronunciacionTermino` | Clientes y su identidad visual y de voz |
 | `Proyecto` | Un SCORM: cliente, estado, parámetros y datos técnicos opcionales |
 | `Recurso` | Archivo en el almacenamiento: tipo, origen, clave S3, hash, metadatos (por ejemplo, la duración) y fecha de borrado |
@@ -683,10 +693,11 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | Tema | Cómo se resuelve |
 | --- | --- |
 | **Sesión** | Cookie `httpOnly` firmada con HMAC-SHA256 (`SESSION_SECRET`), de 12 h. Se invalida al cambiar la clave, el rol o desactivar al usuario. |
-| **Fuerza bruta** | 5 intentos fallidos bloquean la cuenta 15 minutos. Se permiten hasta 3 pedidos de recuperación por hora. |
+| **Fuerza bruta** | 5 intentos fallidos (clave o código del segundo factor) bloquean la cuenta 15 minutos. Se permiten hasta 3 pedidos de recuperación por hora. |
+| **Segundo factor** | TOTP obligatorio para el superadmin, con el secreto cifrado (AES-256-GCM, `TOTP_CLAVE_CIFRADO`), códigos de un solo uso y 10 códigos de recuperación guardados como HMAC. Se restablece solo desde la consola (3.44). |
 | **Google** | OpenID Connect con PKCE, `state` y `nonce`, y firma del id_token verificada. Solo entran correos invitados y nunca se crean cuentas. |
 | **Roles y alcance** | Una guarda global por rol. Toda consulta se limita a la organización de la sesión, y el revisor del cliente, a su cliente. |
-| **Superadmin de plataforma (ADR-011, HU-1501)** | Rol `SUPERADMIN` sin organización. Es el único que entra a `/api/v1/sitio/*` (403 al administrador de cada organización y al resto, CP-109) y ve el grupo «Sitio web» en la web; no ve las vistas de una organización. Por ahora entra con correo y clave: el segundo factor obligatorio va en una historia propia antes de producción (SUP-167). |
+| **Superadmin de plataforma (ADR-011, HU-1501)** | Rol `SUPERADMIN` sin organización. Es el único que entra a `/api/v1/sitio/*` (403 al administrador de cada organización y al resto, CP-109) y ve el grupo «Sitio web» en la web; no ve las vistas de una organización. Además de la clave o de Google, necesita el código de su aplicación autenticadora o un código de recuperación (HU-1515, 3.44). |
 | **Archivos** | Cifrados con KMS y bucket no público. Solo se accede con URLs firmadas de 15 minutos. El tipo real se verifica por contenido (un .exe renombrado se rechaza) y el SVG se sanea con una lista cerrada. |
 | **Retención** | Los documentos del cliente se borran a la fecha de entrega más los días de retención del cliente (180 por defecto). El worker los borra cada día a las 3:00 (Lima), incluido el texto extraído y las transcripciones, y lo registra en auditoría. |
 | **Inyección en la IA** | El material del cliente va escapado y delimitado en `<material_cliente>`. Lo que parece una orden se marca y nunca se obedece (HU-1402). |
@@ -807,6 +818,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.87 | 2026-11-18 | Segundo factor del superadmin (3.44): flujo de desafío, TOTP, códigos de recuperación, cifrado, restablecimiento por consola y secreto generado en la nube. |
 | 0.86 | 2026-11-18 | Producción (3.43): llaves por entorno, `apiskey.md` con cada llave externa y el aviso de lo que falta (OSE real, segundo factor del superadmin). |
 | 0.85 | 2026-11-18 | Entorno de pruebas en la nube (3.43): AWS en sa-east-1 con CloudFront, ECS Fargate, RDS, ElastiCache, buckets con KMS y Secrets Manager; imágenes Docker, despliegue continuo con OIDC y la guía de puesta en marcha. Seguridad y configuración al día. Falta el primer despliegue en la cuenta real. |
 | 0.84 | 2026-11-17 | Portal de facturación de la organización (3.42): datos de facturación por organización para los comprobantes nuevos, descarga aislada del PDF y el XML, cambio de la tarjeta de prueba y la vista «Facturación» del administrador. |

@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.86 · actualizado con la lista de llaves para producción (18 de noviembre de 2026)**
+**Versión 0.87 · actualizado con el segundo factor del superadmin (18 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -57,6 +57,24 @@ Si el enlace venció, pide a Administración que te invite de nuevo, o usa «¿O
 ### 3.3 Ingresar con Google
 
 Si tu correo es de Google y fuiste invitado con ese correo, pulsa **Ingresar con Google**. Solo pueden entrar los correos invitados: si ves «Tu correo no tiene acceso», pide la invitación a Administración.
+
+### 3.3.1 Verificación en dos pasos (solo superadmin)
+
+Si administras la plataforma (superadmin), la clave o Google no bastan: después te pedimos un código de tu teléfono. Así, aunque alguien conozca tu clave, no puede entrar.
+
+**La primera vez:**
+
+1. Instala en tu teléfono una aplicación autenticadora (Google Authenticator, Microsoft Authenticator, 1Password u otra).
+2. Ingresa con tu correo y clave (o con Google). Verás **Activa la verificación en dos pasos** con un código QR.
+3. En la aplicación, agrega una cuenta y escanea el QR. Si no puedes escanearlo, escribe la clave que aparece debajo.
+4. Escribe el código de 6 dígitos que muestra la aplicación y pulsa **Activar**.
+5. Verás **10 códigos de recuperación**. Cópialos o descárgalos y guárdalos fuera de tu computadora (por ejemplo, en tu gestor de claves). **Se muestran una sola vez.** Marca la casilla y pulsa **Continuar**.
+
+**Las siguientes veces:** después de la clave, escribe el código de 6 dígitos de la aplicación y pulsa **Verificar**. El código cambia cada 30 segundos y cada uno sirve una sola vez.
+
+**Si no tienes tu teléfono:** pulsa **No tengo mi teléfono: usar un código de recuperación** y escribe uno de tus códigos. Cada código sirve una sola vez; la pantalla te dice cuántos te quedan. Si te quedan pocos, o perdiste el teléfono y los códigos, pide a soporte técnico que restablezca tu verificación: no se puede hacer por correo. En tu siguiente ingreso la vuelves a activar.
+
+> Tienes 5 minutos para escribir el código después de la clave; si pasan, vuelve a ingresar. Los códigos equivocados cuentan como intentos fallidos: con cinco, la cuenta se bloquea 15 minutos.
 
 ### 3.4 Olvidé mi clave
 
@@ -1314,6 +1332,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.87 | 2026-11-18 | Verificación en dos pasos del superadmin (3.3.1): activarla con el QR, ingresar con el código y usar los códigos de recuperación. |
 | 0.86 | 2026-11-18 | Sin cambios en las formas de uso: se preparó la lista de servicios externos para pasar a producción. |
 | 0.85 | 2026-11-18 | Se prepara el enlace estable de pruebas para revisar la demo de cada sprint; estará disponible cuando se active en la nube. Sin cambios en las formas de uso. |
 | 0.84 | 2026-11-17 | Facturación de la organización (8.50): plan y consumo, descarga del PDF y el XML de tus comprobantes, cambio de la tarjeta de prueba y edición de los datos de facturación (factura o boleta). |
