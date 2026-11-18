@@ -121,10 +121,14 @@ const hexDeArgs = (a: unknown[]): string | null => {
 };
 
 export async function evidenciasDePdf(bytes: Uint8Array): Promise<EvidenciasKit> {
+  // pdfjs-dist 6 (GHSA-hq66-cqwq-w95j): el documento del cliente no es confiable; se libera desde la tarea de carga.
+  // `fontExtraProperties`: desde la 6, el nombre de la fuente (`name`) solo llega con las propiedades extra.
+  const tarea = getDocument({ data: new Uint8Array(bytes), disableFontFace: true, useSystemFonts: false, verbosity: 0, fontExtraProperties: true });
   let doc;
   try {
-    doc = await getDocument({ data: new Uint8Array(bytes), disableFontFace: true, useSystemFonts: false, verbosity: 0 }).promise;
+    doc = await tarea.promise;
   } catch {
+    await tarea.destroy();
     throw new MaterialKitNoValido('FORMATO_NO_VALIDO', 'El PDF no se puede leer');
   }
   const colores: Conteo = new Map();
@@ -163,7 +167,7 @@ export async function evidenciasDePdf(bytes: Uint8Array): Promise<EvidenciasKit>
     }
     return { origen: 'pdf', leidos: paginas, colores: masFrecuentes(colores, MAX_COLORES), fuentes: masFrecuentes(fuentes, MAX_FUENTES), avisos };
   } finally {
-    await doc.destroy();
+    await tarea.destroy();
   }
 }
 

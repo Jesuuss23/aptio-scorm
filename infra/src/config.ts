@@ -68,6 +68,10 @@ export function leerConfig(leer: LeerContexto): ConfigEntorno {
   if (certificadoAlbArn && !certificadoAlbArn.startsWith(`arn:aws:acm:${REGION}:`)) {
     throw new Error(`certificadoAlbArn debe ser un certificado de ACM en ${REGION}`);
   }
+  // M4 · En producción, CloudFront habla con el balanceador solo por HTTPS: exige su dominio y su certificado.
+  if (entorno === 'produccion' && !certificadoAlbArn) {
+    throw new Error('En producción dominioOrigen y certificadoAlbArn son obligatorios (CloudFront → balanceador por HTTPS)');
+  }
   const mifactUrl = texto(leer, 'mifactUrl') ?? (entorno === 'produccion' ? undefined : MIFACT_URL_DEMO);
   if (mifactUrl && !/^https:\/\/[^\s/]+(\/\S*)?$/.test(mifactUrl)) throw new Error(`mifactUrl no válida: «${mifactUrl}» (una URL https)`);
   return {

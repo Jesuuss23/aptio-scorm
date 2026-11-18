@@ -45,6 +45,21 @@ describe('CP-001 · salud', () => {
     expect(res.status).toBe(200);
     expect(res.body.paths).toHaveProperty('/api/v1/salud');
   });
+
+  it('M5 · en producción no publica la documentación generada ni la cabecera X-Powered-By', async () => {
+    const antes = { NODE_ENV: process.env.NODE_ENV, SESSION_SECRET: process.env.SESSION_SECRET, TOTP_CLAVE_CIFRADO: process.env.TOTP_CLAVE_CIFRADO };
+    Object.assign(process.env, { NODE_ENV: 'production', SESSION_SECRET: 'prueba-'.repeat(8), TOTP_CLAVE_CIFRADO: 'prueba-totp-'.repeat(4) });
+    try {
+      const servidor = (await appConBase(true)).getHttpServer();
+      expect((await request(servidor).get('/api/v1/docs-json')).status).toBe(404);
+      expect((await request(servidor).get('/api/v1/docs')).status).toBe(404);
+      const salud = await request(servidor).get('/api/v1/salud');
+      expect(salud.status).toBe(200);
+      expect(salud.headers['x-powered-by']).toBeUndefined();
+    } finally {
+      for (const [k, v] of Object.entries(antes)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  });
 });
 
 // Controlador solo para pruebas: ejercita validación, errores y guardas.

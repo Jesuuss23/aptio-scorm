@@ -176,7 +176,10 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiCookieAuth('sesion')
   @ApiNoContentResponse()
-  salir(@Res({ passthrough: true }) res: Response): void {
+  async salir(@UsuarioActual() usuario: UsuarioSesion, @Res({ passthrough: true }) res: Response): Promise<void> {
+    // Revisión de seguridad para la nube (M2) · La cookie no guarda estado: subir la versión de sesión la invalida aquí
+    // y en los demás dispositivos del usuario, aunque alguien la hubiera copiado.
+    await this.baseDatos.cliente.usuario.update({ where: { id: usuario.id }, data: { versionSesion: { increment: 1 } } });
     res.clearCookie(COOKIE_SESION, { path: '/' });
   }
 

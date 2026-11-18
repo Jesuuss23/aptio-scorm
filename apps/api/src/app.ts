@@ -60,6 +60,8 @@ export function configurarApp(app: INestApplication): INestApplication {
       { path: 's/_cita', method: RequestMethod.POST }, { path: 's/_visita', method: RequestMethod.POST },
     ],
   });
+  // M5 · Sin la cabecera X-Powered-By (no anuncia Express).
+  (app as NestExpressApplication).disable?.('x-powered-by');
   app.use(cookieParser());
   const saltos = saltosProxy();
   if (saltos > 0) (app as NestExpressApplication).set('trust proxy', saltos);
@@ -90,6 +92,9 @@ export function configurarApp(app: INestApplication): INestApplication {
   }
   app.useGlobalFilters(new FiltroErrores(bd?.cliente && bd.enSegundoPlano ? new AuditorAccesoCruzado(bd.cliente, (t) => bd.enSegundoPlano(t)) : undefined));
 
+  // M5 · La documentación generada no se publica en producción (ni en el entorno de pruebas de la nube, que también corre
+  // con NODE_ENV=production): el contrato vive en docs/api/openapi.yaml.
+  if (process.env.NODE_ENV === 'production') return app;
   const config = new DocumentBuilder()
     .setTitle('Aptio SCORM · API')
     .setDescription('Generado desde el código. El contrato de referencia es docs/api/openapi.yaml.')
