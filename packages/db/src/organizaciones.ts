@@ -39,6 +39,8 @@ export const TABLAS_ORGANIZACION = [
   { tabla: 'Comprobante', opcional: true },
   // HU-1708 · Renovaciones de cada período.
   { tabla: 'Renovacion', opcional: false },
+  // HU-1711 · Datos de facturación del portal (uno por organización).
+  { tabla: 'DatosFacturacionOrg', opcional: false },
 ] as const;
 export type TablaOrganizacion = (typeof TABLAS_ORGANIZACION)[number]['tabla'];
 

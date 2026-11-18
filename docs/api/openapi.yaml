@@ -6755,6 +6755,166 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /organizacion/facturacion:
+    get:
+      tags:
+      - Ventas
+      summary: Portal de facturación de la organización (HU-1711, REQ-091, CP-153, PNT-40)
+      operationId: get_organizacion_facturacion
+      description: |-
+        Solo ADMINISTRADOR, siempre con la organización de su sesión (también con la cuenta suspendida). Devuelve el plan
+        vigente, el consumo de cápsulas del mes, el medio de pago (pasarela y 4 últimos dígitos; editable solo con la
+        pasarela de pruebas, SUP-331), los datos de facturación (los editados en el portal o, si aún no se editaron, los
+        del alta: la solicitud de la suscripción o la organización) y sus comprobantes (factura, boleta y nota de crédito),
+        los 100 más recientes. `Cache-Control: no-store`.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FacturacionOrg'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+  /organizacion/facturacion/datos:
+    put:
+      tags:
+      - Ventas
+      summary: Editar los datos de facturación de la organización (HU-1711)
+      operationId: put_organizacion_facturacion_datos
+      description: |-
+        Solo ADMINISTRADOR. Crea o actualiza los datos de facturación con `@aptio/schema/facturacion-org`: la factura exige
+        un RUC de 11 dígitos con el dígito verificador de SUNAT y la boleta lo admite vacío; razón social y dirección en
+        texto plano; correo válido (se guarda en minúsculas). Rigen para los comprobantes nuevos: los ya emitidos no cambian
+        (SUP-318). Auditoría DATOS_FACTURACION_ACTUALIZADOS con el antes y el después.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DatosFacturacionEntrada'
+      responses:
+        '200':
+          description: Guardados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosFacturacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /organizacion/facturacion/medio-pago:
+    post:
+      tags:
+      - Ventas
+      summary: Cambiar la tarjeta con la pasarela de pruebas (HU-1711, SUP-331)
+      operationId: post_organizacion_facturacion_medio_pago
+      description: |-
+        Solo ADMINISTRADOR. Con la pasarela de pruebas acepta solo una tarjeta de prueba (4111 1111 1111 1111 aprueba los
+        cobros automáticos y 4000 0000 0000 0002 los rechaza) y guarda únicamente sus 4 últimos dígitos: el número completo
+        no se guarda y un `cvv` o `cvc` en el cuerpo da 422. Auditoría MEDIO_PAGO_ACTUALIZADO. Con Stripe o Culqi la tarjeta
+        no se guarda en Aptio SCORM: 409 MEDIO_NO_EDITABLE con el aviso de que cada renovación llega por correo con el
+        enlace para pagar (SUP-319). Sin suscripción, 404 SIN_SUSCRIPCION.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedioPagoEntrada'
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedioPago'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: SIN_SUSCRIPCION
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: MEDIO_NO_EDITABLE (Stripe o Culqi)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          $ref: '#/components/responses/NoValido'
+  /organizacion/comprobantes/{id}/pdf:
+    get:
+      tags:
+      - Ventas
+      summary: PDF de un comprobante de la organización (HU-1711, CP-153)
+      operationId: get_organizacion_comprobantes_id_pdf
+      description: Solo ADMINISTRADOR. Lo lee del almacenamiento (S3) solo si el comprobante es de su organización, con `Content-Disposition` y `Cache-Control no-store`. Auditoría COMPROBANTE_DESCARGADO (`desde` portal).
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: El archivo
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: NO_ENCONTRADO si no existe o es de otra organización (CP-153), o ARCHIVO_PENDIENTE si aún no se generó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /organizacion/comprobantes/{id}/xml:
+    get:
+      tags:
+      - Ventas
+      summary: XML UBL 2.1 de un comprobante de la organización (HU-1711, CP-153)
+      operationId: get_organizacion_comprobantes_id_xml
+      description: Solo ADMINISTRADOR. Igual que el PDF, con el XML firmado del comprobante.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: El archivo
+          content:
+            application/xml:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: NO_ENCONTRADO si no existe o es de otra organización (CP-153), o ARCHIVO_PENDIENTE si aún no se generó
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /ventas/ingresos:
     get:
       tags:
@@ -16363,6 +16523,146 @@ components:
         total: { type: number, example: 81.42, description: 'Con IGV de 18 %, por cápsula' }
         moneda: { type: string, enum: [PEN, USD] }
         disponible: { type: boolean, description: 'Hay una pasarela visible y activa que cobra esa moneda' }
+    FacturacionOrg:
+      type: object
+      description: HU-1711 · El portal de facturación de la organización (PNT-40)
+      required: [plan, consumo, medioPago, datos, comprobantes]
+      properties:
+        plan:
+          type: object
+          nullable: true
+          description: null en una organización sin suscripción
+          allOf:
+          - $ref: '#/components/schemas/PlanFacturacion'
+        consumo:
+          $ref: '#/components/schemas/Cuota'
+        medioPago:
+          type: object
+          nullable: true
+          allOf:
+          - $ref: '#/components/schemas/MedioPago'
+        datos:
+          $ref: '#/components/schemas/DatosFacturacion'
+        comprobantes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComprobanteOrg'
+    PlanFacturacion:
+      type: object
+      required: [nombre, ciclo, precioPactadoSinIgv, moneda, estado, finPeriodo]
+      properties:
+        nombre:
+          type: string
+          example: Productora
+        ciclo:
+          type: string
+          enum: [MENSUAL, ANUAL]
+        precioPactadoSinIgv:
+          type: integer
+          example: 1290
+        moneda:
+          type: string
+          enum: [PEN, USD]
+        estado:
+          type: string
+          enum: [ACTIVA, PAGO_PENDIENTE, SUSPENDIDA, CANCELADA]
+        finPeriodo:
+          type: string
+          format: date-time
+    MedioPago:
+      type: object
+      required: [pasarela, ultimos4Digitos, editable, aviso]
+      properties:
+        pasarela:
+          type: string
+          example: pruebas
+        ultimos4Digitos:
+          type: string
+          nullable: true
+          example: '1111'
+        editable:
+          type: boolean
+          description: Solo con la pasarela de pruebas (SUP-331)
+        aviso:
+          type: string
+          nullable: true
+          description: Con Stripe o Culqi, que cada renovación llega por correo con el enlace para pagar (SUP-319)
+    MedioPagoEntrada:
+      type: object
+      required: [tarjeta]
+      properties:
+        tarjeta:
+          type: string
+          example: 4000 0000 0000 0002
+          description: Una tarjeta de prueba; no se guarda, solo sus 4 últimos dígitos. Sin CVV.
+    DatosFacturacionEntrada:
+      type: object
+      required: [razonSocial, correoFacturacion, tipoComprobantePreferido]
+      properties:
+        razonSocial:
+          type: string
+          maxLength: 150
+          example: Minera Andina SAC
+        ruc:
+          type: string
+          nullable: true
+          example: '20100070970'
+          description: 11 dígitos con el dígito verificador de SUNAT; obligatorio para FACTURA
+        direccion:
+          type: string
+          nullable: true
+          maxLength: 200
+        correoFacturacion:
+          type: string
+          format: email
+          maxLength: 160
+        tipoComprobantePreferido:
+          type: string
+          enum: [FACTURA, BOLETA]
+    DatosFacturacion:
+      allOf:
+      - $ref: '#/components/schemas/DatosFacturacionEntrada'
+      - type: object
+        required: [ruc, direccion, origen]
+        properties:
+          origen:
+            type: string
+            enum: [PORTAL, ALTA]
+            description: PORTAL si el administrador ya los editó; ALTA si vienen de la solicitud de la suscripción o de la organización
+    ComprobanteOrg:
+      type: object
+      description: HU-1711 · Un comprobante en el portal de la organización
+      required: [id, tipo, numeroCompleto, referencia, emitidoEn, moneda, total, estado, conPdf, conXml]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          type: string
+          enum: [FACTURA, BOLETA, NOTA_CREDITO]
+        numeroCompleto:
+          type: string
+          example: F001-00000001
+        referencia:
+          type: string
+          nullable: true
+          description: La nota de crédito, el comprobante que corrige
+        emitidoEn:
+          type: string
+          format: date-time
+        moneda:
+          type: string
+          enum: [PEN, USD]
+        total:
+          type: number
+          example: 1522.2
+        estado:
+          type: string
+          enum: [PENDIENTE, ACEPTADO, OBSERVADO, RECHAZADO]
+        conPdf:
+          type: boolean
+        conXml:
+          type: boolean
     Cuota:
       type: object
       description: HU-1705 · La cuota de cápsulas de la ventana mensual vigente (REQ-085, RN-18-6).

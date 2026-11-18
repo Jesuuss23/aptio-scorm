@@ -417,6 +417,19 @@ export interface TrabajoEstado {
 }
 
 /** Error de la API con la forma { codigo, mensaje, detalles }. */
+/** HU-1711 · Facturación de la organización (REQ-091, CP-153, PNT-40). */
+export interface DatosFacturacionEntrada { razonSocial: string; ruc: string | null; direccion: string | null; correoFacturacion: string; tipoComprobantePreferido: 'FACTURA' | 'BOLETA' }
+export interface DatosFacturacionOrg extends DatosFacturacionEntrada { origen: 'PORTAL' | 'ALTA' }
+export interface MedioPagoOrg { pasarela: string; ultimos4Digitos: string | null; editable: boolean; aviso: string | null }
+export interface ComprobanteOrg {
+  id: string; tipo: 'FACTURA' | 'BOLETA' | 'NOTA_CREDITO'; numeroCompleto: string; referencia: string | null; emitidoEn: string; moneda: 'PEN' | 'USD'; total: number;
+  estado: EstadoComprobante; conPdf: boolean; conXml: boolean;
+}
+export interface FacturacionOrg {
+  plan: { nombre: string; ciclo: 'MENSUAL' | 'ANUAL'; precioPactadoSinIgv: number; moneda: 'PEN' | 'USD'; estado: EstadoSuscripcion; finPeriodo: string } | null;
+  consumo: CuotaCapsulas; medioPago: MedioPagoOrg | null; datos: DatosFacturacionOrg; comprobantes: ComprobanteOrg[];
+}
+
 export class ErrorApi extends Error {
   readonly estado: number;
   readonly codigo: string;
@@ -983,6 +996,22 @@ export interface ResumenSitio {
   proximasDemos: { id: string; inicio: string; fecha: string; hora: string; nombre: string; empresa: string | null; tipo: string; asesor: string; estado: string }[];
 }
 
+/** El PDF o el XML de un comprobante como archivo (con la sesión): el nombre viene de Content-Disposition. */
+async function archivo(ruta: string, formato: 'pdf' | 'xml'): Promise<{ archivo: Blob; nombre: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`/api/v1${ruta}`, { credentials: 'same-origin' });
+  } catch {
+    throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+  }
+  if (!res.ok) {
+    const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string };
+    throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'No se pudo descargar el archivo');
+  }
+  const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `comprobante.${formato}`;
+  return { archivo: await res.blob(), nombre };
+}
+
 export const api = {
   yo: () => pedir<Usuario>('/yo'),
   ingresar: (email: string, clave: string) => pedir<{ usuario: Usuario; expira: string }>('/auth/ingresar', json({ email, clave })),
@@ -1054,20 +1083,12 @@ export const api = {
   comprobantes: (estado?: EstadoComprobante) => pedir<{ comprobantes: ComprobanteVenta[] }>(`/ventas/comprobantes${estado ? `?estado=${estado}` : ''}`),
   reenviarComprobante: (id: string, r: ReceptorComprobante) => pedir<ComprobanteVenta>(`/ventas/comprobantes/${id}/reenviar`, json(r)),
   /** El PDF o el XML como archivo (con la sesión): el nombre viene de Content-Disposition. */
-  archivoComprobante: async (id: string, formato: 'pdf' | 'xml'): Promise<{ archivo: Blob; nombre: string }> => {
-    let res: Response;
-    try {
-      res = await fetch(`/api/v1/ventas/comprobantes/${id}/${formato}`, { credentials: 'same-origin' });
-    } catch {
-      throw new ErrorApi(0, 'SIN_CONEXION', 'No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
-    }
-    if (!res.ok) {
-      const cuerpo = (await res.json().catch(() => ({}))) as { codigo?: string; mensaje?: string };
-      throw new ErrorApi(res.status, cuerpo.codigo ?? 'ERROR', cuerpo.mensaje ?? 'No se pudo descargar el archivo');
-    }
-    const nombre = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `comprobante.${formato}`;
-    return { archivo: await res.blob(), nombre };
-  },
+  archivoComprobante: (id: string, formato: 'pdf' | 'xml') => archivo(`/ventas/comprobantes/${id}/${formato}`, formato),
+  // HU-1711 · Facturación de la organización (PNT-40), solo el administrador.
+  facturacionOrg: () => pedir<FacturacionOrg>('/organizacion/facturacion'),
+  guardarDatosFacturacion: (d: DatosFacturacionEntrada) => pedir<DatosFacturacionOrg>('/organizacion/facturacion/datos', json(d, 'PUT')),
+  cambiarMedioPago: (tarjeta: string) => pedir<MedioPagoOrg>('/organizacion/facturacion/medio-pago', json({ tarjeta })),
+  archivoComprobanteOrg: (id: string, formato: 'pdf' | 'xml') => archivo(`/organizacion/comprobantes/${id}/${formato}`, formato),
   datosFiscales: () => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales'),
   guardarDatosFiscales: (d: DatosFiscalesVenta) => pedir<DatosFiscalesConProveedores>('/ventas/datos-fiscales', json(d, 'PUT')),
   cupones: () => pedir<{ cupones: CuponVenta[] }>('/ventas/cupones'),

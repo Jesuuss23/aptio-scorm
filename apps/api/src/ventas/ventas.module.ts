@@ -12,6 +12,8 @@ import { CuotaController } from './cuotas.controller.js';
 import { CuponesController } from './cupones.controller.js';
 import { CuponesService } from './cupones.service.js';
 import { CuotasService } from './cuotas.service.js';
+import { FacturacionOrgController } from './facturacion-org.controller.js';
+import { FacturacionOrgService } from './facturacion-org.service.js';
 import { IngresosController } from './ingresos.controller.js';
 import { IngresosService } from './ingresos.service.js';
 import { CobrosController, PasarelasController } from './pasarelas.controller.js';
@@ -27,12 +29,13 @@ import { SuscripcionesService } from './suscripciones.service.js';
  * `CuotasService` para descontar al lanzar una generación). HU-1706: cambio de plan con prorrateo y cancelación. HU-1707: comprobantes electrónicos SUNAT, datos fiscales y el
  * webhook del OSE. HU-1708: cobranza, suspensión a solo lectura y Ventas › Suscripciones (exporta `CobranzaService` para la guarda).
  * HU-1709: cupones y convenios en el pago y la pestaña Cupones. HU-1710: panel de ingresos de Ventas › Planes.
+ * HU-1711: portal de facturación de la organización.
  */
 @Module({
   imports: [AuthModule, CaptacionModule],
   controllers: [PlanesController, PlanesPublicoController, CheckoutPublicoController, WebhooksPagoController, PasarelasController, CobrosController, CuotaController, SuscripcionOrgController,
-    ComprobantesController, DatosFiscalesController, WebhooksOseController, CobranzaOrgController, SuscripcionesVentasController, CuponesController, IngresosController],
-  providers: [PlanesService, SuscripcionesService, PasarelasService, CobrosService, CuotasService, CambioPlanService, ComprobantesService, AlmacenService, CobranzaService, CuponesService, IngresosService],
+    ComprobantesController, DatosFiscalesController, WebhooksOseController, CobranzaOrgController, SuscripcionesVentasController, CuponesController, IngresosController, FacturacionOrgController],
+  providers: [PlanesService, SuscripcionesService, PasarelasService, CobrosService, CuotasService, CambioPlanService, ComprobantesService, AlmacenService, CobranzaService, CuponesService, IngresosService, FacturacionOrgService],
   exports: [CuotasService, CobranzaService],
 })
 export class VentasModule {}

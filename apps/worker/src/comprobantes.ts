@@ -128,9 +128,18 @@ export function descripcionDe(c: CobroCompleto): string {
   return 'Servicio de Aptio SCORM';
 }
 
-/** El receptor: la solicitud del cobro o la de la suscripción de su organización; sin solicitud, la organización. */
+/**
+ * El receptor. HU-1711: primero los datos de facturación que el administrador editó en el portal (SUP-318); si no los
+ * hay, la solicitud del cobro o la de la suscripción de su organización; sin solicitud, la organización. Solo cuenta al
+ * crear el comprobante: los ya emitidos guardan sus datos.
+ */
 async function receptorDe(bd: PrismaClient, c: CobroCompleto) {
   const organizacionId = c.suscripcion?.organizacionId ?? c.compraCapsulas?.organizacionId ?? c.cambioPlan?.organizacionId ?? c.renovacion?.organizacionId ?? c.solicitud?.organizacionId ?? null;
+  const editados = organizacionId ? await bd.datosFacturacionOrg.findUnique({ where: { organizacionId } }) : null;
+  if (editados) {
+    const tipo: 'FACTURA' | 'BOLETA' = editados.tipoComprobantePreferido === 'FACTURA' ? tipoPara(editados.ruc) : 'BOLETA';
+    return { organizacionId, tipo, ruc: tipo === 'FACTURA' ? editados.ruc : null, razonSocial: editados.razonSocial, direccion: editados.direccion, correo: editados.correoFacturacion };
+  }
   let sol = c.solicitud ?? c.suscripcion?.solicitud ?? null;
   if (!sol && organizacionId) sol = (await bd.suscripcion.findUnique({ where: { organizacionId }, include: { solicitud: true } }))?.solicitud ?? null;
   const org = organizacionId ? await bd.organizacion.findUnique({ where: { id: organizacionId } }) : null;
@@ -142,6 +151,7 @@ async function receptorDe(bd: PrismaClient, c: CobroCompleto) {
     organizacionId, tipo,
     ruc: tipo === 'FACTURA' ? ruc : null,
     razonSocial: sol?.razonSocial ?? org?.nombre ?? 'Cliente',
+    direccion: null as string | null,
     correo: sol?.correoAdmin ?? admin?.email ?? '',
   };
 }
@@ -173,7 +183,7 @@ async function crearComprobante(bd: PrismaClient, c: CobroCompleto, tipo: TipoCo
   } else {
     const r = await receptorDe(bd, c);
     if (r.tipo !== tipo) throw new Error(`El cobro ${c.id} emite ${r.tipo}, no ${tipo}`);
-    base = { organizacionId: r.organizacionId, ruc: r.ruc, razonSocial: r.razonSocial, direccion: null, correoFacturacion: r.correo, total: Number(c.monto), moneda: c.moneda, referenciaId: null };
+    base = { organizacionId: r.organizacionId, ruc: r.ruc, razonSocial: r.razonSocial, direccion: r.direccion, correoFacturacion: r.correo, total: Number(c.monto), moneda: c.moneda, referenciaId: null };
   }
   const d = desglosar(base.total);
   const detraccion = detraccionDe(tipo, base.moneda as 'PEN' | 'USD', d.total, { activa: fiscales.detraccionActiva, tasa: Number(fiscales.detraccionTasa), umbralPen: Number(fiscales.detraccionUmbralPen) });
