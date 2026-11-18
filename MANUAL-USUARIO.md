@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual de usuario
 
-**Versión 0.89 · actualizado con la revisión de seguridad para la nube (18 de noviembre de 2026)**
+**Versión 0.90 · actualizado con el borrado de documentos al entregar (18 de noviembre de 2026)**
 
 Este manual explica cómo usar Aptio SCORM paso a paso. Está pensado para el equipo que produce las cápsulas y para el cliente que las revisa. No hace falta saber de programación: aquí solo se explica qué hacer en cada pantalla y qué esperar.
 
@@ -419,6 +419,8 @@ Desde el proyecto, **Exportar SCORM** abre **Entrega**. Primero eliges el **form
 - **Avance y reanudación** (si caben en lo que guarda el LMS), **archivos que faltan** (el paquete muestra su texto alternativo) y **esquema del curso**. Si el curso no cumple el esquema, el botón Exportar queda deshabilitado y ves qué corregir.
 
 Cada línea muestra ✓ si está bien o ! si conviene revisarla. Al exportar, el historial muestra el avance hasta **Listo** y el botón **Descargar**. Más abajo está la tarjeta del **kit de gamificación** para el LMS del cliente (ver 8.27).
+
+**Entrega al cliente.** Cuando el cliente ya recibió el paquete, pulsa **Marcar como entregado** en esa tarjeta y confirma. Se puede con el proyecto en revisión y al menos un paquete exportado (el kit de gamificación no cuenta); si falta algo, el botón queda deshabilitado y te dice qué hacer. Al marcarlo, el proyecto pasa a **Entregado** y ves la fecha en que se borrarán los documentos que subió el cliente, según sus días de retención. El curso, las ilustraciones, las voces y los paquetes se conservan. Lo hacen administración, diseño instruccional y producción; el revisor del cliente no ve esta tarjeta.
 
 ### 8.10 Modo diagnóstico del paquete (para el soporte)
 
@@ -1258,7 +1260,7 @@ Escribe el tema en «O escribe solo el tema» y pulsa **Agregar tema**. La IA pa
 No. Todo lo que hace la IA es una propuesta que el equipo revisa y aprueba.
 
 **¿Se guardan para siempre los documentos del cliente?**
-No. Se borran solos después de la entrega, según los días de retención del cliente.
+No. Se borran solos después de la entrega, según los días de retención del cliente. La cuenta empieza cuando alguien del equipo pulsa **Marcar como entregado** en Entrega (8.9).
 
 **¿Lo que veo en la vista previa es lo que recibirá el cliente?**
 Sí. La vista previa y el paquete usan el mismo reproductor, así que las pantallas se ven iguales.
@@ -1334,6 +1336,7 @@ Estas funciones se agregarán en las próximas entregas y este manual se actuali
 | 0.55 | 2026-11-13 | Editor de página (8.28): agregar bloques (entran ocultos), mostrar u ocultar sin perder sus datos, cambiar el orden con flechas y borrar con confirmación. |
 | 0.56 | 2026-11-13 | Contenido del sitio (8.28): siete pestañas (cifras, testimonios, logos, funcionalidades, pasos, LMS y preguntas) para agregar, editar, mostrar u ocultar en todas las páginas, ordenar y borrar. |
 | 0.57 | 2026-11-13 | Datos ficticios (8.28): la casilla «Ficticio», el contador, el bloqueo al publicar en producción con «Ocultar todos los ficticios» y el aviso en pruebas. |
+| 0.90 | 2026-11-18 | Entrega (8.9): «Marcar como entregado» cierra el proyecto y muestra cuándo se borran los documentos del cliente. |
 | 0.89 | 2026-11-18 | Seguridad (3.2): el aviso «Demasiadas solicitudes» al ingresar y cerrar sesión cierra también los demás dispositivos. |
 | 0.88 | 2026-11-18 | Facturación real con Mifact (8.40, 8.44 y 8.50): DNI en boletas desde S/ 700, botón CDR, observado con Mifact, consulta cada 10 minutos y los datos fiscales nuevos (ubigeo, anexo, cuenta y código de detracción). |
 | 0.87 | 2026-11-18 | Verificación en dos pasos del superadmin (3.3.1): activarla con el QR, ingresar con el código y usar los códigos de recuperación. |

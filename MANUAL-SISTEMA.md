@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.89 · actualizado con la revisión de seguridad para la nube (18 de noviembre de 2026)**
+**Versión 0.90 · actualizado con el borrado de documentos al entregar (18 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -710,7 +710,7 @@ El documento del curso es un JSON que valida contra `packages/schema/esquemas/cu
 | **Roles y alcance** | Una guarda global por rol. Toda consulta se limita a la organización de la sesión, y el revisor del cliente, a su cliente. |
 | **Superadmin de plataforma (ADR-011, HU-1501)** | Rol `SUPERADMIN` sin organización. Es el único que entra a `/api/v1/sitio/*` (403 al administrador de cada organización y al resto, CP-109) y ve el grupo «Sitio web» en la web; no ve las vistas de una organización. Además de la clave o de Google, necesita el código de su aplicación autenticadora o un código de recuperación (HU-1515, 3.44). |
 | **Archivos** | Cifrados con KMS y bucket no público. Solo se accede con URLs firmadas de 15 minutos. El tipo real se verifica por contenido (un .exe renombrado se rechaza) y el SVG se sanea con una lista cerrada. |
-| **Retención** | Los documentos del cliente se borran a la fecha de entrega más los días de retención del cliente (180 por defecto). El worker los borra cada día a las 3:00 (Lima), incluido el texto extraído y las transcripciones, y lo registra en auditoría. |
+| **Retención** | Los documentos del cliente se borran a la fecha de entrega más los días de retención del cliente (180 por defecto). La fecha se fija al marcar el proyecto como entregado (`POST /proyectos/{proyectoId}/entregar`, solo desde REVISION y con un paquete exportado), en la misma transacción que el cambio de estado y la auditoría `PROYECTO_ENTREGADO`. El worker los borra cada día a las 3:00 (Lima), incluido el texto extraído y las transcripciones, y lo registra en auditoría. |
 | **Inyección en la IA** | El material del cliente va escapado y delimitado en `<material_cliente>`. Lo que parece una orden se marca y nunca se obedece (HU-1402). |
 | **Secretos** | En local, variables de entorno. En la nube, solo en Secrets Manager y cifrados con KMS; ECS los entrega a cada tarea al arrancar (3.43). Ninguna clave real va al repositorio, y GitHub despliega con OIDC, sin llaves de AWS. |
 | **Entrada en la nube** | Solo HTTPS hacia el visitante (TLS 1.2 como mínimo, HSTS de un año). El balanceador solo acepta a CloudFront, y la API toma la IP real del visitante para sus límites (`TRUST_PROXY`, SUP-336). En producción CloudFront llega al balanceador solo por HTTPS (`dominioOrigen` y `certificadoAlbArn` obligatorios). |
@@ -832,6 +832,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.90 | 2026-11-18 | Retención: el borrado de documentos se programa al marcar el proyecto como entregado, con auditoría PROYECTO_ENTREGADO (SUP-358). |
 | 0.89 | 2026-11-18 | Seguridad (5): sesión revocada al salir, límites por IP y AWS WAF, CSP de la web, HTTPS obligatorio hasta el balanceador en producción, documentación de la API cerrada en producción, semilla segura y dependencias. |
 | 0.88 | 2026-11-18 | Facturación electrónica con Mifact (3.45): emisión real, estados de SUNAT, consulta cada 10 minutos, PDF, XML y CDR en S3, DNI en boletas y `MIFACT_TOKEN` solo en el worker. |
 | 0.87 | 2026-11-18 | Segundo factor del superadmin (3.44): flujo de desafío, TOTP, códigos de recuperación, cifrado, restablecimiento por consola y secreto generado en la nube. |
