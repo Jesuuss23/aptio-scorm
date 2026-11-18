@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del programador
 
-**Versión 0.85 · actualizado con el entorno de pruebas en la nube, la historia 110 de 110 (18 de noviembre de 2026)**
+**Versión 0.86 · actualizado con la lista de llaves para producción (18 de noviembre de 2026)**
 
 Guía para quien desarrolla y mantiene Aptio SCORM: cómo preparar el entorno, cómo está organizado el código, qué patrones son obligatorios y cómo agregar funciones sin romper lo existente. La visión de conjunto (componentes, flujos, seguridad y operación) está en [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md). Las reglas del proyecto y las decisiones tomadas están en [`CLAUDE.md`](CLAUDE.md), y el estado vivo, en [`docs/ESTADO.md`](docs/ESTADO.md).
 
@@ -501,7 +501,7 @@ En el reproductor, `packages/player/src/boca.ts` reúne `bocaEn`, `mostrarBoca`,
 - `pnpm --filter @aptio/infra test` corre las pruebas de la plantilla con `aws-cdk-lib/assertions` (HTTPS, buckets privados con KMS, cero secretos en las tareas, comportamientos de CloudFront, tamaño y OIDC). Entran en `pnpm test` y `pnpm typecheck` del CI.
 - `pnpm --filter @aptio/infra exec cdk synth` arma las plantillas; necesita credenciales de la cuenta para resolver la lista de prefijos de CloudFront y las zonas.
 - Parámetros por contexto (`-c` o `infra/cdk.json`): `entorno`, `etiquetaImagen`, `dominio` con `certificadoCloudFrontArn` (us-east-1), `dominioOrigen` con `certificadoAlbArn` (sa-east-1), `modoProveedores`, `replicas`, `repositorioGithub` y `proteccionBorrado`.
-- Una variable nueva de la app que sea secreta se agrega a `LLAVES_APLICACION` (`infra/src/config.ts`); una que no lo sea, a `entornoComun` (`infra/src/entorno.ts`). Las pruebas fallan si una variable de entorno de las tareas parece un secreto.
+- Una variable nueva de la app que sea secreta se agrega a `llavesAplicacion` (`infra/src/config.ts`, que arma la lista según el entorno) y a `apiskey.md`; una que no lo sea, a `entornoComun` (`infra/src/entorno.ts`). Las pruebas fallan si una variable de entorno de las tareas parece un secreto.
 - Las imágenes se construyen desde la raíz: `docker build -f docker/worker.Dockerfile -t aptio-worker .` y la web como archivos con `docker build -f docker/web.Dockerfile --target exportar --output type=local,dest=web-dist .`.
 
 Para que un PR en rojo no se pueda fusionar, el administrador del repositorio debe exigir esos controles en la protección de `main` (desde HU-1405, también los tres de imágenes).
@@ -595,6 +595,7 @@ Ninguna clave real va al repositorio.
 | 0.55 | 2026-11-13 | HU-1503: `SitioBloque` y la migración `20261113100000_sitio_bloques`, `@aptio/schema/sitio-bloques`, `BloquesService` y `BloquesController`, los `bloques` de `GET /publico/paginas`, `EditorPaginaSitio.tsx` con la ruta `/sitio/paginas/{id}` (`sub: 'editor-pagina'`) y `bloquesSitio` en la API simulada. |
 | 0.56 | 2026-11-13 | HU-1504: `SitioElemento` y la migración `20261113110000_sitio_elementos`, `@aptio/schema/sitio-contenido`, `ElementosService` y `ElementosController`, los `elementos` por bloque en `GET /publico/paginas`, `SitioContenido.tsx` (`/sitio/contenido`) y `elementosSitio` en la API simulada. |
 | 0.57 | 2026-11-13 | HU-1505: `ficticio` en `SitioElemento` (migración `20261113120000_sitio_ficticios`), la variable `SITIO_ENTORNO`, `@aptio/schema/sitio-ficticios`, `FicticiosController`, el 409 en `SitioService`, el bloqueo en `publicarProgramadas` y la casilla, el contador y el bloqueo en `SitioContenido.tsx` y `SitioPaginas.tsx`. |
+| 0.86 | 2026-11-18 | `apiskey.md` (llaves externas para producción) y `llavesAplicacion(entorno)` en `infra/`, con el contexto `correoRemitente`. |
 | 0.85 | 2026-11-18 | HU-1405: `docker/` (imágenes de la API, el worker y la web, punto de entrada), `infra/` (`@aptio/infra` con CDK y sus pruebas), el workflow «Despliegue a pruebas» con OIDC y `infra/scripts/migrar.sh`, el job de imágenes del CI y las variables `REDIS_TLS`, `REDIS_PASSWORD`, `DB_*` y `TRUST_PROXY`. |
 | 0.84 | 2026-11-17 | HU-1711: migración `DatosFacturacionOrg`, `@aptio/schema/facturacion-org`, el receptor del worker, `FacturacionOrgService` y `FacturacionOrgController` (`/organizacion/facturacion` y descargas), `FacturacionOrg.tsx` en `/facturacion` y la simulación `facturacion-org-simulada.ts`. |
 | 0.83 | 2026-11-17 | HU-1710: `@aptio/schema/ingresos`, `IngresosService` e `IngresosController` (`GET /ventas/ingresos`), `VentasIngresos.tsx` en Ventas › Planes y la simulación `ingresos-simulados.ts`. |

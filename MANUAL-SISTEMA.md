@@ -1,6 +1,6 @@
 # Aptio SCORM · Manual del sistema
 
-**Versión 0.85 · actualizado con el entorno de pruebas en la nube, la historia 110 de 110 (18 de noviembre de 2026)**
+**Versión 0.86 · actualizado con la lista de llaves para producción (18 de noviembre de 2026)**
 
 Describe cómo está construido y cómo funciona Aptio SCORM en conjunto: sus componentes, cómo viajan los datos, la seguridad, los proveedores externos, la configuración y la operación. Está pensado para el ingeniero a cargo, el área de infraestructura y quien audite el sistema. El detalle de código está en [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md), y el uso de las pantallas, en [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md).
 
@@ -653,6 +653,7 @@ Los comentarios son por pantalla (`Comentario` con `cursoId` y `pantallaId`, ín
 - **Secretos:** solo en Secrets Manager (`aptio-pruebas-postgres`, `-redis`, `-aplicacion` y `-origen-cloudfront`). Las tareas los reciben al arrancar; ninguna variable de las tareas ni del repositorio lleva un valor secreto. Las llaves de proveedores se cargan en `aptio-pruebas-aplicacion` (SUP-338).
 - **Despliegue continuo:** tras cada CI exitoso de `main`, el workflow «Despliegue a pruebas» entra con OIDC, publica las imágenes en ECR, migra la base con una tarea efímera (`migrate deploy` y `verificar-organizaciones`), actualiza los servicios (vuelven atrás solos si no quedan sanos), sube la web y comprueba `/api/v1/salud` por HTTPS (SUP-337). Producción queda fuera.
 - **Modo de pruebas:** proveedores simulados hasta cargar las llaves y `SITIO_ENTORNO=pruebas` (aviso de datos ficticios, pasarela de pruebas y OSE simulado).
+- **Producción:** la misma infraestructura con el entorno `produccion`, desplegada a mano. Su secreto trae las llaves `*_PRODUCCION` de las pasarelas y no las de pruebas (SUP-343). La lista de llaves externas, dónde se obtienen y qué hace cada una está en `apiskey.md`. No emite comprobantes válidos ante SUNAT hasta integrar un OSE real (DA-09).
 
 ## 4. Datos
 
@@ -806,6 +807,7 @@ Registrados en `docs/ESTADO.md` (SUP-##). Los que más afectan al sistema hoy:
 | 0.55 | 2026-11-13 | Bloques de las páginas del sitio (3.13): la tabla `SitioBloque`, el catálogo cerrado, las rutas de bloques y los bloques visibles en `GET /publico/paginas`. |
 | 0.56 | 2026-11-13 | Contenido administrable (3.14): la tabla `SitioElemento`, las 7 colecciones con texto plano, las rutas `/sitio/elementos` y los elementos visibles por bloque en `GET /publico/paginas`. |
 | 0.57 | 2026-11-13 | Datos ficticios (3.15): `SITIO_ENTORNO`, el 409 FICTICIOS_VISIBLES en producción, el aviso en pruebas, «ocultar todos», las programadas bloqueadas y la segunda defensa del sitio público. |
+| 0.86 | 2026-11-18 | Producción (3.43): llaves por entorno, `apiskey.md` con cada llave externa y el aviso de lo que falta (OSE real, segundo factor del superadmin). |
 | 0.85 | 2026-11-18 | Entorno de pruebas en la nube (3.43): AWS en sa-east-1 con CloudFront, ECS Fargate, RDS, ElastiCache, buckets con KMS y Secrets Manager; imágenes Docker, despliegue continuo con OIDC y la guía de puesta en marcha. Seguridad y configuración al día. Falta el primer despliegue en la cuenta real. |
 | 0.84 | 2026-11-17 | Portal de facturación de la organización (3.42): datos de facturación por organización para los comprobantes nuevos, descarga aislada del PDF y el XML, cambio de la tarjeta de prueba y la vista «Facturación» del administrador. |
 | 0.83 | 2026-11-17 | Panel de ingresos (3.41): MRR neto por moneda con el ingreso en riesgo, activas, cancelación mensual con su variación y ARPU por mes de Lima, en `GET /ventas/ingresos` y arriba de Ventas › Planes. |
