@@ -22,7 +22,7 @@
     "@aptio/respaldo": "workspace:*",
     "@aptio/schema": "workspace:*",
     "@aptio/sitio": "workspace:*",
-    "@napi-rs/canvas": "^0.1.100",
+    "@napi-rs/canvas": "^1.1.1",
     "@resvg/resvg-js": "^2.6.2",
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/spa": "^1.0.0",
@@ -33,7 +33,7 @@
     "jszip": "^3.10.2",
     "nodemailer": "^10.4.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^5.7.284",
+    "pdfjs-dist": "^6.5.438",
     "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
@@ -41,6 +41,6 @@
     "@types/nodemailer": "^8.0.2",
     "tsx": "^4.23.15",
     "typescript": "~5.9.3",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.12"
   }
 }

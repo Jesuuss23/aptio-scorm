@@ -31,10 +31,10 @@ Las credenciales viven solo en Secrets Manager:
 pnpm install
 export AWS_PROFILE=<perfil-de-la-cuenta>
 export CDK_DEFAULT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-pnpm --filter @aptio/infra exec cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/sa-east-1
+pnpm --filter @aptio/infra exec cdk bootstrap aws://$CDK_DEFAULT_ACCOUNT/sa-east-1 aws://$CDK_DEFAULT_ACCOUNT/us-east-1
 ```
 
-Crea los roles `cdk-*` y el bucket de recursos de CDK. Si se usará un dominio propio, el certificado de CloudFront va en us-east-1 (paso 7), pero no hace falta bootstrap allí.
+Crea los roles `cdk-*` y el bucket de recursos de CDK en las dos regiones. **us-east-1 hace falta** porque la Web ACL de AWS WAF que protege CloudFront solo puede vivir allí: va en su propia pila, `AptioWaf-<entorno>`, que `cdk deploy Aptio<Entorno>` despliega primero por su cuenta (la del entorno la toma por referencia entre regiones). El certificado de CloudFront de un dominio propio también va en us-east-1 (paso 7).
 
 ## 2. Crear la pila base (ECR y rol de GitHub con OIDC)
 
@@ -88,7 +88,7 @@ Luego se cambia el modo a real con un despliegue que lleve `-c modoProveedores=r
 
 ## 6. Crear el primer usuario y verificar CP-105
 
-1. Sembrar los datos iniciales con una tarea efímera sobre la imagen de la API (comando `pnpm db:seed`, con `SEED_CLAVE` definida solo en esa ejecución) o invitar al primer administrador según `MANUAL-SISTEMA.md`.
+1. Sembrar los datos iniciales con una tarea efímera sobre la imagen de la API (comando `pnpm db:seed`, con `SEED_CLAVE` definida solo en esa ejecución) o invitar al primer administrador según `MANUAL-SISTEMA.md`. En la nube la semilla corre con `NODE_ENV=production` y por eso **exige `SEED_CLAVE` de al menos 16 caracteres** (distinta de la de desarrollo), **solo corre sobre una base vacía** (no borra nada) y no escribe la clave en el registro. Genera la clave con `openssl rand -base64 24`, entra enseguida como superadmin para configurar su segundo factor y cambia las claves de los usuarios de ejemplo.
 2. Completar CP-105 en el entorno, y anotar el resultado en `docs/ESTADO.md`:
    - `GET https://<UrlWeb>/api/v1/salud` responde 200 con `baseDatos: ok`.
    - `http://<UrlWeb>/` responde 301 hacia HTTPS.
@@ -106,7 +106,7 @@ Sin dominio, el entorno usa la URL HTTPS de CloudFront. Para un dominio como `pr
    `dominio`, `certificadoCloudFrontArn`, `dominioOrigen` y `certificadoAlbArn`.
 3. En el DNS: `pruebas.aptioscorm.pe` como CNAME (o alias de Route 53) de la distribución, y `origen-pruebas.aptioscorm.pe` como CNAME del balanceador.
 
-Con el certificado del balanceador, CloudFront llega a él solo por HTTPS (TLS 1.2) y el puerto 80 deja de existir. Sin él, el tramo CloudFront → balanceador va por HTTP dentro de la red de AWS, y el balanceador solo acepta la lista de prefijos `com.amazonaws.global.cloudfront.origin-facing` con la cabecera secreta; cualquier otra petición recibe 403.
+Con el certificado del balanceador, CloudFront llega a él solo por HTTPS (TLS 1.2) y el puerto 80 deja de existir. **En producción es obligatorio**: sin `dominioOrigen` y `certificadoAlbArn`, el despliegue de `produccion` se detiene, para que las cookies de sesión y la cabecera secreta nunca viajen sin cifrar. En pruebas es opcional: sin él, el tramo CloudFront → balanceador va por HTTP dentro de la red de AWS, y el balanceador solo acepta la lista de prefijos `com.amazonaws.global.cloudfront.origin-facing` con la cabecera secreta; cualquier otra petición recibe 403.
 
 ## Caché y cabeceras de CloudFront
 
@@ -117,7 +117,29 @@ Con el certificado del balanceador, CloudFront llega a él solo por HTTPS (TLS 1
 | `/api/*` | Balanceador | Sin caché | Todos los métodos, cookies, consulta y cabeceras del visitante (salvo `Host`). Incluye `/api/v1/publico/leads` y `/api/v1/publico/citas*` (SUP-250, SUP-255). |
 | `/s` y `/s/*` | Balanceador | La decide el origen con `Cache-Control` (SUP-197) | Sin cookies ni consulta (SUP-238). Deja pasar `POST /s/_lead`, `_popup`, `_cita` y `_visita` (SUP-238, SUP-250, SUP-255, SUP-274). |
 
-Todas las respuestas llevan HSTS de un año y `X-Content-Type-Options: nosniff`. En `/s/*` CloudFront no agrega ni reemplaza la CSP: la arma cada versión del sitio (SUP-266).
+Todas las respuestas llevan HSTS de un año y `X-Content-Type-Options: nosniff`. En `/s/*` CloudFront no agrega ni reemplaza la CSP: la arma cada versión del sitio (SUP-266). La web y la API llevan la CSP `CSP_WEB` de `infra/src/entorno.ts`: sin scripts en línea ni `eval`, scripts solo propios y de Culqi Checkout, imágenes, audio y subidas solo hacia S3, sin marcos ajenos salvo Culqi y sin ser incrustada por otros sitios. Si se agrega un servicio externo en la web, hay que sumarlo ahí.
+
+## AWS WAF
+
+La pila `AptioWaf-<entorno>` (us-east-1) crea la Web ACL `aptio-<entorno>-waf` asociada a la distribución:
+
+| Regla | Qué hace |
+| --- | --- |
+| `AWSManagedRulesAmazonIpReputationList` | Bloquea IP conocidas por bots y ataques (lista de AWS). |
+| `AWSManagedRulesKnownBadInputsRuleSet` | Bloquea entradas maliciosas conocidas (por ejemplo, Log4Shell). |
+| `LimiteIngreso` | Más de 100 peticiones en 5 minutos de una IP a `/api/v1/auth/`: bloqueada hasta que baje. |
+| `LimiteGlobal` | Más de 3000 peticiones en 5 minutos de una IP a cualquier ruta: bloqueada hasta que baje. |
+
+No se usa el conjunto común de AWS (`AWSManagedRulesCommonRuleSet`) porque corta los cuerpos de más de 8 KB y rompería el guardado de los cursos. La API suma su propio límite por IP: 20 intentos de ingreso por minuto (`LIMITE_INGRESO_POR_MINUTO`) y 60 por minuto en `/api/v1/publico/*` y en los formularios del sitio. Las métricas y las peticiones bloqueadas se ven en la consola de WAF (us-east-1). Costo aproximado: US$ 5 por la Web ACL, US$ 1 por regla al mes y US$ 0,60 por millón de peticiones; se confirma en la factura.
+
+## Antes de producción
+
+- MFA en la cuenta raíz de AWS y en cada usuario de IAM; la cuenta raíz no se usa para el día a día.
+- GuardDuty y CloudTrail activos en sa-east-1 y us-east-1.
+- Solo administradores pueden leer Secrets Manager y las plantillas de CloudFormation (`cloudformation:GetTemplate`): el token de Redis y la cabecera secreta del origen quedan en la plantilla de la pila.
+- El entorno `produccion` de GitHub con aprobación manual.
+- Rotar toda llave de proveedor que se haya compartido por chat o correo.
+- El entorno de pruebas es público y usa la pasarela y el OSE simulados: solo con datos ficticios.
 
 ## Costos y tamaño
 

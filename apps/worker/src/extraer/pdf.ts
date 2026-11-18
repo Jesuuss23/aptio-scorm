@@ -7,7 +7,9 @@ import type { Ocr, Pagina } from './tipos.js';
 export const MIN_CARACTERES_TEXTO = 25;
 
 export async function extraerPdf(bytes: Uint8Array, ocr: Ocr, alAvanzar?: (hechas: number, total: number) => Promise<void> | void): Promise<Pagina[]> {
-  const doc = await getDocument({ data: new Uint8Array(bytes), disableFontFace: true, useSystemFonts: false, verbosity: 0 }).promise;
+  // pdfjs-dist 6 (GHSA-hq66-cqwq-w95j): el PDF del cliente no es confiable; se libera desde la tarea de carga.
+  const tarea = getDocument({ data: new Uint8Array(bytes), disableFontFace: true, useSystemFonts: false, verbosity: 0 });
+  const doc = await tarea.promise.catch(async (e: unknown) => { await tarea.destroy(); throw e; });
   try {
     const paginas: Pagina[] = [];
     for (let n = 1; n <= doc.numPages; n++) {
@@ -35,6 +37,6 @@ export async function extraerPdf(bytes: Uint8Array, ocr: Ocr, alAvanzar?: (hecha
     }
     return paginas;
   } finally {
-    await doc.destroy();
+    await tarea.destroy();
   }
 }

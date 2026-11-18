@@ -7,21 +7,23 @@ import { fileURLToPath } from 'node:url';
 import { PrismaClient, Rol } from '@prisma/client';
 import { PLANES_DE_EJEMPLO } from '@aptio/schema/planes';
 import { hashearClave } from '../src/clave.js';
+import { permisoSemilla } from '../src/semilla.js';
 
 const prisma = new PrismaClient();
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const caso = (archivo: string) =>
   JSON.parse(readFileSync(join(repo, 'packages/ai/casos/loto/entrada', archivo), 'utf8'));
 
-// Clave de desarrollo para todos los usuarios de ejemplo. No es un secreto real:
-// en la nube los usuarios se crean por invitación (HU-0109).
-const CLAVE = process.env.SEED_CLAVE ?? 'Aptio-local-2026';
 const SLUG_ORG = 'aulas-educativas';
 const CORREO_SUPERADMIN = 'superadmin@aptio.test';
 
 async function main() {
   const kitCaso = caso('kit.json');
   const proyectoCaso = caso('proyecto.json');
+
+  // 0. En producción solo sobre una base vacía y con SEED_CLAVE propia, que no se escribe en el registro (A1).
+  const hayDatos = (await prisma.usuario.count()) + (await prisma.organizacion.count()) > 0;
+  const { clave: CLAVE, avisoClave } = permisoSemilla({ produccion: process.env.NODE_ENV === 'production', clave: process.env.SEED_CLAVE, hayDatos });
 
   // 1. Limpieza de los datos de ejemplo (la organización arrastra todo lo suyo en cascada)
   await prisma.organizacion.deleteMany({ where: { slug: SLUG_ORG } });
@@ -110,7 +112,7 @@ async function main() {
 
   console.log(`Organización: ${org.nombre}`);
   console.log(`Cliente: ${cliente.nombre} (con kit)`);
-  console.log(`Usuarios: ${usuarios.length} de la organización + superadmin · clave de desarrollo: ${CLAVE}`);
+  console.log(`Usuarios: ${usuarios.length} de la organización + superadmin · clave ${avisoClave}`);
   console.log(`Proyecto: ${proyecto.nombre}`);
   console.log(`Planes: ${PLANES_DE_EJEMPLO.map((p) => p.nombre).join(', ')} (ficticios)`);
 }

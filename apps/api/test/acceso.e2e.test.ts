@@ -7,6 +7,7 @@ import { hashearClave, prisma, Rol } from '@aptio/db';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { configurarApp } from '../src/app.js';
+import { LimitePublicoService } from '../src/sitio/limite-publico.js';
 import { AppModule } from '../src/app.module.js';
 import { CorreoService } from '../src/correo/correo.service.js';
 
@@ -111,6 +112,42 @@ describe.skipIf(!hayBase)('acceso (HU-0104, HU-0109)', () => {
       const res = await request(servidor).post('/api/v1/auth/salir').set('Cookie', cookie!);
       expect(res.status).toBe(204);
       expect(res.headers['set-cookie']?.[0]).toMatch(/sesion=;/);
+    });
+
+    it('M2 · salir revoca la cookie: una copia de ella ya no abre la sesión', async () => {
+      const { cookie } = await ingresar(correo('admin'));
+      const otra = await ingresar(correo('admin'));
+      expect((await request(servidor).get('/api/v1/yo').set('Cookie', cookie!)).status).toBe(200);
+      expect((await request(servidor).post('/api/v1/auth/salir').set('Cookie', cookie!)).status).toBe(204);
+      expect((await request(servidor).get('/api/v1/yo').set('Cookie', cookie!)).status).toBe(401);
+      // También las de los demás dispositivos del usuario.
+      expect((await request(servidor).get('/api/v1/yo').set('Cookie', otra.cookie!)).status).toBe(401);
+      expect((await ingresar(correo('admin'))).res.status).toBe(200);
+    });
+  });
+
+  describe('M1 · límite de intentos de ingreso por IP', () => {
+    it('pasado el límite por minuto responde 429 con Retry-After, sin tocar las rutas con sesión', async () => {
+      const limite = app.get(LimitePublicoService);
+      const antes = limite.limiteIngreso;
+      limite.reiniciar();
+      limite.limiteIngreso = 3;
+      try {
+        const { cookie } = await ingresar(correo('productor'));
+        for (let i = 0; i < 2; i++) expect((await ingresar(`nadie-${i}-${sufijo}@prueba.test`, 'x')).res.status).toBe(401);
+        const r = await request(servidor).post('/api/v1/auth/ingresar').send({ email: correo('admin'), clave: CLAVE });
+        expect(r.status).toBe(429);
+        expect(r.body.codigo).toBe('DEMASIADAS_SOLICITUDES');
+        expect(Number(r.headers['retry-after'])).toBeGreaterThan(0);
+        // «Olvidé mi clave» y el segundo factor cuentan en el mismo grupo.
+        expect((await request(servidor).post('/api/v1/auth/clave/olvido').send({ email: correo('admin') })).status).toBe(429);
+        expect((await request(servidor).post('/api/v1/auth/segundo-factor').send({ codigo: '000000' })).status).toBe(429);
+        // La sesión abierta sigue funcionando.
+        expect((await request(servidor).get('/api/v1/yo').set('Cookie', cookie!)).status).toBe(200);
+      } finally {
+        limite.limiteIngreso = antes;
+        limite.reiniciar();
+      }
     });
   });
 

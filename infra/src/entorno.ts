@@ -22,7 +22,30 @@ import { type ConfigEntorno, LLAVES_SOLO_WORKER, llavesAplicacion, nombreBucket 
 
 export interface EntornoProps extends StackProps {
   config: ConfigEntorno;
+  /** La Web ACL de AWS WAF (pila `AptioWaf-<entorno>` en us-east-1) que protege la distribución. */
+  webAclArn?: string;
 }
+
+/**
+ * Revisión de seguridad para la nube (M3) · CSP de la aplicación web y de las respuestas de la API. Sin scripts en
+ * línea ni `eval`: solo el paquete de Vite y Culqi Checkout (los mismos orígenes que `CSP_CULQI` de `@aptio/sitio`).
+ * Las imágenes, el audio y las subidas van con URL firmadas de S3; los estilos en línea los usan los SVG del kit.
+ */
+export const CSP_WEB = [
+  "default-src 'self'",
+  "script-src 'self' https://checkout.culqi.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https://*.amazonaws.com",
+  "media-src 'self' blob: https://*.amazonaws.com",
+  "font-src 'self' data:",
+  "connect-src 'self' https://*.amazonaws.com https://secure.culqi.com https://api.culqi.com",
+  "frame-src https://checkout.culqi.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+].join('; ');
 
 /** Cabecera que CloudFront agrega hacia el balanceador; sin ella (o con otro valor) el balanceador responde 403. */
 export const CABECERA_ORIGEN = 'X-Origen-Aptio';
@@ -225,6 +248,7 @@ export class EntornoStack extends Stack {
         contentTypeOptions: { override: true },
         referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
         frameOptions: { frameOption: cloudfront.HeadersFrameOption.SAMEORIGIN, override: false },
+        contentSecurityPolicy: { contentSecurityPolicy: CSP_WEB, override: true },
       },
     });
 
@@ -290,6 +314,7 @@ export class EntornoStack extends Stack {
       defaultRootObject: 'index.html',
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
+      ...(props.webAclArn ? { webAclId: props.webAclArn } : {}),
       priceClass: cloudfront.PriceClass.PRICE_CLASS_ALL,
       ...(dominioPropio
         ? { domainNames: [c.dominio!], certificate: acm.Certificate.fromCertificateArn(this, 'CertificadoWeb', c.certificadoCloudFrontArn!) }

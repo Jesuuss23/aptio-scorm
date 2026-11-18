@@ -3409,6 +3409,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
       security: []
   /auth/salir:
     post:
@@ -3416,6 +3418,7 @@ paths:
       - Acceso
       summary: Cerrar sesión
       operationId: post_auth_salir
+      description: Borra la cookie y sube la versión de sesión del usuario, así que esa cookie (y las de sus otros dispositivos) deja de valer aunque alguien la hubiera copiado.
       responses:
         '204':
           description: Sin contenido
@@ -3528,6 +3531,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
       security:
       - cookieSegundoFactor: []
   /auth/segundo-factor/configurar:
@@ -3555,6 +3560,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
       security:
       - cookieSegundoFactor: []
   /auth/segundo-factor/confirmar:
@@ -3593,6 +3600,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
       security:
       - cookieSegundoFactor: []
   /auth/clave/olvido:
@@ -3613,6 +3622,8 @@ paths:
           description: Sin contenido
         '422':
           $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
       security: []
   /auth/clave/restablecer:
     post:
@@ -3632,6 +3643,8 @@ paths:
           description: Sin contenido
         '422':
           $ref: '#/components/responses/NoValido'
+        '429':
+          $ref: '#/components/responses/DemasiadasSolicitudes'
       security: []
   /yo:
     get:
@@ -8810,7 +8823,7 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
     DemasiadasSolicitudes:
-      description: Más de 60 peticiones por minuto desde la misma IP en `/publico/*` (DEMASIADAS_SOLICITUDES, con Retry-After)
+      description: Más de 60 peticiones por minuto desde la misma IP en `/publico/*` y en los formularios del sitio, o más de 20 intentos de ingreso por minuto en `/auth/*` (DEMASIADAS_SOLICITUDES, con Retry-After)
       headers:
         Retry-After:
           description: Segundos hasta que se abre la siguiente ventana

@@ -6,7 +6,8 @@ import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { BaseStack } from '../src/base';
 import { type ConfigEntorno, leerConfig, llavesAplicacion, MIFACT_URL_DEMO, REGION } from '../src/config';
-import { CABECERA_ORIGEN, EntornoStack } from '../src/entorno';
+import { CABECERA_ORIGEN, CSP_WEB, EntornoStack } from '../src/entorno';
+import { LIMITE_WAF_AUTH, REGION_WAF, WafStack } from '../src/waf';
 
 const CUENTA = '123456789012';
 const env = { account: CUENTA, region: REGION };
@@ -46,8 +47,8 @@ describe('HU-1405 · configuración del entorno', () => {
 
   it('HU-1712 · fuera de producción usa la demo de Mifact; en producción solo con mifactUrl', () => {
     expect(leerConfig(() => undefined).mifactUrl).toBe(MIFACT_URL_DEMO);
-    expect(leerConfig((k) => ({ entorno: 'produccion' })[k]).mifactUrl).toBeUndefined();
-    expect(leerConfig((k) => ({ entorno: 'produccion', mifactUrl: 'https://www.mifact.net.pe/api/invoiceService.svc' })[k]).mifactUrl).toBe('https://www.mifact.net.pe/api/invoiceService.svc');
+    expect(leerConfig((k) => ({ entorno: 'produccion', dominioOrigen: 'origen.aptioscorm.pe', certificadoAlbArn: 'arn:aws:acm:sa-east-1:1:certificate/x' })[k]).mifactUrl).toBeUndefined();
+    expect(leerConfig((k) => ({ entorno: 'produccion', dominioOrigen: 'origen.aptioscorm.pe', certificadoAlbArn: 'arn:aws:acm:sa-east-1:1:certificate/x', mifactUrl: 'https://www.mifact.net.pe/api/invoiceService.svc' })[k]).mifactUrl).toBe('https://www.mifact.net.pe/api/invoiceService.svc');
   });
 });
 
@@ -221,7 +222,7 @@ describe('Producción · llaves del entorno', () => {
   });
 
   it('la pila de producción lleva sitio en producción, sus llaves y el remitente sin secretos en el entorno', () => {
-    const t = plantilla({ entorno: 'produccion', modoProveedores: 'real', correoRemitente: 'Aptio SCORM <no-responder@aptioscorm.pe>' });
+    const t = plantilla({ entorno: 'produccion', dominioOrigen: 'origen.aptioscorm.pe', certificadoAlbArn: 'arn:aws:acm:sa-east-1:1:certificate/x', modoProveedores: 'real', correoRemitente: 'Aptio SCORM <no-responder@aptioscorm.pe>' });
     const api = (recursos(t, 'AWS::ECS::TaskDefinition').flatMap((d) => d.Properties.ContainerDefinitions as any[])).find((c) => c.Name === 'api');
     expect(api.Environment).toEqual(expect.arrayContaining([{ Name: 'SITIO_ENTORNO', Value: 'produccion' }, { Name: 'PROVEEDORES_MODO', Value: 'real' }, { Name: 'CORREO_REMITENTE', Value: 'Aptio SCORM <no-responder@aptioscorm.pe>' }]));
     expect((api.Secrets as any[]).map((s) => s.Name)).toEqual(expect.arrayContaining(['STRIPE_LLAVE_SECRETA_PRODUCCION', 'CULQI_SECRETO_WEBHOOK_PRODUCCION']));
@@ -282,9 +283,11 @@ describe('HU-1405 · comportamientos de CloudFront', () => {
   it('las cabeceras de seguridad del sitio no reemplazan la CSP que arma cada versión (SUP-266)', () => {
     const politicas = recursos(t, 'AWS::CloudFront::ResponseHeadersPolicy');
     expect(politicas).toHaveLength(2);
+    // La del sitio no trae CSP (la pone cada versión); la de la web sí (M3, más abajo).
+    const sitio = politicas.find((p) => p.Properties.ResponseHeadersPolicyConfig.Name.endsWith('cabeceras-sitio'))!;
+    expect(sitio.Properties.ResponseHeadersPolicyConfig.SecurityHeadersConfig.ContentSecurityPolicy).toBeUndefined();
     for (const p of politicas) {
       const seg = p.Properties.ResponseHeadersPolicyConfig.SecurityHeadersConfig;
-      expect(seg.ContentSecurityPolicy).toBeUndefined();
       expect(seg.StrictTransportSecurity).toMatchObject({ AccessControlMaxAgeSec: 31536000, IncludeSubdomains: true });
       expect(seg.ContentTypeOptions).toMatchObject({ Override: true });
     }
@@ -345,5 +348,48 @@ describe('HU-1405 · pila base (ECR y OIDC)', () => {
     });
     t.resourceCountIs('AWS::IAM::AccessKey', 0);
     t.resourceCountIs('AWS::IAM::User', 0);
+  });
+});
+
+describe('Revisión de seguridad para la nube · infraestructura', () => {
+  it('M4 · producción exige HTTPS entre CloudFront y el balanceador', () => {
+    expect(() => leerConfig((k) => ({ entorno: 'produccion' })[k])).toThrow('dominioOrigen y certificadoAlbArn son obligatorios');
+    expect(() => leerConfig((k) => ({ entorno: 'pruebas' })[k])).not.toThrow();
+  });
+
+  it('M3 · la web y la API salen con una CSP sin scripts en línea ni eval', () => {
+    const politicas = recursos(plantilla(), 'AWS::CloudFront::ResponseHeadersPolicy');
+    const web = politicas.find((p) => p.Properties.ResponseHeadersPolicyConfig.Name === 'aptio-pruebas-cabeceras-web')!;
+    const csp = web.Properties.ResponseHeadersPolicyConfig.SecurityHeadersConfig.ContentSecurityPolicy;
+    expect(csp).toEqual({ ContentSecurityPolicy: CSP_WEB, Override: true });
+    const script = CSP_WEB.split('; ').find((d) => d.startsWith('script-src'))!;
+    expect(script).toBe("script-src 'self' https://checkout.culqi.com");
+    expect(CSP_WEB).not.toContain('unsafe-eval');
+    expect(CSP_WEB).toContain("object-src 'none'");
+    expect(CSP_WEB).toContain("frame-ancestors 'self'");
+    // El sitio público conserva la CSP propia de cada versión (SUP-266).
+    const sitio = politicas.find((p) => p.Properties.ResponseHeadersPolicyConfig.Name === 'aptio-pruebas-cabeceras-sitio')!;
+    expect(sitio.Properties.ResponseHeadersPolicyConfig.SecurityHeadersConfig.ContentSecurityPolicy).toBeUndefined();
+  });
+
+  it('M1 · AWS WAF en us-east-1 con reputación de IP, entradas maliciosas y límites por IP, asociado a la distribución', () => {
+    const app = new App();
+    const config = leerConfig((k) => ({ etiquetaImagen: 'abc123' })[k as 'etiquetaImagen']);
+    const waf = new WafStack(app, 'AptioWaf-pruebas', { env: { account: CUENTA, region: REGION_WAF }, config, crossRegionReferences: true });
+    const entorno = new EntornoStack(app, 'AptioPruebas', { env, config, webAclArn: waf.webAclArn, crossRegionReferences: true });
+    const tw = Template.fromStack(waf);
+    const [acl] = recursos(tw, 'AWS::WAFv2::WebACL');
+    expect(acl!.Properties.Scope).toBe('CLOUDFRONT');
+    expect(acl!.Properties.DefaultAction).toEqual({ Allow: {} });
+    const reglas = acl!.Properties.Rules as any[];
+    expect(reglas.map((r) => r.Name)).toEqual(['AWSManagedRulesAmazonIpReputationList', 'AWSManagedRulesKnownBadInputsRuleSet', 'LimiteIngreso', 'LimiteGlobal']);
+    // Sin el conjunto común de AWS: corta cuerpos de más de 8 KB y rompería el guardado de cursos.
+    expect(reglas.some((r) => r.Statement.ManagedRuleGroupStatement?.Name === 'AWSManagedRulesCommonRuleSet')).toBe(false);
+    const ingreso = reglas.find((r) => r.Name === 'LimiteIngreso');
+    expect(ingreso.Action).toEqual({ Block: {} });
+    expect(ingreso.Statement.RateBasedStatement).toMatchObject({ Limit: LIMITE_WAF_AUTH, AggregateKeyType: 'IP', EvaluationWindowSec: 300 });
+    expect(ingreso.Statement.RateBasedStatement.ScopeDownStatement.ByteMatchStatement).toMatchObject({ SearchString: '/api/v1/auth/', PositionalConstraint: 'STARTS_WITH' });
+    const { cfg } = comportamientos(Template.fromStack(entorno));
+    expect(cfg.WebACLId).toBeDefined();
   });
 });
