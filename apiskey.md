@@ -12,7 +12,7 @@ Esto no se arregla con una llave. Conviene saberlo antes de comprar planes o con
 
 | Tema | Estado | Qué falta |
 | --- | --- | --- |
-| **Facturación electrónica SUNAT** | Solo existe el OSE **simulado**, que emite únicamente en el ambiente de pruebas. | Elegir el OSE o PSE real (DA-09) e integrarlo en una historia nueva. Sin eso, en producción **no se emiten comprobantes válidos ante SUNAT**. |
+| **Facturación electrónica SUNAT** | Integrada con **Mifact** (HU-1712): emite facturas, boletas y notas de crédito reales, guarda el PDF oficial, el XML firmado y la constancia de SUNAT (CDR). El OSE simulado sigue solo en pruebas. | Contratar Mifact para el RUC del emisor y cargar su token (`MIFACT_TOKEN`, abajo). Probar primero en su demo desde el entorno de pruebas: desde este contenedor de desarrollo no se pudo llegar a su servidor (SUP-351). Los cobros en dólares quedan pendientes hasta definir el tipo de cambio (SUP-350). |
 | **Segundo factor del superadmin** | Hecho (HU-1515): el superadmin entra con su clave y un código de su aplicación autenticadora. Su clave de cifrado, `TOTP_CLAVE_CIFRADO`, la genera la infraestructura (no hay que cargarla). | En el primer ingreso a producción, el superadmin escanea el QR y guarda sus 10 códigos de recuperación. |
 | **Imágenes con IA** | No hay un proveedor de imágenes conectado (DA-03). Las ilustraciones salen de la biblioteca y del kit. | No hace falta ninguna llave por ahora. |
 | **Pruebas con llaves reales** | Stripe, Culqi, Anthropic, Google, ElevenLabs y los CRM están integrados según su documentación, pero **no se han probado con llaves reales**. | Probarlos primero en el entorno de pruebas con sus llaves de prueba o sandbox. |
@@ -78,7 +78,16 @@ Cada pasarela tiene un juego de llaves de **pruebas** y otro de **producción**.
 
 ### OSE simulado: `OSE_PRUEBAS_SECRETO_WEBHOOK`
 - **Para qué sirve:** solo en el entorno de pruebas. Firma los avisos del OSE simulado. Es una cadena aleatoria que inventas tú.
-- **Producción:** necesita un OSE real (DA-09), que aún no está integrado. Cuando se elija, se sumarán sus llaves a esta lista.
+- **Producción:** no se usa. En producción el único proveedor es Mifact.
+
+### Mifact (PSE/OSE real): `MIFACT_TOKEN`
+- **Dónde:** lo entrega Mifact al contratar el servicio, uno por RUC emisor. Para la demo, Mifact da un token de pruebas asociado al RUC 20100100100.
+- **Va solo en el worker.** La API no lo necesita ni lo recibe: la infraestructura lo pasa únicamente a la tarea del worker, desde `aptio-<entorno>-aplicacion`.
+- **Ojo con el RUC:** el RUC del emisor en Ventas › Facturación › Datos fiscales debe ser **el mismo** RUC del token. Si no coinciden, Mifact rechaza cada comprobante y quedan pendientes con su mensaje.
+- **Vigencia:** Mifact lo renueva cada 6 meses aproximadamente. Cuando cambie, actualízalo en Secrets Manager y fuerza un despliegue nuevo del worker.
+- **`MIFACT_URL` no es secreta:** es la dirección del servicio. En pruebas se usa la demo (`https://demo.mifact.net.pe/api/invoiceService.svc`) por defecto; en producción se pasa al desplegar con `-c mifactUrl=https://…` (la URL de producción que indique Mifact).
+- **Para qué sirve:** el worker envía cada comprobante a Mifact, que lo firma y lo manda a SUNAT. Si SUNAT tarda, el worker consulta su estado cada 10 minutos. Al quedar aceptado, guarda el PDF de Mifact, el XML firmado y el CDR, y los envía por correo al cliente.
+- **Sin ella:** en producción no se emite ningún comprobante válido; los cobros generan comprobantes que quedan pendientes.
 
 ## 5. Correo
 
@@ -114,7 +123,7 @@ El blog lee la API REST pública de WordPress. Solo hay que guardar la URL del s
 
 | Prioridad | Llaves |
 | --- | --- |
-| **Imprescindibles** | `ANTHROPIC_API_KEY`, `GOOGLE_TTS_API_KEY`, `SMTP_URL` (+ `CORREO_REMITENTE`) y al menos una pasarela en modo producción (Stripe o Culqi, con su llave secreta y su secreto de webhook) |
+| **Imprescindibles** | `ANTHROPIC_API_KEY`, `GOOGLE_TTS_API_KEY`, `SMTP_URL` (+ `CORREO_REMITENTE`), `MIFACT_TOKEN` (con `mifactUrl` al desplegar) y al menos una pasarela en modo producción (Stripe o Culqi, con su llave secreta y su secreto de webhook) |
 | **Recomendadas** | `GOOGLE_STT_API_KEY` (audio y video del cliente), `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` (ingreso con Google) |
 | **Opcionales** | `ELEVENLABS_API_KEY`, la segunda pasarela y el token del CRM que use ventas |
 | **No las consigues tú** | `SESSION_SECRET`, `TOTP_CLAVE_CIFRADO`, la base, Redis, KMS y los buckets (las crea la infraestructura) |

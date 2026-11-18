@@ -2031,6 +2031,7 @@ Organizaciones (multi-tenant), planes administrables, alta de suscripción, pasa
 | HU-1709 | Como superadmin, quiero crear cupones y convenios con vigencia y límite de usos, para campañas y alianzas con universidades. | S14 | Baja | REQ-089 |
 | HU-1710 | Como gerente, quiero ver el ingreso mensual recurrente, la cancelación y el ingreso promedio por cliente, para seguir el negocio. | S14 | Media | REQ-090 |
 | HU-1711 | Como administrador de una organización, quiero ver mi plan, consumo, comprobantes y medio de pago, y actualizar mis datos de facturación, para no escribir a soporte. | S14 | Media | REQ-091 |
+| HU-1712 | Como responsable de facturación, quiero que los comprobantes se emitan ante SUNAT por Mifact, con su PDF oficial, el XML firmado y la constancia de recepción, y el DNI del comprador en las boletas desde S/ 700, para que tengan valor tributario en producción. | Antes de producción (DA-09) | Alta | REQ-087 |
 
 ### HU-1701 · Organizaciones (multi-tenant)
 
@@ -2218,6 +2219,30 @@ Entonces descargo PDF y XML de cada uno y no veo los de otras organizaciones
 
 Subtareas sugeridas: Backend, Frontend.
 
+### HU-1712 · Integración con el PSE/OSE Mifact
+
+Como responsable de facturación, quiero que los comprobantes se emitan ante SUNAT por Mifact, con su PDF oficial, el XML firmado y la constancia de recepción, y el DNI del comprador en las boletas desde S/ 700, para que tengan valor tributario en producción.
+
+**CP-162 · Emisión aceptada por Mifact**
+
+```gherkin
+Dado los datos fiscales con el proveedor Mifact, el RUC del token y el ubigeo del emisor
+Cuando se confirma un cobro con factura
+Entonces Mifact responde aceptado (102), se guardan su PDF, el XML firmado y el CDR
+Y el cliente recibe por correo los tres archivos, una sola vez
+```
+
+**CP-163 · Comprobante en proceso en SUNAT**
+
+```gherkin
+Dado un comprobante que Mifact deja en proceso (101)
+Cuando pasan 10 minutos
+Entonces el worker consulta su estado y, al quedar aceptado, descarga sus archivos y envía el correo
+Y si SUNAT lo rechaza (104), queda rechazado con el motivo y no se envía
+```
+
+Subtareas sugeridas: Backend, Worker, Frontend, Infraestructura.
+
 ## Trazabilidad requisito → historia
 
 | Requisito | Historias |
@@ -2308,7 +2333,7 @@ Subtareas sugeridas: Backend, Frontend.
 | REQ-084 | HU-1704 |
 | REQ-085 | HU-1705 |
 | REQ-086 | HU-1706 |
-| REQ-087 | HU-1707 |
+| REQ-087 | HU-1707, HU-1712 |
 | REQ-088 | HU-1708 |
 | REQ-089 | HU-1709 |
 | REQ-090 | HU-1710 |

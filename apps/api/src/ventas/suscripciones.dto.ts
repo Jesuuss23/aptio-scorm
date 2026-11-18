@@ -7,6 +7,7 @@ export class CheckoutEntradaDto {
   @ApiPropertyOptional({ enum: ['PEN', 'USD'], default: 'PEN', description: 'HU-1704 · Dólares solo si el plan tiene precio en USD y una pasarela cobra en dólares' }) moneda?: 'PEN' | 'USD';
   @ApiProperty({ example: 'Minera Andina SAC', maxLength: 150 }) razonSocial: string;
   @ApiPropertyOptional({ example: '20131312955', description: '11 dígitos con el dígito verificador de SUNAT. Con RUC, factura; sin RUC, boleta' }) ruc?: string;
+  @ApiPropertyOptional({ example: '40506089', description: 'HU-1712 · Solo sin RUC (boleta): DNI de 8 dígitos, obligatorio si el total supera S/ 700 (o US$ 200)' }) dni?: string;
   @ApiProperty({ example: 'Ana Quispe', maxLength: 120 }) nombreAdmin: string;
   @ApiProperty({ example: 'ana@minera.pe', maxLength: 160 }) correoAdmin: string;
   @ApiProperty({ example: true, description: 'Términos y tratamiento de datos personales (Ley 29733)' }) consentimiento: boolean;

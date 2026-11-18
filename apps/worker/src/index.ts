@@ -5,13 +5,13 @@ config({ path: ['.env', '../../packages/db/.env'], quiet: true });
 import {
   COLA_AGENDA, COLA_COMPROBANTES, COLA_CRM, COLA_SUSCRIPCIONES, COLAS, crearRedis, type DatosRespaldo, type DatosTrabajo, opcionesRedis, PATRON_RESPALDO, prefijoColas, TAREA_EXPORTAR, TAREA_RESPALDO, TAREA_PUBLICAR_PAGINAS, CADA_PUBLICAR_PAGINAS_MS,
   type DatosPrerender, idPrerender, idRehacerPrerender, TAREA_PRERENDER, CADA_BLOG_MS, type DatosBlog, TAREA_BLOG,
-  CADA_RENOVAR_MS, type DatosComprobante, opcionesTareaComprobante, TAREA_EMITIR_COMPROBANTE, TAREA_RENOVAR_SUSCRIPCIONES,
+  CADA_RENOVAR_MS, CADA_CONSULTAR_COMPROBANTES_MS, TAREA_CONSULTAR_COMPROBANTES, type DatosComprobante, opcionesTareaComprobante, TAREA_EMITIR_COMPROBANTE, TAREA_RENOVAR_SUSCRIPCIONES,
 } from '@aptio/colas';
 import { sincronizarBlog } from './blog.js';
 import { crearTrabajadorCrm } from './crm.js';
 import { crearTrabajadorAgenda } from './agenda.js';
 import { crearTrabajadorSuscripciones } from './suscripciones.js';
-import { crearTrabajadorComprobantes, proveedoresOseDesdeEntorno } from './comprobantes.js';
+import { consultarPendientes, crearTrabajadorComprobantes, type DependenciasComprobantes, proveedoresOseDesdeEntorno } from './comprobantes.js';
 import { opcionesRenderDesdeEnv } from '@aptio/sitio';
 import { bucketRespaldosDesdeEnv, crearRespaldo, purgarRespaldos } from '@aptio/respaldo';
 import { configurarAvisoLimite } from './conexiones.js';
@@ -138,6 +138,11 @@ const encolarPrerender = (numero: number) =>
   mantenimiento.add(TAREA_PRERENDER, { numero } satisfies DatosPrerender, { jobId: idPrerender(numero), removeOnComplete: true, removeOnFail: 100 });
 // HU-1511 · Cada minuto revisa si toca leer WordPress (según la frecuencia elegida); si algo cambió, re-renderiza.
 await mantenimiento.upsertJobScheduler(TAREA_BLOG, { every: CADA_BLOG_MS }, { name: TAREA_BLOG, data: {} satisfies DatosBlog });
+// HU-1712 · Cada 10 minutos consulta en el OSE real el estado de los comprobantes pendientes.
+await mantenimiento.upsertJobScheduler(TAREA_CONSULTAR_COMPROBANTES, { every: CADA_CONSULTAR_COMPROBANTES_MS }, { name: TAREA_CONSULTAR_COMPROBANTES });
+const depsComprobantes: DependenciasComprobantes = {
+  proveedores: proveedoresOseDesdeEntorno(process.env), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime), enviar: correoDesdeEntorno(process.env),
+};
 // Al arrancar, la última versión que no quedó lista (anterior a la HU-1508 o con un trabajo perdido) se pre-renderiza.
 const pendiente = await versionPendienteDePrerender(prisma);
 if (pendiente !== null) await encolarPrerender(pendiente);
@@ -158,6 +163,12 @@ const mantenedor = new Worker(
         const v = await ultimaVersion(prisma);
         if (v) await mantenimiento.add(TAREA_PRERENDER, { numero: v.numero } satisfies DatosPrerender, { jobId: idRehacerPrerender(v.numero), removeOnComplete: true, removeOnFail: 100 });
       }
+      return r;
+    }
+    if (job.name === TAREA_CONSULTAR_COMPROBANTES) {
+      const r = await consultarPendientes(prisma, depsComprobantes);
+      if (r.resueltos) console.log(`Comprobantes: ${r.resueltos} de ${r.consultados} pendientes ya tienen respuesta de SUNAT`);
+      for (const e of r.errores) console.error(`[${COLA_MANTENIMIENTO}] la consulta del comprobante ${e}`);
       return r;
     }
     if (job.name === TAREA_PUBLICAR_PAGINAS) {
@@ -195,9 +206,7 @@ await colaSuscripciones.upsertJobScheduler(TAREA_RENOVAR_SUSCRIPCIONES, { every:
 // HU-1706 · En la misma cola, el vencimiento de las suscripciones canceladas al fin del período.
 suscripciones.on('failed', (job, err) => console.error(`[${COLA_SUSCRIPCIONES}] ${job?.name === TAREA_RENOVAR_SUSCRIPCIONES ? 'la cobranza periódica' : job && 'renovacionId' in job.data ? `el intento de la renovación ${job.data.renovacionId}` : job && 'suscripcionId' in job.data ? `el vencimiento de la suscripción ${job.data.suscripcionId}` : `la bienvenida de la solicitud ${job && 'solicitudId' in job.data ? job.data.solicitudId : '?'}`} falló (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 // HU-1707 · El comprobante SUNAT de cada cobro (y la nota de crédito de su reembolso) con el OSE elegido (DA-09).
-const comprobantes = crearTrabajadorComprobantes(prisma, {
-  proveedores: proveedoresOseDesdeEntorno(process.env), subir: (clave, cuerpo, mime) => almacen.subir(clave, cuerpo, mime), enviar: correoDesdeEntorno(process.env),
-}, { connection: opcionesRedis(), prefix: prefijoColas() });
+const comprobantes = crearTrabajadorComprobantes(prisma, depsComprobantes, { connection: opcionesRedis(), prefix: prefijoColas() });
 comprobantes.on('failed', (job, err) => console.error(`[${COLA_COMPROBANTES}] el comprobante ${job?.data.tipo ?? ''} del cobro ${job?.data.cobroId ?? '?'} falló (intento ${job?.attemptsMade ?? '?'}): ${err.message}`));
 
 async function respaldar(datos: DatosRespaldo) {

@@ -21,8 +21,14 @@ export const CODIGO_TIPO: Record<TipoComprobante, string> = { FACTURA: '01', BOL
 /** Leyenda de la detracción (SPOT), por validar con el contador (RN-18-5). */
 export const LEYENDA_DETRACCION = 'Operación sujeta al Sistema de Pago de Obligaciones Tributarias con el Gobierno Central';
 export const SERIES_POR_DEFECTO = { serieFactura: 'F001', serieBoleta: 'B001', serieNotaFactura: 'FC01', serieNotaBoleta: 'BC01' } as const;
-/** DA-09 · Los proveedores OSE conocidos. Hoy solo el simulado (SUP-314): el real se suma cuando se elija y contrate. */
-export const PROVEEDORES_OSE = [{ codigo: 'pruebas', nombre: 'OSE de pruebas (simulado)', soloPruebas: true }] as const;
+/**
+ * DA-09 · Los proveedores OSE conocidos: el simulado (SUP-314, solo fuera de producción) y Mifact (HU-1712), el PSE/OSE
+ * real elegido por la empresa. Mifact está disponible donde exista `MIFACT_URL`.
+ */
+export const PROVEEDORES_OSE = [
+  { codigo: 'pruebas', nombre: 'OSE de pruebas (simulado)', soloPruebas: true },
+  { codigo: 'mifact', nombre: 'Mifact', soloPruebas: false },
+] as const;
 export type CodigoOse = (typeof PROVEEDORES_OSE)[number]['codigo'];
 export const esCodigoOse = (x: unknown): x is CodigoOse => PROVEEDORES_OSE.some((p) => p.codigo === x);
 
@@ -52,6 +58,14 @@ export function rucValido(ruc: unknown): ruc is string {
   const dv = 11 - (suma % 11);
   return (dv === 10 ? 0 : dv === 11 ? 1 : dv) === Number(ruc[10]);
 }
+
+/**
+ * HU-1712 · El RUC de pruebas del ambiente demo de Mifact (su token público es de este RUC). No cumple el dígito
+ * verificador, así que solo se admite como emisor en el ambiente de pruebas.
+ */
+export const RUC_DEMO_MIFACT = '20100100100';
+/** El RUC del emisor: válido, o el de la demo de Mifact en el ambiente de pruebas. */
+export const rucEmisorValido = (ruc: unknown, ambiente: unknown): ruc is string => rucValido(ruc) || (ruc === RUC_DEMO_MIFACT && ambiente === 'pruebas');
 
 /** Factura con RUC válido; boleta sin RUC o con uno no válido (RN-18-4). */
 export const tipoPara = (ruc: string | null | undefined): 'FACTURA' | 'BOLETA' => (rucValido(ruc ?? '') ? 'FACTURA' : 'BOLETA');
@@ -89,6 +103,30 @@ export interface DatosSeries { serieFactura: string; serieBoleta: string; serieN
 export interface DatosFiscalesEntrada extends DatosSeries {
   rucEmisor: string | null; razonSocialEmisor: string; direccionEmisor: string; proveedor: string; ambiente: 'pruebas' | 'produccion';
   detraccionActiva: boolean; detraccionTasa: number; detraccionUmbralPen: number;
+  /** HU-1712 · Ubigeo INEI (6 dígitos) del domicilio fiscal y código de anexo SUNAT (4 dígitos, 0000 = principal). */
+  ubigeoEmisor: string; codigoAnexo: string;
+  /** HU-1712 · Cuenta de detracciones del Banco de la Nación y código SPOT (3 dígitos), obligatorios con la detracción activa. */
+  cuentaDetraccion: string; codigoDetraccion: string;
+}
+
+// ---------- HU-1712 · DNI del receptor de una boleta ----------
+
+/**
+ * Desde estos montos (total con IGV) la boleta debe identificar al comprador con su DNI. S/ 700 es la regla de SUNAT; el
+ * equivalente en dólares es un supuesto fijo (SUP-349) hasta validarlo con el contador.
+ */
+export const UMBRAL_DNI_BOLETA: Record<MonedaComprobante, number> = { PEN: 700, USD: 200 };
+export const dniValido = (v: unknown): v is string => typeof v === 'string' && /^\d{8}$/.test(v);
+/** La boleta exige DNI si su total supera el umbral de su moneda. La factura nunca (lleva RUC). */
+export const exigeDni = (tipo: TipoComprobante | 'FACTURA' | 'BOLETA', total: number, moneda: MonedaComprobante): boolean =>
+  tipo === 'BOLETA' && total > UMBRAL_DNI_BOLETA[moneda];
+/** Limpia el DNI escrito (sin espacios ni guiones). */
+export const normalizarDni = (v: unknown): string => (typeof v === 'string' ? v.replace(/[\s.-]/g, '') : '');
+/** El error del campo DNI, o null: formato de 8 dígitos si viene, y obligatorio cuando `exigido`. */
+export function errorDni(v: unknown, exigido: boolean, campo = 'dni'): ErrorCampo | null {
+  const dni = normalizarDni(v);
+  if (!dni) return exigido ? { campo, mensaje: 'Las boletas de más de S/ 700 necesitan el DNI del comprador' } : null;
+  return dniValido(dni) ? null : { campo, mensaje: 'El DNI tiene 8 dígitos' };
 }
 
 const texto = (v: unknown, max: number) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
@@ -96,7 +134,7 @@ const texto = (v: unknown, max: number) => typeof v === 'string' && v.trim().len
 /** Valida los datos fiscales que guarda el superadmin. Las series son de 4 caracteres: F o B y 3 letras o dígitos. */
 export function validarDatosFiscales(v: Partial<Record<keyof DatosFiscalesEntrada, unknown>>, proveedores: readonly string[]): ErrorCampo[] {
   const e: ErrorCampo[] = [];
-  if (v.rucEmisor !== null && v.rucEmisor !== undefined && v.rucEmisor !== '' && !rucValido(v.rucEmisor)) e.push({ campo: 'rucEmisor', mensaje: 'El RUC no es válido' });
+  if (v.rucEmisor !== null && v.rucEmisor !== undefined && v.rucEmisor !== '' && !rucEmisorValido(v.rucEmisor, v.ambiente)) e.push({ campo: 'rucEmisor', mensaje: 'El RUC no es válido' });
   if (!texto(v.razonSocialEmisor, LIMITES_FISCALES.razonSocial)) e.push({ campo: 'razonSocialEmisor', mensaje: 'Escribe la razón social del emisor' });
   if (!texto(v.direccionEmisor, LIMITES_FISCALES.direccion)) e.push({ campo: 'direccionEmisor', mensaje: 'Escribe el domicilio fiscal del emisor' });
   const series: [keyof DatosSeries, RegExp, string][] = [
@@ -113,14 +151,29 @@ export function validarDatosFiscales(v: Partial<Record<keyof DatosFiscalesEntrad
   if (typeof v.detraccionActiva !== 'boolean') e.push({ campo: 'detraccionActiva', mensaje: 'Indica si se aplica la detracción' });
   if (typeof v.detraccionTasa !== 'number' || !(v.detraccionTasa > 0 && v.detraccionTasa <= 100)) e.push({ campo: 'detraccionTasa', mensaje: 'Un porcentaje mayor que 0 y hasta 100' });
   if (typeof v.detraccionUmbralPen !== 'number' || !(v.detraccionUmbralPen >= 0 && v.detraccionUmbralPen <= 1_000_000)) e.push({ campo: 'detraccionUmbralPen', mensaje: 'Un monto en soles de 0 a 1.000.000' });
+  // HU-1712 · Mifact pide el ubigeo del emisor; con la detracción activa, la cuenta y el código SPOT.
+  const real = v.proveedor === 'mifact';
+  const ubigeo = typeof v.ubigeoEmisor === 'string' ? v.ubigeoEmisor : '';
+  if (ubigeo ? !/^\d{6}$/.test(ubigeo) : real) e.push({ campo: 'ubigeoEmisor', mensaje: 'El ubigeo INEI tiene 6 dígitos' });
+  if (typeof v.codigoAnexo !== 'string' || !/^\d{4}$/.test(v.codigoAnexo)) e.push({ campo: 'codigoAnexo', mensaje: 'El código de anexo tiene 4 dígitos (0000 para el local principal)' });
+  const cuenta = typeof v.cuentaDetraccion === 'string' ? v.cuentaDetraccion : '';
+  const codigo = typeof v.codigoDetraccion === 'string' ? v.codigoDetraccion : '';
+  const exige = real && v.detraccionActiva === true;
+  if (cuenta ? !/^[0-9-]{6,30}$/.test(cuenta) : exige) e.push({ campo: 'cuentaDetraccion', mensaje: 'Escribe la cuenta de detracciones del Banco de la Nación (solo dígitos y guiones)' });
+  if (codigo ? !/^\d{3}$/.test(codigo) : exige) e.push({ campo: 'codigoDetraccion', mensaje: 'El código SPOT tiene 3 dígitos' });
   return e;
 }
 
-export interface ReceptorEntrada { ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string }
+export interface ReceptorEntrada { ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string; dni?: string | null }
 
 /** Valida la corrección del receptor de un comprobante observado (CP-149). Una factura exige un RUC válido. */
-export function validarReceptor(v: Partial<Record<keyof ReceptorEntrada, unknown>>, tipo: TipoComprobante): ErrorCampo[] {
+export function validarReceptor(v: Partial<Record<keyof ReceptorEntrada, unknown>>, tipo: TipoComprobante, montos?: { total: number; moneda: MonedaComprobante }): ErrorCampo[] {
   const e: ErrorCampo[] = [];
+  // HU-1712 · La boleta lleva el DNI cuando supera el umbral.
+  if (tipo === 'BOLETA') {
+    const d = errorDni(v.dni, montos ? exigeDni(tipo, montos.total, montos.moneda) : false);
+    if (d) e.push(d);
+  }
   const conRuc = tipo === 'FACTURA';
   if (conRuc ? !rucValido(v.ruc) : v.ruc !== null && v.ruc !== undefined && v.ruc !== '' && !rucValido(v.ruc)) e.push({ campo: 'ruc', mensaje: conRuc ? 'Una factura necesita un RUC válido' : 'El RUC no es válido' });
   if (!texto(v.razonSocial, LIMITES_FISCALES.razonSocial)) e.push({ campo: 'razonSocial', mensaje: 'Escribe la razón social o el nombre' });

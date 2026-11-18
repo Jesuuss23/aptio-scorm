@@ -43,7 +43,7 @@ describe.skipIf(!hayBase && !process.env.CI)('cupones y convenios (HU-1709)', ()
   });
   const sinLimite = () => { app.get(LimitePublicoService).reiniciar(); app.get(SuscripcionesService).reiniciarLimite(); };
   const vista = (d: Record<string, unknown>) => { sinLimite(); return request(servidor).post('/api/v1/publico/checkout/cupon').send({ plan, ...d }); };
-  const empresa = (correo: string, extra: Record<string, unknown> = {}) => ({ plan, ciclo: 'MENSUAL', razonSocial: 'Minera Andina SAC', ruc: '', nombreAdmin: 'Ana Quispe', correoAdmin: correo, consentimiento: true, ...extra });
+  const empresa = (correo: string, extra: Record<string, unknown> = {}) => ({ plan, ciclo: 'MENSUAL', razonSocial: 'Minera Andina SAC', ruc: '', dni: '40506089', nombreAdmin: 'Ana Quispe', correoAdmin: correo, consentimiento: true, ...extra });
   const checkout = (d: Record<string, unknown>) => { sinLimite(); return request(servidor).post('/api/v1/publico/checkout').send(d); };
   const webhook = (d: object) => {
     const cuerpo = Buffer.from(JSON.stringify(d));

@@ -1471,6 +1471,8 @@ model SolicitudSuscripcion {
   ciclo               CicloSuscripcion
   razonSocial         String
   ruc                 String?
+  /// HU-1712 · DNI (8 dígitos) para la boleta; obligatorio sobre S/ 700 o su equivalente en USD.
+  dniReceptor         String?
   tipoComprobante     TipoComprobante
   nombreAdmin         String
   /// En minúsculas.
@@ -1705,6 +1707,8 @@ model Comprobante {
   notas                   Comprobante[]     @relation("NotaDeComprobante")
   /// Receptor: RUC en una factura; sin documento en una boleta (SUP-316).
   ruc                     String?
+  /// HU-1712 · DNI del receptor de una boleta.
+  dniReceptor             String?
   razonSocial             String
   direccion               String?
   correoFacturacion       String
@@ -1720,6 +1724,10 @@ model Comprobante {
   ambiente                String
   s3KeyPdf                String?
   s3KeyXml                String?
+  /// HU-1712 · Constancia de recepción de SUNAT (CDR) que devuelve el OSE real, y los datos de la representación impresa.
+  s3KeyCdr                String?
+  hashCpe                 String?
+  cadenaQr                String?
   intentos                Int               @default(0)
   emitidoEn               DateTime          @default(now())
   enviadoEn               DateTime?
@@ -1759,17 +1767,23 @@ model DatosFiscales {
   rucEmisor           String?
   razonSocialEmisor   String   @default("")
   direccionEmisor     String   @default("")
+  /// HU-1712 · Ubigeo INEI del domicilio fiscal (6 dígitos) y código de anexo del establecimiento (0000 = principal).
+  ubigeoEmisor        String   @default("")
+  codigoAnexo         String   @default("0000")
   serieFactura        String   @default("F001")
   serieBoleta         String   @default("B001")
   serieNotaFactura    String   @default("FC01")
   serieNotaBoleta     String   @default("BC01")
-  /// pruebas (simulado, DA-09) u otro proveedor cuando se elija.
+  /// pruebas (simulado, solo fuera de producción) o mifact (HU-1712, DA-09).
   proveedor           String   @default("pruebas")
   ambiente            String   @default("pruebas")
   detraccionActiva    Boolean  @default(false)
   /// Porcentaje; por validar con el contador (RN-18-5).
   detraccionTasa      Decimal  @default(12) @db.Decimal(5, 2)
   detraccionUmbralPen Decimal  @default(700) @db.Decimal(10, 2)
+  /// HU-1712 · Cuenta de detracciones del Banco de la Nación y código del bien o servicio (SPOT), por validar con el contador.
+  cuentaDetraccion    String   @default("")
+  codigoDetraccion    String   @default("")
   actualizadoEn       DateTime @updatedAt
 }
 
@@ -1818,6 +1832,8 @@ model DatosFacturacionOrg {
   razonSocial              String
   /// 11 dígitos con el dígito verificador de SUNAT; obligatorio para factura.
   ruc                      String?
+  /// HU-1712 · DNI (8 dígitos) para la boleta.
+  dniReceptor              String?
   direccion                String?
   correoFacturacion        String
   tipoComprobantePreferido TipoComprobante

@@ -13,6 +13,7 @@ export class ComprobanteOrgDto {
   @ApiProperty({ enum: ['PENDIENTE', 'ACEPTADO', 'OBSERVADO', 'RECHAZADO'], description: 'Estado SUNAT según el OSE' }) estado: 'PENDIENTE' | 'ACEPTADO' | 'OBSERVADO' | 'RECHAZADO';
   @ApiProperty({ description: 'Ya hay PDF para descargar' }) conPdf: boolean;
   @ApiProperty({ description: 'Ya hay XML para descargar' }) conXml: boolean;
+  @ApiProperty({ description: 'HU-1712 · Ya está la constancia de recepción de SUNAT (CDR)' }) conCdr: boolean;
 }
 
 export class DatosFacturacionDto {
@@ -21,6 +22,7 @@ export class DatosFacturacionDto {
   @ApiProperty({ type: String, nullable: true, example: 'Av. Arequipa 123, Lima' }) direccion: string | null;
   @ApiProperty({ example: 'pagos@minera.pe' }) correoFacturacion: string;
   @ApiProperty({ enum: ['FACTURA', 'BOLETA'] }) tipoComprobantePreferido: 'FACTURA' | 'BOLETA';
+  @ApiProperty({ type: String, nullable: true, example: '40506089', description: 'HU-1712 · DNI del comprador para la boleta' }) dni: string | null;
   @ApiProperty({ enum: ['PORTAL', 'ALTA'], description: 'PORTAL: los editó el administrador; ALTA: los de la solicitud del alta (o la organización), mientras no se editen' }) origen: 'PORTAL' | 'ALTA';
 }
 
@@ -31,6 +33,7 @@ export class DatosFacturacionEntradaDto {
   @ApiPropertyOptional({ example: 'Av. Arequipa 123, Lima', maxLength: 200 }) direccion?: string;
   @ApiProperty({ example: 'pagos@minera.pe' }) correoFacturacion: string;
   @ApiProperty({ enum: ['FACTURA', 'BOLETA'] }) tipoComprobantePreferido: 'FACTURA' | 'BOLETA';
+  @ApiPropertyOptional({ example: '40506089', description: 'HU-1712 · Boleta: DNI de 8 dígitos, obligatorio si el plan supera S/ 700 con IGV' }) dni?: string;
 }
 
 export class MedioPagoDto {

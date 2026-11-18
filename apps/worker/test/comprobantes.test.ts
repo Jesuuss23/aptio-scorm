@@ -8,6 +8,7 @@ import { Queue, QueueEvents } from 'bullmq';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { crearTrabajadorComprobantes, type DependenciasComprobantes, oseSimulado, procesarComprobante, RUC_OBSERVADO_PRUEBAS, siguienteNumero } from '../src/comprobantes.js';
 import type { Correo } from '../src/correo.js';
+import { casosMifact } from './comprobantes-mifact.casos.js';
 
 const hayBase = await prisma.$queryRaw`SELECT 1`.then(() => true, () => false);
 const PID = process.pid;
@@ -254,3 +255,6 @@ describe.skipIf(!hayBase)('cola comprobantes (HU-1707)', () => {
     }
   });
 });
+
+// HU-1712 · Los casos con Mifact, en el mismo archivo para no correr en paralelo con los de arriba.
+casosMifact();

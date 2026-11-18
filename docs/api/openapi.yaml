@@ -7012,6 +7012,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /organizacion/comprobantes/{id}/cdr:
+    get:
+      tags:
+      - Ventas
+      summary: CDR de SUNAT de un comprobante de la organización (HU-1712)
+      operationId: get_organizacion_comprobantes_id_cdr
+      description: Solo ADMINISTRADOR. La constancia de recepción de SUNAT, solo con un proveedor real (Mifact).
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: La constancia de recepción (XML `R-<RUC-tipo-serie-número>.xml`)
+          content:
+            application/xml:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: NO_ENCONTRADO si no existe o es de otra organización, o ARCHIVO_PENDIENTE si no hay CDR (OSE simulado o aún en SUNAT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /organizacion/comprobantes/{id}/xml:
     get:
       tags:
@@ -7433,6 +7465,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /ventas/comprobantes/{id}/cdr:
+    get:
+      tags:
+      - Ventas
+      summary: CDR de SUNAT del comprobante (HU-1712, CP-162)
+      operationId: get_ventas_comprobantes_id_cdr
+      description: Solo SUPERADMIN. La constancia de recepción que Mifact devuelve de SUNAT, guardada en S3 al quedar aceptado u observado. Auditoría COMPROBANTE_DESCARGADO.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: La constancia de recepción (XML `R-<RUC-tipo-serie-número>.xml`)
+          content:
+            application/xml:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '404':
+          description: NO_ENCONTRADO, o ARCHIVO_PENDIENTE si no hay CDR (OSE simulado, o el comprobante sigue en SUNAT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /ventas/comprobantes/{id}/xml:
     get:
       tags:
@@ -7472,8 +7536,10 @@ paths:
       summary: Corregir el receptor y reenviar (HU-1707, CP-149)
       operationId: post_ventas_comprobantes_id_reenviar
       description: |-
-        Solo SUPERADMIN. Para un comprobante OBSERVADO o PENDIENTE: guarda el receptor corregido (una factura exige RUC
-        válido; el correo debe ser válido), lo deja PENDIENTE y encola su reenvío al OSE con el mismo serie y número
+        Solo SUPERADMIN. Para un comprobante PENDIENTE, u OBSERVADO por el OSE simulado (con Mifact el observado, código
+        103, ya es válido en SUNAT y se corrige con una nota de crédito: 422): guarda el receptor corregido (una factura
+        exige RUC válido; una boleta, DNI de 8 dígitos desde S/ 700 o USD 200, HU-1712; el correo debe ser válido), lo
+        deja PENDIENTE y encola su reenvío al OSE con el mismo serie y número
         (jobId `reenvio-<id>-<intentos>-<marca>`). Auditoría COMPROBANTE_REENVIADO con el receptor de antes y el de después.
       parameters:
       - name: id
@@ -7642,6 +7708,11 @@ paths:
         Solo SUPERADMIN. Valida el RUC del emisor (o vacío: los comprobantes quedan pendientes), las series (F o B y 4
         caracteres, todas distintas), el proveedor, el ambiente (el OSE de pruebas solo en pruebas) y la detracción (tasa
         de 0 a 100 y umbral en soles; por validar con el contador, SUP-317). Auditoría DATOS_FISCALES_ACTUALIZADOS.
+
+        HU-1712 · Con Mifact: el proveedor debe estar disponible en este entorno (MIFACT_URL; si no, 422), el ubigeo es
+        obligatorio (6 dígitos), el anexo tiene 4 dígitos (0000 por defecto) y, con la detracción activa, la cuenta del
+        Banco de la Nación y el código SPOT (3 dígitos). El RUC de demostración 20100100100 solo se admite en ambiente
+        pruebas. El token de Mifact vive solo en el worker (MIFACT_TOKEN) y nunca se devuelve.
       requestBody:
         required: true
         content:
@@ -8631,6 +8702,9 @@ paths:
         nada. Idempotente: el mismo `id` de aviso se procesa una vez (`duplicado: true`). Un estado final (aceptado o
         rechazado) no vuelve atrás. Aceptado y sin correo enviado, encola el envío del PDF y el XML. Auditoría
         COMPROBANTE_ESTADO_OSE.
+
+        HU-1712 · Mifact no envía avisos: para cualquier otro proveedor responde 404 y el worker consulta el estado de
+        los pendientes cada 10 minutos (GetEstatusInvoice).
       parameters:
       - name: proveedor
         in: path
@@ -16562,6 +16636,7 @@ components:
         moneda: { type: string, enum: [PEN, USD], default: PEN, description: 'HU-1704 · Dólares solo si el plan tiene precio en USD y una pasarela visible y activa cobra en dólares' }
         razonSocial: { type: string, maxLength: 150, example: Minera Andina SAC }
         ruc: { type: string, example: '20131312955', description: 'Opcional. 11 dígitos (prefijo 10, 15, 16, 17 o 20) con el dígito verificador de SUNAT; admite espacios y guiones' }
+        dni: { type: string, example: '40506089', description: 'HU-1712 · Sin RUC (boleta): 8 dígitos. Obligatorio si el total pasa de S/ 700 o USD 200 (SUP-349); si falta, 422 NO_VALIDO' }
         nombreAdmin: { type: string, maxLength: 120, example: Ana Quispe }
         correoAdmin: { type: string, format: email, maxLength: 160, example: ana@minera.pe }
         consentimiento: { type: boolean, example: true }
@@ -16838,6 +16913,11 @@ components:
           nullable: true
           example: '20100070970'
           description: 11 dígitos con el dígito verificador de SUNAT; obligatorio para FACTURA
+        dni:
+          type: string
+          nullable: true
+          example: '40506089'
+          description: HU-1712 · BOLETA, 8 dígitos; obligatorio si el plan pasa de S/ 700 o USD 200 con IGV
         direccion:
           type: string
           nullable: true
@@ -16853,7 +16933,7 @@ components:
       allOf:
       - $ref: '#/components/schemas/DatosFacturacionEntrada'
       - type: object
-        required: [ruc, direccion, origen]
+        required: [ruc, dni, direccion, origen]
         properties:
           origen:
             type: string
@@ -16862,7 +16942,7 @@ components:
     ComprobanteOrg:
       type: object
       description: HU-1711 · Un comprobante en el portal de la organización
-      required: [id, tipo, numeroCompleto, referencia, emitidoEn, moneda, total, estado, conPdf, conXml]
+      required: [id, tipo, numeroCompleto, referencia, emitidoEn, moneda, total, estado, conPdf, conXml, conCdr]
       properties:
         id:
           type: string
@@ -16893,6 +16973,9 @@ components:
           type: boolean
         conXml:
           type: boolean
+        conCdr:
+          type: boolean
+          description: HU-1712 · Hay constancia de recepción de SUNAT (solo con un proveedor real)
     Cuota:
       type: object
       description: HU-1705 · La cuota de cápsulas de la ventana mensual vigente (REQ-085, RN-18-6).
@@ -17212,7 +17295,7 @@ components:
     Comprobante:
       type: object
       description: HU-1707 · Un comprobante electrónico SUNAT (REQ-087)
-      required: [id, tipo, serie, numero, numeroCompleto, cobroId, referencia, ruc, razonSocial, direccion, correoFacturacion, moneda, baseSinIgv, igv, total, detraccion, estado, motivo, proveedor, ambiente, conArchivos, reenviable, intentos, emitidoEn, correoEnviadoEn]
+      required: [id, tipo, serie, numero, numeroCompleto, cobroId, referencia, ruc, dni, razonSocial, direccion, correoFacturacion, moneda, baseSinIgv, igv, total, detraccion, estado, motivo, proveedor, ambiente, conArchivos, conCdr, reenviable, intentos, emitidoEn, correoEnviadoEn]
       properties:
         id:
           type: string
@@ -17241,6 +17324,11 @@ components:
           type: string
           nullable: true
           description: null en una boleta sin documento (SUP-316)
+        dni:
+          type: string
+          nullable: true
+          example: '40506089'
+          description: HU-1712 · DNI del comprador en una boleta (obligatorio desde S/ 700 o USD 200)
         razonSocial:
           type: string
         direccion:
@@ -17280,8 +17368,12 @@ components:
           enum: [pruebas, produccion]
         conArchivos:
           type: boolean
+        conCdr:
+          type: boolean
+          description: HU-1712 · Ya está la constancia de recepción de SUNAT (CDR); solo con un proveedor real
         reenviable:
           type: boolean
+          description: Se puede corregir el receptor y reenviar. Pendiente, u observado por el OSE simulado; con Mifact el observado ya es válido
         intentos:
           type: integer
         emitidoEn:
@@ -17309,6 +17401,11 @@ components:
           nullable: true
           example: '20131312955'
           description: Obligatorio y válido en una factura
+        dni:
+          type: string
+          nullable: true
+          example: '40506089'
+          description: HU-1712 · Boleta, 8 dígitos; obligatorio desde S/ 700 o USD 200
         razonSocial:
           type: string
           maxLength: 200
@@ -17323,7 +17420,7 @@ components:
     DatosFiscalesEntrada:
       type: object
       description: HU-1707 · Los datos fiscales del emisor. Sin secretos (viven en variables de entorno)
-      required: [rucEmisor, razonSocialEmisor, direccionEmisor, serieFactura, serieBoleta, serieNotaFactura, serieNotaBoleta, proveedor, ambiente, detraccionActiva, detraccionTasa, detraccionUmbralPen]
+      required: [rucEmisor, razonSocialEmisor, direccionEmisor, serieFactura, serieBoleta, serieNotaFactura, serieNotaBoleta, proveedor, ambiente, detraccionActiva, detraccionTasa, detraccionUmbralPen, ubigeoEmisor, codigoAnexo, cuentaDetraccion, codigoDetraccion]
       properties:
         rucEmisor:
           type: string
@@ -17360,6 +17457,22 @@ components:
         detraccionUmbralPen:
           type: number
           example: 700
+        ubigeoEmisor:
+          type: string
+          example: '150101'
+          description: HU-1712 · Ubigeo INEI del domicilio fiscal (6 dígitos); obligatorio con Mifact
+        codigoAnexo:
+          type: string
+          example: '0000'
+          description: HU-1712 · Código de anexo SUNAT del establecimiento (0000 = principal)
+        cuentaDetraccion:
+          type: string
+          example: 00-000-123456
+          description: HU-1712 · Cuenta de detracciones del Banco de la Nación; obligatoria con Mifact y la detracción activa
+        codigoDetraccion:
+          type: string
+          example: '022'
+          description: HU-1712 · Código SPOT del servicio (3 dígitos), por validar con el contador
     DatosFiscales:
       allOf:
       - $ref: '#/components/schemas/DatosFiscalesEntrada'

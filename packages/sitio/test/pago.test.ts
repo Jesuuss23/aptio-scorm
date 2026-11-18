@@ -55,6 +55,12 @@ describe('página /pago', () => {
     expect(TEXTOS_PAGO.es.redireccion).toContain('Tu tarjeta no pasa por Aptio SCORM');
   });
 
+  it('HU-1712 · el DNI de la boleta: textos en los dos idiomas, el umbral de S/ 700 (US$ 200) y se envía solo sin RUC', () => {
+    for (const l of ['es', 'en'] as const) for (const k of ['dni', 'dniAyuda', 'eDni', 'eDniFalta'] as const) expect(TEXTOS_PAGO[l][k]).toBeTruthy();
+    expect(SCRIPT_CHECKOUT).toContain('UMBRAL_DNI={"PEN":700,"USD":200}');
+    for (const t of ["campo('dni'", "'dni'", 'dni:rr?undefined:(nn||undefined)', "e.dni=T.eDni", 'S.err={dni:T.eDniFalta}']) expect(SCRIPT_CHECKOUT).toContain(t);
+  });
+
   it('HU-1704 · la CSP de /pago suma solo los orígenes de Culqi Checkout; las demás páginas siguen igual', () => {
     expect(esArchivoPago('pago/index.html')).toBe(true);
     expect(esArchivoPago('en/pago/index.html')).toBe(true);

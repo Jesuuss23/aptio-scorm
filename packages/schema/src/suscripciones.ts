@@ -10,6 +10,7 @@
  */
 import { esTextoPlano, type ErrorCampo } from './sitio-contenido.js';
 import { conIgv, igvDe, type PlanPublico } from './planes.js';
+import { errorDni, normalizarDni } from './comprobantes.js';
 
 export { RUTA_PAGO } from './planes.js';
 
@@ -45,7 +46,7 @@ export function rucValido(ruc: string): boolean {
 
 export const tipoComprobanteDe = (ruc: string | null): TipoComprobante => (ruc ? 'FACTURA' : 'BOLETA');
 
-export interface DatosEmpresa { razonSocial: string; ruc: string | null; nombreAdmin: string; correoAdmin: string }
+export interface DatosEmpresa { razonSocial: string; ruc: string | null; nombreAdmin: string; correoAdmin: string; /** HU-1712 · Solo para boleta. */ dni: string | null }
 export type ResultadoEmpresa = { ok: true; datos: DatosEmpresa; tipoComprobante: TipoComprobante } | { ok: false; errores: ErrorCampo[] };
 
 /** Paso 1 · Empresa. Con RUC (sin espacios ni guiones) se emite factura; sin RUC, boleta. El consentimiento es obligatorio (Ley 29733). */
@@ -67,9 +68,13 @@ export function validarEmpresa(entrada: unknown): ResultadoEmpresa {
   const correoAdmin = unaLinea(e.correoAdmin).toLowerCase();
   if (!correoAdmin) errores.push({ campo: 'correoAdmin', mensaje: 'Escribe el correo de quien administrará la cuenta' });
   else if (correoAdmin.length > LIMITES_EMPRESA.correo || !CORREO.test(correoAdmin)) errores.push({ campo: 'correoAdmin', mensaje: 'Escribe un correo válido, por ejemplo nombre@empresa.com' });
+  // HU-1712 · El DNI va con la boleta (sin RUC): aquí solo el formato; si es obligatorio lo decide el total (`errorDni`).
+  const dni = ruc ? '' : normalizarDni(e.dni);
+  const d = ruc ? null : errorDni(dni, false);
+  if (d) errores.push(d);
   if (!ACEPTA.has(e.consentimiento)) errores.push({ campo: 'consentimiento', mensaje: 'Acepta los términos y el tratamiento de tus datos personales para continuar' });
   if (errores.length) return { ok: false, errores };
-  return { ok: true, datos: { razonSocial, ruc: ruc || null, nombreAdmin, correoAdmin }, tipoComprobante: tipoComprobanteDe(ruc || null) };
+  return { ok: true, datos: { razonSocial, ruc: ruc || null, nombreAdmin, correoAdmin, dni: dni || null }, tipoComprobante: tipoComprobanteDe(ruc || null) };
 }
 
 export interface ResumenCheckout {

@@ -57,7 +57,7 @@ describe.skipIf(!hayBase && !process.env.CI)('pasarelas de pago y webhooks (HU-1
   const servicio = () => app.get(SuscripcionesService);
   const sinLimite = () => { app.get(LimitePublicoService).reiniciar(); servicio().reiniciarLimite(); };
   const empresa = (correo: string, extra: Record<string, unknown> = {}) => ({
-    plan: slug('productora'), ciclo: 'MENSUAL', razonSocial: 'Andes Learning SAC', ruc: '', nombreAdmin: 'Luis Rojas', correoAdmin: correo, consentimiento: true, ...extra,
+    plan: slug('productora'), ciclo: 'MENSUAL', razonSocial: 'Andes Learning SAC', ruc: '', dni: '40506089', nombreAdmin: 'Luis Rojas', correoAdmin: correo, consentimiento: true, ...extra,
   });
   const checkout = (cuerpo: Record<string, unknown>) => { sinLimite(); return request(servidor).post('/api/v1/publico/checkout').send(cuerpo); };
   const webhookPruebas = (o: Record<string, unknown>) => {

@@ -12,6 +12,7 @@
  */
 import { esTextoPlano, type ErrorCampo } from './sitio-contenido.js';
 import { rucValido, TARJETAS_PRUEBA, type TipoComprobante } from './suscripciones.js';
+import { errorDni, exigeDni, type MonedaComprobante, normalizarDni } from './comprobantes.js';
 
 export const TIPOS_COMPROBANTE = ['FACTURA', 'BOLETA'] as const;
 export const LIMITES_FACTURACION = { razonSocial: 150, direccion: 200, correo: 160 } as const;
@@ -24,10 +25,16 @@ export interface DatosFacturacion {
   direccion: string | null;
   correoFacturacion: string;
   tipoComprobantePreferido: TipoComprobante;
+  /** HU-1712 · DNI de 8 dígitos para la boleta. */
+  dni: string | null;
 }
 export type ResultadoFacturacion = { ok: true; datos: DatosFacturacion } | { ok: false; errores: ErrorCampo[] };
 
-export function validarDatosFacturacion(entrada: unknown): ResultadoFacturacion {
+/**
+ * `importe` (HU-1712): el total con IGV del plan vigente. Con él, la boleta exige el DNI si supera S/ 700 (o su
+ * equivalente en dólares, `exigeDni`); sin él, el DNI solo se valida si viene.
+ */
+export function validarDatosFacturacion(entrada: unknown, importe?: { total: number; moneda: MonedaComprobante }): ResultadoFacturacion {
   const e = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>;
   const errores: ErrorCampo[] = [];
   const tipo = e.tipoComprobantePreferido;
@@ -46,8 +53,13 @@ export function validarDatosFacturacion(entrada: unknown): ResultadoFacturacion 
   const correo = unaLinea(e.correoFacturacion).toLowerCase();
   if (!correo) errores.push({ campo: 'correoFacturacion', mensaje: 'Escribe el correo de facturación' });
   else if (correo.length > LIMITES_FACTURACION.correo || !CORREO.test(correo)) errores.push({ campo: 'correoFacturacion', mensaje: 'Escribe un correo válido, por ejemplo pagos@empresa.com' });
+  const dni = tipo === 'BOLETA' ? normalizarDni(e.dni) : '';
+  if (tipo === 'BOLETA') {
+    const d = errorDni(dni, importe ? exigeDni('BOLETA', importe.total, importe.moneda) : false);
+    if (d) errores.push(d);
+  }
   if (errores.length) return { ok: false, errores };
-  return { ok: true, datos: { razonSocial, ruc: ruc || null, direccion: direccion || null, correoFacturacion: correo, tipoComprobantePreferido: tipo as TipoComprobante } };
+  return { ok: true, datos: { razonSocial, ruc: ruc || null, direccion: direccion || null, correoFacturacion: correo, tipoComprobantePreferido: tipo as TipoComprobante, dni: dni || null } };
 }
 
 export type ResultadoMedio = { ok: true; ultimos4Digitos: string } | { ok: false; errores: ErrorCampo[] };

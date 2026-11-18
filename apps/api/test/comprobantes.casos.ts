@@ -37,7 +37,7 @@ const correoDe = (n: string) => `${n}-${sufijo}@comprobantes.test`;
 const letras = Array.from({ length: 3 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.floor(Math.random() * 24)]).join('');
 const SERIE_F = `F${letras}`;
 const SERIE_B = `B${letras}`;
-const VARIABLES = ['SITIO_ENTORNO', 'OSE_PRUEBAS_SECRETO_WEBHOOK'] as const;
+const VARIABLES = ['SITIO_ENTORNO', 'OSE_PRUEBAS_SECRETO_WEBHOOK', 'MIFACT_URL'] as const;
 
 describe.skipIf(!hayBase && !process.env.CI)('comprobantes electrónicos (HU-1707)', () => {
   let app: INestApplication;
@@ -84,6 +84,7 @@ describe.skipIf(!hayBase && !process.env.CI)('comprobantes electrónicos (HU-170
 
   beforeAll(async () => {
     Object.assign(process.env, { SITIO_ENTORNO: 'pruebas', OSE_PRUEBAS_SECRETO_WEBHOOK: SECRETO });
+    delete process.env.MIFACT_URL;
     fiscalesAntes = await prisma.datosFiscales.findUnique({ where: { id: 'principal' } });
     planId = (await prisma.plan.create({ data: { slug: `productora-cpe-${sufijo}`, nombre: 'Productora', precioMes: 1290 } })).id;
     orgId = (await prisma.organizacion.create({ data: { nombre: 'Minera Andina SAC', slug: `minera-cpe-${sufijo}`, ruc: '20999999990' } })).id;
@@ -104,6 +105,7 @@ describe.skipIf(!hayBase && !process.env.CI)('comprobantes electrónicos (HU-170
 
   beforeEach(() => {
     process.env.SITIO_ENTORNO = 'pruebas';
+    delete process.env.MIFACT_URL;
   });
 
   afterAll(async () => {
@@ -224,10 +226,10 @@ describe.skipIf(!hayBase && !process.env.CI)('comprobantes electrónicos (HU-170
   it('los datos fiscales se guardan validados y auditados, sin secretos, y con los proveedores del entorno', async () => {
     const g = await panel('get', '/ventas/datos-fiscales');
     expect(g.status).toBe(200);
-    expect(g.body.proveedores).toEqual([{ codigo: 'pruebas', nombre: 'OSE de pruebas (simulado)', disponible: true }]);
+    expect(g.body.proveedores).toEqual([{ codigo: 'pruebas', nombre: 'OSE de pruebas (simulado)', disponible: true }, { codigo: 'mifact', nombre: 'Mifact', disponible: false }]);
     const p = await panel('put', '/ventas/datos-fiscales').send({ ...fiscalesValidos, detraccionActiva: true, rucEmisor: '20000000001' });
     expect(p.status).toBe(200);
-    expect(p.body).toMatchObject({ ...fiscalesValidos, detraccionActiva: true });
+    expect(p.body).toMatchObject({ ...fiscalesValidos, detraccionActiva: true, ubigeoEmisor: '', codigoAnexo: '0000', cuentaDetraccion: '', codigoDetraccion: '' });
     expect(JSON.stringify(p.body)).not.toContain(SECRETO);
     expect(await prisma.auditoria.count({ where: { accion: 'DATOS_FISCALES_ACTUALIZADOS', entidadId: 'principal' } })).toBeGreaterThanOrEqual(1);
     const e = await panel('put', '/ventas/datos-fiscales').send({ ...fiscalesValidos, rucEmisor: '20000000002', serieBoleta: 'F002', detraccionTasa: 0, proveedor: 'nubefact', otro: 1 });
@@ -237,6 +239,51 @@ describe.skipIf(!hayBase && !process.env.CI)('comprobantes electrónicos (HU-170
     expect((await panel('put', '/ventas/datos-fiscales').send({ ...fiscalesValidos, rucEmisor: '' })).body.rucEmisor).toBeNull();
     process.env.SITIO_ENTORNO = 'produccion';
     expect((await panel('get', '/ventas/datos-fiscales')).body.proveedores[0].disponible).toBe(false);
+  });
+
+  it('HU-1712 · Mifact está disponible con MIFACT_URL (también en producción) y pide el ubigeo, el anexo y, con detracción, la cuenta y el código SPOT', async () => {
+    const mifact = { ...fiscalesValidos, proveedor: 'mifact' };
+    expect((await panel('put', '/ventas/datos-fiscales').send({ ...mifact, ubigeoEmisor: '150101' })).body.detalles).toEqual([{ campo: 'proveedor', mensaje: 'Mifact no está disponible en este entorno' }]);
+    process.env.MIFACT_URL = 'https://demo.mifact.net.pe/api/invoiceService.svc';
+    expect((await panel('get', '/ventas/datos-fiscales')).body.proveedores).toEqual([{ codigo: 'pruebas', nombre: 'OSE de pruebas (simulado)', disponible: true }, { codigo: 'mifact', nombre: 'Mifact', disponible: true }]);
+    const e = await panel('put', '/ventas/datos-fiscales').send({ ...mifact, detraccionActiva: true, codigoAnexo: '1' });
+    expect(e.body.detalles.map((d: { campo: string }) => d.campo)).toEqual(['ubigeoEmisor', 'codigoAnexo', 'cuentaDetraccion', 'codigoDetraccion']);
+    const ok = await panel('put', '/ventas/datos-fiscales').send({ ...mifact, rucEmisor: '20100100100', ubigeoEmisor: ' 150101 ', detraccionActiva: true, cuentaDetraccion: '00-000-123456', codigoDetraccion: '022' });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ proveedor: 'mifact', rucEmisor: '20100100100', ubigeoEmisor: '150101', codigoAnexo: '0000', cuentaDetraccion: '00-000-123456', codigoDetraccion: '022' });
+    // El RUC de la demo de Mifact no vale en el ambiente de producción.
+    expect((await panel('put', '/ventas/datos-fiscales').send({ ...mifact, rucEmisor: '20100100100', ubigeoEmisor: '150101', ambiente: 'produccion' })).body.detalles).toEqual([{ campo: 'rucEmisor', mensaje: 'El RUC no es válido' }]);
+    process.env.SITIO_ENTORNO = 'produccion';
+    expect((await panel('get', '/ventas/datos-fiscales')).body.proveedores.map((x: { codigo: string; disponible: boolean }) => [x.codigo, x.disponible])).toEqual([['pruebas', false], ['mifact', true]]);
+    // Mifact no avisa por webhook: se consulta cada 10 minutos.
+    expect((await aviso({ id: 'x', serie: SERIE_F, numero: 1, estado: 'ACEPTADO', motivo: null }, null, 'mifact')).status).toBe(404);
+  });
+
+  it('HU-1712 · con Mifact se descarga el CDR; el observado ya es válido y no se reenvía; la boleta pendiente de más de S/ 700 pide el DNI', async () => {
+    const ok = await comprobante('ACEPTADO', { proveedor: 'mifact' });
+    expect((await panel('get', `/ventas/comprobantes/${ok.id}/cdr`)).body.codigo).toBe('ARCHIVO_PENDIENTE');
+    const obs = await comprobante('OBSERVADO', { proveedor: 'mifact', motivo: 'Aceptado con observaciones: 4332' });
+    expect((await panel('get', `/ventas/comprobantes/${obs.id}`)).body).toMatchObject({ estado: 'OBSERVADO', reenviable: false, conCdr: false, dni: null });
+    const r = await panel('post', `/ventas/comprobantes/${obs.id}/reenviar`).send({ ruc: '20131312955', razonSocial: 'X', correoFacturacion: correoDe('x') });
+    expect(r.status).toBe(409);
+    expect(r.body.mensaje).toContain('nota de crédito');
+    const boleta = await comprobante('PENDIENTE', { proveedor: 'mifact', tipo: 'BOLETA', serie: SERIE_B, ruc: null, razonSocial: 'Ana Quispe' });
+    const sinDni = await panel('post', `/ventas/comprobantes/${boleta.id}/reenviar`).send({ ruc: null, razonSocial: 'Ana Quispe', correoFacturacion: correoDe('ana') });
+    expect(sinDni.status).toBe(422);
+    expect(sinDni.body.detalles).toEqual([{ campo: 'dni', mensaje: 'Las boletas de más de S/ 700 necesitan el DNI del comprador' }]);
+    const conDni = await panel('post', `/ventas/comprobantes/${boleta.id}/reenviar`).send({ ruc: null, dni: '4050 6089', razonSocial: 'Ana Quispe', correoFacturacion: correoDe('ana') });
+    expect(conDni.status).toBe(200);
+    expect(conDni.body).toMatchObject({ dni: '40506089', estado: 'PENDIENTE' });
+    if (!hayS3) return;
+    const clave = `comprobantes/${ok.id}/R-20000000001-01-${SERIE_F}-${String(ok.numero).padStart(8, '0')}.xml`;
+    await app.get(AlmacenService).almacen.subir(clave, '<ApplicationResponse/>', 'application/xml');
+    await prisma.comprobante.update({ where: { id: ok.id }, data: { s3KeyCdr: clave } });
+    const cdr = await panel('get', `/ventas/comprobantes/${ok.id}/cdr`);
+    expect(cdr.status).toBe(200);
+    expect(cdr.headers['content-disposition']).toBe(`attachment; filename="R-20000000001-01-${SERIE_F}-${String(ok.numero).padStart(8, '0')}.xml"`);
+    expect(cdr.text).toBe('<ApplicationResponse/>');
+    expect((await panel('get', `/ventas/comprobantes/${ok.id}`)).body.conCdr).toBe(true);
+    expect(await prisma.auditoria.findFirst({ where: { accion: 'COMPROBANTE_DESCARGADO', entidadId: ok.id } })).toMatchObject({ datos: { formato: 'cdr' } });
   });
 
   it('el reembolso de un cobro encola su nota de crédito', async () => {

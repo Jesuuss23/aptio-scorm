@@ -138,6 +138,9 @@ export const opcionesTareaIntento = (renovacionId: string, ahora = Date.now()) =
 export const COLA_COMPROBANTES = 'comprobantes';
 export const TAREA_EMITIR_COMPROBANTE = 'emitir-comprobante';
 export const INTENTOS_COMPROBANTES = 6;
+/** HU-1712 · Consulta periódica (cola `mantenimiento`) del estado de los comprobantes pendientes en el OSE real. */
+export const TAREA_CONSULTAR_COMPROBANTES = 'consultar-comprobantes';
+export const CADA_CONSULTAR_COMPROBANTES_MS = 10 * 60_000;
 /**
  * HU-1707 · Sin `tipo`, la factura o la boleta del cobro; con `NOTA_CREDITO`, la nota de crédito de su reembolso. Con
  * `comprobanteId`, vuelve a enviar ese comprobante (corregido u observado) o, si el OSE ya lo aceptó, solo lo envía por

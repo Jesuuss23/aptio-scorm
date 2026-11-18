@@ -3,13 +3,15 @@
 // un observado (o pendiente), que vuelve a enviar el mismo número al OSE; y «Datos fiscales», el emisor, las series, el
 // proveedor OSE, el ambiente y la detracción, con el aviso de que esta última está por validar con el contador. Los
 // secretos del OSE viven en variables de entorno, nunca aquí. Solo el superadmin (ADR-011).
+// HU-1712: con Mifact, la descarga del CDR de SUNAT, el DNI de la boleta al corregir, y en los datos fiscales el ubigeo,
+// el anexo, la cuenta de detracciones y el código SPOT.
 // HU-1709: la tercera pestaña, «Cupones» (`VentasCupones.tsx`).
-import { LIMITES_FISCALES, validarDatosFiscales, validarReceptor } from '@aptio/schema/comprobantes';
+import { LIMITES_FISCALES, exigeDni, validarDatosFiscales, validarReceptor } from '@aptio/schema/comprobantes';
 import { monto2 } from '@aptio/schema/suscripciones';
 import { Cabecera } from '@aptio/ui';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Cupones } from './VentasCupones';
-import { api, type ComprobanteVenta, type DatosFiscalesConProveedores, type DatosFiscalesVenta, ErrorApi, type EstadoComprobante } from '../api';
+import { api, type ComprobanteVenta, type DatosFiscalesConProveedores, type DatosFiscalesVenta, ErrorApi, type EstadoComprobante, type FormatoComprobante, type ReceptorComprobante } from '../api';
 
 const mensajeDe = (e: unknown, defecto: string) => (e instanceof ErrorApi ? e.message : defecto);
 type Aviso = { tipo: 'ok' | 'error'; texto: string } | null;
@@ -62,7 +64,7 @@ function Comprobantes() {
     .then((r) => { setLista(r.comprobantes); setError(''); }, (e: unknown) => setError(mensajeDe(e, 'No se pudieron cargar los comprobantes')));
   useEffect(() => { void cargar(''); }, []);
 
-  async function descargar(c: ComprobanteVenta, formato: 'pdf' | 'xml') {
+  async function descargar(c: ComprobanteVenta, formato: FormatoComprobante) {
     setAviso(null);
     try {
       const { archivo, nombre } = await api.archivoComprobante(c.id, formato);
@@ -116,7 +118,7 @@ function Comprobantes() {
             {lista.map((c) => (
               <tr key={c.id}>
                 <th scope="row" data-etiqueta="Comprobante"><b>{c.numeroCompleto}</b><br /><span className="sec">{TIPOS[c.tipo]} · {fecha(c.emitidoEn)}{c.referencia ? ` · corrige ${c.referencia}` : ''}</span></th>
-                <td data-etiqueta="Cliente">{c.razonSocial}<br /><span className="sec">{c.ruc ? `RUC ${c.ruc}` : 'Sin documento'} · {c.correoFacturacion}</span></td>
+                <td data-etiqueta="Cliente">{c.razonSocial}<br /><span className="sec">{c.ruc ? `RUC ${c.ruc}` : c.dni ? `DNI ${c.dni}` : 'Sin documento'} · {c.correoFacturacion}</span></td>
                 <td className="num" data-etiqueta="Total">{monto2(c.total, c.moneda)}<br /><span className="sec">IGV {monto2(c.igv, c.moneda)}{c.detraccion !== null ? ` · detracción ${monto2(c.detraccion, 'PEN')}` : ''}</span></td>
                 <td data-etiqueta="Estado SUNAT"><span className={`chip ${ESTADOS[c.estado].chip}`}>{ESTADOS[c.estado].nombre}</span>{c.motivo ? <><br /><span className="sec">{c.motivo}</span></> : null}</td>
                 <td data-etiqueta="Archivos y acciones">
@@ -127,6 +129,7 @@ function Comprobantes() {
                         <button type="button" className="boton" onClick={() => void descargar(c, 'xml')}>XML<span className="sr"> de {c.numeroCompleto}</span></button>
                       </>
                     ) : <span className="sec">Archivos en preparación</span>}
+                    {c.conCdr ? <button type="button" className="boton" onClick={() => void descargar(c, 'cdr')}>CDR<span className="sr"> de SUNAT de {c.numeroCompleto}</span></button> : null}
                     {c.reenviable ? <button type="button" className="boton primario" onClick={() => { setAviso(null); setCorrigiendo(c); }}>Corregir y reenviar<span className="sr"> {c.numeroCompleto}</span></button> : null}
                   </div>
                 </td>
@@ -139,8 +142,9 @@ function Comprobantes() {
   );
 }
 
-function CorregirReenviar({ c, alReenviar, alCancelar }: { c: ComprobanteVenta; alReenviar: (r: { ruc: string | null; razonSocial: string; direccion: string | null; correoFacturacion: string }) => Promise<string[]>; alCancelar: () => void }) {
+function CorregirReenviar({ c, alReenviar, alCancelar }: { c: ComprobanteVenta; alReenviar: (r: ReceptorComprobante) => Promise<string[]>; alCancelar: () => void }) {
   const [ruc, setRuc] = useState(c.ruc ?? '');
+  const [dni, setDni] = useState(c.dni ?? '');
   const [razonSocial, setRazonSocial] = useState(c.razonSocial);
   const [direccion, setDireccion] = useState(c.direccion ?? '');
   const [correo, setCorreo] = useState(c.correoFacturacion);
@@ -155,8 +159,9 @@ function CorregirReenviar({ c, alReenviar, alCancelar }: { c: ComprobanteVenta; 
       {c.motivo ? <p className="nota aviso">El OSE respondió: {c.motivo}</p> : null}
       <form noValidate aria-label={`Receptor de ${c.numeroCompleto}`} onSubmit={(e) => {
         e.preventDefault();
-        const r = { ruc: ruc.trim() || null, razonSocial: razonSocial.trim(), direccion: direccion.trim() || null, correoFacturacion: correo.trim() };
-        const errs = validarReceptor(r, c.tipo).map((x) => x.mensaje);
+        const r: ReceptorComprobante = { ruc: ruc.trim() || null, razonSocial: razonSocial.trim(), direccion: direccion.trim() || null, correoFacturacion: correo.trim() };
+        if (c.tipo === 'BOLETA') r.dni = dni.trim() || null;
+        const errs = validarReceptor(r, c.tipo, { total: c.total, moneda: c.moneda }).map((x) => x.mensaje);
         setErrores(errs);
         if (errs.length) return;
         setOcupado(true);
@@ -165,6 +170,9 @@ function CorregirReenviar({ c, alReenviar, alCancelar }: { c: ComprobanteVenta; 
         {errores.length ? <div className="nota error" role="alert"><ul>{errores.map((x) => <li key={x}>{x}</li>)}</ul></div> : null}
         <div className="plan-campos">
           <p className="campo"><label htmlFor={`${id}-ruc`}>RUC{c.tipo === 'FACTURA' ? '' : ' (opcional)'}</label><input id={`${id}-ruc`} type="text" inputMode="numeric" autoComplete="off" maxLength={11} value={ruc} onChange={(e) => setRuc(e.target.value)} /></p>
+          {c.tipo === 'BOLETA' ? (
+            <p className="campo"><label htmlFor={`${id}-dni`}>DNI del comprador{exigeDni('BOLETA', c.total, c.moneda) ? '' : ' (opcional)'}</label><input id={`${id}-dni`} type="text" inputMode="numeric" autoComplete="off" maxLength={10} value={dni} onChange={(e) => setDni(e.target.value)} aria-describedby={`${id}-dni-ayuda`} /><span id={`${id}-dni-ayuda`} className="sec">Las boletas de más de S/ 700 (o US$ 200) llevan el DNI de 8 dígitos.</span></p>
+          ) : null}
           <p className="campo"><label htmlFor={`${id}-razon`}>Razón social o nombre</label><input id={`${id}-razon`} type="text" maxLength={LIMITES_FISCALES.razonSocial} value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} /></p>
           <p className="campo"><label htmlFor={`${id}-direccion`}>Dirección (opcional)</label><input id={`${id}-direccion`} type="text" maxLength={LIMITES_FISCALES.direccion} value={direccion} onChange={(e) => setDireccion(e.target.value)} /></p>
           <p className="campo"><label htmlFor={`${id}-correo`}>Correo de facturación</label><input id={`${id}-correo`} type="email" maxLength={LIMITES_FISCALES.correo} value={correo} onChange={(e) => setCorreo(e.target.value)} /></p>
@@ -201,6 +209,7 @@ function FormularioFiscal({ inicial, alGuardar }: { inicial: DatosFiscalesConPro
   async function guardar() {
     const d: DatosFiscalesVenta = {
       ...v, rucEmisor: v.rucEmisor.trim() || null, razonSocialEmisor: v.razonSocialEmisor.trim(), direccionEmisor: v.direccionEmisor.trim(),
+      ubigeoEmisor: v.ubigeoEmisor.trim(), codigoAnexo: v.codigoAnexo.trim(), cuentaDetraccion: v.cuentaDetraccion.trim(), codigoDetraccion: v.codigoDetraccion.trim(),
       serieFactura: v.serieFactura.trim().toUpperCase(), serieBoleta: v.serieBoleta.trim().toUpperCase(), serieNotaFactura: v.serieNotaFactura.trim().toUpperCase(), serieNotaBoleta: v.serieNotaBoleta.trim().toUpperCase(),
       detraccionTasa: Number(v.detraccionTasa.replace(',', '.')), detraccionUmbralPen: Number(v.detraccionUmbralPen.replace(',', '.')),
     };
@@ -230,6 +239,8 @@ function FormularioFiscal({ inicial, alGuardar }: { inicial: DatosFiscalesConPro
           <p className="campo"><label htmlFor="fiscal-ruc">RUC del emisor</label><input id="fiscal-ruc" type="text" inputMode="numeric" maxLength={11} value={v.rucEmisor} onChange={campo('rucEmisor')} aria-describedby="fiscal-ruc-ayuda" /><span id="fiscal-ruc-ayuda" className="sec">Sin RUC, los comprobantes quedan pendientes.</span></p>
           <p className="campo"><label htmlFor="fiscal-razon">Razón social</label><input id="fiscal-razon" type="text" maxLength={LIMITES_FISCALES.razonSocial} value={v.razonSocialEmisor} onChange={campo('razonSocialEmisor')} /></p>
           <p className="campo"><label htmlFor="fiscal-direccion">Domicilio fiscal</label><input id="fiscal-direccion" type="text" maxLength={LIMITES_FISCALES.direccion} value={v.direccionEmisor} onChange={campo('direccionEmisor')} /></p>
+          <p className="campo"><label htmlFor="fiscal-ubigeo">Ubigeo del domicilio fiscal{v.proveedor === 'mifact' ? '' : ' (opcional)'}</label><input id="fiscal-ubigeo" type="text" inputMode="numeric" maxLength={6} value={v.ubigeoEmisor} onChange={campo('ubigeoEmisor')} aria-describedby="fiscal-ubigeo-ayuda" /><span id="fiscal-ubigeo-ayuda" className="sec">Código INEI de 6 dígitos (por ejemplo, 150101 es Lima). Mifact lo exige.</span></p>
+          <p className="campo"><label htmlFor="fiscal-anexo">Código de anexo SUNAT</label><input id="fiscal-anexo" type="text" inputMode="numeric" maxLength={4} value={v.codigoAnexo} onChange={campo('codigoAnexo')} aria-describedby="fiscal-anexo-ayuda" /><span id="fiscal-anexo-ayuda" className="sec">0000 para el domicilio fiscal principal.</span></p>
         </div>
       </fieldset>
       <fieldset className="plan-rasgos">
@@ -246,7 +257,7 @@ function FormularioFiscal({ inicial, alGuardar }: { inicial: DatosFiscalesConPro
             <select id="fiscal-proveedor" value={v.proveedor} onChange={campo('proveedor')} aria-describedby="fiscal-proveedor-ayuda">
               {inicial.proveedores.map((p) => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
             </select>
-            <span id="fiscal-proveedor-ayuda" className="sec">{proveedor?.disponible ? 'Disponible en este entorno. Sus credenciales van en variables de entorno, nunca aquí.' : 'No está disponible en este entorno: los comprobantes quedan pendientes.'}</span>
+            <span id="fiscal-proveedor-ayuda" className="sec">{proveedor?.disponible ? `Disponible en este entorno. Sus credenciales van en variables de entorno, nunca aquí.${v.proveedor === 'mifact' ? ' El RUC del emisor debe ser el mismo del token de Mifact.' : ''}` : 'No está disponible en este entorno: elige otro proveedor.'}</span>
           </p>
           <p className="campo">
             <label htmlFor="fiscal-ambiente">Ambiente</label>
@@ -264,6 +275,8 @@ function FormularioFiscal({ inicial, alGuardar }: { inicial: DatosFiscalesConPro
         <div className="plan-campos">
           <p className="campo"><label htmlFor="fiscal-tasa">Tasa (%)</label><input id="fiscal-tasa" type="text" inputMode="decimal" value={v.detraccionTasa} onChange={campo('detraccionTasa')} /></p>
           <p className="campo"><label htmlFor="fiscal-umbral">Umbral en soles (con IGV)</label><input id="fiscal-umbral" type="text" inputMode="decimal" value={v.detraccionUmbralPen} onChange={campo('detraccionUmbralPen')} /></p>
+          <p className="campo"><label htmlFor="fiscal-cuenta">Cuenta de detracciones (Banco de la Nación)</label><input id="fiscal-cuenta" type="text" inputMode="numeric" maxLength={30} value={v.cuentaDetraccion} onChange={campo('cuentaDetraccion')} /></p>
+          <p className="campo"><label htmlFor="fiscal-spot">Código del servicio (SPOT)</label><input id="fiscal-spot" type="text" inputMode="numeric" maxLength={3} value={v.codigoDetraccion} onChange={campo('codigoDetraccion')} aria-describedby="fiscal-spot-ayuda" /><span id="fiscal-spot-ayuda" className="sec">3 dígitos del catálogo de SUNAT. Con Mifact y la detracción activa, la cuenta y el código son obligatorios.</span></p>
         </div>
       </fieldset>
       <div className="acciones-fila"><button type="submit" className="boton primario" disabled={ocupado}>Guardar los datos fiscales</button></div>

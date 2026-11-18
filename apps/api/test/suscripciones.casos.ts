@@ -133,8 +133,14 @@ describe.skipIf(!hayBase && !process.env.CI)('alta de suscripción (HU-1703)', (
     expect((await checkout(empresa(correoDe('malo'), { ciclo: 'SEMANAL' }))).body.detalles[0].campo).toBe('ciclo');
     expect(await solicitudesDe(correoDe('malo'))).toHaveLength(0);
 
-    const anual = await checkout(empresa(correoDe('anual'), { ciclo: 'ANUAL', ruc: '' }));
+    // HU-1712 · Sin RUC es boleta y pasa de S/ 700: pide el DNI del comprador.
+    const sinDni = await checkout(empresa(correoDe('anual'), { ciclo: 'ANUAL', ruc: '' }));
+    expect(sinDni.status).toBe(422);
+    expect(sinDni.body.detalles).toEqual([{ campo: 'dni', mensaje: 'Las boletas de más de S/ 700 necesitan el DNI del comprador' }]);
+    expect(await solicitudesDe(correoDe('anual'))).toHaveLength(0);
+    const anual = await checkout(empresa(correoDe('anual'), { ciclo: 'ANUAL', ruc: '', dni: '40506089' }));
     expect(anual.status).toBe(201);
+    expect(await prisma.solicitudSuscripcion.findUniqueOrThrow({ where: { id: anual.body.id } })).toMatchObject({ tipoComprobante: 'BOLETA', dniReceptor: '40506089' });
     expect(anual.body).toMatchObject({ estado: 'PENDIENTE', tipoComprobante: 'BOLETA', pasarela: 'pruebas', pago: { tipo: 'simulado' }, resumen: { ciclo: 'ANUAL', subtotal: 12384, igv: 2229.12, total: 14613.12, moneda: 'PEN' } });
   });
 

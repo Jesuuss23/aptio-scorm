@@ -1,6 +1,7 @@
 // HU-1711 · Facturación de la organización (PNT-40, REQ-091, CP-153). El administrador ve las 4 secciones (plan y
 // consumo, comprobantes, medio de pago y datos de facturación), descarga el PDF y el XML, cambia la tarjeta de prueba
-// (solo los 4 últimos dígitos, sin CVV) y edita sus datos fiscales (la factura exige RUC; la boleta no). Con Stripe ve el
+// (solo los 4 últimos dígitos, sin CVV) y edita sus datos fiscales (la factura exige RUC; la boleta no, pero pide el DNI
+// si el plan supera S/ 700 con IGV, HU-1712). Con Stripe ve el
 // aviso del cobro por enlace. Todo con el teclado; axe WCAG 2.2 A/AA a 390 y 1280 px.
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page, test } from '@playwright/test';
@@ -102,9 +103,19 @@ for (const ancho of [1280, 390]) {
     await expect(datos.getByRole('radio', { name: 'Boleta' })).toBeChecked();
     const rucOpcional = datos.getByLabel('RUC (opcional)');
     await escribir(page, rucOpcional, '');
+    // HU-1712 · El plan supera S/ 700 con IGV: la boleta pide el DNI del comprador.
+    const dni = datos.getByLabel('DNI del comprador', { exact: true });
+    await expect(dni).toHaveAccessibleDescription(/Tu plan supera S\/ 700 con IGV/);
+    await pulsar(page, datos.getByRole('button', { name: 'Guardar los datos' }));
+    await expect(dni).toBeFocused();
+    await expect(dni).toHaveAttribute('aria-invalid', 'true');
+    await expect(datos).toContainText('Las boletas de más de S/ 700 necesitan el DNI del comprador');
+    await sinViolaciones(page);
+    await escribir(page, dni, '4050 6089');
     await pulsar(page, datos.getByRole('button', { name: 'Guardar los datos' }));
     await expect(datos.getByRole('status')).toContainText('Se guardaron tus datos de facturación');
     await expect(rucOpcional).toHaveValue('');
+    await expect(dni).toHaveValue('40506089');
     await sinViolaciones(page);
     await sinDesbordeHorizontal(page);
 

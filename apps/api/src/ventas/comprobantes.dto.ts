@@ -11,6 +11,7 @@ export class ComprobanteDto {
   @ApiProperty({ format: 'uuid' }) cobroId: string;
   @ApiProperty({ type: String, nullable: true, example: 'F001-00000001', description: 'La nota de crédito: el comprobante que corrige' }) referencia: string | null;
   @ApiProperty({ type: String, nullable: true, example: '20131312955', description: 'null en una boleta sin documento' }) ruc: string | null;
+  @ApiProperty({ type: String, nullable: true, example: '40506089', description: 'HU-1712 · DNI del comprador en una boleta (obligatorio desde S/ 700)' }) dni: string | null;
   @ApiProperty({ example: 'Minera Andina SAC' }) razonSocial: string;
   @ApiProperty({ type: String, nullable: true }) direccion: string | null;
   @ApiProperty({ example: 'pagos@minera.pe' }) correoFacturacion: string;
@@ -24,7 +25,8 @@ export class ComprobanteDto {
   @ApiProperty({ example: 'pruebas' }) proveedor: string;
   @ApiProperty({ enum: ['pruebas', 'produccion'] }) ambiente: string;
   @ApiProperty({ description: 'Ya hay PDF y XML en el almacenamiento' }) conArchivos: boolean;
-  @ApiProperty({ description: 'Observado o pendiente: se puede corregir el receptor y reenviar' }) reenviable: boolean;
+  @ApiProperty({ description: 'HU-1712 · Ya está la constancia de recepción de SUNAT (CDR); solo con un proveedor real' }) conCdr: boolean;
+  @ApiProperty({ description: 'Se puede corregir el receptor y reenviar: pendiente, u observado por el OSE simulado (con Mifact el observado ya es válido)' }) reenviable: boolean;
   @ApiProperty() intentos: number;
   @ApiProperty({ format: 'date-time' }) emitidoEn: string;
   @ApiProperty({ type: String, format: 'date-time', nullable: true }) correoEnviadoEn: string | null;
@@ -43,6 +45,7 @@ export class FiltroComprobantesDto {
 /** CP-149 · El receptor corregido. La validación es de `@aptio/schema/comprobantes` (una factura exige RUC válido). */
 export class ReenvioComprobanteDto {
   @ApiProperty({ type: String, nullable: true, example: '20131312955' }) ruc: string | null;
+  @ApiPropertyOptional({ type: String, nullable: true, example: '40506089', description: 'HU-1712 · Boleta: 8 dígitos, obligatorio desde S/ 700' }) dni?: string | null;
   @ApiProperty({ example: 'Minera Andina SAC', maxLength: 200 }) razonSocial: string;
   @ApiPropertyOptional({ type: String, nullable: true, maxLength: 250 }) direccion?: string | null;
   @ApiProperty({ example: 'pagos@minera.pe' }) correoFacturacion: string;
@@ -51,7 +54,7 @@ export class ReenvioComprobanteDto {
 export class ProveedorOseDto {
   @ApiProperty({ example: 'pruebas' }) codigo: string;
   @ApiProperty({ example: 'OSE de pruebas (simulado)' }) nombre: string;
-  @ApiProperty({ description: 'Existe en este entorno (el simulado solo con SITIO_ENTORNO=pruebas)' }) disponible: boolean;
+  @ApiProperty({ description: 'Existe en este entorno (el simulado solo con SITIO_ENTORNO=pruebas; Mifact con MIFACT_URL)' }) disponible: boolean;
 }
 
 /** HU-1707 · Los datos fiscales del emisor. Los secretos del OSE viven solo en variables de entorno, nunca aquí. */
@@ -68,6 +71,10 @@ export class DatosFiscalesEntradaDto {
   @ApiProperty({ description: 'RN-18-9 · Por validar con el contador (SUP-317)' }) detraccionActiva: boolean;
   @ApiProperty({ example: 12, description: 'Porcentaje' }) detraccionTasa: number;
   @ApiProperty({ example: 700, description: 'Desde este total en soles (con IGV)' }) detraccionUmbralPen: number;
+  @ApiProperty({ example: '150101', description: 'HU-1712 · Ubigeo INEI del domicilio fiscal (6 dígitos); obligatorio con Mifact' }) ubigeoEmisor: string;
+  @ApiProperty({ example: '0000', description: 'HU-1712 · Código de anexo SUNAT del establecimiento (0000 = principal)' }) codigoAnexo: string;
+  @ApiProperty({ example: '00-000-123456', description: 'HU-1712 · Cuenta de detracciones del Banco de la Nación; obligatoria con Mifact y la detracción activa' }) cuentaDetraccion: string;
+  @ApiProperty({ example: '022', description: 'HU-1712 · Código del bien o servicio sujeto a detracción (SPOT, 3 dígitos), por validar con el contador' }) codigoDetraccion: string;
 }
 
 export class DatosFiscalesDto extends DatosFiscalesEntradaDto {

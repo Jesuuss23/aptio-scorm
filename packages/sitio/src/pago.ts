@@ -3,6 +3,7 @@
  * `/pago?plan={slug}` (y `/en/pago`), sin indexar, sin popups ni chat, con un contenedor de altura reservada (CLS 0) y
  * un script propio, diferido y sin cookies (`{base}/_checkout.js`) que guía en tres pasos:
  * 1. Empresa: razón social, RUC opcional (con el dígito verificador de SUNAT: con RUC, factura; sin RUC, boleta),
+ *    HU-1712: el DNI para la boleta (8 dígitos; obligatorio si el total supera S/ 700 o US$ 200: se avisa al pagar),
  *    administrador, correo y consentimiento;
  * 2. Resumen: mensual o anual (si la página lo ofrece), subtotal, IGV de 18 % y total, con el precio del plan publicado;
  *    HU-1709: el «Código de cupón» con «Aplicar» (vista previa en `POST …/checkout/cupon`, mensaje en `role="status"`) y
@@ -14,6 +15,7 @@
  * en dólares), el paso 2 ofrece la moneda. Al volver de la página alojada (`?checkout={id}`), espera la confirmación. El precio y la validación finales los pone la API (`POST /api/v1/publico/checkout`).
  * Sin JavaScript, el `<noscript>` lleva a agendar una demo. Los textos van con `textContent`, nunca como HTML.
  */
+import { UMBRAL_DNI_BOLETA } from '@aptio/schema/comprobantes';
 import { CLAVE_SESION } from './captacion.js';
 
 export const ARCHIVO_CHECKOUT = '_checkout.js';
@@ -31,6 +33,7 @@ export const TEXTOS_PAGO = {
     pasos: ['Empresa', 'Resumen', 'Pago'], paso: 'Paso', de: 'de', planElegido: 'Plan elegido',
     noPlan: 'Este plan no se puede contratar en línea. Elige otro plan o agenda una demo y te ayudamos.', caido: 'No pudimos cargar el plan. Recarga la página o agenda una demo.',
     empresa: 'Datos de la empresa', razonSocial: 'Razón social o nombre', ruc: 'RUC (opcional)', rucAyuda: 'Con RUC emitimos factura; sin RUC, boleta de venta.',
+    dni: 'DNI (para la boleta)', dniAyuda: 'Sin RUC, las boletas de más de S/ 700 llevan tu DNI de 8 dígitos.', eDni: 'El DNI tiene 8 dígitos', eDniFalta: 'Las boletas de más de S/ 700 necesitan el DNI del comprador',
     nombreAdmin: 'Nombre de quien administrará la cuenta', correoAdmin: 'Correo de quien administrará la cuenta', correoAyuda: 'Ahí llega el enlace para crear la clave.',
     consentimiento: 'Acepto los términos del servicio y el tratamiento de mis datos personales para crear y administrar la cuenta (Ley 29733).',
     continuar: 'Continuar', volver: 'Volver', revisa: 'Revisa estos datos:',
@@ -64,6 +67,7 @@ export const TEXTOS_PAGO = {
     pasos: ['Company', 'Summary', 'Payment'], paso: 'Step', de: 'of', planElegido: 'Chosen plan',
     noPlan: "This plan can't be bought online. Choose another plan or book a demo and we'll help you.", caido: "We couldn't load the plan. Reload the page or book a demo.",
     empresa: 'Company details', razonSocial: 'Legal name or your name', ruc: 'RUC tax ID (optional)', rucAyuda: 'With a RUC we issue an invoice (factura); without it, a receipt (boleta).',
+    dni: 'DNI (for the receipt)', dniAyuda: 'Without a RUC, receipts over S/ 700 carry your 8-digit DNI.', eDni: 'The DNI has 8 digits', eDniFalta: 'Receipts over S/ 700 need the buyer’s DNI',
     nombreAdmin: 'Name of the account administrator', correoAdmin: 'Email of the account administrator', correoAyuda: 'The link to create the password goes there.',
     consentimiento: 'I accept the terms of service and the processing of my personal data to create and manage the account (Peruvian Law 29733).',
     continuar: 'Continue', volver: 'Back', revisa: 'Check these details:',
@@ -133,9 +137,9 @@ export const SCRIPT_CHECKOUT = `(function(){try{
 var raiz=document.querySelector('[data-checkout]');if(!raiz)return;
 var b=raiz.getAttribute('data-base')||'',L=document.documentElement.lang==='en'?'en':'es',T=${JSON.stringify(TEXTOS_PAGO)}[L],API=${JSON.stringify(RUTA_CHECKOUT_API)},PL=${JSON.stringify(RUTA_PLANES_API)};
 var q=new URLSearchParams(location.search),slug=(q.get('plan')||'').slice(0,60);
-var S={paso:1,plan:null,ajustes:null,ciclo:'MENSUAL',moneda:'PEN',monedas:['PEN'],d:{razonSocial:'',ruc:'',nombreAdmin:'',correoAdmin:'',consentimiento:false},err:{},aviso:null,co:null,res:null,sinPasarela:false,ocupado:false,volviendo:false,cupon:null,cuponTexto:'',cuponMsg:null,aplicando:false};
-var NOMBRES={stripe:'Stripe',culqi:'Culqi'},CULQI=${JSON.stringify(SCRIPT_CULQI)};
-var CAMPOS=['razonSocial','ruc','nombreAdmin','correoAdmin','consentimiento'];
+var S={paso:1,plan:null,ajustes:null,ciclo:'MENSUAL',moneda:'PEN',monedas:['PEN'],d:{razonSocial:'',ruc:'',dni:'',nombreAdmin:'',correoAdmin:'',consentimiento:false},err:{},aviso:null,co:null,res:null,sinPasarela:false,ocupado:false,volviendo:false,cupon:null,cuponTexto:'',cuponMsg:null,aplicando:false};
+var NOMBRES={stripe:'Stripe',culqi:'Culqi'},CULQI=${JSON.stringify(SCRIPT_CULQI)},UMBRAL_DNI=${JSON.stringify(UMBRAL_DNI_BOLETA)};
+var CAMPOS=['razonSocial','ruc','dni','nombreAdmin','correoAdmin','consentimiento'];
 function el(t,a,h){var e=document.createElement(t);if(a)for(var k in a){var v=a[k];if(v===null||v===undefined||v===false)continue;if(k==='text')e.textContent=v;else if(k.indexOf('on')===0)e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?'':v)}if(h)for(var i=0;i<h.length;i++)if(h[i])e.appendChild(typeof h[i]==='string'?document.createTextNode(h[i]):h[i]);return e}
 function soles(n){return'S/ '+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function dinero(n,m){return(m==='USD'?'US$ ':'S/ ')+Number(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -166,14 +170,17 @@ function pasoEmpresa(){var ok=S.err.consentimiento;
 return[el('h2',{tabindex:'-1',text:T.empresa}),planLinea(),aviso(),el('form',{novalidate:true,onsubmit:siguiente},[
 campo('razonSocial','text',T.razonSocial,{required:true,maxlength:'150',autocomplete:'organization'}),
 campo('ruc','text',T.ruc,{inputmode:'numeric',maxlength:'13',autocomplete:'off'},T.rucAyuda),
+campo('dni','text',T.dni,{inputmode:'numeric',maxlength:'10',autocomplete:'off'},T.dniAyuda),
 campo('nombreAdmin','text',T.nombreAdmin,{required:true,maxlength:'120',autocomplete:'name'}),
 campo('correoAdmin','email',T.correoAdmin,{required:true,maxlength:'160',autocomplete:'email'},T.correoAyuda),
 el('p',{'class':'pg-ok'},[el('input',{id:'pg-consentimiento',name:'consentimiento',type:'checkbox',required:true,checked:S.d.consentimiento,'aria-invalid':ok?'true':null,'aria-describedby':ok?'pg-consentimiento-e':null}),el('label',{'for':'pg-consentimiento',text:T.consentimiento}),ok?el('span',{id:'pg-consentimiento-e','class':'pg-error',style:'grid-column:2',text:ok}):null]),
 el('div',{'class':'pg-acciones'},[el('button',{'class':'btn primary',type:'submit',text:T.continuar})])])]}
 function leer(f){CAMPOS.forEach(function(n){var x=f.elements.namedItem(n);if(!x)return;S.d[n]=n==='consentimiento'?x.checked:x.value})}
-function validar(){var e={},d=S.d,c=d.correoAdmin.trim(),r=d.ruc.replace(/[\\s-]/g,'');
+function dniLimpio(){return S.d.dni.replace(/[\\s.-]/g,'')}
+function validar(){var e={},d=S.d,c=d.correoAdmin.trim(),r=d.ruc.replace(/[\\s-]/g,''),n=dniLimpio();
 if(!d.razonSocial.trim())e.razonSocial=T.eRazon;
 if(r&&!/^\\d{11}$/.test(r))e.ruc=T.eRuc11;else if(r&&!rucOk(r))e.ruc=T.eRuc;
+if(!r&&n&&!/^\\d{8}$/.test(n))e.dni=T.eDni;
 if(!d.nombreAdmin.trim())e.nombreAdmin=T.eNombre;
 if(!/^[^\\s@<>"]+@[^\\s@<>"]+\\.[^\\s@<>"]{2,}$/.test(c))e.correoAdmin=T.eCorreo;
 if(!d.consentimiento)e.consentimiento=T.eOk;return e}
@@ -190,7 +197,7 @@ if(anualDisponible()){var ah=ahorro(),op=[['MENSUAL',T.mensual+' · '+fmt(mes())
 hijos.push(radios('ciclo',T.ciclo,op,S.ciclo,function(c){S.ciclo=c}))}
 hijos.push(formaCupon());
 var dsc=desc(s),base=r2(s-dsc);
-var dl=el('dl',null,[].concat(fila(T.planElegido,S.plan.nombre+' · '+(S.ciclo==='ANUAL'?T.anual:T.mensual)),fila(T.subtotal,fmt(s)),S.cupon?fila(T.descuento.replace('{c}',S.cupon.codigo).replace('{p}',S.cupon.porcentaje),'−'+fmt(dsc)):[],fila(T.igv,fmt(igv(base))),fila(T.comprobante,r?T.factura+' '+r:T.boleta),fila(T.total,fmt(conIgv(base)),true)));
+var dl=el('dl',null,[].concat(fila(T.planElegido,S.plan.nombre+' · '+(S.ciclo==='ANUAL'?T.anual:T.mensual)),fila(T.subtotal,fmt(s)),S.cupon?fila(T.descuento.replace('{c}',S.cupon.codigo).replace('{p}',S.cupon.porcentaje),'−'+fmt(dsc)):[],fila(T.igv,fmt(igv(base))),fila(T.comprobante,r?T.factura+' '+r:T.boleta+(dniLimpio()?' · DNI '+dniLimpio():'')),fila(T.total,fmt(conIgv(base)),true)));
 hijos.push(dl);
 hijos.push(el('div',{'class':'pg-acciones'},[el('button',{'class':'btn',type:'button',text:T.volver,onclick:function(){S.aviso=null;ir(1)}}),el('button',{'class':'btn primary',type:'button',id:'pg-a-pagar',disabled:S.ocupado,text:S.ocupado?T.enviando:T.aPagar,onclick:crear})]));
 return hijos}
@@ -209,8 +216,11 @@ fetch(API+'/cupon',{method:'POST',headers:{'Content-Type':'application/json'},bo
 if(r.s===200&&r.d.resumen&&r.d.resumen.cupon){var c=r.d.resumen.cupon;S.cupon={codigo:c.codigo,porcentaje:c.porcentaje,ciclos:c.ciclosDescuento};S.cuponMsg={ok:true,texto:T.cuponOk.replace('{c}',c.codigo).replace('{p}',c.porcentaje).replace('{d}',ciclosTexto(c.ciclosDescuento))};pintar();return enfocarCupon('pg-quitar')}
 S.cupon=null;var d=r.d&&r.d.detalles&&r.d.detalles[0];S.cuponMsg={ok:false,texto:(r.s===429?T.demasiados:r.s===422?motivoTexto(d):T.fallo)+' '+T.sinCambio};pintar();enfocarCupon()}).catch(function(){S.aplicando=false;S.cupon=null;S.cuponMsg={ok:false,texto:T.fallo+' '+T.sinCambio};pintar();enfocarCupon()})}
 function quitarCupon(){S.cupon=null;S.cuponTexto='';S.cuponMsg={ok:true,texto:T.cuponQuitado};pintar();enfocarCupon()}
-function crear(){if(S.ocupado)return;S.ocupado=true;S.aviso=null;pintar();
-var c={plan:slug,ciclo:S.ciclo,moneda:S.moneda,cupon:S.cupon?S.cupon.codigo:undefined,razonSocial:S.d.razonSocial,ruc:S.d.ruc,nombreAdmin:S.d.nombreAdmin,correoAdmin:S.d.correoAdmin,consentimiento:S.d.consentimiento,idioma:L,paginaFormulario:location.pathname};
+function crear(){if(S.ocupado)return;
+var rr=S.d.ruc.replace(/[\\s-]/g,''),nn=dniLimpio(),tt=conIgv(r2(subtotal()-desc(subtotal())));
+if(!rr&&!nn&&tt>UMBRAL_DNI[S.moneda]){S.err={dni:T.eDniFalta};S.aviso={texto:T.revisa,lista:[T.eDniFalta]};ir(1);var z=raiz.querySelector('#pg-dni');if(z)z.focus();return}
+S.ocupado=true;S.aviso=null;pintar();
+var c={plan:slug,ciclo:S.ciclo,moneda:S.moneda,cupon:S.cupon?S.cupon.codigo:undefined,razonSocial:S.d.razonSocial,ruc:S.d.ruc,dni:rr?undefined:(nn||undefined),nombreAdmin:S.d.nombreAdmin,correoAdmin:S.d.correoAdmin,consentimiento:S.d.consentimiento,idioma:L,paginaFormulario:location.pathname};
 var s=sesion();for(var k in s)if(typeof s[k]==='string'&&!(k in c))c[k]=s[k];if(!c.paginaEntrada)c.paginaEntrada=location.pathname;
 fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(c),credentials:'omit'}).then(json).then(function(r){S.ocupado=false;
 if(r.s===201){S.co=r.d;S.sinPasarela=false;return ir(3)}
