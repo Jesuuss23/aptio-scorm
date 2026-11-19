@@ -26,6 +26,10 @@ const WEBINAR = popup(3, { nombre: 'Webinar de diciembre', titulo: 'Webinar: mic
 const SITIO = { conSesion: true, rol: 'SUPERADMIN', versionSitio: true, paginasSitio: PAGINAS, bloquesSitio: BLOQUES };
 
 const sinViolaciones = async (page: Page, soloMain = true) => {
+  // El popup entra con una animación de opacidad (0,2 s): a mitad, el texto semitransparente no llega al contraste.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((a) => Number.isFinite(Number(a.effect?.getComputedTiming().endTime)))
+    .map((a) => a.finished.catch(() => undefined))));
   const b = new AxeBuilder({ page }).withTags(REGLAS);
   const axe = await (soloMain ? b.include('main') : b).analyze();
   expect(axe.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(' | ')}`)).toEqual([]);
