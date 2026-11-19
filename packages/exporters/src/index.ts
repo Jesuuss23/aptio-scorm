@@ -11,3 +11,4 @@ export {
   ANILLOS, construirKitGamificacion, type CursoKit, type EntradaKitGamificacion, enIdioma, guiaHtml, type IdiomaKit, type InsigniaKit, insigniasDelCurso, type KitGamificacion,
   LADO_INSIGNIA, lineas, LMS_KIT, type LmsKit, type MarcaKit, NOMBRE_LMS, type NivelInsignia, nombreLms, PALETA_KIT_BASE, type PlanGamificacion, planGamificacion, svgInsignia,
 } from './kit-gamificacion.ts';
+export { CARPETA_FUENTES, fuentesDelKit, type FuentesPaquete, HOJA_FUENTES, pesoFuentes } from './fuentes.ts';

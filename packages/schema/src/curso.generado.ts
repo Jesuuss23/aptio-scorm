@@ -165,6 +165,16 @@ export interface CursoDeCapsulasEsquemaV0 {
       };
     }[];
   };
+  /**
+   * SUP-104 · Términos que el reproductor muestra en «Glosario» cuando `navegacion.mostrar` lo incluye. Cada término y su definición van en los idiomas del curso.
+   *
+   * @maxItems 200
+   */
+  glosario?: {
+    id: Id;
+    termino: TextoI18N;
+    definicion: TextoI18N;
+  }[];
 }
 /**
  * This interface was referenced by `CursoDeCapsulasEsquemaV0`'s JSON-Schema
