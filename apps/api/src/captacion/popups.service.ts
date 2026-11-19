@@ -1,8 +1,9 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma } from '@aptio/db';
 import { aPopupPublico, type DatosPopup, esEventoPopup, POPUP_NUEVO, type PopupPublico, tasaConversion, validarPopup } from '@aptio/schema/popups';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { LimitadorService } from '../comun/limitador.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
 import type { PopupDto, PopupEntradaDto, PopupsDto } from './popups.dto.js';
 
@@ -35,9 +36,8 @@ const presentes = (dto: PopupEntradaDto): Record<string, unknown> => Object.from
  */
 @Injectable()
 export class PopupsService {
-  private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
 
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly limitador: LimitadorService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -45,7 +45,7 @@ export class PopupsService {
 
   /** Para las pruebas: vacía el límite por IP. */
   reiniciarLimite(): void {
-    this.ventanas.clear();
+    this.limitador.reiniciar('popups');
   }
 
   async listar(): Promise<PopupsDto> {
@@ -109,11 +109,11 @@ export class PopupsService {
 
   /**
    * `POST /s/_popup`: suma una impresión, o la conversión de un popup con enlace, a un popup activo. Sin datos
-   * personales: no se guarda la IP, solo se usa para el límite en memoria. Un popup que no existe o está apagado se
+   * personales: no se guarda la IP, solo se usa para el límite por IP. Un popup que no existe o está apagado se
    * ignora (204 igual) para no dar pistas.
    */
-  async registrar(popupId: unknown, evento: unknown, ip: string, ahora = Date.now()): Promise<void> {
-    this.contar(ip, ahora);
+  async registrar(popupId: unknown, evento: unknown, ip: string): Promise<void> {
+    await this.limitador.exigir('popups', ip, { envios: LIMITE_EVENTOS_POPUP, ventanaMs: VENTANA_MS }, 'Demasiadas solicitudes: espera un minuto');
     if (typeof popupId !== 'string' || !UUID.test(popupId) || !esEventoPopup(evento)) throw new BadRequestException({ codigo: 'NO_VALIDO', mensaje: 'popupId y evento (impresion o conversion)' });
     const where = { id: popupId, visible: true, ...(evento === 'conversion' ? { accion: 'enlace_interno' } : {}) };
     await this.bd.sitioPopup.updateMany({ where, data: evento === 'impresion' ? { impresiones: { increment: 1 } } : { conversiones: { increment: 1 } } });
@@ -125,18 +125,6 @@ export class PopupsService {
     await this.bd.sitioPopup.updateMany({ where: { id: popupId, accion: 'pedir_correo' }, data: { conversiones: { increment: 1 } } });
   }
 
-  private contar(ip: string, ahora: number): void {
-    let v = this.ventanas.get(ip);
-    if (!v || ahora - v.inicio >= VENTANA_MS) {
-      v = { inicio: ahora, cuenta: 0 };
-      this.ventanas.set(ip, v);
-      if (this.ventanas.size > 10_000) for (const [k, x] of this.ventanas) if (ahora - x.inicio >= VENTANA_MS) this.ventanas.delete(k);
-    }
-    v.cuenta += 1;
-    if (v.cuenta > LIMITE_EVENTOS_POPUP) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Demasiadas solicitudes: espera un minuto', reintentarEn: Math.ceil((v.inicio + VENTANA_MS - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
 
   private validar(entrada: Record<string, unknown>): DatosPopup {
     const r = validarPopup(entrada);

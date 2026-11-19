@@ -24,6 +24,7 @@ import { NegocioModule } from './negocio/negocio.module.js';
 import { ConexionesModule } from './conexiones/conexiones.module.js';
 import { OperacionModule } from './operacion/operacion.module.js';
 import { ComentariosModule } from './comentarios/comentarios.module.js';
+import { LimitadorModule } from './comun/limitador.js';
 import { SitioModule } from './sitio/sitio.module.js';
 import { CaptacionModule } from './captacion/captacion.module.js';
 import { VentasModule } from './ventas/ventas.module.js';
@@ -33,6 +34,7 @@ import { VentasModule } from './ventas/ventas.module.js';
     // Variables de la API y, como respaldo, las de packages/db (DATABASE_URL).
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../packages/db/.env'] }),
     BaseDatosModule,
+    LimitadorModule,
     CorreoModule,
     AuthModule,
     UsuariosModule,

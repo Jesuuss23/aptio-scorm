@@ -1,9 +1,10 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { fechaLima, horaLima } from '@aptio/schema/agenda';
 import {
   conversionPaginas, contarPorDia, indicador, repartoOrigen, serieDiaria, TOPE_DEMOS_RESUMEN, type PeriodoResumen, type Tramo, validarVisita, ventanaResumen,
 } from '@aptio/schema/resumen-sitio';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { LimitadorService } from '../comun/limitador.js';
 import type { ResumenSitioDto } from './resumen.dto.js';
 
 /** Visitas por IP y por minuto en `POST /s/_visita`: una persona real manda una por página. */
@@ -20,9 +21,8 @@ const fechaDe = (d: Date) => d.toISOString().slice(0, 10);
  */
 @Injectable()
 export class ResumenService {
-  private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
 
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly limitador: LimitadorService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -74,11 +74,11 @@ export class ResumenService {
 
   /**
    * `POST /s/_visita`: suma la vista de una página (y la visita, si es la primera de la sesión) al contador del día de
-   * Lima, con un solo `INSERT … ON CONFLICT` atómico. Sin datos personales: la IP solo sirve para el límite en memoria y
+   * Lima, con un solo `INSERT … ON CONFLICT` atómico. Sin datos personales: la IP solo sirve para el límite por IP (en Redis, sin guardarla con la visita) y
    * el origen se valida pero no se guarda. Los bots y el superadmin con sesión no cuentan. Devuelve si contó.
    */
   async registrar(cuerpo: unknown, d: { ip: string; agente: string | null | undefined; superadmin: boolean; bot: boolean }, ahora = new Date()): Promise<boolean> {
-    this.contar(d.ip, ahora.getTime());
+    await this.limitador.exigir('visitas', d.ip, { envios: LIMITE_VISITAS_POR_MINUTO, ventanaMs: VENTANA_MS }, 'Demasiadas solicitudes: espera un minuto');
     const v = validarVisita(cuerpo);
     if (!v || d.bot || d.superadmin) return false;
     const dia = diaUtc(fechaLima(ahora));
@@ -93,19 +93,7 @@ export class ResumenService {
 
   /** Vacía las ventanas del límite (pruebas). */
   reiniciarLimite(): void {
-    this.ventanas.clear();
+    this.limitador.reiniciar('visitas');
   }
 
-  private contar(ip: string, ahora: number): void {
-    let w = this.ventanas.get(ip);
-    if (!w || ahora - w.inicio >= VENTANA_MS) {
-      w = { inicio: ahora, cuenta: 0 };
-      this.ventanas.set(ip, w);
-      if (this.ventanas.size > 10_000) for (const [k, x] of this.ventanas) if (ahora - x.inicio >= VENTANA_MS) this.ventanas.delete(k);
-    }
-    w.cuenta += 1;
-    if (w.cuenta > LIMITE_VISITAS_POR_MINUTO) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Demasiadas solicitudes: espera un minuto', reintentarEn: Math.ceil((w.inicio + VENTANA_MS - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
 }

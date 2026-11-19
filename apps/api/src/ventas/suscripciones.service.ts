@@ -19,6 +19,7 @@ import { Queue } from 'bullmq';
 import { AuthService } from '../auth/auth.service.js';
 import { nuevoToken, VIGENCIA_BIENVENIDA_MS } from '../auth/tokens.service.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { LimitadorService } from '../comun/limitador.js';
 import { LeadsService } from '../captacion/leads.service.js';
 import { BASE_SITIO } from '../sitio/sitio-publico.controller.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
@@ -68,14 +69,12 @@ const noValido = (errores: { campo: string; mensaje: string }[]) => new Unproces
 @Injectable()
 export class SuscripcionesService implements OnModuleDestroy {
   private readonly log = new Logger('Suscripciones');
-  private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
-  private readonly ventanasCupon = new Map<string, { inicio: number; cuenta: number }>();
   private cola?: Queue<DatosBienvenida>;
   private colaCobros?: Queue<DatosComprobante>;
   /** El último encolado de la bienvenida y del comprobante (las pruebas lo esperan; la respuesta a la pasarela no). */
   ultimoEncolado: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService, private readonly cambios: CambioPlanService, private readonly cobranza: CobranzaService, private readonly cupones: CuponesService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly limitador: LimitadorService, private readonly leads: LeadsService, private readonly auth: AuthService, private readonly pasarelas: PasarelasService, private readonly cuotas: CuotasService, private readonly cambios: CambioPlanService, private readonly cobranza: CobranzaService, private readonly cupones: CuponesService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -97,22 +96,10 @@ export class SuscripcionesService implements OnModuleDestroy {
 
   /** Vacía el límite por IP (pruebas). */
   reiniciarLimite(): void {
-    this.ventanas.clear();
-    this.ventanasCupon.clear();
+    this.limitador.reiniciar('pago');
+    this.limitador.reiniciar('cupones');
   }
 
-  private contar(ip: string, ahora: number, ventanas = this.ventanas, limite: { envios: number; ventanaMs: number } = LIMITE_CHECKOUT): void {
-    let v = ventanas.get(ip);
-    if (!v || ahora - v.inicio >= limite.ventanaMs) {
-      v = { inicio: ahora, cuenta: 0 };
-      ventanas.set(ip, v);
-      if (ventanas.size > 10_000) for (const [k, x] of ventanas) if (ahora - x.inicio >= limite.ventanaMs) ventanas.delete(k);
-    }
-    v.cuenta += 1;
-    if (v.cuenta > limite.envios) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo', reintentarEn: Math.ceil((v.inicio + limite.ventanaMs - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
 
   /** Adónde vuelve el visitante desde la página alojada: `/pago` del sitio publicado (el dominio de la versión o `SITIO_URL`, más `SITIO_BASE`). */
   private urlPago(dominio: string | null | undefined, idioma: 'es' | 'en', consulta: Record<string, string>): string {
@@ -149,7 +136,7 @@ export class SuscripcionesService implements OnModuleDestroy {
    * CUPON_NO_VALIDO con el motivo y el resumen de siempre: el total no cambia (CP-151).
    */
   async vistaCupon(entrada: unknown, ip: string, ahora = new Date()): Promise<VistaCuponDto> {
-    this.contar(ip, ahora.getTime(), this.ventanasCupon, LIMITE_CUPON);
+    await this.limitador.exigir('cupones', ip, LIMITE_CUPON, 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo');
     const e = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>;
     if (typeof e.cupon !== 'string' || !e.cupon.trim()) throw noValido([{ campo: 'cupon', mensaje: 'Escribe el código del cupón' }]);
     const { publico, resumen } = await this.planYResumen(e);
@@ -170,7 +157,7 @@ export class SuscripcionesService implements OnModuleDestroy {
    * moneda; 503 si ninguna pasarela cobra esa moneda; 502 si la pasarela no responde.
    */
   async crearCheckout(entrada: unknown, ip: string, ahora = new Date()): Promise<CheckoutCreadoDto> {
-    this.contar(ip, ahora.getTime());
+    await this.limitador.exigir('pago', ip, LIMITE_CHECKOUT, 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo');
     const e = (entrada && typeof entrada === 'object' && !Array.isArray(entrada) ? entrada : {}) as Record<string, unknown>;
     const empresa = validarEmpresa(e);
     const { v, publico, ciclo, moneda, resumen: lista } = await this.planYResumen(e, empresa.ok ? [] : empresa.errores);

@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { ejecutarTarea, fuentesChatParaPrompt, neutralizar, proveedorDesdeEntorno, proveedorSimulado, type ProveedorTexto, type ResultadoTarea, SalidaNoValida, TARIFAS } from '@aptio/ai';
 import { leerAjustesSitio, Prisma, type SitioChatFuente, type SitioChatRapida, type SitioConversacion, ultimaVersion } from '@aptio/db';
 import {
@@ -11,13 +11,14 @@ import { CODIGO_LIMITE_GASTO, inicioMesLima, tipoDeTareaIA } from '@aptio/schema
 import { ajustesPublicados, enlaceWhatsapp, NOMBRE_POR_DEFECTO } from '@aptio/schema/sitio-ajustes';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { LimitadorService } from '../comun/limitador.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
 import type {
   AjustesChatbotCambioDto, AjustesChatbotDto, ChatbotDto, ChatRespuestaDto, ConsultaConversacionesDto, ConversacionDto, ConversacionesDto, FuenteChatDto, FuenteChatEntradaDto,
   RapidaChatDto, RapidaChatEntradaDto,
 } from './chatbot.dto.js';
 
-/** Mensajes a `POST /publico/chat` por IP y por minuto (en memoria: la IP no se guarda). */
+/** Mensajes a `POST /publico/chat` por IP y por minuto (la IP solo es la clave del límite en Redis, que vence con la ventana). */
 export const LIMITE_CHAT = { envios: LIMITES_CHAT.porMinuto, ventanaMs: 60_000 } as const;
 /** Los últimos mensajes que van a IA-20 como historial. */
 const HISTORIAL = 6;
@@ -45,13 +46,12 @@ type Fallo = 'sin_fuentes' | 'limite_gasto' | 'espera' | 'no_valida' | 'no_dispo
 @Injectable()
 export class ChatbotService {
   private readonly log = new Logger('Chatbot');
-  private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
   /** El proveedor de texto del entorno (simulado sin credenciales). Las pruebas lo reemplazan para forzar respuestas. */
   proveedor: ProveedorTexto = proveedorDesdeEntorno(process.env, () => proveedorSimulado());
   /** Lo que espera la respuesta de la IA (las pruebas lo acortan). */
   esperaIaMs: number = LIMITES_CHAT.esperaIaMs;
 
-  constructor(private readonly baseDatos: BaseDatosService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly limitador: LimitadorService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -63,21 +63,9 @@ export class ChatbotService {
 
   /** Vacía el límite por IP (pruebas). */
   reiniciarLimite(): void {
-    this.ventanas.clear();
+    this.limitador.reiniciar('chatbot');
   }
 
-  private contar(ip: string, ahora: number): void {
-    let v = this.ventanas.get(ip);
-    if (!v || ahora - v.inicio >= LIMITE_CHAT.ventanaMs) {
-      v = { inicio: ahora, cuenta: 0 };
-      this.ventanas.set(ip, v);
-      if (this.ventanas.size > 10_000) for (const [k, x] of this.ventanas) if (ahora - x.inicio >= LIMITE_CHAT.ventanaMs) this.ventanas.delete(k);
-    }
-    v.cuenta += 1;
-    if (v.cuenta > LIMITE_CHAT.envios) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Escribiste varios mensajes seguidos: espera un minuto e intenta de nuevo', reintentarEn: Math.ceil((v.inicio + LIMITE_CHAT.ventanaMs - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
 
   // ── Ajustes ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -254,7 +242,7 @@ export class ChatbotService {
    * la respuesta controlada de límite sin IA.
    */
   async conversar(entrada: unknown, ip: string, ahora = new Date()): Promise<ChatRespuestaDto> {
-    this.contar(ip, ahora.getTime());
+    await this.limitador.exigir('chatbot', ip, LIMITE_CHAT, 'Escribiste varios mensajes seguidos: espera un minuto e intenta de nuevo');
     const v = validarEntradaChat(entrada);
     if (!v.ok) throw noValido(v.errores);
     const e = v.entrada;
