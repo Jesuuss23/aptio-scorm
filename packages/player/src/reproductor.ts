@@ -316,7 +316,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   const botonSubtitulos = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-pressed': 'false', onclick: () => { conSubtitulos = !conSubtitulos; recordarSubtitulos(conSubtitulos); refrescar(); } }, 'CC', h('span', { class: 'ap-oculto' }, ` ${tx.subtitulos}`));
   // HU-1406 · Créditos de IA: solo si el paquete los trae (sin recursos de IA no hay botón).
   const botonCreditos: HTMLButtonElement | null = opciones.creditos && conMarco
-    ? h('button', { type: 'button', class: 'ap-boton-barra', 'aria-haspopup': 'dialog', onclick: () => abrirCreditos({ raiz, sombra, creditos: opciones.creditos!, tx, volver: botonCreditos! }) }, tx.creditos)
+    ? h('button', { type: 'button', class: 'ap-boton-barra ap-boton-creditos', 'aria-haspopup': 'dialog', onclick: () => abrirCreditos({ raiz, sombra, creditos: opciones.creditos!, tx, volver: botonCreditos! }) }, tx.creditos)
     : null;
   // SUP-104 · Glosario (si el curso trae términos), ayuda y accesibilidad, cuando la navegación los muestra.
   const glosario = curso.glosario ?? [];
