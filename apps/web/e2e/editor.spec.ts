@@ -24,7 +24,8 @@ function contarEdiciones(page: Page) {
   return cuerpos;
 }
 
-/** Doble clic para escribir; si el lienzo se redibujó justo en ese momento (llegó el kit), se vuelve a intentar. */
+/** Doble clic para escribir y espera «Escribiendo…»; si el clic cayó durante la animación de entrada (el texto aún se
+ * movía y el clic dio en la pantalla), se vuelve a intentar. */
 async function empezarAEscribir(page: Page, el: ReturnType<Page['locator']>) {
   await expect(async () => {
     await el.dblclick();
@@ -54,7 +55,7 @@ test.describe('con el productor', () => {
     const ediciones = contarEdiciones(page);
     await page.goto(URL_EDITOR);
     await expect(titulo(page)).toHaveText('Bloqueo y etiquetado');
-    await titulo(page).dblclick();
+    await empezarAEscribir(page, titulo(page));
     await expect(page.getByText('Escribiendo… Enter para terminar · Esc para cancelar')).toBeVisible();
     await page.keyboard.type('Bloqueo y etiquetado seguro');
     await page.keyboard.press('Enter');
@@ -98,7 +99,7 @@ test.describe('con el productor', () => {
     // Se escribe en el lienzo redibujado: en el de antes, lo escrito se perdería al redibujar.
     await expect(lienzo(page).locator('[data-antes-de-guardar]')).toHaveCount(0);
     // Clic fuera mientras se escribe guarda lo escrito.
-    await titulo(page).dblclick();
+    await empezarAEscribir(page, titulo(page));
     await page.keyboard.type('Bloqueo y etiquetado LOTO');
     await page.getByRole('heading', { level: 1 }).click();
     await expect(titulo(page)).toHaveText('Bloqueo y etiquetado LOTO');
@@ -116,13 +117,34 @@ test.describe('con el productor', () => {
     expect(ediciones).toEqual([]);
   });
 
+  test('si el kit llega tarde, lo que se está escribiendo no se pierde', async ({ page }) => {
+    // El lienzo espera al kit: si se montara antes, se volvería a montar a mitad de la edición.
+    await page.route('**/api/v1/clientes/*/kit', async (r) => {
+      await new Promise((listo) => setTimeout(listo, 1500));
+      await r.fallback();
+    });
+    const kitLlega = page.waitForResponse('**/api/v1/clientes/*/kit');
+    await page.route('**/api/v1/cursos/*/pantallas/p01', (r) =>
+      r.request().method() === 'PATCH'
+        ? r.fulfill({ status: 409, json: { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso.' } })
+        : r.fallback());
+    await page.goto(URL_EDITOR);
+    await empezarAEscribir(page, titulo(page));
+    await page.keyboard.type('Mi cambio');
+    await kitLlega;
+    // Dos cuadros: React ya dibujó con el kit y, si el lienzo se volviera a montar, ya lo habría hecho.
+    await page.evaluate(() => new Promise((listo) => requestAnimationFrame(() => requestAnimationFrame(listo))));
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('alert')).toHaveText('Otra persona cambió el curso mientras editabas. Se cargó la última versión; vuelve a hacer tu cambio.');
+  });
+
   test('si otra persona guardó antes (409), se recarga el curso y se avisa', async ({ page }) => {
     await page.route('**/api/v1/cursos/*/pantallas/p01', (r) =>
       r.request().method() === 'PATCH'
         ? r.fulfill({ status: 409, json: { codigo: 'VERSION_CAMBIO', mensaje: 'Otra persona guardó cambios en el curso.' } })
         : r.fallback());
     await page.goto(URL_EDITOR);
-    await titulo(page).dblclick();
+    await empezarAEscribir(page, titulo(page));
     await page.keyboard.type('Mi cambio');
     await page.keyboard.press('Enter');
     await expect(page.getByRole('alert')).toHaveText('Otra persona cambió el curso mientras editabas. Se cargó la última versión; vuelve a hacer tu cambio.');

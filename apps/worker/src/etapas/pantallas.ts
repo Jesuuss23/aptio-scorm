@@ -1,7 +1,9 @@
 // HU-0406 · Etapa 4 «Pantallas con el kit» (IA-15 v2): cada pantalla del guion sale con una disposición del kit y sus
 // campos, sin HTML. Se componen hasta 4 a la vez y cada una lista se guarda como avance para verla en Producción sin
 // esperar al resto (CP-043). Cada pantalla con actividad pide además sus datos a IA-07 (HU-0407, CP-044). Al terminar
-// se arma el documento del curso con los bloques y se valida (CP-042).
+// se arma el documento del curso con los bloques y se valida (CP-042). Al continuar una etapa 4 cancelada o
+// interrumpida, las pantallas ya compuestas cuya huella no cambió se reutilizan: no se piden de nuevo ni se pagan.
+import { createHash } from 'node:crypto';
 import { type CursoDoc, pantallasDe } from '@aptio/schema/revision';
 import { conservarRetoques } from '@aptio/schema/retoques';
 import { hashNarracion, textoSeguro } from '@aptio/ai';
@@ -101,10 +103,11 @@ function tipoCurso(tipo: string, disposicion: Disposicion): 'portada' | 'conteni
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-export function textoPantallas(listas: number, total: number, terminado: boolean, actividades = 0): string {
-  if (!terminado) return `${listas} de ${total} pantallas listas`;
+export function textoPantallas(listas: number, total: number, terminado: boolean, actividades = 0, reutilizadas = 0): string {
+  const previas = reutilizadas ? ` · ${reutilizadas} ${reutilizadas === 1 ? 'reutilizada' : 'reutilizadas'} del intento anterior` : '';
+  if (!terminado) return `${listas} de ${total} pantallas listas${previas}`;
   const conDatos = actividades ? ` · ${plural(actividades, 'actividad', 'actividades')} con sus datos` : '';
-  return `${plural(total, 'pantalla armada', 'pantallas armadas')} con el kit${conDatos} · curso validado`;
+  return `${plural(total, 'pantalla armada', 'pantallas armadas')} con el kit${conDatos}${previas} · curso validado`;
 }
 
 /** Corre `trabajo` sobre la lista con a lo más `n` a la vez, en orden de llegada. */
@@ -160,20 +163,39 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
   const ideas = new Map(resumen.ideas.map((x) => [x.id, x]));
   const lista = guion.capsulas.flatMap((c) => c.pantallas.map((p) => ({ capsulaId: c.id, p })));
   const listas: (PantallaCompuesta | undefined)[] = new Array(lista.length);
+  const glosario = proyecto.cliente.glosario.map((t) => ({ termino: t.termino, traduccion: t.traduccion, noTraducir: t.noTraducir }));
+  const huellas: Record<string, string> = {};
+  for (const [i, { capsulaId, p }] of lista.entries()) {
+    const e = deEstructura.get(p.id);
+    huellas[p.id] = huellaPantalla({
+      versiones: [VERSION_PROMPT, VERSION_PROMPT_ACTIVIDAD], proveedor: ctx.proveedor, cliente: proyecto.cliente.nombre, glosario,
+      permitidas, personaje, orden: i + 1, capsulaId, pantalla: p, tipo: e?.tipo ?? null,
+      objetivos: p.objetivoIds.map((id) => objetivos.get(id)?.texto ?? null), todosObjetivos: estructura.objetivos.map((o) => [o.id, o.texto, o.verbo]),
+      fragmentos: (e?.fragmentoIds ?? []).map((id) => ideas.get(id) ?? null),
+    });
+  }
+  // Lo que ya estaba compuesto en el intento anterior y sigue pidiendo lo mismo: se reutiliza tal cual.
+  const previas = new Map((reutilizables(ctx.parcial)).filter((x) => x.huella === huellas[x.pantalla.id]).map((x) => [x.pantalla.id, x.pantalla]));
+  for (const [i, { p }] of lista.entries()) {
+    const previa = previas.get(p.id);
+    if (previa) listas[i] = previa;
+  }
+  const reutilizadas = listas.filter(Boolean).length;
   const datos = (): PantallasCurso => ({
     total: lista.length,
     kit: { nombre: kitNombre, paleta, tipografias, personaje: personaje?.nombre ?? null },
     modelos,
     pantallas: listas.filter((x): x is PantallaCompuesta => Boolean(x)),
     advertencias: [],
+    huellas: Object.fromEntries(listas.filter((x): x is PantallaCompuesta => Boolean(x)).map((x) => [x.id, huellas[x.id]!])),
   });
 
   // Los avances se guardan uno detrás de otro: así uno viejo nunca pisa a uno más nuevo.
-  let cola = ctx.avance(textoPantallas(0, lista.length, false), datos());
+  let cola = ctx.avance(textoPantallas(reutilizadas, lista.length, false, 0, reutilizadas), datos());
   const avisar = () => {
     cola = cola.then(() => {
       const d = datos();
-      return ctx.avance(textoPantallas(d.pantallas.length, lista.length, false), d);
+      return ctx.avance(textoPantallas(d.pantallas.length, lista.length, false, 0, reutilizadas), d);
     });
     return cola;
   };
@@ -186,7 +208,7 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
     const usadas = (e?.fragmentoIds ?? []).flatMap((id) => ideas.get(id) ?? []);
     const r = await ctx.ia<SalidaIa07>('IA-07', {
       cliente: { nombre: proyecto.cliente.nombre },
-      glosario: proyecto.cliente.glosario.map((t) => ({ termino: t.termino, traduccion: t.traduccion, noTraducir: t.noTraducir })),
+      glosario,
       pantalla: { id: p.id }, tipo, modo,
       nombreInteraccion: FICHAS_INTERACCION[tipo]?.nombre ?? tipo,
       fichaInteraccion: FICHAS_INTERACCION[tipo]?.ficha ?? null,
@@ -200,12 +222,13 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
     return interaccionDe(p.id, r.datos);
   };
 
-  await enParalelo(lista, EN_PARALELO, async ({ capsulaId, p }, i) => {
+  const faltan = lista.map((x, i) => ({ ...x, i })).filter((x) => !listas[x.i]);
+  await enParalelo(faltan, EN_PARALELO, async ({ capsulaId, p, i }) => {
     const vecinas = [listas[i - 2], listas[i - 1]].filter((x) => x && x.capsulaId === capsulaId).map((x) => x!.disposicion);
     const objetivo = p.objetivoIds.map((id) => objetivos.get(id)?.texto.es).filter(Boolean).join(' · ');
     const r = await ctx.ia<SalidaIa>('IA-15', {
       cliente: { nombre: proyecto.cliente.nombre },
-      glosario: proyecto.cliente.glosario.map((t) => ({ termino: t.termino, traduccion: t.traduccion, noTraducir: t.noTraducir })),
+      glosario,
       kit: { nombre: textoSeguro(kitNombre), disposiciones: permitidas.join(', ') },
       personaje: personaje ? `${textoSeguro(personaje.nombre)} (poses: ${(personaje.poses.length ? personaje.poses : ['explicando', 'advirtiendo', 'celebrando', 'pensando', 'neutral']).join(', ')})` : 'sin personaje: no incluyas el campo personaje',
       objetivo: objetivo || null,
@@ -331,8 +354,20 @@ export const componerPantallas: EjecutorEtapa = async (ctx: ContextoEtapa) => {
   });
 
   const final: PantallasCurso = { ...datos(), pantallas, advertencias, curso: { id: curso.id, version: curso.version } };
-  return { texto: textoPantallas(pantallas.length, lista.length, true, conDatos.length), datos: final };
+  return { texto: textoPantallas(pantallas.length, lista.length, true, conDatos.length, reutilizadas), datos: final };
 };
+
+/** Huella estable de lo que pide una pantalla: si cambia el guion, el kit, los objetivos o el prompt, se compone de nuevo. */
+export function huellaPantalla(entrada: unknown): string {
+  return createHash('sha256').update(JSON.stringify(entrada)).digest('hex').slice(0, 32);
+}
+
+/** Las pantallas del avance anterior que traen su huella (un avance sin huellas no se reutiliza). */
+function reutilizables(parcial: unknown): { pantalla: PantallaCompuesta; huella: string }[] {
+  const d = parcial as Partial<PantallasCurso> | null | undefined;
+  if (!d || !Array.isArray(d.pantallas) || !d.huellas || typeof d.huellas !== 'object') return [];
+  return d.pantallas.flatMap((p) => (p && typeof p.id === 'string' && typeof d.huellas![p.id] === 'string' ? [{ pantalla: p, huella: d.huellas![p.id]! }] : []));
+}
 
 function soloEs(t: { es?: string; en?: string }, respaldo: string): { es: string } {
   return { es: t.es?.trim() || t.en?.trim() || respaldo };
