@@ -212,6 +212,60 @@ describe.skipIf(!baseLista && !process.env.CI)('etapa 4 en el generador', () => 
     await prisma.kitMarca.delete({ where: { clienteId: e.ids.clienteId } });
   });
 
+  it('al continuar una etapa 4 cancelada se reutilizan las pantallas ya compuestas: no se piden ni se pagan de nuevo', async () => {
+    const { generacionId, proyectoId } = await conGuion();
+    // El guion LOTO tiene una pantalla de video: el proyecto trae el video del cliente.
+    const video = await prisma.recurso.create({ data: { organizacionId: e.ids.orgId, proyectoId, tipo: 'VIDEO', origen: 'CLIENTE', claveS3: `v/${generacionId}`, mime: 'video/mp4', bytes: 1, hash: 'x', nombre: 'procedimiento.mp4' } });
+    await prisma.materialFuente.create({ data: { proyectoId, tipo: 'VIDEO', recursoId: video.id, estado: 'listo' } });
+    // Primer intento: a la pantalla 13 pedida, la cancelan como lo hace la API (CP-045).
+    let pedidas = 0;
+    const primero = comoReal({}, async (tarea) => {
+      if (tarea !== 'IA-15' || ++pedidas !== 13) return;
+      await prisma.generacion.update({ where: { id: generacionId }, data: { estado: 'CANCELADO', terminadoEn: new Date() } });
+      await prisma.generacionEtapa.updateMany({ where: { generacionId, estado: { in: ['EN_COLA', 'EN_CURSO'] } }, data: { estado: 'CANCELADO' } });
+    });
+    expect(await e.correr(generacionId, primero, hasta4)).toEqual({ estado: 'CANCELADO' });
+    const cancelada = await etapaDe(generacionId, 'PANTALLAS');
+    const parcial = (cancelada.detalle as unknown as { datos: PantallasCurso }).datos;
+    const guardadas = parcial.pantallas.map((p) => p.id);
+    expect(guardadas.length).toBeGreaterThan(0);
+    expect(guardadas.length).toBeLessThan(30);
+    expect(Object.keys(parcial.huellas ?? {}).sort()).toEqual([...guardadas].sort());
+    const antes = await conteo(generacionId);
+
+    // Mientras estaba cancelada cambió el guion de una de las pantallas ya compuestas: esa sí se compone de nuevo.
+    const cambiada = guardadas[0]!;
+    const etapa3 = await etapaDe(generacionId, 'STORYBOARD_GUION');
+    const d3 = structuredClone(etapa3.detalle) as { texto: string; datos: { capsulas: { pantallas: { id: string; titulo: string }[] }[] } };
+    d3.datos.capsulas.flatMap((c) => c.pantallas).find((p) => p.id === cambiada)!.titulo += ' (revisado)';
+    await prisma.generacionEtapa.update({ where: { id: etapa3.id }, data: { detalle: d3 } });
+
+    // Continuar (HU-0408) deja la etapa en cola con lo que ya había avanzado, como lo hace la API.
+    await prisma.generacionEtapa.update({ where: { id: cancelada.id }, data: { estado: 'EN_COLA', detalle: { texto: 'Se retoma con lo que ya estaba listo', datos: parcial as object } } });
+    await prisma.generacion.update({ where: { id: generacionId }, data: { estado: 'EN_COLA', terminadoEn: null } });
+    const segundo = comoReal();
+    expect(await e.correr(generacionId, segundo, hasta4)).toEqual({ estado: 'COMPLETADO' });
+
+    const pedidasAhora = segundo.llamadas.filter((l) => l.tarea === 'IA-15').map((l) => /pantallaId = "(p\d+)"/.exec(l.mensajes[0]!.texto)?.[1]);
+    const reutilizadas = guardadas.filter((id) => id !== cambiada);
+    expect(pedidasAhora).toHaveLength(30 - reutilizadas.length);
+    expect(pedidasAhora).toContain(cambiada);
+    expect(pedidasAhora.some((id) => reutilizadas.includes(id!))).toBe(false);
+    // Las actividades reutilizadas tampoco vuelven a pedir sus datos (IA-07).
+    const conActividad = (ids: string[]) => ids.filter((id) => parcial.pantallas.find((p) => p.id === id)?.actividad).length;
+    const despues = await conteo(generacionId);
+    expect(despues['IA-15']! - antes['IA-15']!).toBe(30 - reutilizadas.length);
+    expect((despues['IA-07'] ?? 0) - (antes['IA-07'] ?? 0)).toBe(9 - conActividad(reutilizadas));
+
+    const { texto, datos } = (await etapaDe(generacionId, 'PANTALLAS')).detalle as unknown as { texto: string; datos: PantallasCurso };
+    expect(texto).toContain(`${reutilizadas.length} ${reutilizadas.length === 1 ? 'reutilizada' : 'reutilizadas'} del intento anterior`);
+    expect(datos.pantallas.map((p) => p.id)).toEqual(SALIDAS.map((s) => s.pantallaId));
+    expect(datos.pantallas.find((p) => p.id === cambiada)!.titulo).toMatch(/\(revisado\)$/);
+    for (const id of reutilizadas) expect(datos.pantallas.find((p) => p.id === id)).toEqual(parcial.pantallas.find((p) => p.id === id));
+    const curso = await prisma.curso.findUniqueOrThrow({ where: { proyectoId } });
+    expect(esCursoValido(curso.documento)).toBe(true);
+  });
+
   it('sin el guion de la etapa 3 la etapa 4 queda en error y no llama a la IA', async () => {
     const { generacionId } = await e.preparar();
     const sinGuion = { ...hasta3, STORYBOARD_GUION: async () => ({ texto: 'sin datos' }), PANTALLAS: EJECUTORES.PANTALLAS! };

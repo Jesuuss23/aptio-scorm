@@ -35,6 +35,8 @@ export const ESPERA_CASCADA_MS = 1000;
 export const CASCADA_ES = ['voz-es', 'boca', 'subtitulos-es'] as const;
 /** Detalle de una etapa cuyo ejecutor aún no existe (se habilita en sprints siguientes). */
 export const DETALLE_PROXIMAMENTE = 'Se habilita en un sprint siguiente';
+/** Detalle de una etapa que se continúa y guarda lo que ya había avanzado (la etapa 4 reutiliza sus pantallas). */
+export const DETALLE_RETOMA = 'Se retoma con lo que ya estaba listo';
 
 // ---------- Etapa 1 · Leer y resumir (HU-0402) ----------
 
@@ -250,6 +252,11 @@ export interface PantallasCurso {
   pantallas: PantallaCompuesta[];
   advertencias: string[];
   curso?: { id: string; version: number };
+  /**
+   * Huella de lo que pidió cada pantalla compuesta (guion, objetivos, kit y versión del prompt). Al continuar una etapa 4
+   * cancelada o interrumpida, la pantalla cuya huella sigue igual se reutiliza sin volver a pedirla a la IA.
+   */
+  huellas?: Record<string, string>;
 }
 
 /** Tramos de 3 o más pantallas seguidas con la misma disposición (la regla de IA-15 es no repetir 3 veces). */

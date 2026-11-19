@@ -5028,7 +5028,8 @@ paths:
       operationId: post_generaciones_generacionId_continuar
       description: >-
         HU-0408. Retoma una generación con ERROR o CANCELADO desde la primera etapa sin terminar; las terminadas no se
-        repiten. 409 GENERACION_NO_RETOMABLE si no está en esos estados, o GENERACION_ACTIVA si el proyecto ya tiene otra
+        repiten. La etapa retomada conserva lo que ya había avanzado (detalle «Se retoma con lo que ya estaba listo»): la
+        etapa 4 reutiliza las pantallas ya compuestas cuyo guion, kit y prompt no cambiaron, sin volver a pagarlas. 409 GENERACION_NO_RETOMABLE si no está en esos estados, o GENERACION_ACTIVA si el proyecto ya tiene otra
         en curso.
       parameters:
       - name: generacionId
