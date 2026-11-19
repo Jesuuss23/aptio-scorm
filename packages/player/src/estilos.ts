@@ -162,6 +162,8 @@ button:disabled{cursor:not-allowed}
 .ap-carta:disabled,.ap-carta[aria-disabled=true]{cursor:default}
 .ap-dorso{font-size:24px;font-weight:700}
 .ap-leyenda{display:flex;gap:6px;flex-wrap:wrap}
+.ap-clasificar .ap-leyenda{position:sticky;top:0;z-index:2;padding:6px 0;background:var(--ap-fondo)}
+.ap-clasificar .ap-etiqueta{padding:6px 14px;font-size:14px}
 .ap-etiqueta{background:var(--ap-primario);color:var(--ap-blanco);border-radius:999px;padding:2px 10px;font-size:12px}
 .ap-elementos,.ap-pasos{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .ap-elemento,.ap-paso{background:var(--ap-blanco);border:2px solid transparent;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
@@ -173,6 +175,16 @@ button:disabled{cursor:not-allowed}
 .ap-numero{flex:0 0 28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--ap-primario);color:var(--ap-blanco);font-weight:700;font-size:13px}
 .ap-paso-texto{flex:1;min-width:0}
 .ap-mover{display:flex;gap:4px}
+.ap-elemento-cabeza{display:flex;align-items:center;gap:8px}
+.ap-asa{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:32px;height:44px;border-radius:8px;color:var(--ap-primario);font-size:20px;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.ap-asa:hover{background:color-mix(in srgb,var(--ap-primario) 10%,transparent)}
+.ap-arrastrando{cursor:grabbing}
+.ap-fantasma{position:fixed;left:0;top:0;z-index:50;pointer-events:none;margin:0;opacity:.92;box-shadow:0 8px 24px rgb(0 0 0 / 25%);background:var(--ap-blanco);border-radius:10px;padding:8px 10px;box-sizing:border-box}
+.ap-soltar{transition:transform .12s,box-shadow .12s;user-select:none;-webkit-user-select:none}
+.ap-soltar.ap-sobre{transform:scale(1.08);box-shadow:0 0 0 3px var(--ap-acento)}
+.ap-destino-antes{box-shadow:0 -4px 0 0 var(--ap-acento)}
+.ap-destino-despues{box-shadow:0 4px 0 0 var(--ap-acento)}
+@media (prefers-reduced-motion:reduce){.ap-soltar{transition:none}}
 .ap-icono{width:44px;height:44px;border:2px solid var(--ap-primario);background:var(--ap-blanco);color:var(--ap-primario);border-radius:8px;font-weight:700}
 .ap-icono:disabled{opacity:.3}
 .ap-tarjetas{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
