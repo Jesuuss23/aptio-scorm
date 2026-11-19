@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable, type NestMiddleware } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
+import { LimitadorService } from '../comun/limitador.js';
 
 /** Peticiones por IP y por minuto en `/api/v1/publico/*` y en los formularios del sitio (SUP-169). */
 export const LIMITE_PUBLICO_POR_MINUTO = 60;
@@ -33,19 +34,21 @@ function limiteDelEntorno(env: NodeJS.ProcessEnv = process.env): number {
 
 /**
  * HU-1502 · Límite simple por IP para las rutas sin sesión (docs/23, «tienen límite de peticiones»): ventana fija de un
- * minuto en memoria de cada instancia de la API, una por grupo. Al pasarlo responde 429 DEMASIADAS_SOLICITUDES con
- * Retry-After. Detrás de CloudFront y el balanceador, `req.ip` sale de `trust proxy` (HU-1405); AWS WAF suma su propio
- * límite por IP delante (M1).
+ * minuto por grupo, contada en Redis para que todas las instancias de la API compartan la cuenta (en memoria si Redis no
+ * responde). Al pasarlo responde 429 DEMASIADAS_SOLICITUDES con Retry-After. Detrás de CloudFront y el balanceador,
+ * `req.ip` sale de `trust proxy` (HU-1405); AWS WAF suma su propio límite por IP delante (M1).
  */
 @Injectable()
 export class LimitePublicoService {
-  readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
   /** Intentos de ingreso por IP y por minuto. */
   limiteIngreso = limiteDelEntorno();
 
-  /** Vacía las ventanas (pruebas). */
+  constructor(readonly limitador: LimitadorService) {}
+
+  /** Empieza de cero las ventanas del sitio y del ingreso (pruebas). */
   reiniciar(): void {
-    this.ventanas.clear();
+    this.limitador.reiniciar('publico');
+    this.limitador.reiniciar('ingreso');
   }
 
   limite(grupo: Grupo): number {
@@ -57,32 +60,16 @@ export class LimitePublicoService {
 export class LimitePublicoMiddleware implements NestMiddleware {
   constructor(private readonly limite: LimitePublicoService) {}
 
-  private get ventanas() {
-    return this.limite.ventanas;
-  }
-
-  use(req: Request, res: Response, next: NextFunction): void {
+  async use(req: Request, res: Response, next: NextFunction): Promise<void> {
     const grupo = grupoDe(req.method, req.originalUrl);
     if (!grupo) return next();
-    const ahora = Date.now();
     const ip = req.ip ?? req.socket.remoteAddress ?? 'desconocida';
-    const clave = `${grupo}:${ip}`;
-    let v = this.ventanas.get(clave);
-    if (!v || ahora - v.inicio >= VENTANA_MS) {
-      v = { inicio: ahora, cuenta: 0 };
-      this.ventanas.set(clave, v);
-      if (this.ventanas.size > 10_000) this.limpiar(ahora);
-    }
-    v.cuenta += 1;
-    if (v.cuenta > this.limite.limite(grupo)) {
-      res.setHeader('Retry-After', String(Math.ceil((v.inicio + VENTANA_MS - ahora) / 1000)));
+    const { cuenta, restanteMs } = await this.limite.limitador.contar(grupo, ip, { envios: this.limite.limite(grupo), ventanaMs: VENTANA_MS });
+    if (cuenta > this.limite.limite(grupo)) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil(restanteMs / 1000))));
       res.status(HttpStatus.TOO_MANY_REQUESTS).json({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Demasiadas solicitudes: espera un minuto e intenta de nuevo' });
       return;
     }
     next();
-  }
-
-  private limpiar(ahora: number): void {
-    for (const [k, v] of this.ventanas) if (ahora - v.inicio >= VENTANA_MS) this.ventanas.delete(k);
   }
 }
