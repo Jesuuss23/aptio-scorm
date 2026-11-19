@@ -84,7 +84,10 @@ describe('cifrado del secreto en reposo (AES-256-GCM)', () => {
     const a = cifrar('JBSWY3DPEHPK3PXP', clave);
     expect(() => descifrar(a, claveCifrado('otra'))).toThrow(/authenticate/);
     const partes = a.split('.');
-    partes[3] = `${partes[3]!.slice(0, -2)}AA`;
+    // Se invierte un bit del texto cifrado: cambiar los últimos caracteres en base64 a veces no cambia ningún byte.
+    const bytes = Buffer.from(partes[3]!, 'base64url');
+    bytes[0]! ^= 1;
+    partes[3] = bytes.toString('base64url');
     expect(() => descifrar(partes.join('.'), clave)).toThrow(/authenticate/);
     expect(() => descifrar('v2.x.y.z', clave)).toThrow(/formato/);
   });

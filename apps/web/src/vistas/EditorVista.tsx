@@ -80,7 +80,8 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
   proyectoId: string; pantallaId: string | null; rol: Rol; alCargar: (nombre: string) => void;
 }) {
   const [curso, setCurso] = useState<Curso | null>(null);
-  const [kit, setKit] = useState<Kit | null>(null);
+  // undefined: el kit aún no llega. El lienzo espera al kit para no volver a montarse a mitad de una edición.
+  const [kit, setKit] = useState<Kit | null | undefined>(undefined);
   const [sinCurso, setSinCurso] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
@@ -368,7 +369,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
 
   // Una sola pantalla, como la verá el participante, con sus textos editables.
   useEffect(() => {
-    if (!documento || !actual || !lienzo.current) return;
+    if (!documento || !actual || !lienzo.current || kit === undefined) return;
     const r = montar(lienzo.current, documento as unknown as CursoReproductor, {
       kit: kit ? { paleta: kit.paleta, tipografias: kit.tipografias, personaje: kit.personaje?.nombre ?? null } : {},
       revision: true,
@@ -828,7 +829,7 @@ export function EditorVista({ proyectoId, pantallaId, rol, alCargar }: {
             imagenes={<PanelImagenes paleta={paleta} biblioteca={biblioteca} ocupado={ocupado || !editan} subiendo={subiendo}
               alPieza={(p) => void agregarImagen({ pieza: p })} alSubir={(a) => void subirImagen(a)}
               alUsar={(r) => void agregarImagen({ recursoId: r.id, nombre: r.nombre })} />}
-            disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit} ocupado={ocupado} alElegir={cambiarDiseno} />} />
+            disenos={<PanelDisenos documento={documento!} pantalla={actual} kit={kit ?? null} ocupado={ocupado} alElegir={cambiarDiseno} />} />
         </div>
         <section className="editor-lienzo" aria-label={`Lienzo de la pantalla ${actual.id}`}>
           {datosElegido && !escribiendo ? (
