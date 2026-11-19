@@ -13,3 +13,4 @@ export { ID_BLOG, leerBlogPublico, leerConexionBlog } from './blog.js';
 export { esUuid, type IdConOrganizacion, NOMBRE_ORGANIZACION_BASE, organizacionDeIds, SLUG_ORGANIZACION_BASE, TABLAS_ORGANIZACION, verificarOrganizaciones } from './organizaciones.js';
 export { type DesenlacePago, type PagoRenovacion, precioPublicado, resolverPagoRenovacion, type ResultadoPagoRenovacion } from './renovaciones.js';
 export { restablecerSegundoFactor, type ResultadoRestablecimiento } from './segundo-factor.js';
+export { borrarLeadsVencidos, CITA_ANONIMA, eliminarDatosTitular, huellaCorreo, type ResultadoRetencionLeads, type ResultadoTitular, RETENCION_LEADS_DIAS, retencionLeadsDias } from './leads-retencion.js';

@@ -18,7 +18,7 @@ import { configurarAvisoLimite } from './conexiones.js';
 import { correoDesdeEntorno } from './correo.js';
 import { proveedorDesdeEntorno, proveedorSimulado, sintetizadorDesdeEntorno, transcriptorDesdeEntorno } from '@aptio/ai';
 import { Almacen } from '@aptio/almacen';
-import { prisma, publicarProgramadas, ultimaVersion } from '@aptio/db';
+import { borrarLeadsVencidos, prisma, publicarProgramadas, ultimaVersion } from '@aptio/db';
 import { prerenderizarVersion, versionPendienteDePrerender } from './sitio-prerender.js';
 import { entornoSitio } from '@aptio/schema/sitio-ficticios';
 import { TAREA_CASCADA, TAREA_GENERAR } from '@aptio/schema/generacion';
@@ -183,7 +183,10 @@ const mantenedor = new Worker(
     }
     const r = await borrarDocumentosVencidos(prisma, almacen);
     if (r.documentos > 0) console.log(`Borrados ${r.documentos} documentos vencidos de ${r.proyectos} proyectos`);
-    return r;
+    // SUP-237 · Los leads sin actividad tras la retención se borran y las citas de esa antigüedad se anonimizan.
+    const leads = await borrarLeadsVencidos(prisma);
+    if (leads.leads || leads.citas) console.log(`Borrados ${leads.leads} leads y anonimizadas ${leads.citas} citas por retención`);
+    return { ...r, leads };
   },
   // Dos a la vez: una copia de seguridad larga no debe atrasar la publicación programada (CP-111: antes del minuto).
   { connection: opcionesRedis(), prefix: prefijoColas(), concurrency: 2 },

@@ -885,6 +885,14 @@ export interface Conversaciones { conversaciones: Conversacion[]; total: number;
 export type EntradaRapida = Partial<Pick<RapidaChat, 'textoEs' | 'textoEn' | 'accion' | 'visible' | 'ficticio'>>;
 export type EntradaFuente = Partial<Pick<FuenteChatWeb, 'titulo' | 'contenido' | 'idioma' | 'visible'>>;
 
+/** SUP-237 · Lo que se borró a pedido del titular. */
+export interface TitularEliminado {
+  lead: boolean;
+  citas: number;
+  citasCanceladas: number;
+  crm: { tipo: string; idExterno: string | null }[];
+}
+
 export interface LeadSitio {
   id: string; correo: string; nombre: string; empresa: string | null; mensaje: string | null;
   origen: string; via: string; paginaEntrada: string; paginaFormulario: string | null;
@@ -1093,6 +1101,7 @@ export const api = {
   cambiarCrm: (c: CambioCrm) => pedir<EstadoCrm>('/captacion/crm', json(c, 'PATCH')),
   regenerarSecretoCrm: () => pedir<EstadoCrm>('/captacion/crm/webhook/secreto', { method: 'POST' }),
   probarCrm: (tipo: ConexionCrm['tipo']) => pedir<{ ok: boolean; mensaje: string }>(`/captacion/crm/${tipo}/probar`, { method: 'POST' }),
+  eliminarTitular: (correo: string, motivo: string) => pedir<TitularEliminado>('/captacion/leads/eliminar-titular', json({ correo, motivo })),
   sincronizarLead: (id: string) => pedir<{ encolados: string[] }>(`/captacion/leads/${id}/sincronizar`, { method: 'POST' }),
   // HU-1603 · Captación › Popups (PNT-31).
   popups: () => pedir<{ popups: PopupSitio[] }>('/captacion/popups'),

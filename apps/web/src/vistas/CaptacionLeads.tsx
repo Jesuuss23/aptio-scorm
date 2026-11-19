@@ -5,7 +5,7 @@
 import { ETAPAS_LEAD, etiquetaEtapa, etiquetaOrigen, ETIQUETA_ETAPA, ETIQUETA_ORIGEN, ORIGENES_LEAD, PARAMETROS_UTM, resumenUtm, CAMPO_UTM } from '@aptio/schema/leads';
 import { Cabecera } from '@aptio/ui';
 import { useEffect, useState } from 'react';
-import { api, ErrorApi, type FiltroLeads, type LeadSitio, type ListaLeads } from '../api';
+import { api, ErrorApi, type FiltroLeads, type LeadSitio, type ListaLeads, type TitularEliminado } from '../api';
 import { TarjetasCrm } from './CaptacionCrm';
 
 const POR_PAGINA = 25;
@@ -139,7 +139,69 @@ export function CaptacionLeads() {
         <p className="sec leads-pie">Cada correo es un solo lead: el origen, la entrada y el UTM son los de su primer contacto. Si vuelve a escribir, se suma a su historial.</p>
       </section>
       <TarjetasCrm alAvisar={setAviso} />
+      <BorrarTitular recargar={() => api.leads({ ...filtro, pagina, porPagina: POR_PAGINA }).then(setLista, () => undefined)} />
     </>
+  );
+}
+
+const NOMBRE_CRM: Record<string, string> = { hubspot: 'HubSpot', pipedrive: 'Pipedrive', zoho: 'Zoho CRM', webhook: 'el webhook' };
+
+/** SUP-237 · Borrar los datos de una persona a su pedido (Ley 29733), con un paso de confirmación. */
+function BorrarTitular({ recargar }: { recargar: () => void }) {
+  const [correo, setCorreo] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [confirmar, setConfirmar] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState('');
+  const [hecho, setHecho] = useState<(TitularEliminado & { correo: string }) | null>(null);
+  const valido = /^\S+@\S+\.\S+$/.test(correo.trim()) && motivo.trim().length >= 5;
+
+  async function borrar() {
+    setEnviando(true);
+    setError('');
+    try {
+      const r = await api.eliminarTitular(correo.trim(), motivo.trim());
+      setHecho({ ...r, correo: correo.trim() });
+      setCorreo('');
+      setMotivo('');
+      setConfirmar(false);
+      recargar();
+    } catch (e) {
+      setError(e instanceof ErrorApi ? e.message : 'No se pudo borrar: inténtalo de nuevo');
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <section className="tarjeta" aria-labelledby="titular-titulo">
+      <h2 id="titular-titulo">Borrar datos a pedido del titular</h2>
+      <p className="sec">Cuando una persona pide que borremos sus datos (Ley 29733), escribe su correo y de dónde vino el pedido. Se borran su lead y sus envíos al CRM, sus citas quedan sin nombre ni correo y las que venían se cancelan. Los leads sin actividad en 2 años se borran solos.</p>
+      <form className="titular-form" onSubmit={(e) => { e.preventDefault(); if (valido) setConfirmar(true); }}>
+        <label htmlFor="titular-correo">Correo del titular</label>
+        <input id="titular-correo" type="email" autoComplete="off" value={correo} onChange={(e) => { setCorreo(e.target.value); setConfirmar(false); }} />
+        <label htmlFor="titular-motivo">Motivo del pedido</label>
+        <input id="titular-motivo" type="text" maxLength={300} placeholder="Pidió por correo el 19/11 que borremos sus datos" value={motivo} onChange={(e) => { setMotivo(e.target.value); setConfirmar(false); }} />
+        {!confirmar ? (
+          <div className="acciones-fila"><button type="submit" className="boton peligro" disabled={!valido}>Borrar sus datos</button></div>
+        ) : (
+          <div className="nota aviso" role="alert">
+            <p>¿Borrar los datos de <b>{correo.trim()}</b>? No se puede deshacer.</p>
+            <div className="acciones-fila">
+              <button type="button" className="boton peligro" disabled={enviando} onClick={() => void borrar()}>{enviando ? 'Borrando…' : 'Sí, borrar'}</button>
+              <button type="button" className="boton" onClick={() => setConfirmar(false)}>Cancelar</button>
+            </div>
+          </div>
+        )}
+      </form>
+      {error ? <div className="nota error" role="alert">{error}</div> : null}
+      {hecho ? (
+        <div className="nota validado" role="status">
+          <p>{hecho.lead ? `Se borró el lead de ${hecho.correo}` : `No había un lead con ${hecho.correo}`}{hecho.citas ? `; ${hecho.citas === 1 ? '1 cita quedó' : `${hecho.citas} citas quedaron`} sin sus datos${hecho.citasCanceladas ? ` (${hecho.citasCanceladas} por venir, cancelada${hecho.citasCanceladas === 1 ? '' : 's'})` : ''}` : ''}.</p>
+          {hecho.crm.length ? <p>También está en {hecho.crm.map((x) => `${NOMBRE_CRM[x.tipo] ?? x.tipo}${x.idExterno ? ` (id ${x.idExterno})` : ''}`).join(', ')}: pide allí que lo borren.</p> : null}
+        </div>
+      ) : null}
+    </section>
   );
 }
 

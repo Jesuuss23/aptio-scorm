@@ -1,6 +1,9 @@
 // Borrado programado de los documentos del cliente (HU-1404, CP-104, ADR-009).
 // Cada día borra del almacenamiento los recursos de origen CLIENTE cuyo `eliminarEn` ya pasó, limpia el texto
 // extraído de esos documentos y deja registro en Auditoría. El curso y los recursos generados se conservan.
+// SUP-139 · El material del cliente subido sin proyecto (el manual de marca o el SCORM anterior para proponer el kit)
+// vence a los días de retención del cliente contados desde que se subió; la API lo marca al confirmar la subida y aquí
+// se marca lo que se subió antes de esta regla.
 import type { Almacen } from '@aptio/almacen';
 import { Prisma, type PrismaClient } from '@aptio/db';
 
@@ -16,7 +19,16 @@ export interface ResultadoBorrado {
   proyectos: number;
 }
 
+/** SUP-139 · Pone fecha de borrado al material del cliente sin proyecto que aún no la tiene. Devuelve cuántos marcó. */
+export async function programarMaterialSinProyecto(bd: PrismaClient): Promise<number> {
+  return bd.$executeRaw`
+    UPDATE "Recurso" r SET "eliminarEn" = r."creadoEn" + make_interval(days => c."retencionDocumentosDias")
+    FROM "Cliente" c
+    WHERE r."clienteId" = c.id AND r.origen = 'CLIENTE' AND r."proyectoId" IS NULL AND r."eliminarEn" IS NULL`;
+}
+
 export async function borrarDocumentosVencidos(bd: PrismaClient, almacen: Almacen, ahora = new Date()): Promise<ResultadoBorrado> {
+  await programarMaterialSinProyecto(bd);
   let documentos = 0;
   const proyectos = new Set<string>();
   for (;;) {
