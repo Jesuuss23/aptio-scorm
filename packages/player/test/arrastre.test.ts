@@ -18,9 +18,9 @@ function preparar(activo = () => true) {
   item.append(asa);
   r.append(item);
   document.body.replaceChildren(r);
-  const alSoltar = vi.fn();
-  const alTerminar = vi.fn();
-  const alEmpezar = vi.fn();
+  const alSoltar = vi.fn<(x: number, y: number) => void>();
+  const alTerminar = vi.fn<() => void>();
+  const alEmpezar = vi.fn<() => void>();
   arrastrable(asa, { fantasma: () => item, activo, alSoltar, alTerminar, alEmpezar });
   return { r, asa, alSoltar, alTerminar, alEmpezar };
 }
