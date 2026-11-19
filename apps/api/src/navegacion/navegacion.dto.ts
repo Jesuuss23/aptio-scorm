@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsObject, IsOptional, IsString, Matches, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 
 /** Los mismos valores que `navegacion` en el esquema del curso (curso-v0.schema.json). */
 export const PATRONES = ['clasico', 'historias', 'vertical', 'mapa', 'hub', 'ramificado', 'inmersivo', 'personalizado'] as const;
@@ -7,6 +8,18 @@ export const MODOS = ['libre', 'condiciones', 'secuencial'] as const;
 export const HABILITA = ['siempre', 'narracion', 'actividad'] as const;
 export const REANUDAR = ['preguntar', 'automatica', 'no'] as const;
 export const ELEMENTOS = ['temario', 'progreso', 'contador', 'botones', 'glosario', 'recursos', 'ayuda', 'accesibilidad', 'puntos', 'idioma'] as const;
+
+class TextoGlosarioDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(600) es?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MinLength(1) @MaxLength(600) en?: string;
+}
+
+/** SUP-104 · Un término del glosario del curso, en los idiomas del curso. */
+export class TerminoGlosarioDto {
+  @ApiProperty({ pattern: '^[a-z0-9][a-z0-9-]{1,63}$' }) @IsString() @Matches(/^[a-z0-9][a-z0-9-]{1,63}$/) id: string;
+  @ApiProperty({ type: TextoGlosarioDto }) @ValidateNested() @Type(() => TextoGlosarioDto) termino: TextoGlosarioDto;
+  @ApiProperty({ type: TextoGlosarioDto }) @ValidateNested() @Type(() => TextoGlosarioDto) definicion: TextoGlosarioDto;
+}
 
 class CamposNavegacion {
   @ApiPropertyOptional({ enum: PATRONES }) @IsOptional() @IsIn(PATRONES) patron?: string;
@@ -23,6 +36,7 @@ class CamposNavegacion {
 /** HU-1103 · Patrón y reglas del curso, con la versión leída y el patrón preferido del cliente (kit de marca). */
 export class NavegacionDto extends CamposNavegacion {
   @ApiProperty({ description: 'Versión del curso leída (para el PUT)' }) version: number;
+  @ApiProperty({ type: [TerminoGlosarioDto], description: 'SUP-104 · Glosario del curso que muestra el reproductor' }) glosario: TerminoGlosarioDto[];
   @ApiProperty({ description: 'El patrón del curso es el preferido del cliente' }) patronPreferidoDelCliente: boolean;
   @ApiProperty({ enum: PATRONES, nullable: true, type: String, description: 'Preferido del cliente guardado en su kit de marca' }) patronPreferido: string | null;
   @ApiProperty({ description: 'El cliente tiene kit de marca (sin kit no se puede guardar el preferido)' }) hayKit: boolean;
@@ -33,4 +47,6 @@ export class NavegacionCambioDto extends CamposNavegacion {
   @ApiProperty({ description: 'Versión del curso leída; si otra persona guardó antes, 409 VERSION_CAMBIO' }) @IsInt() @Min(1) version: number;
   @ApiPropertyOptional({ description: 'true guarda el patrón como preferido en el kit de marca del cliente' })
   @IsOptional() @IsBoolean() patronPreferidoDelCliente?: boolean;
+  @ApiPropertyOptional({ type: [TerminoGlosarioDto], description: 'SUP-104 · Reemplaza el glosario del curso (vacío lo quita)' })
+  @IsOptional() @IsArray() @ArrayMaxSize(200) @ValidateNested({ each: true }) @Type(() => TerminoGlosarioDto) glosario?: TerminoGlosarioDto[];
 }

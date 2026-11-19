@@ -110,6 +110,35 @@ describe.skipIf(!hayBase && !process.env.CI)('patrones de navegación (HU-1103)'
     expect((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version).toBe(antes);
   });
 
+  it('SUP-104 · el glosario del curso se guarda con la navegación, vuelve en el GET y vacío se quita', async () => {
+    const version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
+    const glosario = [
+      { id: 'bloqueo', termino: { es: 'Bloqueo' }, definicion: { es: 'Dispositivo que impide liberar la energía.' } },
+      { id: 'etiquetado', termino: { es: 'Etiquetado' }, definicion: { es: 'Aviso de quién bloqueó y por qué.' } },
+    ];
+    const r = await como('instruccional').put(`/cursos/${cursoId}/navegacion`, { version, mostrar: ['temario', 'glosario', 'ayuda', 'accesibilidad'], glosario });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ version: version + 1, mostrar: ['temario', 'glosario', 'ayuda', 'accesibilidad'], glosario });
+    expect(((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).documento as { glosario?: unknown }).glosario).toEqual(glosario);
+    expect((await como('grafico').get(`/cursos/${cursoId}/navegacion`)).body.glosario).toEqual(glosario);
+    // Sin `glosario` en el cambio, se conserva.
+    const otro = await como('instruccional').put(`/cursos/${cursoId}/navegacion`, { version: version + 1, atajosTeclado: true });
+    expect(otro.body.glosario).toEqual(glosario);
+    // Ids repetidos, un id inválido o una definición vacía: 422 y nada se guarda.
+    const malos = [
+      [glosario[0], glosario[0]],
+      [{ ...glosario[0], id: 'Con Espacios' }],
+      [{ ...glosario[0], definicion: { es: '' } }],
+      [{ ...glosario[0], definicion: {} }],
+    ];
+    const estados = await Promise.all(malos.map(async (g) => (await como('instruccional').put(`/cursos/${cursoId}/navegacion`, { version: version + 2, glosario: g })).status));
+    expect(estados).toEqual([422, 422, 422, 422]);
+    // Vacío lo quita del curso.
+    const vacio = await como('instruccional').put(`/cursos/${cursoId}/navegacion`, { version: version + 2, glosario: [] });
+    expect(vacio.body.glosario).toEqual([]);
+    expect(((await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).documento as { glosario?: unknown }).glosario).toBeUndefined();
+  });
+
   it('diseño gráfico y producción solo ven; el revisor del cliente no ve la configuración; otra organización no la encuentra', async () => {
     const version = (await prisma.curso.findUniqueOrThrow({ where: { id: cursoId } })).version;
     expect((await como('grafico').get(`/cursos/${cursoId}/navegacion`)).status).toBe(200);

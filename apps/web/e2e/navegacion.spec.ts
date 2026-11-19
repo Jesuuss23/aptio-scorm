@@ -19,7 +19,7 @@ async function simularNavegacion(page: Page) {
   let version = 1;
   let preferido: string | null = null;
   const pedidos: Record<string, unknown>[] = [];
-  const respuesta = () => ({ ...nav, version, patronPreferido: preferido, patronPreferidoDelCliente: preferido === nav.patron, hayKit: true });
+  const respuesta = () => ({ glosario: [], ...nav, version, patronPreferido: preferido, patronPreferidoDelCliente: preferido === nav.patron, hayKit: true });
   await page.route(`**/api/v1/cursos/${CURSO}/navegacion`, (r) => {
     if (r.request().method() === 'PUT') {
       const { version: leida, patronPreferidoDelCliente, ...campos } = r.request().postDataJSON() as Record<string, unknown>;
@@ -66,10 +66,9 @@ test('CP-087 · Historias + Secuencial: se guarda como preferido y en la prueba 
   await expect(tarjeta(page, 'Historias')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('radio', { name: /Libre con actividades obligatorias/ })).toBeChecked();
   await expect(page.getByRole('radio', { name: /Al volver: preguntar/ })).toBeChecked();
-  // Glosario, ayuda y accesibilidad llegan después; «✦ Recomendar» y «✦ Crear con IA» (HU-1104) son de quien edita.
-  for (const x of ['Glosario', 'Ayuda', 'Accesibilidad']) await expect(page.getByRole('checkbox', { name: x })).toBeDisabled();
-  await expect(page.getByRole('checkbox', { name: 'Temario' })).toBeEnabled();
-  await expect(page.getByText('llega después')).toHaveCount(3);
+  // SUP-104 · Glosario, ayuda y accesibilidad se encienden como los demás; «✦ Recomendar» y «✦ Crear con IA» (HU-1104) son de quien edita.
+  for (const x of ['Temario', 'Glosario', 'Ayuda', 'Accesibilidad']) await expect(page.getByRole('checkbox', { name: x })).toBeEnabled();
+  await expect(page.getByText('llega después')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Recomendar|Crear con IA/ })).toHaveCount(2);
   expect(await auditar(page)).toEqual([]);
 
@@ -165,6 +164,47 @@ test('la vista previa con cada uno de los 7 patrones pasa axe WCAG 2.2 A/AA', as
     resultados[patron] = await auditar(page);
   }
   expect(resultados).toEqual(Object.fromEntries(PATRONES.map((p) => [p, []])));
+});
+
+test('SUP-104 · con Glosario encendido se escriben los términos en los dos idiomas y se guardan con la navegación', async ({ page }) => {
+  await simularApi(page, { conSesion: true, conProyectos: true, rol: 'DISENADOR_INSTRUCCIONAL' });
+  const { pedidos } = await simularNavegacion(page);
+  await page.goto(URL_NAVEGACION);
+  await expect(page.getByRole('group', { name: 'Términos del glosario' })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Glosario' }).check();
+  await page.getByRole('checkbox', { name: 'Ayuda' }).check();
+  const editor = page.getByRole('group', { name: 'Términos del glosario' });
+  await expect(editor).toBeVisible();
+  await editor.getByRole('button', { name: '+ Agregar término' }).click();
+  await editor.getByRole('button', { name: '+ Agregar término' }).click();
+  // El proyecto es bilingüe: cada término lleva su texto y su definición en español e inglés.
+  const campo = (nombre: string, i: number) => editor.locator('.termino-glosario').nth(i).getByLabel(nombre, { exact: true });
+  // Un término a medio escribir no se guarda: se avisa cuál falta.
+  await campo('Término en español', 0).fill('Bloqueo');
+  await page.getByRole('button', { name: 'Guardar navegación' }).click();
+  await expect(page.getByRole('alert')).toContainText('Completa el término 1 del glosario: texto y definición en español e inglés');
+  expect(pedidos).toHaveLength(0);
+  await campo('Definición en español', 0).fill('Dispositivo que impide liberar la energía.');
+  await campo('Término en inglés', 0).fill('Lockout');
+  await campo('Definición en inglés', 0).fill('Device that prevents energy release.');
+  await campo('Término en español', 1).fill('Energía cero');
+  await campo('Definición en español', 1).fill('Estado verificado sin energía peligrosa.');
+  await campo('Término en inglés', 1).fill('Zero energy');
+  await campo('Definición en inglés', 1).fill('Verified state with no hazardous energy.');
+  expect(await auditar(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Guardar navegación' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Navegación guardada' })).toBeVisible();
+  expect(pedidos.at(-1)).toMatchObject({
+    mostrar: expect.arrayContaining(['glosario', 'ayuda']),
+    glosario: [
+      { id: 'bloqueo', termino: { es: 'Bloqueo', en: 'Lockout' }, definicion: { es: 'Dispositivo que impide liberar la energía.', en: 'Device that prevents energy release.' } },
+      { id: 'energia-cero', termino: { es: 'Energía cero', en: 'Zero energy' }, definicion: { es: 'Estado verificado sin energía peligrosa.', en: 'Verified state with no hazardous energy.' } },
+    ],
+  });
+  // Quitar un término y guardar manda el glosario sin él.
+  await editor.getByRole('button', { name: 'Quitar el término 1 «Bloqueo»' }).click();
+  await page.getByRole('button', { name: 'Guardar navegación' }).click();
+  await expect.poll(() => (pedidos.at(-1)?.glosario as unknown[] | undefined)?.length).toBe(1);
 });
 
 test('diseño gráfico ve la navegación sin poder cambiarla', async ({ page }) => {

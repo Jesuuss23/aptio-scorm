@@ -15658,6 +15658,32 @@ components:
                 type: string
               nivelBloom:
                 $ref: '#/components/schemas/NivelBloom'
+    TerminoGlosarioCurso:
+      type: object
+      description: SUP-104. Un término del glosario del curso, en los idiomas del curso
+      required:
+      - id
+      - termino
+      - definicion
+      properties:
+        id:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{1,63}$
+        termino:
+          $ref: '#/components/schemas/TextoGlosario'
+        definicion:
+          $ref: '#/components/schemas/TextoGlosario'
+    TextoGlosario:
+      type: object
+      properties:
+        es:
+          type: string
+          minLength: 1
+          maxLength: 600
+        en:
+          type: string
+          minLength: 1
+          maxLength: 600
     Navegacion:
       type: object
       description: HU-1103. Patrón y reglas del curso, con la versión leída y el preferido del cliente
@@ -15667,7 +15693,13 @@ components:
       - patronPreferido
       - patronPreferidoDelCliente
       - hayKit
+      - glosario
       properties:
+        glosario:
+          type: array
+          description: SUP-104. Glosario del curso que muestra el reproductor
+          items:
+            $ref: '#/components/schemas/TerminoGlosarioCurso'
         version:
           type: integer
           description: Versión del curso leída (para el PUT)
@@ -15741,6 +15773,12 @@ components:
       required:
       - version
       properties:
+        glosario:
+          type: array
+          maxItems: 200
+          description: SUP-104. Reemplaza el glosario del curso; vacío lo quita. 422 GLOSARIO_REPETIDO con ids repetidos y GLOSARIO_INCOMPLETO si un término no tiene texto o definición
+          items:
+            $ref: '#/components/schemas/TerminoGlosarioCurso'
         version:
           type: integer
           minimum: 1

@@ -2,11 +2,12 @@
 // saltar. Se combinan libremente sobre el mismo reproductor (seguimiento, reanudación y teclado iguales en todos).
 // Administración y diseño instruccional guardan (versión nueva del curso); diseño gráfico y producción solo ven.
 // HU-1104 · «✦ Recomendar» y «✦ Crear con IA» (CP-088): IA-14 propone un patrón; la franja «✦ Propuesta de la IA» lo
-// muestra con su miniatura y se aplica (solo cambia el patrón, versión nueva) o se descarta. Glosario, ayuda y
-// accesibilidad llegan después.
+// muestra con su miniatura y se aplica (solo cambia el patrón, versión nueva) o se descarta.
+// SUP-104 · Glosario, ayuda y accesibilidad se encienden en «Elementos visibles»; los términos del glosario se escriben aquí
+// (en los idiomas del proyecto) y se guardan con la navegación.
 import { Cabecera } from '@aptio/ui';
 import { useCallback, useEffect, useState } from 'react';
-import { api, EDITAN_NAVEGACION, ErrorApi, type ModoNavegacion, type ModoPatron, type Navegacion, type PatronNavegacion, type Propuesta, type Proyecto, type Reanudar, type Rol } from '../api';
+import { api, EDITAN_NAVEGACION, ErrorApi, type ModoNavegacion, type ModoPatron, type Navegacion, type PatronNavegacion, type Propuesta, type Proyecto, type Reanudar, type Rol, type TerminoGlosarioCurso } from '../api';
 import { navegar } from '../ruta';
 import { Miniatura } from './MiniaturaPatron';
 import { NOMBRE_PATRON, PATRONES, type PatronBase } from './patrones-navegacion';
@@ -21,26 +22,33 @@ const REANUDAR: { id: Reanudar; nombre: string; detalle: string }[] = [
   { id: 'automatica', nombre: 'Al volver: continuar', detalle: 'Sin preguntar' },
   { id: 'no', nombre: 'Al volver: desde el inicio', detalle: 'No guarda la posición' },
 ];
-/** Elementos que el reproductor ya muestra; los demás llegan después (se conservan si el curso los trae). */
-const ELEMENTOS: { id: string; nombre: string; despues?: true }[] = [
+/** Elementos que el reproductor muestra en la barra del curso. */
+const ELEMENTOS: { id: string; nombre: string }[] = [
   { id: 'temario', nombre: 'Temario' },
   { id: 'progreso', nombre: 'Progreso' },
   { id: 'contador', nombre: 'Pantalla X de Y' },
   { id: 'puntos', nombre: 'Puntos' },
-  { id: 'glosario', nombre: 'Glosario', despues: true },
-  { id: 'ayuda', nombre: 'Ayuda', despues: true },
-  { id: 'accesibilidad', nombre: 'Accesibilidad', despues: true },
+  { id: 'glosario', nombre: 'Glosario' },
+  { id: 'ayuda', nombre: 'Ayuda' },
+  { id: 'accesibilidad', nombre: 'Accesibilidad' },
 ];
+/** Id de un término nuevo: el texto en minúsculas sin tildes, más un sufijo para que no se repita. */
+const idTermino = (texto: string, usados: Set<string>) => {
+  const base = (texto.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'termino').padEnd(2, '0');
+  let id = base;
+  for (let n = 2; usados.has(id); n++) id = `${base}-${n}`;
+  return id;
+};
 const CADA_MS = 1500;
 const LIMITE_MS = 120_000;
 /** HU-1104 · La última propuesta de patrón, mientras esté pendiente o vencida (con «Recalcular propuesta»). */
 const vigenteDe = (l: Propuesta[]) => l.find((p) => p.tipo === 'patron' && p.patron && (p.estado === 'PENDIENTE' || p.estado === 'VENCIDA')) ?? null;
 const baseDe = (patron: PatronNavegacion, personalizado?: { base: PatronBase }): PatronBase => (patron === 'personalizado' ? personalizado?.base ?? 'clasico' : patron);
 const mensajeDe = (e: unknown, otro: string) => (e instanceof ErrorApi ? e.message : otro);
-interface Borrador { patron: PatronNavegacion; modo: ModoNavegacion; reanudar: Reanudar; mostrar: string[]; preferido: boolean }
+interface Borrador { patron: PatronNavegacion; modo: ModoNavegacion; reanudar: Reanudar; mostrar: string[]; preferido: boolean; glosario: TerminoGlosarioCurso[] }
 const borradorDe = (n: Navegacion): Borrador => ({
   patron: n.patron, modo: n.modo ?? 'condiciones', reanudar: n.reanudar ?? 'preguntar',
-  mostrar: n.mostrar ?? ['temario', 'progreso'], preferido: n.patronPreferidoDelCliente,
+  mostrar: n.mostrar ?? ['temario', 'progreso'], preferido: n.patronPreferidoDelCliente, glosario: n.glosario ?? [],
 });
 const igual = (a: Borrador, b: Borrador) => JSON.stringify({ ...a, mostrar: [...a.mostrar].sort() }) === JSON.stringify({ ...b, mostrar: [...b.mostrar].sort() });
 
@@ -181,15 +189,21 @@ export function NavegacionVista({ proyectoId, rol, alCargar }: { proyectoId: str
     setError('');
     setAviso('');
     try {
+      // Cada término necesita su texto y su definición en los idiomas del proyecto.
+      const idiomas = proyecto?.idiomas.length ? proyecto.idiomas : ['es' as const];
+      const incompleto = borrador.glosario.findIndex((x) => idiomas.some((i) => !x.termino[i]?.trim() || !x.definicion[i]?.trim()));
+      if (incompleto >= 0) throw new Error(`Completa el término ${incompleto + 1} del glosario: texto y definición${idiomas.length > 1 ? ' en español e inglés' : ''}`);
+      const glosarioCambio = JSON.stringify(borrador.glosario) !== JSON.stringify(nav.glosario ?? []);
       const n = await api.guardarNavegacion(cursoId, {
         version: nav.version, patron: borrador.patron, modo: borrador.modo, reanudar: borrador.reanudar, mostrar: borrador.mostrar,
         ...(borrador.preferido && nav.patronPreferido !== borrador.patron ? { patronPreferidoDelCliente: true } : {}),
+        ...(glosarioCambio ? { glosario: idsGlosario(borrador.glosario, idiomas[0]!).map((x) => ({ id: x.id, termino: limpio(x.termino), definicion: limpio(x.definicion) })) } : {}),
       });
       setNav(n);
       setBorrador(borradorDe(n));
       setAviso(`Navegación guardada · versión ${n.version} del curso`);
     } catch (e) {
-      setError(mensajeDe(e, 'No se pudo guardar la navegación'));
+      setError(e instanceof Error && !(e instanceof ErrorApi) ? e.message : mensajeDe(e, 'No se pudo guardar la navegación'));
       if (e instanceof ErrorApi && e.estado === 409) {
         const n = await api.navegacion(cursoId).catch(() => null);
         if (n) {
@@ -312,18 +326,25 @@ export function NavegacionVista({ proyectoId, rol, alCargar }: { proyectoId: str
             <h2 id="nav-elementos">Elementos visibles</h2>
             <div className="elementos-visibles">
               {ELEMENTOS.map((x) => (
-                <label key={x.id} className={x.despues ? 'deshabilitado' : ''}>
+                <label key={x.id}>
                   <input
                     type="checkbox"
                     checked={borrador.mostrar.includes(x.id)}
-                    disabled={!editan || ocupado || x.despues}
+                    disabled={!editan || ocupado}
                     onChange={(e) => cambiar({ mostrar: e.target.checked ? [...borrador.mostrar, x.id] : borrador.mostrar.filter((y) => y !== x.id) })}
                   />
                   {x.nombre}
-                  {x.despues ? <span className="chip">llega después</span> : null}
                 </label>
               ))}
             </div>
+            {borrador.mostrar.includes('glosario') ? (
+              <EditorGlosario
+                terminos={borrador.glosario}
+                idiomas={proyecto.idiomas.length ? proyecto.idiomas : ['es']}
+                editan={editan && !ocupado}
+                cambiar={(glosario) => cambiar({ glosario })}
+              />
+            ) : null}
           </section>
         </div>
         <aside className="tarjeta navegacion-elegido" aria-labelledby="nav-elegido">
@@ -382,5 +403,62 @@ function FranjaPatron({ propuesta, proyectoId, modo, ocupado, alAplicar, alDesca
         <button type="button" className="boton" disabled={ocupado} onClick={alDescartar}>Descartar</button>
       </div>
     </section>
+  );
+}
+
+const NUEVO = '';
+
+/** Da un id estable a los términos nuevos (sin id), a partir de su texto, sin repetir los que ya existen. */
+function idsGlosario(terminos: TerminoGlosarioCurso[], idioma: 'es' | 'en'): TerminoGlosarioCurso[] {
+  const usados = new Set(terminos.filter((x) => x.id).map((x) => x.id));
+  return terminos.map((x) => {
+    if (x.id) return x;
+    const id = idTermino(x.termino[idioma] ?? '', usados);
+    usados.add(id);
+    return { ...x, id };
+  });
+}
+
+/** Quita los idiomas vacíos de un texto antes de guardarlo. */
+function limpio(t: { es?: string; en?: string }) {
+  return Object.fromEntries(Object.entries(t).map(([k, v]) => [k, v?.trim()]).filter(([, v]) => v)) as { es?: string; en?: string };
+}
+
+/** SUP-104 · Términos del glosario del curso: texto y definición en cada idioma del proyecto. */
+function EditorGlosario({ terminos, idiomas, editan, cambiar }: { terminos: TerminoGlosarioCurso[]; idiomas: ('es' | 'en')[]; editan: boolean; cambiar: (t: TerminoGlosarioCurso[]) => void }) {
+  const NOMBRE = { es: 'español', en: 'inglés' } as const;
+  const bilingue = idiomas.length > 1;
+  const poner = (i: number, campo: 'termino' | 'definicion', idioma: 'es' | 'en', valor: string) => {
+    cambiar(terminos.map((x, k) => (k !== i ? x : { ...x, [campo]: { ...x[campo], [idioma]: valor } })));
+  };
+  // El id definitivo de un término nuevo se calcula al guardar, con su texto (ver `idsGlosario`).
+  const agregar = () => cambiar([...terminos, { id: NUEVO, termino: {}, definicion: {} }]);
+  return (
+    <fieldset className="editor-glosario" disabled={!editan}>
+      <legend>Términos del glosario</legend>
+      <p className="sec">El participante los ve en «Glosario», con un buscador. Sin términos, el botón no aparece en el curso.</p>
+      {terminos.length ? (
+        <ol className="lista-glosario">
+          {terminos.map((x, i) => (
+            <li key={i} className="termino-glosario">
+              {idiomas.map((idioma) => (
+                <div key={idioma} className="campos-termino">
+                  <div>
+                    <label htmlFor={`glosario-${i}-termino-${idioma}`}>Término{bilingue ? ` en ${NOMBRE[idioma]}` : ''}</label>
+                    <input id={`glosario-${i}-termino-${idioma}`} type="text" value={x.termino[idioma] ?? ''} maxLength={600} onChange={(e) => poner(i, 'termino', idioma, e.target.value)} />
+                  </div>
+                  <div>
+                    <label htmlFor={`glosario-${i}-definicion-${idioma}`}>Definición{bilingue ? ` en ${NOMBRE[idioma]}` : ''}</label>
+                    <textarea id={`glosario-${i}-definicion-${idioma}`} rows={2} value={x.definicion[idioma] ?? ''} maxLength={600} onChange={(e) => poner(i, 'definicion', idioma, e.target.value)} />
+                  </div>
+                </div>
+              ))}
+              <button type="button" className="boton" onClick={() => cambiar(terminos.filter((_, k) => k !== i))} aria-label={`Quitar el término ${i + 1}${x.termino[idiomas[0]!] ? ` «${x.termino[idiomas[0]!]}»` : ''}`}>Quitar</button>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      <button type="button" className="boton" onClick={agregar}>+ Agregar término</button>
+    </fieldset>
   );
 }

@@ -575,7 +575,10 @@ export interface Navegacion {
   patronPreferido: PatronNavegacion | null;
   patronPreferidoDelCliente: boolean;
   hayKit: boolean;
+  /** SUP-104 · Glosario del curso que muestra el reproductor. */
+  glosario: TerminoGlosarioCurso[];
 }
+export interface TerminoGlosarioCurso { id: string; termino: { es?: string; en?: string }; definicion: { es?: string; en?: string } }
 export interface NavegacionCambio {
   version: number;
   patron?: PatronNavegacion;
@@ -583,6 +586,7 @@ export interface NavegacionCambio {
   reanudar?: Reanudar;
   mostrar?: string[];
   patronPreferidoDelCliente?: boolean;
+  glosario?: TerminoGlosarioCurso[];
 }
 /** Editan la navegación administración y diseño instruccional; diseño gráfico y producción solo ven (M14). */
 export const EDITAN_NAVEGACION: Rol[] = ['ADMINISTRADOR', 'DISENADOR_INSTRUCCIONAL'];

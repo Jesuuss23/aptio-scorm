@@ -3950,3 +3950,14 @@ ul.fila-chips {
 .facturacion-org .cuota-capsulas { margin: 0; }
 .facturacion-org .campo { display: grid; gap: 6px; }
 .fo-tarjeta { display: grid; gap: 12px; max-width: 32rem; }
+
+/* SUP-104 · Términos del glosario del curso (Navegación). */
+.editor-glosario { border: 1px solid var(--borde, #d5dbe3); border-radius: 12px; padding: 16px; margin-top: 16px; display: grid; gap: 12px; }
+.editor-glosario legend { font-weight: 700; padding: 0 4px; }
+.lista-glosario { list-style: decimal; margin: 0; padding-left: 24px; display: grid; gap: 12px; }
+.termino-glosario { display: grid; gap: 8px; }
+.campos-termino { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(220px, 2fr); gap: 8px; }
+.campos-termino > div { display: grid; gap: 4px; align-content: start; }
+.campos-termino input, .campos-termino textarea { font: inherit; }
+.termino-glosario > .boton { justify-self: start; }
+@media (max-width: 640px) { .campos-termino { grid-template-columns: 1fr; } }
