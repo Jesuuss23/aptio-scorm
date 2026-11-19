@@ -165,6 +165,52 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('recursos y almacenamie
     expect((await como('productor').get(`/recursos/${confirmado.body.id}`)).body.eliminarEn).toBe('2027-05-09T12:00:00.000Z');
   });
 
+  it('marcar un proyecto como entregado lo cierra, programa el borrado de sus documentos y lo audita', async () => {
+    const proyecto = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId, nombre: 'Entrega LOTO', creadoPorId: usuarioId, estado: 'BORRADOR' } });
+    const { confirmado } = await subir('Fuente LOTO.pdf', 'application/pdf', PDF, { proyectoId: proyecto.id, origen: 'CLIENTE' });
+    const entregar = (quien: string) => como(quien).post(`/proyectos/${proyecto.id}/entregar`);
+
+    // Un borrador no se entrega.
+    const borrador = await entregar('productor');
+    expect(borrador.status).toBe(409);
+    expect(borrador.body.codigo).toBe('ESTADO_NO_VALIDO');
+
+    // En revisión, pero sin un paquete exportado.
+    await prisma.proyecto.update({ where: { id: proyecto.id }, data: { estado: 'REVISION' } });
+    const curso = await prisma.curso.create({ data: { organizacionId: orgId, proyectoId: proyecto.id, versionEsquema: '0.2.0', documento: {} } });
+    const exportacion = { organizacionId: orgId, cursoId: curso.id, versionCurso: 1, formato: 'SCORM12' as const, modoIdioma: 'es', creadoPorId: usuarioId };
+    await prisma.exportacion.create({ data: { ...exportacion, estado: 'ERROR' } });
+    // El kit de gamificación no es el paquete del curso: no cuenta como entrega.
+    await prisma.exportacion.create({ data: { ...exportacion, formato: 'KIT_GAMIFICACION', estado: 'COMPLETADO' } });
+    const sinPaquete = await entregar('productor');
+    expect(sinPaquete.status).toBe(409);
+    expect(sinPaquete.body.codigo).toBe('SIN_EXPORTACION');
+    expect((await prisma.recurso.findUniqueOrThrow({ where: { id: confirmado.body.id } })).eliminarEn).toBeNull();
+
+    // Otra organización no lo encuentra y el revisor del cliente no puede entregar.
+    await prisma.exportacion.create({ data: { ...exportacion, estado: 'COMPLETADO' } });
+    expect((await entregar('ajeno')).status).toBe(404);
+    expect((await entregar('revisor')).status).toBe(403);
+
+    const antes = Date.now();
+    const r = await entregar('productor');
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ proyecto: { id: proyecto.id, estado: 'ENTREGADO' }, documentos: 1, retencionDias: 180 });
+    const entregadoEn = new Date(r.body.entregadoEn).getTime();
+    expect(entregadoEn).toBeGreaterThanOrEqual(antes - 1000);
+    expect(new Date(r.body.eliminarDocumentosEn).getTime()).toBe(entregadoEn + 180 * 24 * 60 * 60 * 1000);
+    expect((await como('productor').get(`/recursos/${confirmado.body.id}`)).body.eliminarEn).toBe(r.body.eliminarDocumentosEn);
+    expect((await prisma.proyecto.findUniqueOrThrow({ where: { id: proyecto.id } })).estado).toBe('ENTREGADO');
+    const auditoria = await prisma.auditoria.findFirstOrThrow({ where: { organizacionId: orgId, accion: 'PROYECTO_ENTREGADO', entidadId: proyecto.id } });
+    expect(auditoria).toMatchObject({ usuarioId, entidad: 'Proyecto', datos: { documentos: 1, retencionDias: 180, eliminarEn: r.body.eliminarDocumentosEn } });
+
+    // Entregar dos veces no reprograma el borrado.
+    const otraVez = await entregar('productor');
+    expect(otraVez.status).toBe(409);
+    expect(otraVez.body.codigo).toBe('YA_ENTREGADO');
+    expect(await prisma.auditoria.count({ where: { accion: 'PROYECTO_ENTREGADO', entidadId: proyecto.id } })).toBe(1);
+  });
+
   it('CP-106 · una ilustración generada muestra proveedor, modelo y licencia, y el revisor la ve solo si es de su cliente', async () => {
     // Hasta el S9 no hay generación de imágenes: la fila se siembra como la guardará el worker (SUP-65).
     const proyecto = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId: otroClienteId, nombre: 'Cápsula banco', creadoPorId: usuarioId } });

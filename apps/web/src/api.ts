@@ -226,6 +226,15 @@ export interface Proyecto {
   actualizadoEn: string;
 }
 
+/** Lo que responde marcar un proyecto como entregado: cuándo se borran los documentos del cliente (ADR-009). */
+export interface EntregaProyecto {
+  proyecto: Proyecto;
+  entregadoEn: string;
+  eliminarDocumentosEn: string;
+  documentos: number;
+  retencionDias: number;
+}
+
 export interface ProyectoEntrada {
   clienteId: string;
   nombre: string;
@@ -1276,6 +1285,7 @@ export const api = {
   crearProyecto: (datos: ProyectoEntrada) => pedir<Proyecto>('/proyectos', json(datos)),
   editarProyecto: (id: string, datos: Partial<ProyectoEntrada>) => pedir<Proyecto>(`/proyectos/${id}`, json(datos, 'PATCH')),
   archivarProyecto: (id: string) => pedir<void>(`/proyectos/${id}`, { method: 'DELETE' }),
+  entregarProyecto: (id: string) => pedir<EntregaProyecto>(`/proyectos/${id}/entregar`, { method: 'POST' }),
   materiales: (proyectoId: string) => pedir<Material[]>(`/proyectos/${proyectoId}/materiales`),
   agregarMaterial: (proyectoId: string, datos: { recursoId: string } | { tema: string }) =>
     pedir<Material>(`/proyectos/${proyectoId}/materiales`, json(datos)),

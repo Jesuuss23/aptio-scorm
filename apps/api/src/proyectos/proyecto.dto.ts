@@ -81,3 +81,12 @@ export class CursoDto {
   @ApiProperty({ type: 'object', additionalProperties: { type: 'string' }, description: 'HU-0801 · Texto WebVTT de cada narración, por id de recurso de subtítulos' })
   subtitulos: Record<string, string>;
 }
+
+/** M09 · HU-1404 (CP-104) · El proyecto entregado y cuándo se borran los documentos del cliente. */
+export class EntregaProyectoDto {
+  @ApiProperty({ type: () => ProyectoDto }) proyecto: ProyectoDto;
+  @ApiProperty({ format: 'date-time' }) entregadoEn: string;
+  @ApiProperty({ format: 'date-time', description: 'Fecha de entrega más los días de retención del cliente' }) eliminarDocumentosEn: string;
+  @ApiProperty({ example: 3, description: 'Documentos del cliente marcados para borrarse' }) documentos: number;
+  @ApiProperty({ example: 180 }) retencionDias: number;
+}
