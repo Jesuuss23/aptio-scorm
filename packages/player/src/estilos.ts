@@ -20,6 +20,8 @@ button:disabled{cursor:not-allowed}
 .ap-espacio{flex:1}
 .ap-boton-barra{min-height:36px;background:transparent;color:inherit;border:1px solid rgba(255,255,255,.55);border-radius:8px;padding:4px 10px;font-size:13px;white-space:nowrap}
 .ap-boton-barra[aria-pressed=true]{background:rgba(255,255,255,.2)}
+/* En un celular angosto la barra lleva más herramientas (SUP-104): se compacta y «Temario» queda solo para el lector. */
+@container (max-width:479.98px){.ap-barra,.ap-barra-fila{gap:4px}.ap-barra{padding:6px 8px}.ap-boton-barra{padding:4px 7px}.ap-etiqueta-barra{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
 .ap-cuerpo{position:relative;flex:1 1 auto;display:flex;min-height:0}
 .ap-escena{flex:1;min-width:0;overflow:auto;display:flex}
 .ap-temario{position:absolute;inset:0 auto 0 0;z-index:5;width:min(320px,88%);overflow:auto;background:var(--ap-blanco);color:var(--ap-texto);padding:12px;box-shadow:4px 0 18px rgba(0,0,0,.2);font-size:14px}
@@ -69,6 +71,25 @@ button:disabled{cursor:not-allowed}
 .ap-creditos-aviso{margin:0 0 12px;font-size:16px;font-weight:700}
 .ap-creditos-tabla{width:100%;border-collapse:collapse;margin:0 0 16px}
 .ap-creditos-tabla caption{text-align:left;font-weight:700;margin-bottom:4px}
+.ap-panel-caja h3{margin:12px 0 4px;font-size:16px;color:var(--ap-primario)}
+.ap-panel-caja p{margin:0 0 6px;font-size:16px}
+.ap-glosario-etiqueta{display:block;font-weight:700;margin:4px 0}
+.ap-glosario-buscar{width:100%;box-sizing:border-box;min-height:44px;font:inherit;font-size:16px;padding:8px 10px;border:2px solid var(--ap-primario);border-radius:8px}
+.ap-glosario-cuenta{font-size:14px;opacity:.85}
+.ap-glosario-lista{margin:8px 0 16px}
+.ap-glosario-lista dt{font-weight:700;margin-top:10px;color:var(--ap-primario)}
+.ap-glosario-lista dd{margin:2px 0 0}
+.ap-panel-grupo{border:0;margin:0 0 8px;padding:0}
+.ap-panel-grupo legend{font-weight:700;margin-bottom:4px}
+.ap-opcion-panel{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-height:44px;font-size:16px}
+.ap-opcion-panel input{width:22px;height:22px;margin:0;accent-color:var(--ap-primario)}
+.ap-opcion-panel small{flex-basis:100%;padding-left:30px;opacity:.85}
+.ap-r[data-texto=grande] .ap-escena,.ap-r[data-texto=grande] .ap-subtitulos,.ap-r[data-texto=grande] .ap-panel-caja{zoom:1.15}
+.ap-r[data-texto=muy-grande] .ap-escena,.ap-r[data-texto=muy-grande] .ap-subtitulos,.ap-r[data-texto=muy-grande] .ap-panel-caja{zoom:1.3}
+.ap-r.ap-alto-contraste{--ap-fondo:#fff!important;--ap-blanco:#fff!important;--ap-texto:#000!important;--ap-primario:#000!important;--ap-secundario:#00561b!important;--ap-acento:#000!important;--ap-bien-texto:#00561b!important;--ap-mal-texto:#a00000!important;--ap-foco:#000!important}
+.ap-r.ap-alto-contraste .ap-opcion,.ap-r.ap-alto-contraste .ap-elemento,.ap-r.ap-alto-contraste .ap-paso,.ap-r.ap-alto-contraste .ap-carta,.ap-r.ap-alto-contraste .ap-nav{border:2px solid #000!important}
+.ap-r.ap-alto-contraste .ap-barra,.ap-r.ap-alto-contraste .ap-pie{background:#000!important;color:#fff!important}
+.ap-r.ap-sin-movimiento *,.ap-r.ap-sin-movimiento *::before,.ap-r.ap-sin-movimiento *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 .ap-creditos-tabla th,.ap-creditos-tabla td{text-align:left;vertical-align:top;padding:6px 8px;border-bottom:1px solid rgba(0,0,0,.12);overflow-wrap:anywhere}
 .ap-reanudar-nombre{display:block;font-weight:700}
 .ap-reanudar-botones{display:flex;flex-wrap:wrap;gap:8px}

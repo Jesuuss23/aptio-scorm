@@ -20,6 +20,7 @@
 // barras, con marcador y botones flotantes). El personalizado usa su patrón base. Siguiente bloqueado dice por qué.
 import { colorLegible } from './contraste.ts';
 import { abrirCreditos } from './creditos.ts';
+import { abrirAccesibilidad, abrirAyuda, abrirGlosario, aplicarPreferencias, guardarPreferencias, leerPreferencias } from './paneles.ts';
 import { animarBoca, bocaEn, mostrarBoca, parpadear } from './boca.ts';
 import { h, vaciar } from './dom.ts';
 import { ACTIVIDADES, type ContextoActividad } from './interacciones/index.ts';
@@ -311,11 +312,33 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   const titulo = t(curso.metadatos.titulo, idioma);
   const barraAvance = h('div', { class: 'ap-avance', role: 'progressbar', 'aria-label': tx.progreso, 'aria-valuemin': 0, 'aria-valuemax': 100 }, h('i'));
   const porcentaje = h('span', { class: 'ap-porcentaje' });
-  const botonTemario = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-expanded': 'false', onclick: () => { temarioAbierto = !temarioAbierto; refrescar(); } }, h('span', { 'aria-hidden': 'true' }, '☰ '), tx.temario);
+  const botonTemario = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-expanded': 'false', onclick: () => { temarioAbierto = !temarioAbierto; refrescar(); } }, h('span', { 'aria-hidden': 'true' }, '☰ '), h('span', { class: 'ap-etiqueta-barra' }, tx.temario));
   const botonSubtitulos = h('button', { type: 'button', class: 'ap-boton-barra', 'aria-pressed': 'false', onclick: () => { conSubtitulos = !conSubtitulos; recordarSubtitulos(conSubtitulos); refrescar(); } }, 'CC', h('span', { class: 'ap-oculto' }, ` ${tx.subtitulos}`));
   // HU-1406 · Créditos de IA: solo si el paquete los trae (sin recursos de IA no hay botón).
   const botonCreditos: HTMLButtonElement | null = opciones.creditos && conMarco
     ? h('button', { type: 'button', class: 'ap-boton-barra', 'aria-haspopup': 'dialog', onclick: () => abrirCreditos({ raiz, sombra, creditos: opciones.creditos!, tx, volver: botonCreditos! }) }, tx.creditos)
+    : null;
+  // SUP-104 · Glosario (si el curso trae términos), ayuda y accesibilidad, cuando la navegación los muestra.
+  const glosario = curso.glosario ?? [];
+  const conGlosario = conMarco && mostrar.has('glosario') && glosario.length > 0;
+  const conAyuda = conMarco && mostrar.has('ayuda');
+  const conAccesibilidad = conMarco && mostrar.has('accesibilidad');
+  let preferencias = leerPreferencias();
+  const herramienta = (glifoTexto: string, nombre: string, abrir: (b: HTMLButtonElement) => void, clase: string) => {
+    const b: HTMLButtonElement = h('button', { type: 'button', class: `ap-boton-barra ${clase}`, 'aria-haspopup': 'dialog', title: nombre, onclick: () => abrir(b) },
+      h('span', { 'aria-hidden': 'true' }, glifoTexto), h('span', { class: 'ap-oculto' }, nombre));
+    return b;
+  };
+  const botonGlosario = conGlosario ? herramienta('A–Z', tx.glosario, (b) => abrirGlosario({ raiz, tx, idioma, terminos: glosario, volver: b }), 'ap-boton-glosario') : null;
+  const botonAyuda = conAyuda
+    ? herramienta('?', tx.ayuda, (b) => abrirAyuda({ raiz, tx, volver: b, atajos, conTemario: mostrar.has('temario') && marco.menu === 'temario', conAccesibilidad, conGlosario }), 'ap-boton-ayuda')
+    : null;
+  const botonAccesibilidad = conAccesibilidad
+    ? herramienta('Aa', tx.accesibilidad, (b) => abrirAccesibilidad({
+      raiz, tx, volver: b, preferencias,
+      cambiar: (p) => { preferencias = p; guardarPreferencias(p); aplicarPreferencias(raiz, p); },
+      subtitulos: { valor: conSubtitulos, cambiar: (si) => { conSubtitulos = si; recordarSubtitulos(si); refrescar(); } },
+    }), 'ap-boton-accesibilidad')
     : null;
   // HU-0804 · Botón de idioma: muestra el otro idioma y lo dice completo para el lector de pantalla.
   const ofrecidos = opciones.idiomas ?? curso.idiomas;
@@ -347,7 +370,7 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
   // Mapa de misiones y Menú de temas: «← Mapa» o «← Temas» vuelve a elegir estación.
   const botonMapa = h('button', { type: 'button', class: 'ap-boton-barra ap-volver-mapa', onclick: () => verMapa(true) }, glifo('← '), hub ? tx.temas : tx.mapa);
   const conTemario = mostrar.has('temario') && marco.menu === 'temario';
-  const herramientas = [botonSubtitulos, botonIdioma, botonCreditos];
+  const herramientas = [botonSubtitulos, botonGlosario, botonAyuda, botonAccesibilidad, botonIdioma, botonCreditos];
   const menu = esMapa ? botonMapa : conTemario ? botonTemario : null;
   const conProgreso = mostrar.has('progreso') && marco.progreso !== 'ninguno';
   const progresoEn = (fila: boolean) => !conProgreso ? null
@@ -390,11 +413,13 @@ function montarUno(contenedor: HTMLElement, curso: CursoReproductor, opciones: O
     audio,
     subtitulos,
     pie);
+  // SUP-104 · Las preferencias de accesibilidad guardadas valen desde que abre el curso (las respeta aunque no se muestre el panel).
+  aplicarPreferencias(raiz, preferencias);
 
   if (atajos) {
     raiz.addEventListener('keydown', (e) => {
       const destino = e.target as HTMLElement;
-      if (pendiente || enMapa || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar, .ap-creditos') || e.altKey || e.ctrlKey || e.metaKey) return;
+      if (pendiente || enMapa || destino.closest('.ap-actividad, .ap-temario, .ap-reanudar, .ap-creditos, .ap-panel') || e.altKey || e.ctrlKey || e.metaKey) return;
       // Vertical también con ↓ y ↑ (sin quitarle al navegador el desplazamiento dentro de la pantalla: solo en los botones).
       const vertical = marco.avance === 'desplazar' && destino.closest('.ap-pie');
       if (e.key === 'ArrowRight' || (vertical && e.key === 'ArrowDown')) { e.preventDefault(); irA(actual + 1, true); }
