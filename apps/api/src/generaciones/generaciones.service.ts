@@ -2,7 +2,7 @@
 // (apps/worker/src/generar.ts); aquí solo se crean, se encolan y se marcan.
 import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { Prisma } from '@aptio/db';
-import { ACTIVOS, ETAPAS, TAREA_GENERAR } from '@aptio/schema/generacion';
+import { ACTIVOS, DETALLE_RETOMA, ETAPAS, TAREA_GENERAR } from '@aptio/schema/generacion';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
 import { organizacionDe } from '../comun/organizacion.js';
 import type { UsuarioSesion } from '../comun/roles.js';
@@ -139,7 +139,16 @@ export class GeneracionesService {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${g.proyectoId}))`;
       const otra = await tx.generacion.findFirst({ where: { proyectoId: g.proyectoId, estado: { in: [...ACTIVOS] } }, select: { id: true } });
       if (otra) throw new ConflictException({ codigo: 'GENERACION_ACTIVA', mensaje: 'Ya hay una generación en curso para este proyecto' });
-      await tx.generacionEtapa.updateMany({ where: { generacionId: id, estado: { in: ['ERROR', 'CANCELADO'] } }, data: { estado: 'EN_COLA', detalle: Prisma.DbNull, inicio: null, fin: null } });
+      // Lo que la etapa ya había avanzado se conserva para que el worker lo reutilice (la etapa 4 no vuelve a pedir ni a
+      // pagar las pantallas ya compuestas); el texto del error o de la cancelación se borra.
+      const retomadas = await tx.generacionEtapa.findMany({ where: { generacionId: id, estado: { in: ['ERROR', 'CANCELADO'] } }, select: { id: true, detalle: true } });
+      for (const e of retomadas) {
+        const datos = (e.detalle as { datos?: unknown } | null)?.datos;
+        await tx.generacionEtapa.update({
+          where: { id: e.id },
+          data: { estado: 'EN_COLA', inicio: null, fin: null, detalle: datos === undefined ? Prisma.DbNull : ({ texto: DETALLE_RETOMA, datos } as Prisma.InputJsonValue) },
+        });
+      }
       await tx.generacion.update({ where: { id }, data: { estado: 'EN_COLA', terminadoEn: null } });
       await tx.proyecto.update({ where: { id: g.proyectoId }, data: { estado: 'GENERANDO' } });
       await tx.auditoria.create({ data: { organizacionId: g.organizacionId, usuarioId: u.id, accion: 'GENERACION_CONTINUADA', entidad: 'Generacion', entidadId: id } });

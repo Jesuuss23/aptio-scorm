@@ -153,6 +153,9 @@ describe.skipIf(!hayBase && !process.env.CI)('generación del SCORM (HU-0401, HU
 
     await prisma.generacionEtapa.updateMany({ where: { generacionId: g.id, orden: 1 }, data: { estado: 'COMPLETADO', detalle: { texto: 'resumen' } } });
     await prisma.generacionEtapa.updateMany({ where: { generacionId: g.id, orden: 2 }, data: { estado: 'ERROR', detalle: { texto: '529' } } });
+    // La etapa 4 se canceló con 2 pantallas ya compuestas: al continuar se quedan para que el worker las reutilice.
+    const parcial = { total: 30, pantallas: [{ id: 'p01' }, { id: 'p02' }], huellas: { p01: 'a', p02: 'b' } };
+    await prisma.generacionEtapa.updateMany({ where: { generacionId: g.id, etapa: 'PANTALLAS' }, data: { estado: 'CANCELADO', detalle: { texto: '2 de 30 pantallas listas', datos: parcial } } });
     await prisma.generacion.update({ where: { id: g.id }, data: { estado: 'ERROR', terminadoEn: new Date() } });
     encolados.length = 0;
 
@@ -161,6 +164,8 @@ describe.skipIf(!hayBase && !process.env.CI)('generación del SCORM (HU-0401, HU
     expect(res.body).toMatchObject({ estado: 'EN_COLA', terminadoEn: null });
     expect(res.body.etapas[0]).toMatchObject({ estado: 'COMPLETADO', detalle: 'resumen' });
     expect(res.body.etapas[1]).toMatchObject({ estado: 'EN_COLA', detalle: null });
+    expect(res.body.etapas[3]).toMatchObject({ etapa: 'PANTALLAS', estado: 'EN_COLA', detalle: 'Se retoma con lo que ya estaba listo' });
+    expect((await prisma.generacionEtapa.findFirstOrThrow({ where: { generacionId: g.id, etapa: 'PANTALLAS' } })).detalle).toEqual({ texto: 'Se retoma con lo que ya estaba listo', datos: parcial });
     // Otro jobId: BullMQ descarta un trabajo repetido con el mismo id.
     expect(encolados).toEqual([{ cola: 'ia', datos: { trabajoId: g.id, organizacionId: orgId, tarea: 'GENERAR' }, jobId: `${g.id}-2` }]);
     expect(await estadoProyecto(id)).toBe('GENERANDO');

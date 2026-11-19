@@ -36,7 +36,10 @@ export type ResultadoCaptura = { estado: 'guardado'; leadId: string; nuevo: bool
 export class LeadsService {
   private readonly log = new Logger('Leads');
   private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
-  /** El último aviso por correo en curso (las pruebas lo esperan; la respuesta al visitante no). */
+  /**
+   * Los avisos por correo en curso, encadenados (las pruebas los esperan; la respuesta al visitante no). Se encadenan
+   * todos y no solo el último: si no, un aviso anterior que tarda más podría llegar después de esperarlo.
+   */
   ultimoAviso: Promise<void> = Promise.resolve();
   /** HU-1602 · El último encolado al CRM en curso (la respuesta al visitante tampoco lo espera). */
   ultimoEnvio: Promise<unknown> = Promise.resolve();
@@ -45,6 +48,11 @@ export class LeadsService {
 
   private get bd() {
     return this.baseDatos.cliente;
+  }
+
+  private encadenarAviso(aviso: Promise<void>, leadId: string): void {
+    const seguro = aviso.catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${leadId}: ${e instanceof Error ? e.message : String(e)}`));
+    this.ultimoAviso = Promise.all([this.ultimoAviso, seguro]).then(() => undefined);
   }
 
   /** Vacía las ventanas del límite (pruebas). */
@@ -80,7 +88,7 @@ export class LeadsService {
     if (r.envio.via === 'popup') await this.popups.convertirPorCorreo((entrada as { popupId?: unknown } | null)?.popupId).catch((e: unknown) => this.log.warn(`No se pudo contar la conversión del popup: ${e instanceof Error ? e.message : String(e)}`));
     // HU-1604 · El correo y la pregunta dejados en el chat: la conversación pasa a «lead».
     if (r.envio.via === 'chatbot') await this.chatbot.marcar((entrada as { conversacionId?: unknown } | null)?.conversacionId, 'lead');
-    this.ultimoAviso = this.avisar(lead, nuevo, r.envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
+    this.encadenarAviso(this.avisar(lead, nuevo, r.envio), lead.id);
     // HU-1602 · Al CRM y al webhook activos: el alta, o un contacto nuevo del mismo correo.
     this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
     return { estado: 'guardado', leadId: lead.id, nuevo };
@@ -95,7 +103,7 @@ export class LeadsService {
     let { lead, nuevo } = await this.guardar(envio, ahora);
     const etapa = etapaTrasAgendar(lead.etapa);
     if (etapa !== lead.etapa) lead = await this.bd.lead.update({ where: { id: lead.id }, data: { etapa } });
-    this.ultimoAviso = this.avisar(lead, nuevo, envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
+    this.encadenarAviso(this.avisar(lead, nuevo, envio), lead.id);
     this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
     return { leadId: lead.id, nuevo };
   }
@@ -118,7 +126,7 @@ export class LeadsService {
 
   /** El aviso al correo de leads y el envío al CRM de un lead ya guardado (no esperan; si fallan, se registra). */
   trasGuardar(lead: FilaLead, nuevo: boolean, envio: EnvioLead): void {
-    this.ultimoAviso = this.avisar(lead, nuevo, envio).catch((e: unknown) => this.log.warn(`No se pudo avisar del lead ${lead.id}: ${e instanceof Error ? e.message : String(e)}`));
+    this.encadenarAviso(this.avisar(lead, nuevo, envio), lead.id);
     this.ultimoEnvio = this.crm.encolar(lead.id, nuevo ? 'lead.creado' : 'lead.actualizado').catch((e: unknown) => this.log.warn(`No se pudo encolar el lead ${lead.id} al CRM: ${e instanceof Error ? e.message : String(e)}`));
   }
 

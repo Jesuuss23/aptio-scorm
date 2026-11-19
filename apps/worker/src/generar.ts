@@ -16,6 +16,11 @@ export interface ContextoEtapa {
   parametros: Record<string, unknown>;
   /** Datos guardados por las etapas ya terminadas de esta generación. */
   anteriores: Partial<Record<Etapa, unknown>>;
+  /**
+   * Lo último que guardó `avance` en esta misma etapa antes de que la cancelaran, fallara o se cayera el worker. La
+   * etapa decide qué reutiliza (la 4 conserva las pantallas ya compuestas si su guion no cambió); `undefined` si no hay.
+   */
+  parcial?: unknown;
   bd: PrismaClient;
   /** Nombre del proveedor de texto (`simulado` responde siempre el caso LOTO). */
   proveedor: string;
@@ -115,12 +120,16 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
       await emitir(etapa, 'EN_CURSO');
 
       let costo = 0;
+      // Lo que esta etapa ya había avanzado en un intento anterior (continuar o reintento de BullMQ).
+      const parcial = (e.detalle as { datos?: unknown } | null)?.datos;
+      let ultimoAvance: unknown = parcial;
       const comprobar = async () => {
         const actual = await bd.generacionEtapa.findUnique({ where: { id: e.id }, select: { estado: true } });
         if (actual?.estado !== 'EN_CURSO') throw new GeneracionCancelada();
       };
       const ctx: ContextoEtapa = {
         generacionId, organizacionId, proyectoId: g.proyectoId, parametros: g.parametros as Record<string, unknown>, anteriores, bd,
+        ...(parcial !== undefined ? { parcial } : {}),
         proveedor: proveedor.nombre,
         comprobar,
         async gastar(usd: number) {
@@ -142,7 +151,10 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
           const r = await bd.generacionEtapa.updateMany({
             where: { id: e.id, estado: 'EN_CURSO' }, data: { costoUsd: costo, detalle: { texto, datos } as Prisma.InputJsonValue },
           });
-          if (r.count) await emitir(etapa, 'EN_CURSO', texto);
+          if (r.count) {
+            ultimoAvance = datos;
+            await emitir(etapa, 'EN_CURSO', texto);
+          }
         },
       };
 
@@ -158,7 +170,8 @@ export function crearGenerador({ bd, redis, proveedor, ejecutores }: Dependencia
 
       if (fallo !== undefined) {
         const marcada = await bd.generacionEtapa.updateMany({
-          where: { id: e.id, estado: 'EN_CURSO' }, data: { estado: 'ERROR', fin: new Date(), costoUsd: costo, detalle: { texto: fallo } },
+          where: { id: e.id, estado: 'EN_CURSO' }, // El avance se conserva con el error: al continuar, la etapa reutiliza lo que ya estaba hecho.
+          data: { estado: 'ERROR', fin: new Date(), costoUsd: costo, detalle: { texto: fallo, ...(ultimoAvance !== undefined ? { datos: ultimoAvance } : {}) } as Prisma.InputJsonValue },
         });
         if (!marcada.count) return cancelada(e.id, costo);
         await bd.generacion.updateMany({ where: { id: generacionId, estado: 'EN_CURSO' }, data: { estado: 'ERROR', terminadoEn: new Date() } });
