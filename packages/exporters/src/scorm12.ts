@@ -6,6 +6,7 @@
 import { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma } from './bilingue.ts';
 import type { Creditos, CursoReproductor, Idioma, KitReproductor } from '@aptio/player';
 import JSZip from 'jszip';
+import { fuentesDelKit, HOJA_FUENTES } from './fuentes.ts';
 import { escaparXml, manifiestoScorm12 } from './manifiesto.ts';
 
 export interface RecursoPaquete {
@@ -57,14 +58,15 @@ const esVtt = (r: RecursoCurso, nombre: string) => r.tipo === 'subtitulos' || r.
 
 const textoDe = (t: Partial<Record<string, string>> | undefined, idioma: string): string => t?.[idioma] ?? Object.values(t ?? {}).find(Boolean) ?? '';
 
-export function indexHtml(titulo: string, idioma: string): string {
+/** `conFuentes`: enlaza `fuentes/fuentes.css`, con las tipografías del kit que van en el paquete. */
+export function indexHtml(titulo: string, idioma: string, conFuentes = false): string {
   return `<!doctype html>
 <html lang="${escaparXml(idioma)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escaparXml(titulo)}</title>
-<style>html,body{margin:0;height:100%;background:#fff}#curso{height:100%;min-height:100vh}</style>
+${conFuentes ? `<link rel="stylesheet" href="${HOJA_FUENTES}">\n` : ''}<style>html,body{margin:0;height:100%;background:#fff}#curso{height:100%;min-height:100vh}</style>
 </head>
 <body>
 <div id="curso"></div>
@@ -119,7 +121,10 @@ export function armarContenido(entrada: EntradaScorm12, extra: Record<string, un
   }
 
   const datos = { curso, idioma, ...(entrada.kit ? { kit: entrada.kit } : {}), rutas, svgs, subtitulos, ...(entrada.incluirDiagnostico === false ? { diagnostico: false } : {}), ...(entrada.creditos ? { creditos: entrada.creditos } : {}), ...extra };
-  contenido.set('index.html', indexHtml(titulo, idioma));
+  // Las tipografías del kit van dentro del paquete: sin ellas, el LMS mostraría las del sistema.
+  const fuentes = fuentesDelKit(entrada.kit);
+  for (const [ruta, datos] of fuentes.archivos) contenido.set(ruta, datos);
+  contenido.set('index.html', indexHtml(titulo, idioma, fuentes.familias.length > 0));
   contenido.set('aptio-reproductor.js', entrada.reproductor);
   contenido.set('datos.js', `window.APTIO_DATOS = ${JSON.stringify(datos)};\n`);
   contenido.set('iniciar.js', INICIAR_JS);
