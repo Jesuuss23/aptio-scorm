@@ -144,12 +144,20 @@ export class RecursosService {
     }
 
     const recurso = await this.bd.$transaction(async (tx) => {
+      // SUP-139 · El material del cliente sin proyecto (para proponer el kit) no espera a una entrega: vence a los días
+      // de retención del cliente desde hoy. El de un proyecto se programa al entregarlo (HU-1404).
+      let eliminarEn: Date | undefined;
+      if (subida.origen === 'CLIENTE' && !subida.proyectoId && subida.clienteId) {
+        const c = await tx.cliente.findUniqueOrThrow({ where: { id: subida.clienteId }, select: { retencionDocumentosDias: true } });
+        eliminarEn = new Date(Date.now() + c.retencionDocumentosDias * 24 * 60 * 60 * 1000);
+      }
       const r = await tx.recurso.create({
         data: {
           organizacionId, clienteId: subida.clienteId, proyectoId: subida.proyectoId,
           tipo: permitido.tipo, origen: subida.origen, claveS3: subida.claveS3,
           mime: subida.mime, bytes: BigInt(bytes), hash, nombre: subida.nombre,
           ...(metadatos ? { metadatos } : {}),
+          ...(eliminarEn ? { eliminarEn } : {}),
         },
       });
       await tx.subida.update({ where: { id: subida.id }, data: { recursoId: r.id } });

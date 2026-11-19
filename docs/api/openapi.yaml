@@ -2322,6 +2322,37 @@ paths:
           $ref: '#/components/responses/NoEncontrado'
         '422':
           $ref: '#/components/responses/NoValido'
+  /captacion/leads/eliminar-titular:
+    post:
+      tags:
+      - Captación
+      summary: Borrar los datos de una persona a su pedido (SUP-237, Ley 29733)
+      operationId: post_captacion_leads_eliminar_titular
+      description: |-
+        Solo SUPERADMIN. Borra el lead de ese correo con sus envíos al CRM, deja sin nombre ni correo sus citas del
+        agendador y cancela las que venían. Responde igual exista o no el correo. Las copias en los CRM conectados no se
+        borran desde aquí: la respuesta las lista para pedir allí su borrado. Auditoría LEAD_ELIMINADO_TITULAR con la
+        huella SHA-256 del correo y el motivo, nunca el correo. Los leads sin actividad en 730 días (`RETENCION_LEADS_DIAS`)
+        los borra el worker cada día.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TitularEliminacion'
+      responses:
+        '200':
+          description: Datos borrados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TitularEliminado'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          $ref: '#/components/responses/SinPermiso'
+        '422':
+          $ref: '#/components/responses/NoValido'
   /captacion/leads/{leadId}/sincronizar:
     post:
       tags:
@@ -10876,6 +10907,45 @@ components:
         mensaje:
           type: string
           example: El webhook respondió 204 a la entrega 6f1c2a90-5b7e-4d1a-9c3f-2e8b7a6d5c41
+    TitularEliminacion:
+      type: object
+      required: [correo, motivo]
+      properties:
+        correo:
+          type: string
+          format: email
+          maxLength: 254
+        motivo:
+          type: string
+          minLength: 5
+          maxLength: 300
+          description: De dónde vino el pedido (queda en la Auditoría)
+    TitularEliminado:
+      type: object
+      required: [lead, citas, citasCanceladas, crm]
+      properties:
+        lead:
+          type: boolean
+          description: Había un lead con ese correo y se borró
+        citas:
+          type: integer
+          description: Citas del agendador que quedaron sin nombre ni correo
+        citasCanceladas:
+          type: integer
+          description: De ellas, las que venían y se cancelaron
+        crm:
+          type: array
+          description: Copias en los CRM conectados; hay que pedir allí su borrado
+          items:
+            type: object
+            required: [tipo, idExterno]
+            properties:
+              tipo:
+                type: string
+                enum: [hubspot, pipedrive, zoho, webhook]
+              idExterno:
+                type: string
+                nullable: true
     Sincronizacion:
       type: object
       required: [encolados]
@@ -13593,7 +13663,7 @@ components:
           type: string
           format: date-time
           nullable: true
-          description: Borrado programado de un documento del cliente (HU-1404)
+          description: Borrado programado de un documento del cliente (HU-1404). El de un proyecto se programa al entregarlo; el material del cliente sin proyecto (para el kit) vence a los días de retención del cliente desde la subida (SUP-139)
         proveedor:
           type: string
           nullable: true

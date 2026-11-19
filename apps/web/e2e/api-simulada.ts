@@ -1533,6 +1533,15 @@ export async function simularApi(page: Page, { conSesion, rol, segundoFactor = '
       if (ruta === '/captacion/leads/exportar.csv' && req.method() === 'GET') {
         return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="leads-2026-11-16.csv"', 'Cache-Control': 'no-store' }, body: leadsACsv(filtrados) });
       }
+      // SUP-237 · Borrar a pedido del titular: el lead sale de la lista y responde igual exista o no.
+      if (ruta === '/captacion/leads/eliminar-titular' && req.method() === 'POST') {
+        const { correo, motivo } = req.postDataJSON() as { correo?: string; motivo?: string };
+        if (!correo?.includes('@') || (motivo ?? '').trim().length < 5) return responder(422, { codigo: 'NO_VALIDO', mensaje: 'motivo lleva de 5 a 300 caracteres' });
+        const antes = leadsSim.length;
+        leadsSim.splice(0, leadsSim.length, ...leadsSim.filter((x) => x.correo !== correo.trim().toLowerCase()));
+        const borrado = leadsSim.length < antes;
+        return responder(200, { lead: borrado, citas: borrado ? 1 : 0, citasCanceladas: 0, crm: borrado ? [{ tipo: 'hubspot', idExterno: '901' }] : [] });
+      }
       const id = ruta.split('/')[3];
       const l = leadsSim.find((x) => x.id === id);
       // HU-1602 · «Reintentar» de la fila: vuelve a poner en la cola lo que no se envió.

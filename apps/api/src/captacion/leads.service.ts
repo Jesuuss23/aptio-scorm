@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { leerAjustesSitio, type Prisma } from '@aptio/db';
+import { eliminarDatosTitular, huellaCorreo, leerAjustesSitio, type Prisma } from '@aptio/db';
 import { etapaTrasAgendar } from '@aptio/schema/agenda';
 import { etiquetaOrigen, fusionarLead, leadNuevo, leadsACsv, leerHistorial, LIMITES_LEAD, resumenUtm, validarEnvioLead, type EnvioLead } from '@aptio/schema/leads';
 import type { UsuarioSesion } from '../comun/roles.js';
@@ -9,7 +9,7 @@ import { CorreoService } from '../correo/correo.service.js';
 import { CrmService, crmDeLead } from './crm.service.js';
 import { ChatbotService } from './chatbot.service.js';
 import { PopupsService } from './popups.service.js';
-import type { ConsultaLeadsDto, FiltroLeadsDto, LeadDto, ListaLeadsDto } from './leads.dto.js';
+import type { ConsultaLeadsDto, FiltroLeadsDto, LeadDto, ListaLeadsDto, TitularEliminacionDto, TitularEliminadoDto } from './leads.dto.js';
 
 /** HU-1601 · Envíos por IP en cada ventana; más, 429 (aparte del límite general de /publico/*, SUP-169). */
 export const LIMITE_LEADS = { envios: 5, ventanaMs: 10 * 60_000 } as const;
@@ -188,6 +188,17 @@ export class LeadsService {
     const filas = await this.bd.lead.findMany({ where: this.donde(f), orderBy: [{ creadoEn: 'desc' }, { id: 'asc' }], take: LIMITES_LEAD.exportar });
     await this.auditar(u, 'LEADS_EXPORTADOS', null, { filas: filas.length, filtros: { ...(f.origen ? { origen: f.origen } : {}), ...(f.etapa ? { etapa: f.etapa } : {}) } });
     return { csv: leadsACsv(filas), filas: filas.length };
+  }
+
+  /**
+   * SUP-237 · Borrar a pedido del titular (Ley 29733): el lead de ese correo se borra con sus envíos al CRM, sus citas
+   * se anonimizan y las que venían se cancelan. La Auditoría guarda la huella del correo, no el correo. Las copias en
+   * los CRM conectados se devuelven para pedir allí su borrado. Responde igual exista o no el correo.
+   */
+  async eliminarTitular(u: UsuarioSesion, dto: TitularEliminacionDto): Promise<TitularEliminadoDto> {
+    const r = await this.bd.$transaction((tx) => eliminarDatosTitular(tx, dto.correo));
+    await this.auditar(u, 'LEAD_ELIMINADO_TITULAR', null, { correoHuella: huellaCorreo(dto.correo), motivo: dto.motivo.trim(), lead: r.lead, citas: r.citas, citasCanceladas: r.citasCanceladas, crm: r.crm.map((x) => x.tipo) });
+    return r;
   }
 
   private auditar(u: UsuarioSesion, accion: string, entidadId: string | null, datos: Record<string, unknown>) {

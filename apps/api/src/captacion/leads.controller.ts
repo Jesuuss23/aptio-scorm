@@ -3,7 +3,7 @@ import { ApiAcceptedResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundRe
 import type { Response } from 'express';
 import { Roles, type UsuarioSesion } from '../comun/roles.js';
 import { UsuarioActual } from '../comun/usuario-actual.js';
-import { ConsultaLeadsDto, FiltroLeadsDto, LeadCambioDto, LeadDto, ListaLeadsDto } from './leads.dto.js';
+import { ConsultaLeadsDto, FiltroLeadsDto, LeadCambioDto, LeadDto, ListaLeadsDto, TitularEliminacionDto, TitularEliminadoDto } from './leads.dto.js';
 import { SincronizacionDto } from './crm.dto.js';
 import { CrmService } from './crm.service.js';
 import { LeadsService } from './leads.service.js';
@@ -34,6 +34,15 @@ export class LeadsController {
     const { csv } = await this.leads.exportar(u, f);
     res.setHeader('Content-Disposition', `attachment; filename="leads-${new Date().toISOString().slice(0, 10)}.csv"`);
     return csv;
+  }
+
+  /** SUP-237 · Borrar los datos de una persona a su pedido (Ley 29733). Va antes de `:leadId` para no confundirse. */
+  @Post('eliminar-titular')
+  @HttpCode(200)
+  @ApiOkResponse({ type: TitularEliminadoDto })
+  @ApiUnprocessableEntityResponse({ description: 'NO_VALIDO: correo o motivo' })
+  eliminarTitular(@UsuarioActual() u: UsuarioSesion, @Body() dto: TitularEliminacionDto): Promise<TitularEliminadoDto> {
+    return this.leads.eliminarTitular(u, dto);
   }
 
   @Patch(':leadId')

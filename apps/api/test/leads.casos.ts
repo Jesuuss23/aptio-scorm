@@ -6,7 +6,7 @@
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { hashearClave, ID_AJUSTES, prisma, Rol } from '@aptio/db';
+import { hashearClave, huellaCorreo, ID_AJUSTES, prisma, Rol } from '@aptio/db';
 import { AJUSTES_POR_DEFECTO } from '@aptio/schema/sitio-ajustes';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -224,6 +224,39 @@ describe.skipIf(!hayBase && !process.env.CI)('leads con origen y UTM (HU-1601)',
     expect(res.text).not.toContain(visitante('ia'));
     const aud = await prisma.auditoria.findMany({ where: { accion: 'LEADS_EXPORTADOS', usuario: { email: correoDe('super') } } });
     expect(aud.at(-1)!.datos).toEqual({ filas: 2, filtros: { origen: 'popup' } });
+  });
+
+  it('SUP-237 · a pedido del titular borra su lead, anonimiza sus citas, cancela las que vienen y lo audita sin el correo', async () => {
+    const correo = visitante('titular');
+    expect((await publico({ correo, nombre: 'Rosa Mendoza', consentimiento: true, via: 'formulario', paginaEntrada: '/s/' })).status).toBe(201);
+    const l = await lead(correo);
+    const tipo = await prisma.agendaTipo.create({ data: { nombreEs: `Demo ${sufijo}` } });
+    const asesor = await prisma.agendaAsesor.create({ data: { nombre: 'Asesor', correo: 'asesor@aptio.test', enlaceVideollamada: 'https://meet.example/x', tipos: { connect: { id: tipo.id } } } });
+    const cita = (inicio: Date, h: string) => prisma.agendaCita.create({ data: { tipoId: tipo.id, asesorId: asesor.id, inicio, fin: new Date(inicio.getTime() + 30 * 60_000), nombre: 'Rosa Mendoza', correo, empresa: 'Nuevo Horizonte', leadId: l.id, tokenCancelacionHash: `${h}-${sufijo}` } });
+    const pasada = await cita(new Date(Date.now() - 7 * 24 * 3600_000), 'pasada');
+    const proxima = await cita(new Date(Date.now() + 7 * 24 * 3600_000), 'proxima');
+
+    const motivo = 'Pidió por correo que borremos sus datos';
+    const res = await request(servidor).post('/api/v1/captacion/leads/eliminar-titular').set('Cookie', cookies.super!).send({ correo: correo.toUpperCase(), motivo });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ lead: true, citas: 2, citasCanceladas: 1, crm: [] });
+    expect(await prisma.lead.findUnique({ where: { correo } })).toBeNull();
+    for (const c of [pasada, proxima]) {
+      expect(await prisma.agendaCita.findUniqueOrThrow({ where: { id: c.id } })).toMatchObject({ nombre: 'Titular eliminado', correo: '', empresa: null, leadId: null });
+    }
+    expect(await prisma.agendaCita.findUniqueOrThrow({ where: { id: pasada.id } })).toMatchObject({ estado: 'confirmada' });
+    expect(await prisma.agendaCita.findUniqueOrThrow({ where: { id: proxima.id } })).toMatchObject({ estado: 'cancelada', canceladaPor: 'titular' });
+    const aud = await prisma.auditoria.findFirstOrThrow({ where: { accion: 'LEAD_ELIMINADO_TITULAR', usuario: { email: correoDe('super') } }, orderBy: { creadoEn: 'desc' } });
+    expect(aud.datos).toEqual({ correoHuella: huellaCorreo(correo), motivo, lead: true, citas: 2, citasCanceladas: 1, crm: [] });
+    expect(JSON.stringify(aud.datos)).not.toContain(correo);
+
+    // Un correo que no está responde igual; sin motivo, 422; solo el superadmin.
+    expect((await request(servidor).post('/api/v1/captacion/leads/eliminar-titular').set('Cookie', cookies.super!).send({ correo: 'nadie@ejemplo.test', motivo })).body).toEqual({ lead: false, citas: 0, citasCanceladas: 0, crm: [] });
+    expect((await request(servidor).post('/api/v1/captacion/leads/eliminar-titular').set('Cookie', cookies.super!).send({ correo })).status).toBe(422);
+    expect((await request(servidor).post('/api/v1/captacion/leads/eliminar-titular').set('Cookie', cookies.admin!).send({ correo, motivo })).status).toBe(403);
+    await prisma.agendaCita.deleteMany({ where: { tipoId: tipo.id } });
+    await prisma.agendaAsesor.delete({ where: { id: asesor.id } });
+    await prisma.agendaTipo.delete({ where: { id: tipo.id } });
   });
 
   it('solo el superadmin: 401 sin sesión y 403 a un rol de organización', async () => {

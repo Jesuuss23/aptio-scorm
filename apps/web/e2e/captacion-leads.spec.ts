@@ -145,3 +145,27 @@ test('sin leads la vista dice cómo empezar a recibirlos', async ({ page }) => {
   await page.goto('/captacion/leads');
   await expect(page.getByText('Aún no llegan leads. Agrega el bloque «Formulario de contacto» a una página del sitio y publícala.')).toBeVisible();
 });
+
+test('SUP-237 · borrar los datos de una persona a su pedido, con confirmación, solo con teclado y axe sin violaciones', async ({ page }) => {
+  await simularApi(page, { ...SITIO, leadsSitio: LEADS });
+  await page.goto('/captacion/leads');
+  await expect(fila(page, 'Elena Soto')).toBeVisible();
+  const tarjeta = page.getByRole('region', { name: 'Borrar datos a pedido del titular' });
+  const boton = tarjeta.getByRole('button', { name: 'Borrar sus datos' });
+  await expect(boton).toBeDisabled();
+  await tarjeta.getByLabel('Correo del titular').fill('ESoto@RetailPacifico.example');
+  await tarjeta.getByLabel('Motivo del pedido').fill('Pidió por correo que borremos sus datos');
+  await tarjeta.getByLabel('Motivo del pedido').press('Enter');
+  await expect(tarjeta.getByRole('alert')).toContainText('¿Borrar los datos de ESoto@RetailPacifico.example? No se puede deshacer.');
+  await sinViolaciones(page);
+  await tarjeta.getByRole('button', { name: 'Cancelar' }).click();
+  await expect(tarjeta.getByRole('alert')).toHaveCount(0);
+  await boton.click();
+  await tarjeta.getByRole('button', { name: 'Sí, borrar' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(tarjeta.getByRole('status')).toContainText('Se borró el lead de ESoto@RetailPacifico.example; 1 cita quedó sin sus datos.');
+  await expect(tarjeta.getByRole('status')).toContainText('También está en HubSpot (id 901): pide allí que lo borren.');
+  await expect(fila(page, 'Elena Soto')).toHaveCount(0);
+  await expect(tarjeta.getByLabel('Correo del titular')).toHaveValue('');
+  await sinViolaciones(page);
+});

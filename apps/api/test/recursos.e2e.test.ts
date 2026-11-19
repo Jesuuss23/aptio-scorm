@@ -154,6 +154,18 @@ describe.skipIf((!hayBase || !hayS3) && !process.env.CI)('recursos y almacenamie
     expect(lista.body[0].url).toBeUndefined();
   });
 
+  it('SUP-139 · el material del cliente sin proyecto (para el kit) vence a los días de retención desde la subida', async () => {
+    const antes = Date.now();
+    const { confirmado } = await subir('Manual de marca.pdf', 'application/pdf', PDF);
+    expect(confirmado.body.proyectoId ?? null).toBeNull();
+    const vence = new Date(confirmado.body.eliminarEn).getTime();
+    expect(vence).toBeGreaterThanOrEqual(antes + 180 * 24 * 3600_000);
+    expect(vence).toBeLessThanOrEqual(Date.now() + 180 * 24 * 3600_000);
+    // Lo que sube el equipo (no del cliente) no se programa.
+    const { confirmado: propio } = await subir('Plantilla.pdf', 'application/pdf', PDF, { clienteId, origen: 'SUBIDO' });
+    expect(propio.body.eliminarEn).toBeNull();
+  });
+
   it('al entregar un proyecto programa el borrado de sus documentos según la retención del cliente', async () => {
     const proyecto = await prisma.proyecto.create({ data: { organizacionId: orgId, clienteId, nombre: 'LOTO', creadoPorId: usuarioId, estado: 'ENTREGADO' } });
     const { confirmado } = await subir('Procedimiento LOTO.pdf', 'application/pdf', PDF, { proyectoId: proyecto.id, origen: 'CLIENTE' });

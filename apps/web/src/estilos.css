@@ -3359,6 +3359,18 @@ ul.fila-chips {
   flex-wrap: wrap;
   gap: 4px;
 }
+.titular-form {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin-top: 16px;
+}
+
+.titular-form .acciones-fila,
+.titular-form .nota {
+  margin-top: 8px;
+}
+
 .leads-pie {
   margin: 16px 0 0;
 }

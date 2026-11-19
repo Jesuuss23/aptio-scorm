@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ESTADOS_ENVIO, TIPOS_CRM } from '@aptio/schema/crm';
 import { ETAPAS_LEAD, LIMITES_LEAD, ORIGENES_LEAD, VIAS_LEAD } from '@aptio/schema/leads';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsEmail, IsIn, IsInt, IsOptional, IsString, Length, Max, MaxLength, Min } from 'class-validator';
 
 /** HU-1601 · Lo que envía el sitio (JSON o formulario HTML). Todo es texto no confiable: lo valida `@aptio/schema/leads`. */
 export class LeadEntradaDto {
@@ -99,4 +99,24 @@ export class ListaLeadsDto {
 
 export class LeadCambioDto {
   @ApiProperty({ enum: ETAPAS_LEAD }) @IsIn(ETAPAS_LEAD, { message: 'etapa no está en el catálogo' }) etapa: string;
+}
+
+/** SUP-237 · Pedido del titular (Ley 29733): borrar sus datos del sitio. */
+export class TitularEliminacionDto {
+  @ApiProperty({ example: 'rmendoza@nuevohorizonte.example', description: 'El correo con el que dejó sus datos' })
+  @IsEmail({}, { message: 'correo no es un correo válido' }) @MaxLength(LIMITES_LEAD.correo) correo: string;
+  @ApiProperty({ minLength: 5, maxLength: 300, example: 'Pidió por correo el 19/11 que borremos sus datos' })
+  @IsString() @Length(5, 300, { message: 'motivo lleva de 5 a 300 caracteres' }) motivo: string;
+}
+
+export class CopiaCrmDto {
+  @ApiProperty({ enum: TIPOS_CRM }) tipo: string;
+  @ApiProperty({ nullable: true, description: 'El id del contacto en ese CRM, para pedir allí su borrado' }) idExterno: string | null;
+}
+
+export class TitularEliminadoDto {
+  @ApiProperty({ description: 'Había un lead con ese correo y se borró' }) lead: boolean;
+  @ApiProperty({ description: 'Citas del agendador anonimizadas' }) citas: number;
+  @ApiProperty({ description: 'De ellas, las que venían y quedaron canceladas' }) citasCanceladas: number;
+  @ApiProperty({ type: [CopiaCrmDto], description: 'Copias en los CRM conectados: el sitio no las borra, hay que pedirlo allí' }) crm: CopiaCrmDto[];
 }
