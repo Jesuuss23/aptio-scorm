@@ -358,7 +358,7 @@ test('CP-107 · solo con teclado hasta «Créditos»: la frase de revisión, la 
   ], 'AulasEducativas');
   await page.goto(await carpetaHtml(loto, undefined, creditos));
   await expect(page.locator('#curso .ap-titulo-pantalla')).toBeVisible();
-  const BOTON = '.ap-boton-barra[aria-haspopup="dialog"]';
+  const BOTON = '.ap-boton-creditos[aria-haspopup="dialog"]';
   expect(await texto(page, BOTON)).toBe('Créditos');
   await usar(page, BOTON);
 
@@ -407,5 +407,5 @@ test('CP-107 · solo con teclado hasta «Créditos»: la frase de revisión, la 
 test('CP-107 · sin créditos (nada de IA) la barra no tiene el botón', async ({ page }) => {
   await page.goto(urlLoto);
   await expect(page.locator('#curso .ap-titulo-pantalla')).toBeVisible();
-  expect(await contar(page, '.ap-boton-barra[aria-haspopup="dialog"]')).toBe(0);
+  expect(await contar(page, '.ap-boton-creditos')).toBe(0);
 });
