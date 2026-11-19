@@ -1,9 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { eliminarDatosTitular, huellaCorreo, leerAjustesSitio, type Prisma } from '@aptio/db';
 import { etapaTrasAgendar } from '@aptio/schema/agenda';
 import { etiquetaOrigen, fusionarLead, leadNuevo, leadsACsv, leerHistorial, LIMITES_LEAD, resumenUtm, validarEnvioLead, type EnvioLead } from '@aptio/schema/leads';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { LimitadorService } from '../comun/limitador.js';
 import { CorreoService } from '../correo/correo.service.js';
 import { CrmService, crmDeLead } from './crm.service.js';
 import { ChatbotService } from './chatbot.service.js';
@@ -35,7 +36,6 @@ export type ResultadoCaptura = { estado: 'guardado'; leadId: string; nuevo: bool
 @Injectable()
 export class LeadsService {
   private readonly log = new Logger('Leads');
-  private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
   /**
    * Los avisos por correo en curso, encadenados (las pruebas los esperan; la respuesta al visitante no). Se encadenan
    * todos y no solo el último: si no, un aviso anterior que tarda más podría llegar después de esperarlo.
@@ -44,7 +44,7 @@ export class LeadsService {
   /** HU-1602 · El último encolado al CRM en curso (la respuesta al visitante tampoco lo espera). */
   ultimoEnvio: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly correo: CorreoService, private readonly crm: CrmService, private readonly popups: PopupsService, private readonly chatbot: ChatbotService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly limitador: LimitadorService, private readonly correo: CorreoService, private readonly crm: CrmService, private readonly popups: PopupsService, private readonly chatbot: ChatbotService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -57,29 +57,17 @@ export class LeadsService {
 
   /** Vacía las ventanas del límite (pruebas). */
   reiniciarLimite(): void {
-    this.ventanas.clear();
+    this.limitador.reiniciar('leads');
   }
 
   /** ¿Esta IP ya hizo demasiados envíos en la ventana? Cuenta cada intento, también los no válidos. */
-  private contar(ip: string, ahora: number): void {
-    let v = this.ventanas.get(ip);
-    if (!v || ahora - v.inicio >= LIMITE_LEADS.ventanaMs) {
-      v = { inicio: ahora, cuenta: 0 };
-      this.ventanas.set(ip, v);
-      if (this.ventanas.size > 10_000) for (const [k, x] of this.ventanas) if (ahora - x.inicio >= LIMITE_LEADS.ventanaMs) this.ventanas.delete(k);
-    }
-    v.cuenta += 1;
-    if (v.cuenta > LIMITE_LEADS.envios) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Recibimos varios envíos seguidos: espera unos minutos e intenta de nuevo', reintentarEn: Math.ceil((v.inicio + LIMITE_LEADS.ventanaMs - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
 
   /**
    * Un envío del sitio. 429 si la IP pasó el límite; 422 NO_VALIDO con `detalles` si no valida. Con el campo trampa
    * lleno no se guarda nada, pero quien envía no lo nota. `base` es donde se sirve el sitio (`/s`).
    */
   async capturar(entrada: unknown, ip: string, base: string, ahora = new Date()): Promise<ResultadoCaptura> {
-    this.contar(ip, ahora.getTime());
+    await this.limitador.exigir('leads', ip, LIMITE_LEADS, 'Recibimos varios envíos seguidos: espera unos minutos e intenta de nuevo');
     const r = validarEnvioLead(entrada, base);
     if (!r.ok) throw new UnprocessableEntityException({ codigo: 'NO_VALIDO', mensaje: r.errores.map((e) => e.mensaje).join('. '), detalles: r.errores });
     if (r.trampa) return { estado: 'descartado' };

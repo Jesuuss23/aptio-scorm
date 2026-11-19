@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { ConflictException, HttpException, HttpStatus, Injectable, Logger, NotFoundException, type OnModuleDestroy, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, NotFoundException, type OnModuleDestroy, UnprocessableEntityException } from '@nestjs/common';
 import { type AvisoAgenda, COLA_AGENDA, type DatosAgenda, idTareaAgenda, opcionesRedis, opcionesTareaAgenda, prefijoColas, TAREA_AGENDA } from '@aptio/colas';
 import { Prisma } from '@aptio/db';
 import {
@@ -12,6 +12,7 @@ import { leerAjustesSitio } from '@aptio/db';
 import { Queue } from 'bullmq';
 import type { UsuarioSesion } from '../comun/roles.js';
 import { BaseDatosService } from '../base-datos/base-datos.service.js';
+import { LimitadorService } from '../comun/limitador.js';
 import { entornoActual } from '../sitio/entorno-sitio.js';
 import { ChatbotService } from './chatbot.service.js';
 import { LeadsService } from './leads.service.js';
@@ -58,13 +59,11 @@ const noValido = (errores: { campo: string; mensaje: string }[]) => new Unproces
 @Injectable()
 export class AgendaService implements OnModuleDestroy {
   private readonly log = new Logger('Agenda');
-  private readonly ventanas = new Map<string, { inicio: number; cuenta: number }>();
-  private readonly lecturas = new Map<string, { inicio: number; cuenta: number }>();
   private cola?: Queue<DatosAgenda>;
   /** El último encolado en curso (las pruebas lo esperan; la respuesta al visitante no). */
   ultimoEncolado: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly baseDatos: BaseDatosService, private readonly leads: LeadsService, private readonly chatbot: ChatbotService) {}
+  constructor(private readonly baseDatos: BaseDatosService, private readonly limitador: LimitadorService, private readonly leads: LeadsService, private readonly chatbot: ChatbotService) {}
 
   private get bd() {
     return this.baseDatos.cliente;
@@ -81,22 +80,10 @@ export class AgendaService implements OnModuleDestroy {
 
   /** Vacía los límites por IP (pruebas). */
   reiniciarLimite(): void {
-    this.ventanas.clear();
-    this.lecturas.clear();
+    this.limitador.reiniciar('agenda-reservas');
+    this.limitador.reiniciar('agenda-lecturas');
   }
 
-  private contar(mapa: Map<string, { inicio: number; cuenta: number }>, limite: { envios: number; ventanaMs: number }, ip: string, ahora: number): void {
-    let v = mapa.get(ip);
-    if (!v || ahora - v.inicio >= limite.ventanaMs) {
-      v = { inicio: ahora, cuenta: 0 };
-      mapa.set(ip, v);
-      if (mapa.size > 10_000) for (const [k, x] of mapa) if (ahora - x.inicio >= limite.ventanaMs) mapa.delete(k);
-    }
-    v.cuenta += 1;
-    if (v.cuenta > limite.envios) {
-      throw new HttpException({ codigo: 'DEMASIADAS_SOLICITUDES', mensaje: 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo', reintentarEn: Math.ceil((v.inicio + limite.ventanaMs - ahora) / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
-    }
-  }
 
   // ── Ajustes ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -280,7 +267,7 @@ export class AgendaService implements OnModuleDestroy {
 
   /** `GET /s/_agenda.json` (CP-135): los tipos y las franjas libres del tipo pedido, sin datos de asesores ni de otras citas. */
   async publica(tipoId: unknown, idioma: string, ip: string, ahora = new Date()): Promise<AgendaPublica> {
-    this.contar(this.lecturas, LIMITE_LECTURAS_AGENDA, ip, ahora.getTime());
+    await this.limitador.exigir('agenda-lecturas', ip, LIMITE_LECTURAS_AGENDA, 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo');
     const [ajustes, tipos] = await Promise.all([this.ajustes(), this.tiposPublicos()]);
     const tipo = tipos.find((t) => t.id === tipoId) ?? tipos[0];
     const hoy = fechaLima(ahora);
@@ -296,7 +283,7 @@ export class AgendaService implements OnModuleDestroy {
    * 409 FRANJA_OCUPADA si otro visitante la tomó (CP-135). Con el campo trampa lleno responde 201 sin cita y no guarda.
    */
   async reservar(entrada: unknown, ip: string, base: string, ahora = new Date()): Promise<ReservaRecibidaDto> {
-    this.contar(this.ventanas, LIMITE_RESERVAS, ip, ahora.getTime());
+    await this.limitador.exigir('agenda-reservas', ip, LIMITE_RESERVAS, 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo');
     const r = validarReserva(entrada, base);
     if (!r.ok) throw noValido(r.errores);
     if (r.trampa) return { recibido: true, cita: null };
@@ -372,7 +359,7 @@ export class AgendaService implements OnModuleDestroy {
    * ya no está confirmada o CITA_YA_EMPEZO. Cancela, quita los recordatorios y avisa al visitante y al asesor.
    */
   async cancelarPorToken(token: unknown, ip: string, ahora = new Date()): Promise<{ cita: FilaCita; texto: string }> {
-    this.contar(this.ventanas, LIMITE_RESERVAS, ip, ahora.getTime());
+    await this.limitador.exigir('agenda-reservas', ip, LIMITE_RESERVAS, 'Recibimos varias solicitudes seguidas: espera unos minutos e intenta de nuevo');
     const c = await this.porToken(token);
     if (!c) throw new NotFoundException({ codigo: 'CITA_NO_ENCONTRADA', mensaje: 'El enlace no corresponde a ninguna cita' });
     if (c.estado !== 'confirmada') throw new ConflictException({ codigo: 'CITA_NO_ACTIVA', mensaje: 'Esta cita ya no está activa' });
