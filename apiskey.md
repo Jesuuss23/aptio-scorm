@@ -2,6 +2,8 @@
 
 Lista de todas las llaves (API keys, tokens y secretos) que Aptio SCORM necesita para funcionar en producción: qué servicio da cada una, dónde se obtiene y qué hace en el sistema. Las revisé contra el código el 18 de noviembre de 2026.
 
+> **Costos, límites y cómo verificar cada servicio:** están en el manual de APIs v1.00, [`docs/manuales/Manual-APIs.md`](docs/manuales/Manual-APIs.md) (también en [`.docx`](docs/manuales/Manual-APIs.docx)), con la fecha de consulta de cada precio. Los manuales de usuario, programador y sistema están en la misma carpeta.
+
 > **Dónde se ponen:** en la nube **nunca** van en el repositorio ni en GitHub. Van en AWS Secrets Manager, en el secreto `aptio-<entorno>-aplicacion` (por ejemplo `aptio-produccion-aplicacion`). Cómo cargarlas está en `docs/24-puesta-en-marcha-aws.md`, paso 5. En local van en los `.env` de `apps/api`, `apps/worker` y `packages/db`, que no se suben al repositorio.
 >
 > **Cómo se activa producción:** se despliega la infraestructura con el entorno `produccion` (ver el final de este archivo). Así el secreto `aptio-produccion-aplicacion` nace con las variables `*_PRODUCCION` de las pasarelas (vacías) y sin las de pruebas, y `SITIO_ENTORNO` queda en `produccion`. Después, cada pasarela se pone en modo «producción» desde el panel del superadmin (Ventas › Pasarelas).

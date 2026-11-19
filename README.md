@@ -8,9 +8,10 @@ El equipo, los plazos y la estimación los define el ingeniero a cargo; este paq
 
 | Manual | Para quién |
 | --- | --- |
-| [`MANUAL-USUARIO.md`](MANUAL-USUARIO.md) | El equipo y el cliente: cómo usar cada pantalla, sin términos técnicos. |
-| [`MANUAL-PROGRAMADOR.md`](MANUAL-PROGRAMADOR.md) | Desarrollo: entorno, estructura, patrones y cómo extender. |
-| [`MANUAL-SISTEMA.md`](MANUAL-SISTEMA.md) | Ingeniería e infraestructura: arquitectura, flujos, seguridad, proveedores y operación. |
+| [`docs/manuales/Manual-Usuario.md`](docs/manuales/Manual-Usuario.md) (y `.docx`) | El equipo y el cliente: cómo usar cada pantalla, por rol, sin términos técnicos. |
+| [`docs/manuales/Manual-Programador.md`](docs/manuales/Manual-Programador.md) (y `.docx`) | Desarrollo: entorno, estructura, patrones y cómo extender. |
+| [`docs/manuales/Manual-Sistema.md`](docs/manuales/Manual-Sistema.md) (y `.docx`) | Ingeniería e infraestructura: arquitectura, flujos, seguridad, proveedores y operación. |
+| [`docs/manuales/Manual-APIs.md`](docs/manuales/Manual-APIs.md) (y `.docx`) | Servicios externos: costos referenciales, límites, variables y cómo verificar cada uno. |
 
 Se actualizan al cerrar cada entrega.
 

@@ -88,7 +88,7 @@ Luego se cambia el modo a real con un despliegue que lleve `-c modoProveedores=r
 
 ## 6. Crear el primer usuario y verificar CP-105
 
-1. Sembrar los datos iniciales con una tarea efímera sobre la imagen de la API (comando `pnpm db:seed`, con `SEED_CLAVE` definida solo en esa ejecución) o invitar al primer administrador según `MANUAL-SISTEMA.md`. En la nube la semilla corre con `NODE_ENV=production` y por eso **exige `SEED_CLAVE` de al menos 16 caracteres** (distinta de la de desarrollo), **solo corre sobre una base vacía** (no borra nada) y no escribe la clave en el registro. Genera la clave con `openssl rand -base64 24`, entra enseguida como superadmin para configurar su segundo factor y cambia las claves de los usuarios de ejemplo.
+1. Sembrar los datos iniciales con una tarea efímera sobre la imagen de la API (comando `pnpm db:seed`, con `SEED_CLAVE` definida solo en esa ejecución) o invitar al primer administrador según `docs/manuales/Manual-Sistema.md`. En la nube la semilla corre con `NODE_ENV=production` y por eso **exige `SEED_CLAVE` de al menos 16 caracteres** (distinta de la de desarrollo), **solo corre sobre una base vacía** (no borra nada) y no escribe la clave en el registro. Genera la clave con `openssl rand -base64 24`, entra enseguida como superadmin para configurar su segundo factor y cambia las claves de los usuarios de ejemplo.
 2. Completar CP-105 en el entorno, y anotar el resultado en `docs/ESTADO.md`:
    - `GET https://<UrlWeb>/api/v1/salud` responde 200 con `baseDatos: ok`.
    - `http://<UrlWeb>/` responde 301 hacia HTTPS.
