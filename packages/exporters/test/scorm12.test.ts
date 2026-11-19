@@ -54,14 +54,15 @@ describe('paquete SCORM 1.2 del caso LOTO (CP-091)', () => {
     const enZip = Object.values(zip.files).filter((f) => !f.dir).map((f) => f.name).filter((n) => n !== 'imsmanifest.xml');
     expect(new Set(listados)).toEqual(new Set(enZip));
     expect(listados).toEqual(paquete.archivos.slice(1));
-    expect(listados.slice(0, 5)).toEqual(['index.html', 'aptio-reproductor.js', 'datos.js', 'iniciar.js', 'recursos/aud-p01-es.mp3']);
+    expect(listados.slice(0, 3)).toEqual(['index.html', 'aptio-reproductor.js', 'datos.js']);
+    expect(listados.filter((r) => !r.startsWith('fuentes/')).slice(3, 5)).toEqual(['iniciar.js', 'recursos/aud-p01-es.mp3']);
     expect(Object.values(zip.files).some((f) => f.dir)).toBe(false);
   });
 
   it('todas las rutas son relativas y ningún archivo de texto descarga nada de internet', async () => {
     for (const ruta of paquete.archivos) {
       expect(ruta).not.toMatch(/^(\/|[a-z]+:)|\.\./i);
-      if (!/\.(html|js|xml|svg|vtt)$/.test(ruta)) continue;
+      if (!/\.(html|js|xml|svg|vtt|css)$/.test(ruta)) continue;
       const urls = (await texto(ruta)).match(/(https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}[^\s"'<>)]*/gi) ?? [];
       expect({ ruta, externas: urls.filter((u) => !ESPACIOS.test(u)) }).toEqual({ ruta, externas: [] });
     }

@@ -69,7 +69,7 @@ export class ExportacionesService {
     const ids = (Array.isArray(doc?.recursos) ? doc.recursos : []).map((r) => r?.id).filter((id): id is string => typeof id === 'string' && UUID.test(id));
     const [filas, proyecto, organizacion] = await Promise.all([
       ids.length ? this.bd.recurso.findMany({ where: { id: { in: ids }, organizacionId: c.organizacionId }, select: { id: true, nombre: true, bytes: true, tipo: true, proveedor: true, modelo: true, licencia: true } }) : [],
-      this.bd.proyecto.findFirst({ where: { id: c.proyectoId }, select: { clienteId: true } }),
+      this.bd.proyecto.findFirst({ where: { id: c.proyectoId }, select: { clienteId: true, cliente: { select: { kit: { select: { tipografias: true } } } } } }),
       this.bd.organizacion.findUnique({ where: { id: c.organizacionId }, select: { nombre: true } }),
     ]);
     const ficha = proyecto && formato === 'SCORM12'
@@ -81,7 +81,7 @@ export class ExportacionesService {
     const pesos = filas.map((r) => ({ id: r.id, nombre: r.nombre, bytes: Number(r.bytes) }));
     const bilingue = modoIdioma === 'mismo-paquete';
     const desbordes = bilingue ? await this.bd.traduccion.count({ where: { cursoId: c.id, idioma: 'en', estado: 'DESBORDE' } }) : 0;
-    const v = validarExportacion(formato, c.documento, pesos, await medirReproductor(), limiteMb, { origenLimite, modoIdioma, desbordes });
+    const v = validarExportacion(formato, c.documento, pesos, await medirReproductor(), limiteMb, { origenLimite, modoIdioma, desbordes, kit: (proyecto?.cliente.kit ?? null) as { tipografias?: { titulos?: string; textos?: string } } | null });
     // HU-1406 · Los créditos con las mismas reglas que el worker: recursos de los idiomas del paquete, sin documentos del
     // cliente. En el bilingüe van en español, el idioma con que abre (HU-0804).
     const idioma = bilingue ? 'es' : doc?.idiomas?.[0] === 'en' ? 'en' : 'es';

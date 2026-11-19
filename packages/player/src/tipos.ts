@@ -148,6 +148,8 @@ export interface CursoReproductor {
   seguimiento: Seguimiento;
   recursos: Recurso[];
   navegacion?: Navegacion;
+  /** SUP-104 · Términos del glosario del curso (se ven si `navegacion.mostrar` incluye «glosario»). */
+  glosario?: { id: string; termino: TextoI18n; definicion: TextoI18n }[];
 }
 
 /** HU-1406 · Una fila de los créditos: qué se generó con IA, con qué proveedor y modelo, y con qué licencia. */

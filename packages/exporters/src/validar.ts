@@ -12,6 +12,7 @@ import { informeAlineacion } from '@aptio/schema/alineacion';
 import type { CursoDoc } from '@aptio/schema/revision';
 import { cursoBilingue, IDIOMAS_BILINGUE, type ModoIdioma, pantallasSinVozIngles, textosEnIngles } from './bilingue.ts';
 import { LEEME_HTML } from './html.ts';
+import { pesoFuentes } from './fuentes.ts';
 import { indexHtml, INICIAR_JS } from './scorm12.ts';
 import { manifiestoScorm12 } from './manifiesto.ts';
 
@@ -64,6 +65,8 @@ export interface OpcionesValidacion {
   modoIdioma?: ModoIdioma;
   /** HU-0804 · Textos en Desborde sin revisar (filas de Traduccion), para advertir en el bilingüe. */
   desbordes?: number;
+  /** Tipografías del kit: sus archivos van en el paquete y suman al peso. Sin kit, las del kit inicial. */
+  kit?: { tipografias?: { titulos?: string; textos?: string } } | null;
 }
 
 export const MB = 1024 * 1024;
@@ -162,7 +165,7 @@ export function validarExportacion(
     conArchivo.push({ id: r.id, nombre, bytes: p.bytes });
   }
   const datosJs = 40 + Buffer.byteLength(JSON.stringify(curso)) + bytesEnDatos;
-  const fijos = Buffer.byteLength(indexHtml(String(c.id ?? ''), idioma)) + INICIAR_JS.length
+  const fijos = Buffer.byteLength(indexHtml(String(c.id ?? ''), idioma, true)) + INICIAR_JS.length + pesoFuentes(opciones.kit)
     + (html
       ? Buffer.byteLength(LEEME_HTML(String(c.id ?? '')))
       : Buffer.byteLength(manifiestoScorm12({ cursoId: String(c.id ?? 'curso'), titulo: '', masteryscore: null, archivos: conArchivo.map((r) => `recursos/${r.id}.xxxx`) })));
